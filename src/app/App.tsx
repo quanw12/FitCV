@@ -1,20 +1,19 @@
 import { useState } from 'react'
-import AuthScreen from './screens/AuthScreen'
-import Layout from './components/Layout'
-import SeekerDashboard from './screens/SeekerDashboard'
-import AnalyzerScreen from './screens/AnalyzerScreen'
-import ImprovementScreen from './screens/ImprovementScreen'
-import CVHistoryScreen from './screens/CVHistoryScreen'
-import AppTrackerScreen from './screens/AppTrackerScreen'
-import JDLibraryScreen from './screens/JDLibraryScreen'
-import HRDashboard from './screens/HRDashboard'
-import JobPostsScreen from './screens/JobPostsScreen'
-import CVRankingScreen from './screens/CVRankingScreen'
-import PipelineScreen from './screens/PipelineScreen'
-import AutoEmailScreen from './screens/AutoEmailScreen'
-import ReportsScreen from './screens/ReportsScreen'
-
-type Portal = 'seeker' | 'hr'
+import AuthScreen from '@/ui/screens/AuthScreen'
+import Layout from '@/ui/components/Layout'
+import SeekerDashboard from '@/ui/screens/SeekerDashboard'
+import AnalyzerScreen from '@/ui/screens/AnalyzerScreen'
+import ImprovementScreen from '@/ui/screens/ImprovementScreen'
+import CVHistoryScreen from '@/ui/screens/CVHistoryScreen'
+import AppTrackerScreen from '@/ui/screens/AppTrackerScreen'
+import JDLibraryScreen from '@/ui/screens/JDLibraryScreen'
+import HRDashboard from '@/ui/screens/HRDashboard'
+import JobPostsScreen from '@/ui/screens/JobPostsScreen'
+import CVRankingScreen from '@/ui/screens/CVRankingScreen'
+import PipelineScreen from '@/ui/screens/PipelineScreen'
+import AutoEmailScreen from '@/ui/screens/AutoEmailScreen'
+import ReportsScreen from '@/ui/screens/ReportsScreen'
+import type { Portal, ScreenId } from '@/types/app'
 
 function ProfilePlaceholder() {
   return (
@@ -30,7 +29,7 @@ function defaultScreen(portal: Portal) {
 
 export default function App() {
   const [portal, setPortal] = useState<Portal | null>(null)
-  const [screen, setScreen] = useState<string>('')
+  const [screen, setScreen] = useState<ScreenId | ''>('')
 
   const handleAuth = (role: Portal) => {
     setPortal(role)
@@ -42,7 +41,7 @@ export default function App() {
     setScreen('')
   }
 
-  const handleNavigate = (s: string) => setScreen(s)
+  const handleNavigate = (s: ScreenId) => setScreen(s)
 
   if (!portal) {
     return <AuthScreen onAuth={handleAuth} />

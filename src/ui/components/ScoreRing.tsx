@@ -1,3 +1,5 @@
+import { getScoreTone } from '@/services/matchScore'
+
 interface ScoreRingProps {
   score: number
   size?: number
@@ -10,9 +12,7 @@ export default function ScoreRing({ score, size = 100, strokeWidth = 10, label, 
   const radius = (size - strokeWidth * 2) / 2
   const circumference = 2 * Math.PI * radius
   const dashOffset = circumference - (score / 100) * circumference
-
-  const color = score >= 80 ? '#10B981' : score >= 50 ? '#4F46E5' : '#F59E0B'
-  const trackColor = score >= 80 ? '#D1FAE5' : score >= 50 ? '#EEF2FF' : '#FEF3C7'
+  const { color, trackColor } = getScoreTone(score)
 
   return (
     <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
