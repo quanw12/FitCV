@@ -1,1 +1,6 @@
 node_modules
+FitCV_DB_Schema.docx
+KAN-101_AUTH_ROLE_SELECTION_EXPLAIN.md
+.env.local
+backend/.env
+backend/fitcv_dev.db

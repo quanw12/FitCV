@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { authApi } from '@/api'
 import AuthScreen from '@/ui/screens/AuthScreen'
 import Layout from '@/ui/components/Layout'
 import SeekerDashboard from '@/ui/screens/SeekerDashboard'
@@ -14,6 +15,7 @@ import PipelineScreen from '@/ui/screens/PipelineScreen'
 import AutoEmailScreen from '@/ui/screens/AutoEmailScreen'
 import ReportsScreen from '@/ui/screens/ReportsScreen'
 import type { Portal, ScreenId } from '@/types/app'
+import { portalFromAccountRole, type AuthSession } from '@/types/auth'
 
 function ProfilePlaceholder() {
   return (
@@ -28,23 +30,31 @@ function defaultScreen(portal: Portal) {
 }
 
 export default function App() {
-  const [portal, setPortal] = useState<Portal | null>(null)
-  const [screen, setScreen] = useState<ScreenId | ''>('')
+  const [session, setSession] = useState<AuthSession | null>(() => authApi.getSession())
+  const [screen, setScreen] = useState<ScreenId | ''>(() => {
+    const currentSession = authApi.getSession()
+    return currentSession?.user.role ? defaultScreen(portalFromAccountRole(currentSession.user.role)) : ''
+  })
+  const portal = session?.user.role ? portalFromAccountRole(session.user.role) : null
 
-  const handleAuth = (role: Portal) => {
-    setPortal(role)
-    setScreen(defaultScreen(role))
+  const handleAuth = (nextSession: AuthSession) => {
+    setSession(nextSession)
+    if (nextSession.user.role) {
+      const nextPortal = portalFromAccountRole(nextSession.user.role)
+      setScreen(defaultScreen(nextPortal))
+    }
   }
 
   const handleLogout = () => {
-    setPortal(null)
+    authApi.logout()
+    setSession(null)
     setScreen('')
   }
 
   const handleNavigate = (s: ScreenId) => setScreen(s)
 
-  if (!portal) {
-    return <AuthScreen onAuth={handleAuth} />
+  if (!session || session.requiresRoleSelection || !portal) {
+    return <AuthScreen onAuth={handleAuth} startInRoleSelection={Boolean(session?.requiresRoleSelection)} />
   }
 
   const renderScreen = () => {
@@ -75,7 +85,7 @@ export default function App() {
       currentScreen={screen}
       onNavigate={handleNavigate}
       onLogout={handleLogout}
-      userName={portal === 'seeker' ? 'Nguyen Minh' : 'Tran Huong'}
+      userName={session.user.fullName}
     >
       {renderScreen()}
     </Layout>
