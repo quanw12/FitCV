@@ -161,7 +161,7 @@ Recommended ownership by feature area:
 - `src/services/authValidation.ts` - Auth form validation helpers
 - `backend/app/api/routes/auth.py` - Backend auth endpoints
 - `backend/app/services/auth_service.py` - Backend auth business logic
-- `database/auth_user_schema.sql` - MySQL schema for auth/users
+- `database/full_schema.sql` - Full MySQL schema for FitCV, including auth/users
 - `src/imports/FitCV_Figma_AI_Prompt.md` - Original UI prompt/reference
 - `package.json` - Dependencies and scripts
 - `vite.config.ts` - Vite config

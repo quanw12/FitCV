@@ -10,8 +10,6 @@ import uvicorn
 
 from app.api.routes import auth
 from app.core.config import settings
-from app.db.session import Base, engine
-from app import models as _models
 
 app = FastAPI(title="FitCV API", version="0.1.0")
 
@@ -24,11 +22,6 @@ app.add_middleware(
 )
 
 app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
-
-
-@app.on_event("startup")
-def create_dev_tables() -> None:
-    Base.metadata.create_all(bind=engine)
 
 
 @app.get("/api/health")

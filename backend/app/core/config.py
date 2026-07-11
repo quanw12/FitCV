@@ -1,15 +1,18 @@
-from pydantic_settings import BaseSettings, SettingsConfigDict
 from pathlib import Path
 
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 BACKEND_ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_SQLITE_URL = f"sqlite:///{(BACKEND_ROOT / 'fitcv_dev.db').as_posix()}"
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
+    model_config = SettingsConfigDict(
+        env_file=str(BACKEND_ROOT / ".env"),
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
 
-    database_url: str = DEFAULT_SQLITE_URL
+    database_url: str
     jwt_secret_key: str = "change-me-before-production"
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 60 * 24
