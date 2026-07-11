@@ -30,15 +30,18 @@ CREATE TABLE company (
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
 
 CREATE TABLE account (
-    account_id     BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
-    email          VARCHAR(150) NOT NULL UNIQUE,
-    password_hash  VARCHAR(255) NOT NULL,
-    full_name      VARCHAR(150) NOT NULL,
-    role           ENUM('Student', 'HR', 'HiringManager', 'Admin') NOT NULL,
-    avatar_url     VARCHAR(400) NULL,
-    company_id     BIGINT UNSIGNED NULL,
-    created_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at     DATETIME NULL ON UPDATE CURRENT_TIMESTAMP,
+    account_id             BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+    email                  VARCHAR(150) NOT NULL UNIQUE,
+    password_hash          VARCHAR(255) NULL,
+    full_name              VARCHAR(150) NOT NULL,
+    role                   ENUM('Student', 'HR', 'HiringManager', 'Admin') NULL,
+    avatar_url             VARCHAR(400) NULL,
+    company_id             BIGINT UNSIGNED NULL,
+    auth_provider          ENUM('Password', 'Google') NOT NULL DEFAULT 'Password',
+    reset_token_hash       VARCHAR(255) NULL,
+    reset_token_expires_at DATETIME NULL,
+    created_at             DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at             DATETIME NULL ON UPDATE CURRENT_TIMESTAMP,
 
     CONSTRAINT fk_account_company
         FOREIGN KEY (company_id) REFERENCES company(company_id)
@@ -227,6 +230,8 @@ CREATE TABLE cv_improvement_suggestion (
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
 
 CREATE INDEX idx_account_company_id ON account(company_id);
+CREATE INDEX idx_account_role ON account(role);
+CREATE INDEX idx_account_reset_token_hash ON account(reset_token_hash);
 CREATE INDEX idx_candidate_account_id ON candidate(account_id);
 CREATE INDEX idx_candidate_created_by_hr ON candidate(created_by_hr_account_id);
 CREATE INDEX idx_cv_account_id ON cv(account_id);
