@@ -1,42 +1,14 @@
 import { useState } from 'react'
 import {
-  LayoutDashboard, Zap, Lightbulb, Clock, CheckSquare, BookOpen,
-  User, ChevronLeft, ChevronRight, Bell, Search, LogOut,
-  Briefcase, BarChart3, Users, Mail, FileText, Settings, ChevronDown
+  Zap, ChevronLeft, ChevronRight, Bell, Search, LogOut, ChevronDown
 } from 'lucide-react'
-
-type PortalType = 'seeker' | 'hr'
-
-interface NavItem {
-  icon: React.ReactNode
-  label: string
-  screen: string
-}
-
-const seekerNav: NavItem[] = [
-  { icon: <LayoutDashboard size={18} />, label: 'Dashboard', screen: 'seeker-dashboard' },
-  { icon: <Zap size={18} />, label: 'Match Analyzer', screen: 'analyzer' },
-  { icon: <Lightbulb size={18} />, label: 'Improvement Tips', screen: 'improvement' },
-  { icon: <Clock size={18} />, label: 'CV History', screen: 'cv-history' },
-  { icon: <CheckSquare size={18} />, label: 'Application Tracker', screen: 'app-tracker' },
-  { icon: <BookOpen size={18} />, label: 'JD Library', screen: 'jd-library' },
-  { icon: <User size={18} />, label: 'Profile', screen: 'profile' },
-]
-
-const hrNav: NavItem[] = [
-  { icon: <LayoutDashboard size={18} />, label: 'Dashboard', screen: 'hr-dashboard' },
-  { icon: <Briefcase size={18} />, label: 'Job Posts', screen: 'job-posts' },
-  { icon: <FileText size={18} />, label: 'CV Ranking', screen: 'cv-ranking' },
-  { icon: <Users size={18} />, label: 'Pipeline', screen: 'pipeline' },
-  { icon: <Mail size={18} />, label: 'Auto Email', screen: 'auto-email' },
-  { icon: <BarChart3 size={18} />, label: 'Reports', screen: 'reports' },
-  { icon: <Settings size={18} />, label: 'Settings', screen: 'hr-settings' },
-]
+import { getPortalNavigation } from '@/data/navigation'
+import type { Portal, ScreenId } from '@/types/app'
 
 interface LayoutProps {
-  portal: PortalType
-  currentScreen: string
-  onNavigate: (screen: string) => void
+  portal: Portal
+  currentScreen: ScreenId | ''
+  onNavigate: (screen: ScreenId) => void
   onLogout: () => void
   children: React.ReactNode
   userName?: string
@@ -46,7 +18,7 @@ export default function Layout({ portal, currentScreen, onNavigate, onLogout, ch
   const [collapsed, setCollapsed] = useState(false)
   const [showUserMenu, setShowUserMenu] = useState(false)
 
-  const navItems = portal === 'seeker' ? seekerNav : hrNav
+  const navItems = getPortalNavigation(portal)
   const portalLabel = portal === 'seeker' ? 'Job Seeker' : 'HR Recruiter'
   const avatarInitials = userName.split(' ').map(n => n[0]).join('').slice(0, 2)
 
