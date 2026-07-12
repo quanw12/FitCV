@@ -9,7 +9,12 @@ const breakdowns = [
   { label: 'Soft Skills', score: 62, color: '#F59E0B', track: '#FEF3C7' },
 ]
 
-export default function AnalyzerScreen() {
+interface AnalyzerScreenProps {
+  onAnalysisComplete?: (matchResultId: string) => void
+  onViewSuggestions?: () => void
+}
+
+export default function AnalyzerScreen({ onAnalysisComplete, onViewSuggestions }: AnalyzerScreenProps) {
   const [analyzed, setAnalyzed] = useState(false)
   const [loading, setLoading] = useState(false)
   const [cvFile, setCvFile] = useState<string | null>(null)
@@ -18,7 +23,12 @@ export default function AnalyzerScreen() {
 
   const handleAnalyze = () => {
     setLoading(true)
-    setTimeout(() => { setLoading(false); setAnalyzed(true) }, 1800)
+    setTimeout(() => {
+      setLoading(false)
+      setAnalyzed(true)
+      // Temporary adapter until the Analyzer backend returns its real matchResultId.
+      onAnalysisComplete?.('demo')
+    }, 1800)
   }
 
   return (
@@ -187,6 +197,11 @@ export default function AnalyzerScreen() {
                 ))}
               </div>
             </div>
+            {onViewSuggestions && (
+              <button className="fitcv-btn-primary" onClick={onViewSuggestions} style={{ marginTop: 18 }}>
+                View improvement suggestions
+              </button>
+            )}
           </div>
         </div>
       )}

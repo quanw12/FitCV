@@ -35,6 +35,7 @@ export default function App() {
     const currentSession = authApi.getSession()
     return currentSession?.user.role ? defaultScreen(portalFromAccountRole(currentSession.user.role)) : ''
   })
+  const [improvementMatchResultId, setImprovementMatchResultId] = useState<string | null>('demo')
   const portal = session?.user.role ? portalFromAccountRole(session.user.role) : null
 
   const handleAuth = (nextSession: AuthSession) => {
@@ -61,8 +62,8 @@ export default function App() {
     switch (screen) {
       // Seeker
       case 'seeker-dashboard': return <SeekerDashboard onNavigate={handleNavigate} />
-      case 'analyzer': return <AnalyzerScreen />
-      case 'improvement': return <ImprovementScreen />
+      case 'analyzer': return <AnalyzerScreen onAnalysisComplete={setImprovementMatchResultId} onViewSuggestions={() => setScreen('improvement')} />
+      case 'improvement': return <ImprovementScreen matchResultId={improvementMatchResultId ?? 'demo'} />
       case 'cv-history': return <CVHistoryScreen />
       case 'app-tracker': return <AppTrackerScreen />
       case 'jd-library': return <JDLibraryScreen />

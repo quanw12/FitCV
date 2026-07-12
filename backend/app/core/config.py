@@ -20,6 +20,9 @@ class Settings(BaseSettings):
     google_client_id: str | None = None
     resend_api_key: str | None = None
     resend_from_email: str | None = None
+    improvement_provider: str = "fixture"
+    gemini_api_key: str | None = None
+    gemini_model: str = "gemini-2.5-flash"
     cors_origins: list[str] = ["http://localhost:5173", "http://127.0.0.1:5173"]
 
 
