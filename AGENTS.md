@@ -23,16 +23,47 @@ A Vite development server is usually running in the Figma Make environment on `$
 - Preview URL: available through the preview panel
 - Hot reload: source changes reflect automatically
 
-## Important Project Documents
+## Project Context Sources
 
-Read the docs before making architecture, data, or product decisions:
+The original planning documents have been removed from this repository. Use these files as the current source of project context:
 
-- `docs/FitCV_Project_Proposal.docx`
-- `docs/FitCV_Use_Case_Specification.docx`
-- `docs/FitCV_DB_Schema.docx`
-- `docs/FitCV_Shared_Design_System.docx`
-- `docs/Project plan_Group06.docx`
-- `docs/Vision document_Group06.docx`
+- `AGENTS.md` - product summary, architecture direction, layer rules, ownership notes, and AI prompt guidance.
+- `README.md` - setup instructions, environment variables, run commands, and troubleshooting.
+- `database/full_schema.sql` - current database schema source.
+- Existing source files in `src/` and `backend/` - current implementation details.
+
+## Required Context Before Coding
+
+Every team member or AI assistant must do this before changing code:
+
+1. Read `AGENTS.md` completely.
+2. Read `README.md` for local setup, environment variables, and run commands.
+3. Read `database/full_schema.sql` before changing database models, repositories, migrations, or auth/user fields.
+4. Inspect the existing files in the target layer before adding new files or abstractions.
+5. Check current Git state and do not overwrite unrelated work.
+6. Keep production code in the established layers. Do not create member-specific folders for application code.
+
+For Auth & Role Selection work, also inspect:
+
+- `src/ui/screens/AuthScreen.tsx`
+- `src/api/authApi.ts`
+- `src/types/auth.ts`
+- `src/services/authValidation.ts`
+- `backend/app/api/routes/auth.py`
+- `backend/app/services/auth_service.py`
+- `backend/app/services/email_service.py`
+- `backend/app/schemas/auth.py`
+- `backend/app/models/account.py`
+- `database/full_schema.sql`
+
+Current auth behavior:
+
+- Account roles follow the database enum: `Student`, `HR`, `HiringManager`, `Admin`.
+- Frontend portals remain `seeker` and `hr`; `HR`, `HiringManager`, and `Admin` route to the HR portal.
+- Google sign-in uses Google Identity Services on the frontend and backend ID-token verification with `GOOGLE_CLIENT_ID`.
+- Forgot/reset password uses a 6-digit verification code. The backend stores only the hash in `account.reset_token_hash` and expiry in `account.reset_token_expires_at`.
+- If email sending is not configured, reset codes are printed in the backend terminal as `PASSWORD_RESET_CODE`.
+- Do not reintroduce reset links or UI-exposed reset tokens unless the team explicitly changes the auth design.
 
 Core MVP use cases:
 
@@ -240,10 +271,14 @@ If dependencies are missing, run `npm install` first.
 When another coding agent or AI model is used in this repo, prompt it with:
 
 - "Read `AGENTS.md` first."
-- "Read the relevant docs in `docs/` before changing architecture or product behavior."
+- "Read `README.md` before running the project."
+- "Use `AGENTS.md`, `README.md`, and `database/full_schema.sql` as the current context sources."
+- "Inspect existing files in the target layer before editing."
 - "Follow the FitCV modular monolith direction unless explicitly told otherwise."
 - "Keep frontend code organized by layer under `src/app`, `src/ui`, `src/api`, `src/services`, `src/data`, and `src/types`."
+- "Keep backend code organized under `backend/app/api`, `core`, `db`, `models`, `repositories`, `schemas`, `services`, and `middleware`."
 - "Do not overwrite unrelated work or user changes."
+- "For auth, preserve the 4 database roles and the 6-digit reset-code flow."
 
 ## Prompt Templates For Members
 
@@ -252,16 +287,17 @@ Use these prompt starters when a team member asks another agent/model to work in
 Phuc Khang - Team Lead / Integration:
 
 ```text
-Read AGENTS.md first. I am working on FitCV integration/auth/app coordination.
+Read AGENTS.md and README.md first. I am working on FitCV integration/auth/app coordination.
 Follow the layer architecture in src/: app, ui, api, services, data, types.
 For app flow changes, prefer src/app/App.tsx and shared layout/navigation files.
+For auth, preserve 4 DB roles and the 6-digit reset-code flow unless explicitly told otherwise.
 Do not create member folders. Keep code in the correct layer and run npm run build when source changes.
 ```
 
 Gia Thuan - Developer / Student Portal:
 
 ```text
-Read AGENTS.md first. I am working on the Job Seeker portal features:
+Read AGENTS.md and README.md first. I am working on the Job Seeker portal features:
 CV & JD Match Analyzer, Application Tracker, JD Library, and CV History.
 UI screens belong in src/ui/screens. Reusable UI goes in src/ui/components.
 Move shared mock data/config to src/data, score or validation logic to src/services,
@@ -271,7 +307,7 @@ and shared types to src/types. Preserve PDF/DOCX max 10MB upload rules.
 Anh Quan - Developer / HR and AI Workflow:
 
 ```text
-Read AGENTS.md first. I am working on AI suggestions and HR workflows:
+Read AGENTS.md and README.md first. I am working on AI suggestions and HR workflows:
 Improvement Suggestions, Job Post Management, Candidate Pipeline, and Auto Email.
 Keep HR UI in src/ui/screens, workflow/display logic in src/services,
 API contracts in src/api, and shared domain types in src/types.
@@ -281,8 +317,8 @@ AI email must stay review-first: AI drafts, HR reviews, HR approves before sendi
 Anh Kiet - BA / Tester:
 
 ```text
-Read AGENTS.md first. I am validating FitCV requirements and test cases.
-Map behavior back to docs in docs/: proposal, use case specification, vision,
-database schema, and design system. Check happy path, empty, loading, error,
+Read AGENTS.md and README.md first. I am validating FitCV requirements and test cases.
+Map behavior back to AGENTS.md, README.md, database/full_schema.sql,
+and existing source files. Check happy path, empty, loading, error,
 role/permission behavior, and whether files are placed in the correct src layer.
 ```
