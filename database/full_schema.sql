@@ -217,16 +217,35 @@ CREATE TABLE match_result (
 CREATE TABLE cv_improvement_suggestion (
     suggestion_id    BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
     match_result_id  BIGINT UNSIGNED NOT NULL,
+    suggestion_type  ENUM('SkillGap', 'SectionFeedback', 'Rewrite', 'QuickWin') NOT NULL,
     category         ENUM('Skill', 'Experience', 'Education', 'Keyword', 'Format', 'Other') NOT NULL,
+    section          VARCHAR(50) NULL,
     original_text    LONGTEXT NULL,
     suggested_text   LONGTEXT NULL,
     explanation      LONGTEXT NULL,
     priority         ENUM('Low', 'Medium', 'High') NOT NULL DEFAULT 'Medium',
+    sort_order       INT NOT NULL DEFAULT 0,
+    metadata_json    JSON NULL,
     created_at       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT fk_cv_improvement_suggestion_match_result
         FOREIGN KEY (match_result_id) REFERENCES match_result(match_result_id)
         ON DELETE CASCADE
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
+
+CREATE TABLE ai_task (
+    ai_task_id    BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+    task_type     VARCHAR(50) NOT NULL,
+    resource_id   BIGINT UNSIGNED NOT NULL,
+    status        ENUM('Pending', 'Processing', 'Success', 'Failed') NOT NULL DEFAULT 'Pending',
+    provider      VARCHAR(50) NULL,
+    model_name    VARCHAR(100) NULL,
+    error_message VARCHAR(1000) NULL,
+    created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    started_at    DATETIME NULL,
+    completed_at  DATETIME NULL,
+
+    INDEX idx_ai_task_resource (task_type, resource_id, created_at)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
 
 CREATE INDEX idx_account_company_id ON account(company_id);
@@ -243,3 +262,4 @@ CREATE INDEX idx_application_candidate_id ON application(candidate_id);
 CREATE INDEX idx_application_job_id ON application(job_id);
 CREATE INDEX idx_match_result_cv_job ON match_result(cv_id, job_id);
 CREATE INDEX idx_cv_improvement_suggestion_match_result_id ON cv_improvement_suggestion(match_result_id);
+CREATE INDEX idx_suggestion_match_type_order ON cv_improvement_suggestion(match_result_id, suggestion_type, sort_order);

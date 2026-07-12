@@ -1,206 +1,214 @@
-import { useState } from 'react'
-import { CheckSquare, Square, ChevronDown, ChevronUp, Lightbulb, ArrowRight } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import type { ReactNode } from 'react'
+import { AlertCircle, CheckSquare, ChevronDown, ChevronUp, Clipboard, Lightbulb, RefreshCw, Square } from 'lucide-react'
+import { fitcvApi } from '@/api/fitcvApi'
+import type { CvSection, ImprovementReport, ImprovementReportResponse, SuggestionPriority } from '@/types/improvement'
 
-const toc = ['Skill Gap Report', 'Work Experience', 'Skills Section', 'Education', 'Summary', 'Quick Wins']
+const priorityRank: Record<SuggestionPriority, number> = { High: 0, Medium: 1, Low: 2 }
+const sectionLabel: Record<CvSection, string> = {
+  Summary: 'Summary', WorkExperience: 'Work Experience', Skills: 'Skills',
+  Education: 'Education', Projects: 'Projects', Other: 'Other',
+}
 
-const missingSkills = [
-  { skill: 'Docker', priority: 'High', level: 90 },
-  { skill: 'Kubernetes', priority: 'High', level: 85 },
-  { skill: 'Redis', priority: 'Medium', level: 65 },
-  { skill: 'Microservices', priority: 'Medium', level: 60 },
-  { skill: 'CI/CD Pipeline', priority: 'Medium', level: 55 },
-  { skill: 'GraphQL', priority: 'Low', level: 30 },
-]
+interface ImprovementScreenProps {
+  matchResultId?: string | null
+}
 
-const feedbackItems = [
-  {
-    section: 'Work Experience',
-    before: 'Responsible for developing backend features and fixing bugs in the main application.',
-    after: 'Engineered and deployed 12 RESTful microservices handling 50K+ daily transactions, reducing API response time by 40% through Redis caching and PostgreSQL query optimization.',
-    issue: 'Vague responsibility statement with no measurable impact.',
-  },
-  {
-    section: 'Work Experience',
-    before: 'Worked with team to build new features and improve code quality.',
-    after: 'Collaborated with a cross-functional team of 8 engineers to ship 3 major product features (Q3 2024), achieving 98.5% uptime and zero critical incidents post-launch.',
-    issue: 'Missing team size, features delivered, and outcome metrics.',
-  },
-]
+function priorityBadge(priority: SuggestionPriority): string {
+  return priority === 'High' ? 'badge-red' : priority === 'Medium' ? 'badge-amber' : 'badge-indigo'
+}
 
-const quickWins = [
-  { text: 'Add "Docker" to skills section', done: false },
-  { text: 'Include GitHub profile link', done: true },
-  { text: 'Add quantified metrics to 2 bullet points', done: false },
-  { text: 'Remove "References available upon request"', done: true },
-  { text: 'Shorten summary to under 3 sentences', done: false },
-  { text: 'Add LinkedIn URL to contact section', done: false },
-]
+function scoreLabel(score: number): string {
+  return score >= 80 ? 'Strong Match' : score >= 50 ? 'Moderate Match' : 'Weak Match'
+}
 
-export default function ImprovementScreen() {
-  const [activeSection, setActiveSection] = useState('Skill Gap Report')
-  const [expanded, setExpanded] = useState<number[]>([0, 1])
-  const [wins, setWins] = useState(quickWins)
+export default function ImprovementScreen({ matchResultId = 'demo' }: ImprovementScreenProps) {
+  const [response, setResponse] = useState<ImprovementReportResponse | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [expanded, setExpanded] = useState<Set<string>>(new Set())
+  const [completedWins, setCompletedWins] = useState<Set<string>>(new Set())
+  const [copyMessage, setCopyMessage] = useState<Record<string, string>>({})
+  const cancelledRef = useRef(false)
 
-  const toggleExpanded = (i: number) => setExpanded(p => p.includes(i) ? p.filter(x => x !== i) : [...p, i])
-  const toggleWin = (i: number) => setWins(p => p.map((w, idx) => idx === i ? { ...w, done: !w.done } : w))
+  const loadReport = useCallback(async (regenerate = false) => {
+    if (!matchResultId) {
+      setLoading(false)
+      setResponse(null)
+      return
+    }
+    setLoading(true)
+    setError(null)
+    setCompletedWins(new Set())
+    try {
+      let current = await fitcvApi.getImprovementReport(matchResultId)
+      if (current.status === 'Pending' && !current.report) {
+        await fitcvApi.generateImprovementReport(matchResultId, regenerate)
+      } else if (regenerate) {
+        await fitcvApi.generateImprovementReport(matchResultId, true)
+        current = { ...current, status: 'Pending', report: null }
+      }
+
+      for (let attempt = 0; attempt < 30 && ['Pending', 'Processing'].includes(current.status); attempt += 1) {
+        if (cancelledRef.current) return
+        setResponse(current)
+        await new Promise(resolve => window.setTimeout(resolve, 2000))
+        if (cancelledRef.current) return
+        current = await fitcvApi.getImprovementReport(matchResultId)
+      }
+      if (['Pending', 'Processing'].includes(current.status)) throw new Error('Analysis is taking longer than expected. Please retry shortly.')
+      if (current.status === 'Failed') throw new Error(current.errorMessage ?? 'AI suggestions could not be generated.')
+      if (!cancelledRef.current) setResponse(current)
+    } catch (caught) {
+      if (!cancelledRef.current) setError(caught instanceof Error ? caught.message : 'Unable to load improvement suggestions.')
+    } finally {
+      if (!cancelledRef.current) setLoading(false)
+    }
+  }, [matchResultId])
+
+  useEffect(() => {
+    cancelledRef.current = false
+    void loadReport()
+    return () => { cancelledRef.current = true }
+  }, [loadReport])
+
+  const report = response?.report
+  const skillGaps = useMemo(() => [...(report?.skillGaps ?? [])].sort((a, b) => priorityRank[a.priority] - priorityRank[b.priority]), [report])
+  const feedback = useMemo(() => [...(report?.sectionFeedback ?? [])].sort((a, b) => priorityRank[a.priority] - priorityRank[b.priority]), [report])
+  const rewrites = report?.rewriteSuggestions ?? []
+  const quickWins = useMemo(() => [...(report?.quickWins ?? [])].sort((a, b) => priorityRank[a.priority] - priorityRank[b.priority]), [report])
+  const sections = useMemo(() => Array.from(new Set([...feedback.map(item => item.section), ...rewrites.map(item => item.section)])), [feedback, rewrites])
+
+  const toggleExpanded = (id: string) => setExpanded(previous => {
+    const next = new Set(previous)
+    next.has(id) ? next.delete(id) : next.add(id)
+    return next
+  })
+
+  const toggleWin = (id: string) => setCompletedWins(previous => {
+    const next = new Set(previous)
+    next.has(id) ? next.delete(id) : next.add(id)
+    return next
+  })
+
+  const copyRewrite = async (id: string, value: string) => {
+    try {
+      await navigator.clipboard.writeText(value)
+      setCopyMessage(previous => ({ ...previous, [id]: 'Copied' }))
+    } catch {
+      setCopyMessage(previous => ({ ...previous, [id]: 'Copy failed' }))
+    }
+    window.setTimeout(() => setCopyMessage(previous => ({ ...previous, [id]: '' })), 1800)
+  }
+
+  const isProcessing = loading || response?.status === 'Pending' || response?.status === 'Processing'
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '220px 1fr', gap: 20 }}>
-      {/* Sidebar TOC */}
-      <div className="fitcv-card" style={{ padding: 16, alignSelf: 'start', position: 'sticky', top: 0 }}>
-        <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>Contents</div>
-        {toc.map(s => (
-          <button
-            key={s}
-            onClick={() => setActiveSection(s)}
-            style={{
-              width: '100%', textAlign: 'left', padding: '8px 12px', borderRadius: 8, border: 'none',
-              background: activeSection === s ? 'var(--indigo-light)' : 'transparent',
-              color: activeSection === s ? 'var(--indigo)' : 'var(--text-secondary)',
-              fontSize: 13, fontWeight: activeSection === s ? 600 : 400, cursor: 'pointer', marginBottom: 2,
-              transition: 'all 0.15s',
-            }}
-          >
-            {s}
-          </button>
-        ))}
-
-        {/* Score summary */}
-        <div style={{ marginTop: 16, padding: '12px', background: 'var(--bg)', borderRadius: 10 }}>
-          <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 8, fontWeight: 600 }}>Overall CV Score</div>
-          {[['Relevance', 78], ['Format', 84], ['Impact', 62], ['Keywords', 70]].map(([l, v]) => (
-            <div key={l} style={{ marginBottom: 6 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
-                <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{l}</span>
-                <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-primary)' }}>{v}%</span>
-              </div>
-              <div style={{ height: 4, borderRadius: 2, background: '#E5E7EB', overflow: 'hidden' }}>
-                <div style={{ width: `${v}%`, height: '100%', background: Number(v) >= 80 ? '#10B981' : Number(v) >= 65 ? '#4F46E5' : '#F59E0B', borderRadius: 2 }} />
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Main content */}
-      <div>
-        <div style={{ marginBottom: 20 }}>
-          <h1 style={{ fontSize: 22, fontWeight: 800, color: 'var(--text-primary)', marginBottom: 4 }}>AI Improvement Suggestions</h1>
-          <p style={{ color: 'var(--text-secondary)', fontSize: 14 }}>For: <strong>VNG Corp — Senior Backend Developer</strong></p>
-        </div>
-
-        {/* Skill gap report */}
-        <div className="fitcv-card" style={{ padding: 24, marginBottom: 16 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
-            <div style={{ width: 36, height: 36, borderRadius: 10, background: '#FEF3C7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Lightbulb size={18} color="#F59E0B" />
-            </div>
-            <h3 style={{ fontSize: 17, fontWeight: 700, color: 'var(--text-primary)' }}>Skill Gap Report</h3>
-            <span className="badge-amber" style={{ marginLeft: 'auto' }}>6 gaps found</span>
+    <div className="improvement-layout">
+      <aside className="fitcv-card improvement-sidebar" aria-label="Improvement report contents">
+        <div className="improvement-eyebrow">Contents</div>
+        <a href="#skill-gaps">Skill Gap Report</a>
+        {sections.map(section => <a key={section} href={`#section-${section}`}>{sectionLabel[section]}</a>)}
+        <a href="#rewrites">Rewrite Suggestions</a>
+        <a href="#quick-wins">Quick Wins</a>
+        {response?.overallScore != null && (
+          <div className="improvement-score" aria-label={`Overall score ${response.overallScore}, ${scoreLabel(response.overallScore)}`}>
+            <span>Overall Match</span><strong>{response.overallScore}%</strong>
+            <small>{scoreLabel(response.overallScore)}</small>
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {missingSkills.map(s => (
-              <div key={s.skill} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', background: 'var(--bg)', borderRadius: 10 }}>
-                <span className={s.priority === 'High' ? 'badge-red' : s.priority === 'Medium' ? 'badge-amber' : 'badge-indigo'} style={{ minWidth: 60, justifyContent: 'center' }}>
-                  {s.priority}
-                </span>
-                <span style={{ fontWeight: 600, fontSize: 14, color: 'var(--text-primary)', flex: 1 }}>{s.skill}</span>
-                <div style={{ width: 100, height: 6, borderRadius: 3, background: '#E5E7EB', overflow: 'hidden' }}>
-                  <div style={{ width: `${s.level}%`, height: '100%', background: s.priority === 'High' ? '#EF4444' : s.priority === 'Medium' ? '#F59E0B' : '#4F46E5', borderRadius: 3 }} />
-                </div>
-                <span style={{ fontSize: 12, color: 'var(--text-secondary)', width: 40, textAlign: 'right' }}>{s.level}% demand</span>
-              </div>
-            ))}
+        )}
+      </aside>
+
+      <main className="improvement-content">
+        <header className="improvement-header">
+          <div>
+            <h1>AI Improvement Suggestions</h1>
+            <p>Prioritized recommendations for the selected CV and job description.</p>
           </div>
+          {matchResultId && <button className="fitcv-btn-secondary" onClick={() => void loadReport(true)} disabled={isProcessing}><RefreshCw size={15} /> Regenerate</button>}
+        </header>
+
+        <div className="improvement-disclaimer" role="note">
+          <AlertCircle size={18} aria-hidden="true" />
+          <span>AI suggestions support your review and do not guarantee a hiring outcome. Verify every fact and replace placeholders only with accurate information.</span>
         </div>
 
-        {/* Before/after comparisons */}
-        <div className="fitcv-card" style={{ padding: 24, marginBottom: 16 }}>
-          <h3 style={{ fontSize: 17, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 16 }}>Section Feedback</h3>
-          {feedbackItems.map((item, i) => (
-            <div key={i} style={{ marginBottom: 16 }}>
-              <button
-                onClick={() => toggleExpanded(i)}
-                style={{
-                  width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                  padding: '12px 16px', borderRadius: 10, border: '1px solid var(--border)',
-                  background: expanded.includes(i) ? 'var(--bg)' : 'white', cursor: 'pointer',
-                  transition: 'all 0.15s',
-                }}
-              >
-                <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>{item.section} — Bullet #{i + 1}</span>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span className="badge-red">Weak impact</span>
-                  {expanded.includes(i) ? <ChevronUp size={16} color="var(--text-muted)" /> : <ChevronDown size={16} color="var(--text-muted)" />}
-                </div>
-              </button>
+        {!matchResultId && <StateCard title="No analysis selected" message="Run a CV and JD analysis, then open its improvement report." />}
+        {isProcessing && <StateCard title="Generating your report" message="FitCV is reviewing skill gaps and CV sections. This can take a few moments." loading />}
+        {error && <StateCard title="Suggestions unavailable" message={error} action={<button className="fitcv-btn-primary" onClick={() => void loadReport(true)}>Retry</button>} />}
+        {response?.stale && <div className="improvement-warning">This report may be outdated because the CV or job description changed. Regenerate it for current advice.</div>}
 
-              {expanded.includes(i) && (
-                <div style={{ padding: '16px', border: '1px solid var(--border)', borderTop: 'none', borderRadius: '0 0 10px 10px', background: 'white' }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: '#EF4444', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Issue</div>
-                  <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 14, padding: '8px 12px', background: '#FEF2F2', borderRadius: 6, borderLeft: '3px solid #EF4444' }}>
-                    {item.issue}
-                  </div>
-
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                    <div>
-                      <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
-                        BEFORE
-                      </div>
-                      <div style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.6, padding: '10px 12px', background: '#F9FAFB', borderRadius: 8, textDecoration: 'line-through', textDecorationColor: '#EF4444' }}>
-                        {item.before}
-                      </div>
-                    </div>
-                    <div>
-                      <div style={{ fontSize: 11, fontWeight: 700, color: '#10B981', marginBottom: 6 }}>AI REWRITE</div>
-                      <div style={{ fontSize: 13, color: 'var(--text-primary)', lineHeight: 1.6, padding: '10px 12px', background: '#F0FDF4', borderRadius: 8, border: '1px solid #BBF7D0' }}>
-                        {item.after}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-                    <span style={{ fontSize: 11, fontWeight: 600, padding: '3px 8px', borderRadius: 4, background: '#EEF2FF', color: '#4F46E5' }}>Problem</span>
-                    <ArrowRight size={12} color="var(--text-muted)" style={{ alignSelf: 'center' }} />
-                    <span style={{ fontSize: 11, fontWeight: 600, padding: '3px 8px', borderRadius: 4, background: '#F0FDF4', color: '#10B981' }}>Action</span>
-                    <ArrowRight size={12} color="var(--text-muted)" style={{ alignSelf: 'center' }} />
-                    <span style={{ fontSize: 11, fontWeight: 600, padding: '3px 8px', borderRadius: 4, background: '#FEF3C7', color: '#92400E' }}>Result</span>
-                  </div>
+        {!isProcessing && !error && report && (
+          <>
+            <section id="skill-gaps" className="fitcv-card improvement-section">
+              <SectionTitle icon={<Lightbulb size={18} />} title="Skill Gap Report" count={skillGaps.length} />
+              {skillGaps.length === 0 ? <Empty message="No clear skill gaps were found for this job description." /> : (
+                <div className="improvement-list">
+                  {skillGaps.map(item => (
+                    <article key={item.id} className="skill-gap-item">
+                      <div className="item-heading"><h3>{item.skill}</h3><span className={priorityBadge(item.priority)}>{item.priority} priority</span></div>
+                      <p>{item.reason}</p><blockquote><strong>JD evidence:</strong> {item.jdEvidence}</blockquote>
+                    </article>
+                  ))}
                 </div>
               )}
-            </div>
-          ))}
-        </div>
+            </section>
 
-        {/* Quick wins */}
-        <div className="fitcv-card" style={{ padding: 24 }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-            <h3 style={{ fontSize: 17, fontWeight: 700, color: 'var(--text-primary)' }}>⚡ Quick Wins Checklist</h3>
-            <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>{wins.filter(w => w.done).length}/{wins.length} done</span>
-          </div>
-          <div style={{ height: 6, borderRadius: 3, background: '#E5E7EB', overflow: 'hidden', marginBottom: 16 }}>
-            <div style={{ width: `${(wins.filter(w => w.done).length / wins.length) * 100}%`, height: '100%', background: '#10B981', borderRadius: 3, transition: 'width 0.3s ease' }} />
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {wins.map((w, i) => (
-              <button
-                key={i}
-                onClick={() => toggleWin(i)}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', borderRadius: 10,
-                  border: '1px solid var(--border)', background: w.done ? '#F0FDF4' : 'white', cursor: 'pointer',
-                  transition: 'all 0.15s', textAlign: 'left',
-                }}
-              >
-                {w.done ? <CheckSquare size={18} color="#10B981" /> : <Square size={18} color="var(--text-muted)" />}
-                <span style={{ fontSize: 14, color: w.done ? 'var(--text-muted)' : 'var(--text-primary)', textDecoration: w.done ? 'line-through' : 'none', fontWeight: 500 }}>
-                  {w.text}
-                </span>
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
+            <section className="fitcv-card improvement-section">
+              <SectionTitle title="Section-by-section Feedback" count={feedback.length} />
+              {feedback.length === 0 ? <Empty message="No section-specific feedback is available." /> : feedback.map(item => (
+                <article id={`section-${item.section}`} key={item.id} className="feedback-item">
+                  <button onClick={() => toggleExpanded(item.id)} aria-expanded={expanded.has(item.id)} aria-controls={`feedback-${item.id}`}>
+                    <span>{sectionLabel[item.section]} — {item.issue}</span>
+                    <span className={priorityBadge(item.priority)}>{item.priority}</span>
+                    {expanded.has(item.id) ? <ChevronUp size={17} /> : <ChevronDown size={17} />}
+                  </button>
+                  {expanded.has(item.id) && <div id={`feedback-${item.id}`} className="feedback-detail"><p>{item.explanation}</p><strong>Recommended action</strong><p>{item.suggestedAction}</p></div>}
+                </article>
+              ))}
+            </section>
+
+            <section id="rewrites" className="fitcv-card improvement-section">
+              <SectionTitle title="Rewrite Suggestions" count={rewrites.length} />
+              {rewrites.length === 0 ? <Empty message="No safe rewrite suggestions are available." /> : rewrites.map(item => (
+                <article key={item.id} className="rewrite-item">
+                  <div className="item-heading"><h3>{sectionLabel[item.section]}</h3><span>{item.framework}</span></div>
+                  <p className="rewrite-issue"><strong>Issue:</strong> {item.issue}</p>
+                  <div className="rewrite-grid">
+                    <div><small>Before</small><p className="rewrite-before">{item.originalText}</p></div>
+                    <div><small>Suggested rewrite</small><p className="rewrite-after">{item.suggestedText}</p></div>
+                  </div>
+                  <div className="copy-row"><button className="fitcv-btn-secondary" onClick={() => void copyRewrite(item.id, item.suggestedText)} aria-label={`Copy rewrite for ${sectionLabel[item.section]}`}><Clipboard size={14} /> Copy rewrite</button><span role="status">{copyMessage[item.id]}</span></div>
+                </article>
+              ))}
+            </section>
+
+            <section id="quick-wins" className="fitcv-card improvement-section">
+              <SectionTitle title="Quick Wins Checklist" count={quickWins.length} />
+              {quickWins.length > 0 && <><div className="quick-progress"><div style={{ width: `${(completedWins.size / quickWins.length) * 100}%` }} /></div><p className="progress-label">{completedWins.size}/{quickWins.length} completed</p></>}
+              {quickWins.length === 0 ? <Empty message="No quick wins are available for this report." /> : quickWins.map(item => {
+                const done = completedWins.has(item.id)
+                return <button key={item.id} className={`quick-win ${done ? 'done' : ''}`} onClick={() => toggleWin(item.id)} aria-pressed={done}>
+                  {done ? <CheckSquare size={19} /> : <Square size={19} />}
+                  <span><strong>{item.title}</strong><small>{item.category} · {item.priority} priority — {item.explanation}</small></span>
+                </button>
+              })}
+            </section>
+          </>
+        )}
+      </main>
     </div>
   )
+}
+
+function SectionTitle({ title, count, icon }: { title: string; count: number; icon?: ReactNode }) {
+  return <div className="section-title">{icon}<h2>{title}</h2><span>{count} items</span></div>
+}
+
+function Empty({ message }: { message: string }) {
+  return <div className="improvement-empty">{message}</div>
+}
+
+function StateCard({ title, message, loading, action }: { title: string; message: string; loading?: boolean; action?: ReactNode }) {
+  return <div className="fitcv-card improvement-state" role="status">{loading && <div className="state-spinner" />}<h2>{title}</h2><p>{message}</p>{action}</div>
 }
