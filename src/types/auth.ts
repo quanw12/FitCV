@@ -2,7 +2,7 @@ import type { Portal } from '@/types/app'
 
 export type AccountRole = 'Student' | 'HR' | 'HiringManager' | 'Admin'
 export type AuthProvider = 'Password' | 'Google'
-export type AuthMode = 'login' | 'register' | 'forgot' | 'reset'
+export type AuthMode = 'login' | 'register' | 'forgot' | 'verify' | 'reset'
 
 export interface AuthUser {
   accountId: string
@@ -33,9 +33,7 @@ export interface LoginRequest {
 
 export interface OAuthLoginRequest {
   provider: 'google'
-  email: string
-  fullName: string
-  avatarUrl?: string | null
+  credential: string
 }
 
 export interface SelectRoleRequest {
@@ -48,11 +46,20 @@ export interface ForgotPasswordRequest {
 
 export interface ForgotPasswordResponse {
   message: string
-  resetToken?: string | null
+}
+
+export interface VerifyResetCodeRequest {
+  email: string
+  code: string
+}
+
+export interface VerifyResetCodeResponse {
+  message: string
 }
 
 export interface ResetPasswordRequest {
-  token: string
+  email: string
+  code: string
   password: string
 }
 
@@ -60,6 +67,7 @@ export interface AuthFormErrors {
   email?: string
   password?: string
   fullName?: string
+  code?: string
   general?: string
 }
 

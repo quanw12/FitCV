@@ -11,12 +11,14 @@ import {
   type RegisterRequest,
   type ResetPasswordRequest,
   type SelectRoleRequest,
+  type VerifyResetCodeRequest,
+  type VerifyResetCodeResponse,
 } from '@/types/auth'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? ''
 const SESSION_KEY = 'fitcv.auth.session'
 const ACCOUNTS_KEY = 'fitcv.auth.accounts'
-const RESET_TOKENS_KEY = 'fitcv.auth.resetTokens'
+const RESET_CODES_KEY = 'fitcv.auth.resetCodes'
 
 interface StoredAccount {
   accountId: string
@@ -28,7 +30,7 @@ interface StoredAccount {
   authProvider: AuthProvider
 }
 
-type ResetTokenRecord = Record<string, string>
+type ResetCodeRecord = Record<string, { accountId: string; code: string; expiresAt: number }>
 
 function canUseStorage() {
   return typeof window !== 'undefined' && typeof window.localStorage !== 'undefined'
@@ -52,6 +54,20 @@ function writeJson<T>(key: string, value: T) {
 
 function simpleHash(input: string) {
   return btoa(unescape(encodeURIComponent(input))).split('').reverse().join('')
+}
+
+function decodeJwtPayload(token: string): Record<string, any> {
+  const payload = token.split('.')[1]
+  if (!payload) throw new Error('Google credential is invalid.')
+  const base64 = payload.replace(/-/g, '+').replace(/_/g, '/')
+  const paddedBase64 = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), '=')
+  const json = decodeURIComponent(
+    atob(paddedBase64)
+      .split('')
+      .map(char => `%${char.charCodeAt(0).toString(16).padStart(2, '0')}`)
+      .join(''),
+  )
+  return JSON.parse(json) as Record<string, any>
 }
 
 function toUser(account: StoredAccount): AuthUser {
@@ -170,16 +186,19 @@ const mockAuthApi = {
   },
 
   async oauthLogin(payload: OAuthLoginRequest): Promise<AuthSession> {
+    const profile = decodeJwtPayload(payload.credential)
+    if (!profile.email) throw new Error('Google credential is missing an email.')
+
     const accounts = readJson<StoredAccount[]>(ACCOUNTS_KEY, [])
-    let account = accounts.find(item => item.email.toLowerCase() === payload.email.toLowerCase())
+    let account = accounts.find(item => item.email.toLowerCase() === String(profile.email).toLowerCase())
     if (!account) {
       account = {
         accountId: crypto.randomUUID(),
-        email: payload.email.toLowerCase(),
+        email: String(profile.email).toLowerCase(),
         passwordHash: null,
-        fullName: payload.fullName.trim(),
+        fullName: String(profile.name ?? profile.email).trim(),
         role: null,
-        avatarUrl: payload.avatarUrl,
+        avatarUrl: typeof profile.picture === 'string' ? profile.picture : null,
         authProvider: 'Google',
       }
       accounts.push(account)
@@ -209,28 +228,44 @@ const mockAuthApi = {
   async forgotPassword(payload: ForgotPasswordRequest): Promise<ForgotPasswordResponse> {
     const accounts = readJson<StoredAccount[]>(ACCOUNTS_KEY, [])
     const account = accounts.find(item => item.email.toLowerCase() === payload.email.toLowerCase())
-    if (!account) return { message: 'If the email exists, a reset link will be sent.' }
+    if (!account) return { message: 'If the email exists, a verification code will be sent.' }
 
-    const token = crypto.randomUUID()
-    const resetTokens = readJson<ResetTokenRecord>(RESET_TOKENS_KEY, {})
-    resetTokens[token] = account.accountId
-    writeJson(RESET_TOKENS_KEY, resetTokens)
-    return { message: 'Password reset token generated for demo.', resetToken: token }
+    const code = String(Math.floor(Math.random() * 1_000_000)).padStart(6, '0')
+    const resetCodes = readJson<ResetCodeRecord>(RESET_CODES_KEY, {})
+    resetCodes[account.email.toLowerCase()] = {
+      accountId: account.accountId,
+      code,
+      expiresAt: Date.now() + 30 * 60 * 1000,
+    }
+    writeJson(RESET_CODES_KEY, resetCodes)
+    console.info(`PASSWORD_RESET_CODE for ${account.email}: ${code}`)
+    return { message: 'If the email exists, a verification code will be sent.' }
+  },
+
+  async verifyResetCode(payload: VerifyResetCodeRequest): Promise<VerifyResetCodeResponse> {
+    const resetCodes = readJson<ResetCodeRecord>(RESET_CODES_KEY, {})
+    const record = resetCodes[payload.email.toLowerCase()]
+    if (!record || record.code !== payload.code || record.expiresAt < Date.now()) {
+      throw new Error('Verification code is invalid or expired.')
+    }
+    return { message: 'Verification code accepted. Choose a new password.' }
   },
 
   async resetPassword(payload: ResetPasswordRequest): Promise<void> {
-    const resetTokens = readJson<ResetTokenRecord>(RESET_TOKENS_KEY, {})
-    const accountId = resetTokens[payload.token]
-    if (!accountId) throw new Error('Reset token is invalid or expired.')
+    const resetCodes = readJson<ResetCodeRecord>(RESET_CODES_KEY, {})
+    const record = resetCodes[payload.email.toLowerCase()]
+    if (!record || record.code !== payload.code || record.expiresAt < Date.now()) {
+      throw new Error('Verification code is invalid or expired.')
+    }
 
     const accounts = readJson<StoredAccount[]>(ACCOUNTS_KEY, [])
-    const account = accounts.find(item => item.accountId === accountId)
+    const account = accounts.find(item => item.accountId === record.accountId)
     if (!account) throw new Error('Account not found.')
 
     account.passwordHash = simpleHash(payload.password)
-    delete resetTokens[payload.token]
+    delete resetCodes[payload.email.toLowerCase()]
     writeJson(ACCOUNTS_KEY, accounts)
-    writeJson(RESET_TOKENS_KEY, resetTokens)
+    writeJson(RESET_CODES_KEY, resetCodes)
   },
 
   logout() {
@@ -268,9 +303,7 @@ export const authApi = {
     if (!shouldUseBackend()) return mockAuthApi.oauthLogin(payload)
     const response = await postJson<any>('/api/auth/oauth/google', {
       provider: payload.provider,
-      email: payload.email,
-      full_name: payload.fullName,
-      avatar_url: payload.avatarUrl,
+      credential: payload.credential,
     })
     const session = normalizeBackendSession(response)
     mockAuthApi.saveSession(session)
@@ -289,7 +322,13 @@ export const authApi = {
   async forgotPassword(payload: ForgotPasswordRequest): Promise<ForgotPasswordResponse> {
     if (!shouldUseBackend()) return mockAuthApi.forgotPassword(payload)
     const response = await postJson<any>('/api/auth/forgot-password', payload)
-    return { message: response.message, resetToken: response.reset_token }
+    return { message: response.message }
+  },
+
+  async verifyResetCode(payload: VerifyResetCodeRequest): Promise<VerifyResetCodeResponse> {
+    if (!shouldUseBackend()) return mockAuthApi.verifyResetCode(payload)
+    const response = await postJson<any>('/api/auth/verify-reset-code', payload)
+    return { message: response.message }
   },
 
   async resetPassword(payload: ResetPasswordRequest): Promise<void> {

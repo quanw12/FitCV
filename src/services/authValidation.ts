@@ -1,4 +1,4 @@
-import type { AuthFormErrors, LoginRequest, RegisterRequest, ResetPasswordRequest } from '@/types/auth'
+import type { AuthFormErrors, LoginRequest, RegisterRequest, ResetPasswordRequest, VerifyResetCodeRequest } from '@/types/auth'
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
@@ -11,6 +11,12 @@ export function validateEmail(email: string) {
 export function validatePassword(password: string) {
   if (!password) return 'Password is required.'
   if (password.length < 8) return 'Password must be at least 8 characters.'
+  return undefined
+}
+
+export function validateResetCode(code: string) {
+  if (!code.trim()) return 'Verification code is required.'
+  if (!/^\d{6}$/.test(code.trim())) return 'Enter the 6-digit verification code.'
   return undefined
 }
 
@@ -37,8 +43,16 @@ export function validateRegister(payload: RegisterRequest): AuthFormErrors {
 
 export function validateResetPassword(payload: ResetPasswordRequest): AuthFormErrors {
   return {
+    email: validateEmail(payload.email),
+    code: validateResetCode(payload.code),
     password: validatePassword(payload.password),
-    general: payload.token.trim() ? undefined : 'Reset token is required.',
+  }
+}
+
+export function validateVerifyResetCode(payload: VerifyResetCodeRequest): AuthFormErrors {
+  return {
+    email: validateEmail(payload.email),
+    code: validateResetCode(payload.code),
   }
 }
 

@@ -14,6 +14,8 @@ from app.schemas.auth import (
     RegisterRequest,
     ResetPasswordRequest,
     SelectRoleRequest,
+    VerifyResetCodeRequest,
+    VerifyResetCodeResponse,
 )
 from app.services import auth_service
 
@@ -37,12 +39,7 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)) -> AuthSession:
 
 @router.post("/oauth/google", response_model=AuthSession)
 def google_oauth_login(payload: OAuthLoginRequest, db: Session = Depends(get_db)) -> AuthSession:
-    return auth_service.oauth_login(
-        db,
-        email=payload.email,
-        full_name=payload.full_name,
-        avatar_url=payload.avatar_url,
-    )
+    return auth_service.oauth_login(db, credential=payload.credential)
 
 
 @router.post("/select-role", response_model=AuthSession)
@@ -61,10 +58,16 @@ def me(account: Account = Depends(get_current_account)) -> Account:
 
 @router.post("/forgot-password", response_model=ForgotPasswordResponse)
 def forgot_password(payload: ForgotPasswordRequest, db: Session = Depends(get_db)) -> ForgotPasswordResponse:
-    message, token = auth_service.start_password_reset(db, email=payload.email)
-    return ForgotPasswordResponse(message=message, reset_token=token)
+    message = auth_service.start_password_reset(db, email=payload.email)
+    return ForgotPasswordResponse(message=message)
+
+
+@router.post("/verify-reset-code", response_model=VerifyResetCodeResponse)
+def verify_reset_code(payload: VerifyResetCodeRequest, db: Session = Depends(get_db)) -> VerifyResetCodeResponse:
+    message = auth_service.verify_password_reset_code(db, email=payload.email, code=payload.code)
+    return VerifyResetCodeResponse(message=message)
 
 
 @router.post("/reset-password", status_code=status.HTTP_204_NO_CONTENT)
 def reset_password(payload: ResetPasswordRequest, db: Session = Depends(get_db)) -> None:
-    auth_service.reset_password(db, token=payload.token, password=payload.password)
+    auth_service.reset_password(db, email=payload.email, code=payload.code, password=payload.password)

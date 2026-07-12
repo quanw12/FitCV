@@ -1,6 +1,6 @@
 from pydantic import BaseModel, EmailStr, Field
 
-from app.models.account import AccountRole
+from app.models.account import AccountRole, AuthProvider
 
 
 class AccountPublic(BaseModel):
@@ -9,6 +9,7 @@ class AccountPublic(BaseModel):
     full_name: str
     role: AccountRole | None = None
     avatar_url: str | None = None
+    auth_provider: AuthProvider
 
     model_config = {"from_attributes": True}
 
@@ -41,16 +42,23 @@ class ForgotPasswordRequest(BaseModel):
 
 class ForgotPasswordResponse(BaseModel):
     message: str
-    reset_token: str | None = None
+
+
+class VerifyResetCodeRequest(BaseModel):
+    email: EmailStr
+    code: str = Field(pattern=r"^\d{6}$")
+
+
+class VerifyResetCodeResponse(BaseModel):
+    message: str
 
 
 class ResetPasswordRequest(BaseModel):
-    token: str
+    email: EmailStr
+    code: str = Field(pattern=r"^\d{6}$")
     password: str = Field(min_length=8, max_length=128)
 
 
 class OAuthLoginRequest(BaseModel):
     provider: str = Field(pattern="^google$")
-    email: EmailStr
-    full_name: str = Field(min_length=2, max_length=150)
-    avatar_url: str | None = None
+    credential: str = Field(min_length=10)

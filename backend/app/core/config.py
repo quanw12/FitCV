@@ -17,6 +17,9 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 60 * 24
     reset_token_expire_minutes: int = 30
+    google_client_id: str | None = None
+    resend_api_key: str | None = None
+    resend_from_email: str | None = None
     cors_origins: list[str] = ["http://localhost:5173", "http://127.0.0.1:5173"]
 
 

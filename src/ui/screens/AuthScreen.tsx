@@ -1,9 +1,33 @@
-import { useState, type CSSProperties, type FormEvent, type ReactNode } from 'react'
-import { ArrowLeft, ArrowRight, Briefcase, Eye, EyeOff, Lock, Mail, RotateCcw, User, Zap } from 'lucide-react'
+import { useEffect, useRef, useState, type CSSProperties, type FormEvent, type ReactNode } from 'react'
+import { ArrowLeft, ArrowRight, Briefcase, Eye, EyeOff, Lock, Mail, RotateCcw, User, Users, Zap } from 'lucide-react'
 import { authApi } from '@/api'
-import { hasAuthErrors, validateEmail, validateLogin, validateRegister, validateResetPassword } from '@/services'
-import type { AuthFormErrors, AuthMode, AuthSession } from '@/types/auth'
-import type { Portal } from '@/types/app'
+import { hasAuthErrors, validateEmail, validateLogin, validateRegister, validateResetPassword, validateVerifyResetCode } from '@/services'
+import type { AccountRole, AuthFormErrors, AuthMode, AuthSession } from '@/types/auth'
+
+const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID ?? ''
+const GOOGLE_SCRIPT_ID = 'google-identity-services'
+
+type GoogleCredentialResponse = {
+  credential?: string
+}
+
+type GoogleAccountsId = {
+  initialize: (options: { client_id: string; callback: (response: GoogleCredentialResponse) => void }) => void
+  renderButton: (
+    element: HTMLElement,
+    options: { theme: 'outline'; size: 'large'; width: number; text: 'signin_with' | 'signup_with' },
+  ) => void
+}
+
+declare global {
+  interface Window {
+    google?: {
+      accounts: {
+        id: GoogleAccountsId
+      }
+    }
+  }
+}
 
 interface AuthScreenProps {
   onAuth: (session: AuthSession) => void
@@ -11,36 +35,50 @@ interface AuthScreenProps {
 }
 
 const roleOptions: Array<{
-  role: Portal
+  role: AccountRole
   title: string
   description: string
   icon: ReactNode
 }> = [
   {
-    role: 'seeker',
-    title: 'I am a Job Seeker',
+    role: 'Student',
+    title: 'Student / Job Seeker',
     description: 'Analyze CVs, track applications, improve job readiness',
     icon: <User size={22} />,
   },
   {
-    role: 'hr',
-    title: 'I am a Recruiter',
-    description: 'Screen CVs, rank candidates, manage your pipeline',
+    role: 'HR',
+    title: 'HR / Recruiter',
+    description: 'Screen CVs, rank candidates, and manage hiring workflows',
     icon: <Briefcase size={22} />,
+  },
+  {
+    role: 'HiringManager',
+    title: 'Hiring Manager',
+    description: 'Review shortlisted candidates and support hiring decisions',
+    icon: <Users size={22} />,
+  },
+  {
+    role: 'Admin',
+    title: 'System Admin',
+    description: 'Manage platform access, users, and operational settings',
+    icon: <Lock size={22} />,
   },
 ]
 
 export default function AuthScreen({ onAuth, startInRoleSelection = false }: AuthScreenProps) {
+  const googleButtonRef = useRef<HTMLDivElement | null>(null)
   const [mode, setMode] = useState<AuthMode>('login')
   const [step, setStep] = useState<'auth' | 'role'>(startInRoleSelection ? 'role' : 'auth')
   const [showPass, setShowPass] = useState(false)
-  const [selectedRole, setSelectedRole] = useState<Portal | null>(null)
+  const [selectedRole, setSelectedRole] = useState<AccountRole | null>(null)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [fullName, setFullName] = useState('')
-  const [resetToken, setResetToken] = useState('')
+  const [resetCode, setResetCode] = useState('')
   const [errors, setErrors] = useState<AuthFormErrors>({})
   const [notice, setNotice] = useState('')
+  const [googleError, setGoogleError] = useState('')
   const [loading, setLoading] = useState(false)
 
   const resetFeedback = () => {
@@ -55,6 +93,82 @@ export default function AuthScreen({ onAuth, startInRoleSelection = false }: Aut
     }
     onAuth(session)
   }
+
+  const handleGoogleCredential = async (credential?: string) => {
+    resetFeedback()
+    if (!credential) {
+      setErrors({ general: 'Google did not return a sign-in credential.' })
+      return
+    }
+
+    try {
+      setLoading(true)
+      finishAuth(await authApi.oauthLogin({ provider: 'google', credential }))
+    } catch (error) {
+      setErrors({ general: error instanceof Error ? error.message : 'Google login failed.' })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    if (step !== 'auth' || (mode !== 'login' && mode !== 'register')) return
+
+    if (!GOOGLE_CLIENT_ID) {
+      setGoogleError('Google sign-in needs VITE_GOOGLE_CLIENT_ID.')
+      return
+    }
+
+    let active = true
+
+    const renderGoogleButton = () => {
+      if (!active || !window.google?.accounts.id || !googleButtonRef.current) return
+
+      setGoogleError('')
+      googleButtonRef.current.innerHTML = ''
+      window.google.accounts.id.initialize({
+        client_id: GOOGLE_CLIENT_ID,
+        callback: response => void handleGoogleCredential(response.credential),
+      })
+      window.google.accounts.id.renderButton(googleButtonRef.current, {
+        theme: 'outline',
+        size: 'large',
+        width: googleButtonRef.current.clientWidth || 360,
+        text: mode === 'register' ? 'signup_with' : 'signin_with',
+      })
+    }
+
+    if (window.google?.accounts.id) {
+      renderGoogleButton()
+      return () => {
+        active = false
+      }
+    }
+
+    const existingScript = document.getElementById(GOOGLE_SCRIPT_ID)
+    if (existingScript) {
+      existingScript.addEventListener('load', renderGoogleButton, { once: true })
+      return () => {
+        active = false
+        existingScript.removeEventListener('load', renderGoogleButton)
+      }
+    }
+
+    const script = document.createElement('script')
+    script.id = GOOGLE_SCRIPT_ID
+    script.src = 'https://accounts.google.com/gsi/client'
+    script.async = true
+    script.defer = true
+    script.onload = renderGoogleButton
+    script.onerror = () => {
+      if (active) setGoogleError('Could not load Google sign-in.')
+    }
+    document.head.appendChild(script)
+
+    return () => {
+      active = false
+    }
+  }, [mode, step])
 
   const handleAuthSubmit = async (e: FormEvent) => {
     e.preventDefault()
@@ -88,45 +202,37 @@ export default function AuthScreen({ onAuth, startInRoleSelection = false }: Aut
           return
         }
         const response = await authApi.forgotPassword({ email })
-        setNotice(response.resetToken ? `${response.message} Demo token: ${response.resetToken}` : response.message)
-        if (response.resetToken) {
-          setResetToken(response.resetToken)
-          setMode('reset')
-        }
+        setNotice(response.message)
+        setResetCode('')
+        setMode('verify')
       }
 
-      if (mode === 'reset') {
-        const nextErrors = validateResetPassword({ token: resetToken, password })
+      if (mode === 'verify') {
+        const nextErrors = validateVerifyResetCode({ email, code: resetCode })
         if (hasAuthErrors(nextErrors)) {
           setErrors(nextErrors)
           return
         }
-        await authApi.resetPassword({ token: resetToken, password })
+        const response = await authApi.verifyResetCode({ email, code: resetCode })
+        setNotice(response.message)
+        setPassword('')
+        setMode('reset')
+      }
+
+      if (mode === 'reset') {
+        const nextErrors = validateResetPassword({ email, code: resetCode, password })
+        if (hasAuthErrors(nextErrors)) {
+          setErrors(nextErrors)
+          return
+        }
+        await authApi.resetPassword({ email, code: resetCode, password })
         setNotice('Password reset successfully. Sign in with your new password.')
         setMode('login')
         setPassword('')
-        setResetToken('')
+        setResetCode('')
       }
     } catch (error) {
       setErrors({ general: error instanceof Error ? error.message : 'Authentication failed.' })
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleGoogleLogin = async () => {
-    resetFeedback()
-    try {
-      setLoading(true)
-      const oauthEmail = validateEmail(email) ? 'google.user@fitcv.dev' : email
-      const oauthName = fullName.trim() || 'Google Demo User'
-      finishAuth(await authApi.oauthLogin({
-        provider: 'google',
-        email: oauthEmail,
-        fullName: oauthName,
-      }))
-    } catch (error) {
-      setErrors({ general: error instanceof Error ? error.message : 'Google login failed.' })
     } finally {
       setLoading(false)
     }
@@ -137,7 +243,7 @@ export default function AuthScreen({ onAuth, startInRoleSelection = false }: Aut
     resetFeedback()
     try {
       setLoading(true)
-      const session = await authApi.selectRole({ role: authApi.accountRoleFromPortal(selectedRole) })
+      const session = await authApi.selectRole({ role: selectedRole })
       onAuth(session)
     } catch (error) {
       setErrors({ general: error instanceof Error ? error.message : 'Role selection failed.' })
@@ -158,7 +264,9 @@ export default function AuthScreen({ onAuth, startInRoleSelection = false }: Aut
         ? 'Create account'
         : mode === 'forgot'
           ? 'Reset access'
-          : 'Set new password'
+          : mode === 'verify'
+            ? 'Verify code'
+            : 'Set new password'
 
   const submitLabel =
     mode === 'login'
@@ -166,8 +274,10 @@ export default function AuthScreen({ onAuth, startInRoleSelection = false }: Aut
       : mode === 'register'
         ? 'Create account'
         : mode === 'forgot'
-          ? 'Send reset link'
-          : 'Reset password'
+          ? 'Send verification code'
+          : mode === 'verify'
+            ? 'Verify code'
+            : 'Reset password'
 
   return (
     <div style={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
@@ -213,12 +323,12 @@ export default function AuthScreen({ onAuth, startInRoleSelection = false }: Aut
           Know your fit<br />before you apply.
         </h1>
         <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: 15, textAlign: 'center', lineHeight: 1.6, maxWidth: 320 }}>
-          AI-powered CV screening with role-aware experiences for students and recruiters.
+          AI-powered CV screening with role-aware experiences for students, recruiters, hiring managers, and admins.
         </p>
       </div>
 
-      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'white', padding: 48 }}>
-        <div style={{ width: '100%', maxWidth: 420 }}>
+      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'white', padding: 48, overflowY: 'auto' }}>
+        <div style={{ width: '100%', maxWidth: 460 }}>
           {step === 'auth' ? (
             <>
               <div style={{ marginBottom: 28 }}>
@@ -227,7 +337,8 @@ export default function AuthScreen({ onAuth, startInRoleSelection = false }: Aut
                   {mode === 'login' && <>Don&apos;t have an account? <button onClick={() => switchMode('register')} style={linkButtonStyle}>Sign up</button></>}
                   {mode === 'register' && <>Already have an account? <button onClick={() => switchMode('login')} style={linkButtonStyle}>Sign in</button></>}
                   {mode === 'forgot' && <>Remember your password? <button onClick={() => switchMode('login')} style={linkButtonStyle}>Back to sign in</button></>}
-                  {mode === 'reset' && <>Paste the reset token and choose a new password.</>}
+                  {mode === 'verify' && <>Enter the 6-digit verification code sent to {email || 'your email'}.</>}
+                  {mode === 'reset' && <>Code verified. Choose a new password.</>}
                 </p>
               </div>
 
@@ -236,10 +347,14 @@ export default function AuthScreen({ onAuth, startInRoleSelection = false }: Aut
 
               {(mode === 'login' || mode === 'register') && (
                 <>
-                  <button onClick={handleGoogleLogin} disabled={loading} style={googleButtonStyle}>
-                    <svg width="18" height="18" viewBox="0 0 18 18"><path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z" fill="#4285F4"/><path d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332C2.438 15.983 5.482 18 9 18z" fill="#34A853"/><path d="M3.964 10.71c-.18-.54-.282-1.117-.282-1.71s.102-1.17.282-1.71V4.958H.957C.347 6.173 0 7.548 0 9s.348 2.827.957 4.042l3.007-2.332z" fill="#FBBC05"/><path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0 5.482 0 2.438 2.017.957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z" fill="#EA4335"/></svg>
-                    Continue with Google
-                  </button>
+                  {GOOGLE_CLIENT_ID ? (
+                    <div ref={googleButtonRef} style={googleButtonContainerStyle} />
+                  ) : (
+                    <button type="button" disabled style={{ ...googleButtonStyle, opacity: 0.6, cursor: 'not-allowed' }}>
+                      Google sign-in is not configured
+                    </button>
+                  )}
+                  {googleError && <div style={{ ...errorTextStyle, marginTop: -10, marginBottom: 12 }}>{googleError}</div>}
 
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
                     <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
@@ -273,18 +388,18 @@ export default function AuthScreen({ onAuth, startInRoleSelection = false }: Aut
                   />
                 )}
 
-                {mode === 'reset' && (
+                {mode === 'verify' && (
                   <Field
-                    label="Reset token"
+                    label="Verification code"
                     icon={<RotateCcw size={16} color="var(--text-muted)" />}
-                    value={resetToken}
-                    placeholder="Paste token from reset email"
-                    error={errors.general}
-                    onChange={setResetToken}
+                    value={resetCode}
+                    placeholder="Enter 6-digit code"
+                    error={errors.code}
+                    onChange={value => setResetCode(value.replace(/\D/g, '').slice(0, 6))}
                   />
                 )}
 
-                {mode !== 'forgot' && (
+                {mode !== 'forgot' && mode !== 'verify' && (
                   <div style={{ marginBottom: 8 }}>
                     <label style={labelStyle}>Password</label>
                     <div style={{ position: 'relative' }}>
@@ -321,12 +436,12 @@ export default function AuthScreen({ onAuth, startInRoleSelection = false }: Aut
             <>
               <div style={{ marginBottom: 28 }}>
                 <h2 style={{ fontSize: 26, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 6 }}>Choose your workspace</h2>
-                <p style={{ color: 'var(--text-secondary)', fontSize: 14 }}>FitCV will route you to the right portal after this step.</p>
+                <p style={{ color: 'var(--text-secondary)', fontSize: 14 }}>FitCV will save your database role and route you to the right portal after this step.</p>
               </div>
 
               {errors.general && <Feedback tone="error" message={errors.general} />}
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                 {roleOptions.map(option => {
                   const active = selectedRole === option.role
                   return (
@@ -334,7 +449,7 @@ export default function AuthScreen({ onAuth, startInRoleSelection = false }: Aut
                       key={option.role}
                       onClick={() => setSelectedRole(option.role)}
                       style={{
-                        padding: '20px 20px', borderRadius: 16, cursor: 'pointer',
+                        padding: '16px 18px', borderRadius: 16, cursor: 'pointer',
                         border: `2px solid ${active ? 'var(--indigo)' : 'var(--border)'}`,
                         background: active ? 'var(--indigo-light)' : 'white',
                         textAlign: 'left', display: 'flex', alignItems: 'center', gap: 16,
@@ -480,5 +595,11 @@ const googleButtonStyle: CSSProperties = {
   fontWeight: 600,
   cursor: 'pointer',
   color: 'var(--text-primary)',
+  marginBottom: 20,
+}
+
+const googleButtonContainerStyle: CSSProperties = {
+  width: '100%',
+  minHeight: 42,
   marginBottom: 20,
 }
