@@ -30,18 +30,18 @@ CREATE TABLE company (
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
 
 CREATE TABLE account (
-    account_id             BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
-    email                  VARCHAR(150) NOT NULL UNIQUE,
-    password_hash          VARCHAR(255) NULL,
-    full_name              VARCHAR(150) NOT NULL,
-    role                   ENUM('Student', 'HR', 'HiringManager', 'Admin') NULL,
-    avatar_url             VARCHAR(400) NULL,
-    company_id             BIGINT UNSIGNED NULL,
-    auth_provider          ENUM('Password', 'Google') NOT NULL DEFAULT 'Password',
-    reset_token_hash       VARCHAR(255) NULL,
+    account_id     BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+    email          VARCHAR(150) NOT NULL UNIQUE,
+    password_hash  VARCHAR(255) NULL,
+    full_name      VARCHAR(150) NOT NULL,
+    role           ENUM('Student', 'HR', 'HiringManager', 'Admin') NULL,
+    avatar_url     VARCHAR(400) NULL,
+    company_id     BIGINT UNSIGNED NULL,
+    auth_provider  ENUM('Password', 'Google') NOT NULL DEFAULT 'Password',
+    reset_token_hash VARCHAR(255) NULL,
     reset_token_expires_at DATETIME NULL,
-    created_at             DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at             DATETIME NULL ON UPDATE CURRENT_TIMESTAMP,
+    created_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at     DATETIME NULL ON UPDATE CURRENT_TIMESTAMP,
 
     CONSTRAINT fk_account_company
         FOREIGN KEY (company_id) REFERENCES company(company_id)

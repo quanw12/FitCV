@@ -5,7 +5,7 @@ FitCV is an AI-powered CV screening and job readiness platform for two user grou
 - Job Seekers / Students: upload CVs, compare CVs with job descriptions, view match scores, skill gaps, AI improvement suggestions, CV history, application tracking, and JD market insights.
 - HR / Recruiters: create job posts, upload candidate CVs, rank candidates with AI, manage a hiring pipeline, draft candidate emails, and view reports.
 
-This repository currently contains the React/Vite frontend prototype generated for the FitCV UI. The planned backend architecture is a FastAPI modular monolith with async AI processing, MySQL, file storage, Gemini API, and Resend email.
+This repository contains the React/Vite frontend prototype generated for the FitCV UI and a FastAPI backend foundation for the Auth & Role Selection flow. The planned backend architecture is a FastAPI modular monolith with async AI processing, MySQL, file storage, Gemini API, and Resend email.
 
 ## Current Tech Stack
 
@@ -14,6 +14,7 @@ This repository currently contains the React/Vite frontend prototype generated f
 - Icons: `lucide-react`
 - Charts: `recharts`
 - Package manager: npm is available; lockfiles for npm and pnpm both exist.
+- Backend: FastAPI, SQLAlchemy, MySQL-ready schema, JWT auth, passlib password hashing.
 
 ## Development Server
 
@@ -113,6 +114,29 @@ Where to put new code:
 
 Small screen-local arrays are acceptable inside a screen while the app is still a prototype. If the data is reused by more than one file, grows large, or represents domain mock data for a feature, move it to `src/data/`.
 
+Backend code is organized under `backend/`:
+
+- `backend/app/main.py` - FastAPI app setup, CORS, route registration
+- `backend/app/api/` - API routers and dependencies
+- `backend/app/core/` - config and security helpers
+- `backend/app/db/` - database engine/session setup
+- `backend/app/models/` - SQLAlchemy models
+- `backend/app/repositories/` - database access functions
+- `backend/app/schemas/` - Pydantic request/response schemas
+- `backend/app/services/` - backend business logic
+- `backend/app/middleware/` - guard helpers such as role requirements
+- `backend/requirements.txt` - backend dependencies
+- `database/` - SQL schema artifacts, especially MySQL DDL
+
+Backend layer rules:
+
+- API routes should validate HTTP concerns and call service functions.
+- Services should own business rules and call repositories.
+- Repositories should own database queries.
+- Models should mirror the MySQL schema in the DB document.
+- Schemas should define API request/response contracts.
+- Security helpers should stay in `backend/app/core/security.py`.
+
 Recommended ownership by feature area:
 
 - Phuc Khang: `src/app/`, auth flow, integration, deployment coordination
@@ -132,6 +156,12 @@ Recommended ownership by feature area:
 - `src/services/matchScore.ts` - Score label/color logic
 - `src/api/fitcvApi.ts` - API contract placeholder for backend integration
 - `src/types/app.ts` - Shared portal/screen/status types
+- `src/types/auth.ts` - Auth/session/user role types
+- `src/api/authApi.ts` - Frontend auth API client with backend-first behavior and local fallback
+- `src/services/authValidation.ts` - Auth form validation helpers
+- `backend/app/api/routes/auth.py` - Backend auth endpoints
+- `backend/app/services/auth_service.py` - Backend auth business logic
+- `database/full_schema.sql` - Full MySQL schema for FitCV, including auth/users
 - `src/imports/FitCV_Figma_AI_Prompt.md` - Original UI prompt/reference
 - `package.json` - Dependencies and scripts
 - `vite.config.ts` - Vite config

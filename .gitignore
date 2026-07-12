@@ -1,1 +1,7 @@
 node_modules
+FitCV_DB_Schema.docx
+KAN-101_AUTH_ROLE_SELECTION_EXPLAIN.md
+.env.local
+backend/.env
+google.json
+client_secret_*.json
