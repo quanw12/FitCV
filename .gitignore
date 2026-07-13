@@ -3,6 +3,7 @@ FitCV_DB_Schema.docx
 KAN-101_AUTH_ROLE_SELECTION_EXPLAIN.md
 .env.local
 backend/.env
+backend/.env.example
 google.json
 client_secret_*.json
 KAN-181_IMPROVEMENT_TEST_HANDOFF
