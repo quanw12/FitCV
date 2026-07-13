@@ -50,6 +50,14 @@ VITE_API_BASE_URL=http://127.0.0.1:8000
 VITE_GOOGLE_CLIENT_ID=<google-oauth-client-id>
 ```
 
+Frontend production currently falls back to this backend URL if `VITE_API_BASE_URL` is not set:
+
+```text
+https://fitcv-0cab.onrender.com
+```
+
+Still set `VITE_API_BASE_URL` explicitly in Vercel so future backend URL changes do not require code changes.
+
 Chạy frontend:
 
 ```bash
@@ -146,6 +154,7 @@ Google Cloud Console cần cấu hình Authorized JavaScript origins:
 http://localhost:5173
 http://127.0.0.1:5173
 https://<your-vercel-domain>
+https://fit-cv.vercel.app
 ```
 
 Nếu OAuth consent screen đang ở Testing, thêm email test user vào Google Cloud Console.
