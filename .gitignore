@@ -7,3 +7,19 @@ backend/.env.example
 google.json
 client_secret_*.json
 KAN-181_IMPROVEMENT_TEST_HANDOFF
+# Environment files
+.env
+.env.*
+!.env.example
+!**/.env.example
+
+# Python generated files
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+
+# Virtual environments
+.venv/
+venv/
+backend/.venv/
