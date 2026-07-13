@@ -6,8 +6,8 @@ import type {
   ImprovementReportResponse,
   SuggestionPriority,
 } from '@/types/improvement'
+import { API_BASE_URL } from './config'
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? ''
 const USE_IMPROVEMENT_FIXTURE = import.meta.env.VITE_IMPROVEMENT_FIXTURE === 'true' || !API_BASE_URL
 
 export interface AnalyzeCvRequest {
