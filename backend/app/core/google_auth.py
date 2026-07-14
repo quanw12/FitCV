@@ -16,7 +16,7 @@ def verify_google_credential(credential: str) -> dict[str, str | None]:
     except ImportError as exc:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Google auth dependency is not installed.",
+            detail=f"Google auth dependency is not installed: {exc.name or exc.__class__.__name__}.",
         ) from exc
 
     try:
