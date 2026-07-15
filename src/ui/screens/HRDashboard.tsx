@@ -1,7 +1,8 @@
 import { Briefcase, FileText, TrendingUp, Upload, Plus, ArrowRight, Star } from 'lucide-react'
+import type { ScreenId } from '@/types/app'
 
 interface HRDashboardProps {
-  onNavigate: (screen: string) => void
+  onNavigate: (screen: ScreenId) => void
 }
 
 const jobPosts = [

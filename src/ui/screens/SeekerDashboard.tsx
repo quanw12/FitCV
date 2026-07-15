@@ -1,8 +1,9 @@
 import { Trophy, TrendingUp, FileText, CheckSquare, Plus, ArrowRight, Clock, Zap } from 'lucide-react'
 import ScoreRing from '../components/ScoreRing'
+import type { ScreenId } from '@/types/app'
 
 interface SeekerDashboardProps {
-  onNavigate: (screen: string) => void
+  onNavigate: (screen: ScreenId) => void
 }
 
 const recentActivity = [
@@ -145,7 +146,7 @@ export default function SeekerDashboard({ onNavigate }: SeekerDashboardProps) {
             ].map(a => (
               <button
                 key={a.screen}
-                onClick={() => onNavigate(a.screen)}
+                onClick={() => onNavigate(a.screen as ScreenId)}
                 style={{
                   width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px',
                   borderRadius: 10, border: 'none', background: 'transparent', cursor: 'pointer',

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { AlertCircle, CheckSquare, ChevronDown, ChevronUp, Clipboard, Lightbulb, RefreshCw, Square } from 'lucide-react'
 import { fitcvApi } from '@/api/fitcvApi'
-import type { CvSection, ImprovementReport, ImprovementReportResponse, SuggestionPriority } from '@/types/improvement'
+import type { CvSection, ImprovementReportResponse, SuggestionPriority } from '@/types/improvement'
 
 const priorityRank: Record<SuggestionPriority, number> = { High: 0, Medium: 1, Low: 2 }
 const sectionLabel: Record<CvSection, string> = {
