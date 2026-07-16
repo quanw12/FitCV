@@ -272,12 +272,34 @@ const mockAuthApi = {
     if (!canUseStorage()) return
     window.localStorage.removeItem(SESSION_KEY)
   },
+
+  // Local-only demo session — lets anyone explore the UI without a
+  // backend or real credentials. Always uses the mock path.
+  createDemoSession(role: AccountRole): AuthSession {
+    const session: AuthSession = {
+      accessToken: `demo-${role}-${Date.now()}`,
+      tokenType: 'bearer',
+      requiresRoleSelection: false,
+      user: {
+        accountId: `demo-${role}`,
+        email: role === 'HR' ? 'hr@fitcv.demo' : 'student@fitcv.demo',
+        fullName: role === 'HR' ? 'HR Demo' : 'Minh Nguyen',
+        role,
+        avatarUrl: null,
+        authProvider: 'Password',
+      },
+    }
+    writeJson(SESSION_KEY, session)
+    return session
+  },
 }
 
 export const authApi = {
   getSession: mockAuthApi.getSession,
 
   logout: mockAuthApi.logout,
+
+  createDemoSession: mockAuthApi.createDemoSession,
 
   async register(payload: RegisterRequest): Promise<AuthSession> {
     if (!shouldUseBackend()) return mockAuthApi.register(payload)

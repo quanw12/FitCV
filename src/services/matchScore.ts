@@ -8,12 +8,12 @@ export function getMatchLabel(score: number): MatchLabel {
 
 export function getScoreTone(score: number) {
   if (score >= 80) {
-    return { color: '#10B981', trackColor: '#D1FAE5', label: getMatchLabel(score) }
+    return { color: '#16A34A', trackColor: '#DCFCE7', label: getMatchLabel(score) }
   }
 
   if (score >= 50) {
-    return { color: '#4F46E5', trackColor: '#EEF2FF', label: getMatchLabel(score) }
+    return { color: '#2563EB', trackColor: '#DBEAFE', label: getMatchLabel(score) }
   }
 
-  return { color: '#F59E0B', trackColor: '#FEF3C7', label: getMatchLabel(score) }
+  return { color: '#D97706', trackColor: '#FDE68A', label: getMatchLabel(score) }
 }
