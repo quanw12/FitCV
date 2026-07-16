@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Upload, ChevronRight, X, Mail, Phone, MapPin, Briefcase, GraduationCap } from 'lucide-react'
+import ScoreRing from '../components/ScoreRing'
 
 const candidates = [
   { id: 1, name: 'Nguyen Thanh Minh', score: 92, email: 'ntminh@gmail.com', phone: '0912 345 678', location: 'Ho Chi Minh City', skills: ['Node.js', 'Docker', 'PostgreSQL', 'TypeScript'], exp: '6 years', edu: "Bachelor's CS — HCMUT", pos: 'Senior Backend Developer' },
@@ -14,55 +15,72 @@ export default function CVRankingScreen() {
   const [selected, setSelected] = useState<typeof candidates[0] | null>(null)
   const [dragOver, setDragOver] = useState(false)
 
-  const getScoreClass = (score: number) => score >= 80 ? { color: '#10B981', bg: '#D1FAE5' } : score >= 50 ? { color: '#F59E0B', bg: '#FEF3C7' } : { color: '#EF4444', bg: '#FEE2E2' }
+  const getScoreClass = (score: number) =>
+    score >= 80
+      ? { color: 'var(--success)', soft: 'var(--success-soft)', badge: 'fc-badge--green' }
+      : score >= 50
+        ? { color: 'var(--warning)', soft: 'var(--warning-soft)', badge: 'fc-badge--amber' }
+        : { color: 'var(--danger)', soft: 'var(--danger-soft)', badge: 'fc-badge--red' }
+
+  const barColor = (v: number) => (v >= 80 ? 'var(--success)' : v >= 50 ? 'var(--warning)' : 'var(--danger)')
 
   return (
-    <div>
-      <div style={{ marginBottom: 20 }}>
-        <h1 style={{ fontSize: 22, fontWeight: 800, color: 'var(--text-primary)', marginBottom: 4 }}>CV Upload & AI Ranking</h1>
-        <p style={{ color: 'var(--text-secondary)', fontSize: 14 }}>Senior Backend Developer · 6 candidates ranked by AI score</p>
+    <div className="fc-stagger">
+      <div className="fc-page-head">
+        <div>
+          <div className="fc-eyebrow" style={{ marginBottom: 6 }}>Talent Intelligence</div>
+          <h1>CV Upload &amp; AI Ranking</h1>
+          <p>Senior Backend Developer · 6 candidates ranked by AI score</p>
+        </div>
+        <button className="fc-btn fc-btn--primary"><Upload size={15} /> Upload CVs</button>
       </div>
 
-      {/* Upload zone */}
+      {/* Upload dropzone */}
       <div
         onDragOver={e => { e.preventDefault(); setDragOver(true) }}
         onDragLeave={() => setDragOver(false)}
         onDrop={e => { e.preventDefault(); setDragOver(false) }}
+        className="fc-card"
         style={{
-          border: `2px dashed ${dragOver ? 'var(--indigo)' : 'var(--border)'}`,
-          borderRadius: 16, padding: '24px', marginBottom: 20,
-          background: dragOver ? 'var(--indigo-light)' : 'white',
-          display: 'flex', alignItems: 'center', gap: 16, cursor: 'pointer',
-          transition: 'all 0.2s',
+          border: `2px dashed ${dragOver ? 'var(--accent)' : 'var(--border-strong)'}`,
+          borderRadius: 'var(--r-lg)',
+          padding: 24,
+          marginBottom: 22,
+          background: dragOver ? 'var(--accent-soft)' : 'var(--surface-2)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 16,
+          cursor: 'pointer',
+          transition: 'all 0.2s ease',
         }}
       >
-        <div style={{ width: 52, height: 52, borderRadius: 14, background: 'var(--indigo-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-          <Upload size={24} color="var(--indigo)" />
+        <div style={{ width: 52, height: 52, borderRadius: 14, background: 'var(--accent-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <Upload size={24} color="var(--accent)" />
         </div>
         <div style={{ flex: 1 }}>
           <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--text-primary)', marginBottom: 2 }}>Drop CVs here or browse</div>
           <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>PDF or DOCX · Multiple files supported · AI ranks automatically</div>
         </div>
-        <button className="fitcv-btn-primary">Browse Files</button>
+        <button className="fc-btn fc-btn--primary">Browse Files</button>
       </div>
 
       {/* Ranked list + detail panel */}
       <div style={{ display: 'grid', gridTemplateColumns: selected ? '1fr 380px' : '1fr', gap: 16, transition: 'grid-template-columns 0.2s' }}>
         {/* Ranked table */}
-        <div className="fitcv-card" style={{ overflow: 'hidden' }}>
-          <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h3 style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)' }}>Ranked Candidates</h3>
-            <div style={{ display: 'flex', gap: 6 }}>
-              <span className="badge-green">3 Strong</span>
-              <span className="badge-amber">2 Moderate</span>
-              <span className="badge-red">1 Weak</span>
+        <div className="fc-card" style={{ overflow: 'hidden' }}>
+          <div className="fc-section-title" style={{ padding: '16px 22px', borderBottom: '1px solid var(--border)' }}>
+            <h3>Ranked Candidates</h3>
+            <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
+              <span className="fc-badge fc-badge--green">3 Strong</span>
+              <span className="fc-badge fc-badge--amber">2 Moderate</span>
+              <span className="fc-badge fc-badge--red">1 Weak</span>
             </div>
           </div>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <table className="fc-table">
             <thead>
-              <tr style={{ background: 'var(--bg)' }}>
+              <tr>
                 {['Rank', 'Candidate', 'AI Score', 'Skills Match', 'Experience', ''].map(h => (
-                  <th key={h} style={{ padding: '10px 16px', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', textAlign: 'left', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{h}</th>
+                  <th key={h}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -73,18 +91,16 @@ export default function CVRankingScreen() {
                 return (
                   <tr key={c.id}
                     onClick={() => setSelected(isActive ? null : c)}
-                    style={{ borderTop: '1px solid var(--border)', cursor: 'pointer', background: isActive ? 'var(--indigo-light)' : 'white', transition: 'background 0.15s' }}
-                    onMouseOver={e => !isActive && (e.currentTarget.style.background = 'var(--bg)')}
-                    onMouseOut={e => !isActive && (e.currentTarget.style.background = 'white')}
+                    style={{ cursor: 'pointer', background: isActive ? 'var(--accent-soft)' : 'transparent', transition: 'background 0.15s' }}
                   >
-                    <td style={{ padding: '14px 16px' }}>
-                      <div style={{ width: 28, height: 28, borderRadius: 8, background: i < 3 ? 'var(--indigo-light)' : 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 800, color: i < 3 ? 'var(--indigo)' : 'var(--text-muted)' }}>
+                    <td style={{ width: 36 }}>
+                      <div style={{ width: 28, height: 28, borderRadius: 8, background: i < 3 ? 'var(--accent-soft)' : 'var(--surface-2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 800, color: i < 3 ? 'var(--accent-ink)' : 'var(--text-muted)' }}>
                         {i + 1}
                       </div>
                     </td>
-                    <td style={{ padding: '14px 16px' }}>
+                    <td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <div style={{ width: 34, height: 34, borderRadius: 10, background: sc.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: sc.color, flexShrink: 0 }}>
+                        <div style={{ width: 34, height: 34, borderRadius: 10, background: sc.soft, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: sc.color, flexShrink: 0 }}>
                           {c.name.split(' ').pop()?.[0]}
                         </div>
                         <div>
@@ -93,17 +109,17 @@ export default function CVRankingScreen() {
                         </div>
                       </div>
                     </td>
-                    <td style={{ padding: '14px 16px' }}>
-                      <span style={{ background: sc.bg, color: sc.color, borderRadius: 20, padding: '4px 12px', fontSize: 13, fontWeight: 800 }}>{c.score}%</span>
+                    <td>
+                      <span className={`fc-badge ${sc.badge}`}>{c.score}%</span>
                     </td>
-                    <td style={{ padding: '14px 16px', maxWidth: 180 }}>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                        {c.skills.slice(0, 2).map(s => <span key={s} className="badge-green" style={{ fontSize: 11 }}>{s}</span>)}
-                        {c.skills.length > 2 && <span className="badge-indigo" style={{ fontSize: 11 }}>+{c.skills.length - 2}</span>}
+                    <td style={{ maxWidth: 200 }}>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                        {c.skills.slice(0, 2).map(s => <span key={s} className="fc-chip">{s}</span>)}
+                        {c.skills.length > 2 && <span className="fc-chip fc-chip--active">+{c.skills.length - 2}</span>}
                       </div>
                     </td>
-                    <td style={{ padding: '14px 16px', fontSize: 13, color: 'var(--text-secondary)', fontWeight: 500 }}>{c.exp}</td>
-                    <td style={{ padding: '14px 16px' }}>
+                    <td style={{ fontSize: 13, color: 'var(--text-secondary)', fontWeight: 500 }}>{c.exp}</td>
+                    <td>
                       <ChevronRight size={16} color="var(--text-muted)" style={{ transform: isActive ? 'rotate(90deg)' : 'none', transition: 'transform 0.2s' }} />
                     </td>
                   </tr>
@@ -115,27 +131,24 @@ export default function CVRankingScreen() {
 
         {/* Detail panel */}
         {selected && (
-          <div className="fitcv-card" style={{ padding: 22, alignSelf: 'start', position: 'sticky', top: 0 }}>
+          <div className="fc-card fc-card--pad" style={{ alignSelf: 'start', position: 'sticky', top: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
               <h3 style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)' }}>Candidate Profile</h3>
-              <button onClick={() => setSelected(null)} style={{ background: 'var(--bg)', border: 'none', borderRadius: 8, padding: 6, cursor: 'pointer', color: 'var(--text-muted)' }}>
+              <button onClick={() => setSelected(null)} className="fc-icon-btn" aria-label="Close">
                 <X size={16} />
               </button>
             </div>
 
             {/* Avatar + score */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 18 }}>
-              <div style={{ width: 52, height: 52, borderRadius: 14, background: 'linear-gradient(135deg, #4F46E5, #7C3AED)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, fontWeight: 800, color: 'white' }}>
+              <div style={{ width: 52, height: 52, borderRadius: 14, background: 'linear-gradient(135deg, var(--accent), var(--accent-2))', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, fontWeight: 800, color: 'white', flexShrink: 0 }}>
                 {selected.name.split(' ').pop()?.[0]}
               </div>
-              <div>
+              <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontWeight: 800, fontSize: 16, color: 'var(--text-primary)' }}>{selected.name}</div>
                 <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 2 }}>{selected.pos}</div>
               </div>
-              <div style={{ marginLeft: 'auto', textAlign: 'center' }}>
-                <div style={{ fontSize: 26, fontWeight: 800, color: getScoreClass(selected.score).color, fontFamily: 'Plus Jakarta Sans', lineHeight: 1 }}>{selected.score}%</div>
-                <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>AI Score</div>
-              </div>
+              <ScoreRing score={selected.score} size={84} strokeWidth={9} label="AI Score" />
             </div>
 
             {/* Contact info */}
@@ -165,28 +178,28 @@ export default function CVRankingScreen() {
             <div style={{ marginBottom: 16 }}>
               <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', marginBottom: 8 }}>Matched Skills</div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
-                {selected.skills.map(s => <span key={s} className="badge-green" style={{ fontSize: 11 }}>✓ {s}</span>)}
+                {selected.skills.map(s => <span key={s} className="fc-badge fc-badge--green">✓ {s}</span>)}
               </div>
             </div>
 
             {/* Score breakdown */}
-            <div style={{ padding: 14, background: 'var(--bg)', borderRadius: 10, marginBottom: 16 }}>
-              {[['Skills', 88], ['Experience', 75], ['Education', 90]].map(([l, v]) => (
+            <div className="fc-panel" style={{ padding: 14, marginBottom: 16 }}>
+              {([['Skills', 88], ['Experience', 75], ['Education', 90]] as [string, number][]).map(([l, v]) => (
                 <div key={l} style={{ marginBottom: 8 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
                     <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{l}</span>
                     <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)' }}>{v}%</span>
                   </div>
-                  <div style={{ height: 5, borderRadius: 3, background: '#E5E7EB', overflow: 'hidden' }}>
-                    <div style={{ width: `${v}%`, height: '100%', background: '#4F46E5', borderRadius: 3 }} />
+                  <div className="fc-progress">
+                    <div style={{ width: `${v}%`, background: barColor(v) }} />
                   </div>
                 </div>
               ))}
             </div>
 
             <div style={{ display: 'flex', gap: 8 }}>
-              <button className="fitcv-btn-primary" style={{ flex: 1, justifyContent: 'center', fontSize: 13 }}>Shortlist</button>
-              <button className="fitcv-btn-secondary" style={{ fontSize: 13 }}>Reject</button>
+              <button className="fc-btn fc-btn--primary" style={{ flex: 1, justifyContent: 'center', fontSize: 13 }}>Shortlist</button>
+              <button className="fc-btn fc-btn--secondary" style={{ fontSize: 13 }}>Reject</button>
             </div>
           </div>
         )}

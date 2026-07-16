@@ -1,12 +1,13 @@
 import { useState } from 'react'
 import { Upload, FileText, Zap, AlertCircle } from 'lucide-react'
 import ScoreRing from '../components/ScoreRing'
+import { getScoreTone } from '@/services/matchScore'
 
 const breakdowns = [
-  { label: 'Skills Match', score: 85, color: '#10B981', track: '#D1FAE5' },
-  { label: 'Experience', score: 68, color: '#4F46E5', track: '#EEF2FF' },
-  { label: 'Education', score: 90, color: '#10B981', track: '#D1FAE5' },
-  { label: 'Soft Skills', score: 62, color: '#F59E0B', track: '#FEF3C7' },
+  { label: 'Skills Match', score: 85 },
+  { label: 'Experience', score: 68 },
+  { label: 'Education', score: 90 },
+  { label: 'Soft Skills', score: 62 },
 ]
 
 interface AnalyzerScreenProps {
@@ -32,44 +33,46 @@ export default function AnalyzerScreen({ onAnalysisComplete, onViewSuggestions }
   }
 
   return (
-    <div>
-      <div style={{ marginBottom: 24 }}>
-        <h1 style={{ fontSize: 24, fontWeight: 800, color: 'var(--text-primary)', marginBottom: 4 }}>CV & JD Match Analyzer</h1>
-        <p style={{ color: 'var(--text-secondary)', fontSize: 14 }}>Upload your CV and paste a Job Description to get your AI-powered match score.</p>
+    <div className="fc-stagger">
+      <div className="fc-page-head">
+        <div>
+          <h1>CV &amp; JD Match Analyzer</h1>
+          <p>Upload your CV and paste a Job Description to get your AI-powered match score.</p>
+        </div>
       </div>
 
       {/* Upload area */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 20 }}>
         {/* CV upload */}
         <div
-          className="fitcv-card"
+          className="fc-card fc-card--pad fc-card--lift"
           onDragOver={e => { e.preventDefault(); setCvDrag(true) }}
           onDragLeave={() => setCvDrag(false)}
           onDrop={e => { e.preventDefault(); setCvDrag(false); const f = e.dataTransfer.files[0]; if (f) setCvFile(f.name) }}
           style={{
-            padding: 24, border: `2px dashed ${cvDrag ? 'var(--indigo)' : cvFile ? '#10B981' : 'var(--border)'}`,
-            background: cvDrag ? 'var(--indigo-light)' : cvFile ? '#F0FDF4' : 'white',
+            border: `2px dashed ${cvDrag ? 'var(--accent)' : cvFile ? 'var(--success)' : 'var(--border-strong)'}`,
+            background: cvDrag ? 'var(--accent-soft)' : cvFile ? 'var(--success-soft)' : 'var(--surface)',
             transition: 'all 0.2s', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 200,
           }}
           onClick={() => !cvFile && setCvFile('My_CV_2025.pdf')}
         >
           {cvFile ? (
             <>
-              <div style={{ width: 56, height: 56, borderRadius: 16, background: '#D1FAE5', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}>
-                <FileText size={26} color="#10B981" />
+              <div style={{ width: 56, height: 56, borderRadius: 16, background: 'var(--success-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}>
+                <FileText size={26} color="var(--success)" />
               </div>
               <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--text-primary)', marginBottom: 4 }}>{cvFile}</div>
-              <div style={{ fontSize: 13, color: '#10B981', fontWeight: 600 }}>✓ Ready to analyze</div>
+              <div style={{ fontSize: 13, color: 'var(--success)', fontWeight: 600 }}>✓ Ready to analyze</div>
               <button onClick={e => { e.stopPropagation(); setCvFile(null) }} style={{ marginTop: 12, fontSize: 12, color: 'var(--text-muted)', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>Remove</button>
             </>
           ) : (
             <>
-              <div style={{ width: 56, height: 56, borderRadius: 16, background: 'var(--indigo-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 14 }}>
-                <Upload size={24} color="var(--indigo)" />
+              <div style={{ width: 56, height: 56, borderRadius: 16, background: 'var(--accent-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 14 }}>
+                <Upload size={24} color="var(--accent)" />
               </div>
               <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--text-primary)', marginBottom: 6 }}>Upload your CV</div>
               <div style={{ fontSize: 13, color: 'var(--text-secondary)', textAlign: 'center', lineHeight: 1.5 }}>
-                Drag & drop or <span style={{ color: 'var(--indigo)', fontWeight: 600 }}>browse files</span>
+                Drag &amp; drop or <span style={{ color: 'var(--accent)', fontWeight: 600 }}>browse files</span>
                 <br />PDF or DOCX, max 10MB
               </div>
             </>
@@ -77,21 +80,22 @@ export default function AnalyzerScreen({ onAnalysisComplete, onViewSuggestions }
         </div>
 
         {/* JD input */}
-        <div className="fitcv-card" style={{ padding: 24, display: 'flex', flexDirection: 'column' }}>
+        <div className="fc-card fc-card--pad" style={{ display: 'flex', flexDirection: 'column' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-            <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--text-primary)' }}>Job Description</div>
-            <button style={{ fontSize: 12, color: 'var(--indigo)', fontWeight: 600, background: 'var(--indigo-light)', border: 'none', borderRadius: 6, padding: '4px 10px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
-              <Upload size={11} /> Upload JD
+            <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--text-primary)', fontFamily: 'var(--font-display)' }}>Job Description</div>
+            <button className="fc-btn fc-btn--secondary" style={{ padding: '6px 12px', fontSize: 12 }}>
+              <Upload size={12} /> Upload JD
             </button>
           </div>
           <textarea
+            className="fc-input"
             value={jdText}
             onChange={e => setJdText(e.target.value)}
             placeholder="Paste the full job description here...&#10;&#10;We're looking for a Senior Backend Developer with experience in Node.js, PostgreSQL, Docker, and microservices architecture..."
             style={{
-              flex: 1, minHeight: 150, resize: 'none', border: '1px solid var(--border)', borderRadius: 10,
-              padding: 14, fontSize: 13, fontFamily: 'Inter', color: 'var(--text-primary)', outline: 'none',
-              background: 'var(--bg)', lineHeight: 1.6,
+              flex: 1, minHeight: 150, resize: 'none',
+              padding: 14, fontSize: 13, fontFamily: 'var(--font-body)', color: 'var(--text-primary)',
+              background: 'var(--surface-2)', lineHeight: 1.6,
             }}
           />
           <div style={{ marginTop: 10, fontSize: 12, color: 'var(--text-muted)' }}>
@@ -103,7 +107,7 @@ export default function AnalyzerScreen({ onAnalysisComplete, onViewSuggestions }
       {/* Analyze button */}
       <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 28 }}>
         <button
-          className="fitcv-btn-primary"
+          className="fc-btn fc-btn--primary"
           onClick={handleAnalyze}
           disabled={loading}
           style={{ padding: '14px 40px', fontSize: 16, gap: 10, opacity: loading ? 0.8 : 1 }}
@@ -126,34 +130,41 @@ export default function AnalyzerScreen({ onAnalysisComplete, onViewSuggestions }
       {analyzed && (
         <div>
           {/* Main score + breakdowns */}
-          <div className="fitcv-card" style={{ padding: 28, marginBottom: 16 }}>
-            <h3 style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 24, textAlign: 'center' }}>
-              Analysis Results — VNG Corp · Senior Backend Developer
-            </h3>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 40, flexWrap: 'wrap' }}>
+          <div className="fc-card fc-card--pad" style={{ marginBottom: 16, position: 'relative', overflow: 'hidden' }}>
+            <div className="fc-glow" style={{ width: 240, height: 240, top: -80, right: -60 }} />
+            <div style={{ textAlign: 'center', marginBottom: 24, position: 'relative', zIndex: 1 }}>
+              <div className="fc-eyebrow" style={{ marginBottom: 6 }}>Analysis Results</div>
+              <h2 style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-primary)', fontFamily: 'var(--font-display)' }}>
+                VNG Corp · Senior Backend Developer
+              </h2>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 40, flexWrap: 'wrap', position: 'relative', zIndex: 1 }}>
               <ScoreRing score={78} size={160} strokeWidth={14} label="Overall Match" />
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                {breakdowns.map(b => (
-                  <div key={b.label} style={{ background: 'var(--bg)', borderRadius: 12, padding: '14px 16px', minWidth: 150 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                      <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-secondary)' }}>{b.label}</span>
-                      <span style={{ fontSize: 14, fontWeight: 800, color: b.color, fontFamily: 'Plus Jakarta Sans' }}>{b.score}%</span>
+                {breakdowns.map(b => {
+                  const tone = getScoreTone(b.score)
+                  return (
+                    <div key={b.label} style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 12, padding: '14px 16px', minWidth: 150 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                        <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-secondary)' }}>{b.label}</span>
+                        <span style={{ fontSize: 14, fontWeight: 800, color: tone.color, fontFamily: 'var(--font-display)' }}>{b.score}%</span>
+                      </div>
+                      <div className="fc-progress">
+                        <div style={{ width: `${b.score}%`, background: tone.color }} />
+                      </div>
                     </div>
-                    <div style={{ height: 6, borderRadius: 3, background: b.track, overflow: 'hidden' }}>
-                      <div style={{ width: `${b.score}%`, height: '100%', background: b.color, borderRadius: 3, transition: 'width 0.8s ease' }} />
-                    </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             </div>
           </div>
 
           {/* Probability gauge */}
-          <div className="fitcv-card" style={{ padding: 24, marginBottom: 16, border: '1px solid #FEF3C7', background: 'linear-gradient(135deg, #FFFBEB, #FEF3C7 80%, #FFF)' }}>
+          <div className="fc-card fc-card--pad" style={{ marginBottom: 16, background: 'var(--warning-soft)', border: '1px solid #fde9cf' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-              <div style={{ width: 52, height: 52, borderRadius: 14, background: 'var(--amber-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <AlertCircle size={24} color="var(--amber)" />
+              <div style={{ width: 52, height: 52, borderRadius: 14, background: '#fff', border: '1px solid #fde9cf', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <AlertCircle size={24} color="var(--warning)" />
               </div>
               <div style={{ flex: 1 }}>
                 <div style={{ fontWeight: 700, fontSize: 16, color: 'var(--text-primary)', marginBottom: 4 }}>
@@ -172,33 +183,35 @@ export default function AnalyzerScreen({ onAnalysisComplete, onViewSuggestions }
                 </div>
               </div>
               <div style={{ textAlign: 'center', flexShrink: 0 }}>
-                <div style={{ fontSize: 36, fontWeight: 800, color: '#F59E0B', fontFamily: 'Plus Jakarta Sans', lineHeight: 1 }}>68%</div>
+                <div style={{ fontSize: 36, fontWeight: 800, color: 'var(--warning)', fontFamily: 'var(--font-display)', lineHeight: 1 }}>68%</div>
                 <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 2 }}>Pass Rate</div>
               </div>
             </div>
           </div>
 
           {/* Skill tags summary */}
-          <div className="fitcv-card" style={{ padding: 24 }}>
-            <h4 style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 14 }}>Skills Assessment</h4>
+          <div className="fc-card fc-card--pad">
+            <div className="fc-section-title" style={{ marginBottom: 14 }}>
+              <h3>Skills Assessment</h3>
+            </div>
             <div style={{ marginBottom: 12 }}>
-              <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Matched Skills</div>
+              <div className="fc-eyebrow" style={{ marginBottom: 8 }}>Matched Skills</div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                 {['Node.js', 'PostgreSQL', 'REST APIs', 'Git', 'Agile', 'JavaScript', 'TypeScript'].map(s => (
-                  <span key={s} className="badge-green">✓ {s}</span>
+                  <span key={s} className="fc-badge fc-badge--green">✓ {s}</span>
                 ))}
               </div>
             </div>
             <div>
-              <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Missing Skills</div>
+              <div className="fc-eyebrow" style={{ marginBottom: 8 }}>Missing Skills</div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                 {['Docker', 'Kubernetes', 'Redis', 'Microservices'].map(s => (
-                  <span key={s} className="badge-amber">⚠ {s}</span>
+                  <span key={s} className="fc-badge fc-badge--amber">⚠ {s}</span>
                 ))}
               </div>
             </div>
             {onViewSuggestions && (
-              <button className="fitcv-btn-primary" onClick={onViewSuggestions} style={{ marginTop: 18 }}>
+              <button className="fc-btn fc-btn--primary" onClick={onViewSuggestions} style={{ marginTop: 18 }}>
                 View improvement suggestions
               </button>
             )}
