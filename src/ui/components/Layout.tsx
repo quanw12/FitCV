@@ -12,9 +12,10 @@ interface LayoutProps {
   onLogout: () => void
   children: React.ReactNode
   userName?: string
+  userAvatarUrl?: string | null
 }
 
-export default function Layout({ portal, currentScreen, onNavigate, onLogout, children, userName = 'Nguyen Minh' }: LayoutProps) {
+export default function Layout({ portal, currentScreen, onNavigate, onLogout, children, userName = 'Nguyen Minh', userAvatarUrl }: LayoutProps) {
   const [collapsed, setCollapsed] = useState(false)
   const [showUserMenu, setShowUserMenu] = useState(false)
 
@@ -153,10 +154,28 @@ export default function Layout({ portal, currentScreen, onNavigate, onLogout, ch
               <div style={{
                 width: 28, height: 28, borderRadius: 8,
                 background: 'linear-gradient(135deg, #4F46E5, #7C3AED)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', overflow: 'hidden',
                 color: 'white', fontSize: 11, fontWeight: 700,
               }}>
                 {avatarInitials}
+                {userAvatarUrl && (
+                  <img
+                    key={userAvatarUrl}
+                    src={userAvatarUrl}
+                    alt=""
+                    onError={event => {
+                      event.currentTarget.style.display = 'none'
+                    }}
+                    style={{
+                      position: 'absolute',
+                      inset: 0,
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'cover',
+                      borderRadius: 8,
+                    }}
+                  />
+                )}
               </div>
               <span style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-primary)' }}>{userName}</span>
               <ChevronDown size={14} color="var(--text-muted)" />

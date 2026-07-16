@@ -14,7 +14,7 @@ import {
   type VerifyResetCodeRequest,
   type VerifyResetCodeResponse,
 } from '@/types/auth'
-import { API_BASE_URL } from './config'
+import { API_BASE_URL, apiConnectionErrorMessage } from './config'
 
 const SESSION_KEY = 'fitcv.auth.session'
 const ACCOUNTS_KEY = 'fitcv.auth.accounts'
@@ -108,14 +108,19 @@ function normalizeBackendSession(payload: any): AuthSession {
 }
 
 async function postJson<T>(path: string, payload: unknown, token?: string): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-    body: JSON.stringify(payload),
-  })
+  let response: Response
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify(payload),
+    })
+  } catch {
+    throw new Error(apiConnectionErrorMessage())
+  }
 
   if (!response.ok) {
     const error = await response.json().catch(() => undefined)
@@ -276,6 +281,20 @@ const mockAuthApi = {
 
 export const authApi = {
   getSession: mockAuthApi.getSession,
+
+  updateCurrentUser(changes: Partial<Pick<AuthUser, 'fullName' | 'avatarUrl'>>): AuthSession | null {
+    const session = mockAuthApi.getSession()
+    if (!session) return null
+    const nextSession = { ...session, user: { ...session.user, ...changes } }
+    mockAuthApi.saveSession(nextSession)
+    const accounts = readJson<StoredAccount[]>(ACCOUNTS_KEY, [])
+    const account = accounts.find(item => item.accountId === session.user.accountId)
+    if (account) {
+      Object.assign(account, changes)
+      writeJson(ACCOUNTS_KEY, accounts)
+    }
+    return nextSession
+  },
 
   logout: mockAuthApi.logout,
 

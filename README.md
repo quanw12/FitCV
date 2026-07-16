@@ -96,7 +96,31 @@ JWT_SECRET_KEY=<local-secret>
 GOOGLE_CLIENT_ID=<google-oauth-client-id>
 RESEND_API_KEY=
 RESEND_FROM_EMAIL=
+AVATAR_STORAGE=local
+BACKEND_PUBLIC_URL=http://127.0.0.1:8000
 ```
+
+Avatar uploads accept JPG, PNG, and WebP images up to 5MB. With `AVATAR_STORAGE=local`, files are stored in the ignored `backend/uploads/avatars` directory and served at `/uploads`; this is intended for local development. `BACKEND_PUBLIC_URL` is optional, but should be set to the externally reachable backend origin when proxy headers do not reflect the public URL.
+
+## Cấu Hình Cloudinary Cho Avatar Trên Render (Bắt Buộc)
+
+Ổ đĩa cục bộ của Render là tạm thời (ephemeral), nên avatar lưu trên đó có thể mất khi service khởi động lại, redeploy hoặc chuyển instance. Vì vậy, môi trường Render bắt buộc dùng Cloudinary. Cấu hình `AVATAR_STORAGE=local` ở trên chỉ dành cho phát triển local.
+
+1. Đăng nhập Cloudinary Dashboard và mở **Dashboard / Product Environment Credentials**.
+2. Sao chép **Cloud name**, **API key** và **API secret**.
+3. Trong Render Dashboard, chọn backend service, mở **Environment** và thêm chính xác các biến sau bằng thông tin Cloudinary của bạn:
+
+```env
+AVATAR_STORAGE=cloudinary
+CLOUDINARY_CLOUD_NAME=<cloud-name>
+CLOUDINARY_API_KEY=<api-key>
+CLOUDINARY_API_SECRET=<api-secret>
+BACKEND_PUBLIC_URL=https://<your-backend>.onrender.com
+```
+
+4. Bấm **Save Changes**, sau đó redeploy backend để cấu hình mới có hiệu lực.
+
+Không ghi giá trị secret thật vào README, Git, frontend hoặc `backend/.env.example`. Nếu chọn `AVATAR_STORAGE=cloudinary` nhưng thiếu một trong ba thông tin Cloudinary, upload avatar sẽ báo lỗi cấu hình và không tự chuyển sang ổ đĩa tạm thời của Render.
 
 Chạy backend:
 
@@ -114,7 +138,10 @@ Health check:
 
 ```text
 http://127.0.0.1:8000/api/health
+http://127.0.0.1:8000/api/health/database
 ```
+
+Endpoint `/api/health/database` thực hiện `SELECT 1`. Nếu trả `503`, kiểm tra MySQL, firewall và kết nối Tailscale trước khi kiểm tra Auth hoặc Profile.
 
 ## Database
 
@@ -123,6 +150,8 @@ Schema chính nằm ở:
 ```text
 database/full_schema.sql
 ```
+
+Profile chỉ dùng các bảng `account`, `candidate`, `company`, và `industry` đã có trong `database/full_schema.sql`. Tính năng này không cần migration riêng hoặc bảng mới.
 
 Nếu tạo database mới:
 
@@ -204,6 +233,19 @@ POST /api/auth/forgot-password
 POST /api/auth/verify-reset-code
 POST /api/auth/reset-password
 ```
+
+## Profile API
+
+Các endpoint dưới đây yêu cầu access token trong header `Authorization: Bearer <token>`:
+
+```text
+GET   /api/profile
+PATCH /api/profile
+POST  /api/profile/avatar
+DELETE /api/profile/avatar
+```
+
+Mọi role có thể cập nhật `account.full_name` và avatar qua upload flow. `Student` có thể cập nhật thêm `candidate.phone` qua candidate liên kết bằng `candidate.account_id`. `HR`, `HiringManager`, và `Admin` có thể cập nhật thông tin công ty và ngành nghề qua các bảng `company` và `industry` hiện có.
 
 Role hợp lệ theo database:
 

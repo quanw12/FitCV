@@ -14,16 +14,9 @@ import CVRankingScreen from '@/ui/screens/CVRankingScreen'
 import PipelineScreen from '@/ui/screens/PipelineScreen'
 import AutoEmailScreen from '@/ui/screens/AutoEmailScreen'
 import ReportsScreen from '@/ui/screens/ReportsScreen'
+import ProfileScreen from '@/ui/screens/ProfileScreen'
 import type { Portal, ScreenId } from '@/types/app'
 import { portalFromAccountRole, type AuthSession } from '@/types/auth'
-
-function ProfilePlaceholder() {
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 300, color: 'var(--text-muted)', fontSize: 16 }}>
-      Profile settings coming soon...
-    </div>
-  )
-}
 
 function defaultScreen(portal: Portal) {
   return portal === 'seeker' ? 'seeker-dashboard' : 'hr-dashboard'
@@ -67,7 +60,7 @@ export default function App() {
       case 'cv-history': return <CVHistoryScreen />
       case 'app-tracker': return <AppTrackerScreen />
       case 'jd-library': return <JDLibraryScreen />
-      case 'profile': return <ProfilePlaceholder />
+      case 'profile': return <ProfileScreen session={session} onSessionChange={setSession} />
       // HR
       case 'hr-dashboard': return <HRDashboard onNavigate={handleNavigate} />
       case 'job-posts': return <JobPostsScreen />
@@ -75,7 +68,7 @@ export default function App() {
       case 'pipeline': return <PipelineScreen />
       case 'auto-email': return <AutoEmailScreen />
       case 'reports': return <ReportsScreen />
-      case 'hr-settings': return <ProfilePlaceholder />
+      case 'hr-settings': return <ProfileScreen session={session} onSessionChange={setSession} />
       default: return portal === 'seeker' ? <SeekerDashboard onNavigate={handleNavigate} /> : <HRDashboard onNavigate={handleNavigate} />
     }
   }
@@ -87,6 +80,7 @@ export default function App() {
       onNavigate={handleNavigate}
       onLogout={handleLogout}
       userName={session.user.fullName}
+      userAvatarUrl={session.user.avatarUrl}
     >
       {renderScreen()}
     </Layout>

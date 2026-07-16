@@ -64,6 +64,7 @@ Current auth behavior:
 - Forgot/reset password uses a 6-digit verification code. The backend stores only the hash in `account.reset_token_hash` and expiry in `account.reset_token_expires_at`.
 - If email sending is not configured, reset codes are printed in the backend terminal as `PASSWORD_RESET_CODE`.
 - Do not reintroduce reset links or UI-exposed reset tokens unless the team explicitly changes the auth design.
+- Profile uses only existing `account`, `candidate`, `company`, and `industry` schema fields. Students edit phone; HR, HiringManager, and Admin edit linked company and industry data.
 
 Core MVP use cases:
 
