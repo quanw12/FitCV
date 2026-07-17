@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
@@ -16,6 +18,11 @@ from app.models.improvement import (
 from app.schemas.improvement import ImprovementReportData
 
 TASK_TYPE = "ImprovementReport"
+PRIORITY_RANK = {
+    SuggestionPriority.high: 0,
+    SuggestionPriority.medium: 1,
+    SuggestionPriority.low: 2,
+}
 
 
 def get_owned_match_result(
@@ -115,13 +122,13 @@ def load_report(db: Session, match_result_id: int) -> ImprovementReportData:
 def replace_report(db: Session, match_result_id: int, report: ImprovementReportData) -> None:
     db.execute(delete(CvImprovementSuggestion).where(CvImprovementSuggestion.match_result_id == match_result_id))
     rows: list[CvImprovementSuggestion] = []
-    for order, item in enumerate(report.skill_gaps):
+    for order, item in enumerate(sorted(report.skill_gaps, key=lambda value: PRIORITY_RANK[value.priority])):
         rows.append(CvImprovementSuggestion(
             match_result_id=match_result_id, suggestion_type=SuggestionType.skill_gap,
             category=SuggestionCategory.skill, suggested_text=item.skill, explanation=item.reason,
             priority=item.priority, sort_order=order, metadata_json={"jd_evidence": item.jd_evidence},
         ))
-    for order, item in enumerate(report.section_feedback):
+    for order, item in enumerate(sorted(report.section_feedback, key=lambda value: PRIORITY_RANK[value.priority])):
         rows.append(CvImprovementSuggestion(
             match_result_id=match_result_id, suggestion_type=SuggestionType.section_feedback,
             category=_category_for_section(item.section.value), section=item.section.value,
@@ -135,13 +142,28 @@ def replace_report(db: Session, match_result_id: int, report: ImprovementReportD
             original_text=item.original_text, suggested_text=item.suggested_text, explanation=item.issue,
             priority=SuggestionPriority.high, sort_order=order, metadata_json={"framework": item.framework},
         ))
-    for order, item in enumerate(report.quick_wins):
+    for order, item in enumerate(sorted(report.quick_wins, key=lambda value: PRIORITY_RANK[value.priority])):
         rows.append(CvImprovementSuggestion(
             match_result_id=match_result_id, suggestion_type=SuggestionType.quick_win,
             category=_category_from_text(item.category), suggested_text=item.title, explanation=item.explanation,
             priority=item.priority, sort_order=order, metadata_json={"category": item.category},
         ))
     db.add_all(rows)
+
+
+def is_report_stale(db: Session, match_result_id: int, completed_at: datetime | None) -> bool:
+    match, parsed, job = get_generation_context(db, match_result_id)
+    cv = db.get(Cv, match.cv_id)
+    if cv is None or completed_at is None:
+        return True
+    source_timestamps = [
+        cv.uploaded_at,
+        parsed.parsed_at if parsed else None,
+        job.updated_at,
+        job.created_at,
+        match.generated_at,
+    ]
+    return any(value is not None and value > completed_at for value in source_timestamps)
 
 
 def _category_for_section(section: str) -> SuggestionCategory:

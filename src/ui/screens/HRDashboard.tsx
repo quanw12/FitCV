@@ -1,7 +1,8 @@
 import { Briefcase, FileText, TrendingUp, Upload, Plus, ArrowRight, Star, BarChart3 } from 'lucide-react'
+import type { ScreenId } from '@/types/app'
 
 interface HRDashboardProps {
-  onNavigate: (screen: string) => void
+  onNavigate: (screen: ScreenId) => void
 }
 
 function MiniBars({ values, color }: { values: number[]; color: string }) {

@@ -10,6 +10,12 @@ const breakdowns = [
   { label: 'Soft Skills', score: 62 },
 ]
 
+function demoMatchResultId(): string | null {
+  const seededMatchResultId = import.meta.env.VITE_IMPROVEMENT_DEMO_MATCH_RESULT_ID?.trim()
+  if (seededMatchResultId) return seededMatchResultId
+  return import.meta.env.VITE_IMPROVEMENT_FIXTURE === 'true' ? 'demo' : null
+}
+
 interface AnalyzerScreenProps {
   onAnalysisComplete?: (matchResultId: string) => void
   onViewSuggestions?: () => void
@@ -28,7 +34,8 @@ export default function AnalyzerScreen({ onAnalysisComplete, onViewSuggestions }
       setLoading(false)
       setAnalyzed(true)
       // Temporary adapter until the Analyzer backend returns its real matchResultId.
-      onAnalysisComplete?.('demo')
+      const matchResultId = demoMatchResultId()
+      if (matchResultId) onAnalysisComplete?.(matchResultId)
     }, 1800)
   }
 
