@@ -23,6 +23,11 @@ class Settings(BaseSettings):
     improvement_provider: str = "fixture"
     gemini_api_key: str | None = None
     gemini_model: str = "gemini-2.5-flash"
+    gemini_timeout_seconds: float = 30.0
+    gemini_max_retries: int = 2
+    improvement_task_stale_minutes: int = 10
+    improvement_max_cv_chars: int = 120_000
+    improvement_max_jd_chars: int = 60_000
     cors_origins: list[str] = [
         "http://localhost:5173",
         "http://127.0.0.1:5173",

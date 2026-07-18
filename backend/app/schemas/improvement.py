@@ -22,16 +22,16 @@ class StrictSchema(BaseModel):
 class SkillGap(StrictSchema):
     skill: str = Field(min_length=1, max_length=100)
     priority: SuggestionPriority
-    reason: str = Field(min_length=1)
-    jd_evidence: str = Field(min_length=1)
+    reason: str = Field(min_length=1, max_length=1000)
+    jd_evidence: str = Field(min_length=1, max_length=1000)
 
 
 class SectionFeedback(StrictSchema):
     section: CvSection
-    issue: str = Field(min_length=1)
-    explanation: str = Field(min_length=1)
+    issue: str = Field(min_length=1, max_length=1000)
+    explanation: str = Field(min_length=1, max_length=2000)
     priority: SuggestionPriority
-    suggested_action: str = Field(min_length=1)
+    suggested_action: str = Field(min_length=1, max_length=2000)
 
     @field_validator("section", mode="before")
     @classmethod
@@ -44,9 +44,9 @@ class SectionFeedback(StrictSchema):
 
 class RewriteSuggestion(StrictSchema):
     section: CvSection
-    original_text: str = Field(min_length=1)
-    issue: str = Field(min_length=1)
-    suggested_text: str = Field(min_length=1)
+    original_text: str = Field(min_length=1, max_length=3000)
+    issue: str = Field(min_length=1, max_length=1000)
+    suggested_text: str = Field(min_length=1, max_length=3000)
     framework: str = Field(default="Problem → Action → Result", min_length=1, max_length=100)
 
     @field_validator("section", mode="before")
@@ -59,14 +59,14 @@ class QuickWin(StrictSchema):
     title: str = Field(min_length=1, max_length=200)
     category: str = Field(min_length=1, max_length=50)
     priority: SuggestionPriority
-    explanation: str = Field(min_length=1)
+    explanation: str = Field(min_length=1, max_length=1000)
 
 
 class ImprovementReportData(StrictSchema):
-    skill_gaps: list[SkillGap] = Field(default_factory=list)
-    section_feedback: list[SectionFeedback] = Field(default_factory=list)
-    rewrite_suggestions: list[RewriteSuggestion] = Field(default_factory=list)
-    quick_wins: list[QuickWin] = Field(default_factory=list)
+    skill_gaps: list[SkillGap] = Field(default_factory=list, max_length=30)
+    section_feedback: list[SectionFeedback] = Field(default_factory=list, max_length=50)
+    rewrite_suggestions: list[RewriteSuggestion] = Field(default_factory=list, max_length=30)
+    quick_wins: list[QuickWin] = Field(default_factory=list, max_length=30)
 
 
 class ImprovementReportResponse(BaseModel):

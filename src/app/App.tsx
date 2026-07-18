@@ -29,13 +29,19 @@ function defaultScreen(portal: Portal) {
   return portal === 'seeker' ? 'seeker-dashboard' : 'hr-dashboard'
 }
 
+function initialImprovementMatchResultId(): string | null {
+  const seededMatchResultId = import.meta.env.VITE_IMPROVEMENT_DEMO_MATCH_RESULT_ID?.trim()
+  if (seededMatchResultId) return seededMatchResultId
+  return import.meta.env.VITE_IMPROVEMENT_FIXTURE === 'true' ? 'demo' : null
+}
+
 export default function App() {
   const [session, setSession] = useState<AuthSession | null>(() => authApi.getSession())
   const [screen, setScreen] = useState<ScreenId | ''>(() => {
     const currentSession = authApi.getSession()
     return currentSession?.user.role ? defaultScreen(portalFromAccountRole(currentSession.user.role)) : ''
   })
-  const [improvementMatchResultId, setImprovementMatchResultId] = useState<string | null>('demo')
+  const [improvementMatchResultId, setImprovementMatchResultId] = useState<string | null>(() => initialImprovementMatchResultId())
   const portal = session?.user.role ? portalFromAccountRole(session.user.role) : null
 
   const handleAuth = (nextSession: AuthSession) => {
@@ -63,7 +69,7 @@ export default function App() {
       // Seeker
       case 'seeker-dashboard': return <SeekerDashboard onNavigate={handleNavigate} />
       case 'analyzer': return <AnalyzerScreen onAnalysisComplete={setImprovementMatchResultId} onViewSuggestions={() => setScreen('improvement')} />
-      case 'improvement': return <ImprovementScreen matchResultId={improvementMatchResultId ?? 'demo'} />
+      case 'improvement': return <ImprovementScreen matchResultId={improvementMatchResultId} />
       case 'cv-history': return <CVHistoryScreen />
       case 'app-tracker': return <AppTrackerScreen />
       case 'jd-library': return <JDLibraryScreen />

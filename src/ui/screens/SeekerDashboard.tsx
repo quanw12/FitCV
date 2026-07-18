@@ -1,8 +1,9 @@
 import { Trophy, TrendingUp, FileText, CheckSquare, Plus, ArrowRight, Clock, Zap, Sparkles } from 'lucide-react'
 import ScoreRing from '../components/ScoreRing'
+import type { ScreenId } from '@/types/app'
 
 interface SeekerDashboardProps {
-  onNavigate: (screen: string) => void
+  onNavigate: (screen: ScreenId) => void
 }
 
 function Sparkline({ points, color }: { points: number[]; color: string }) {
@@ -156,12 +157,12 @@ export default function SeekerDashboard({ onNavigate }: SeekerDashboardProps) {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div className="fc-card fc-card--pad">
             <h3 style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 14 }}>Quick Actions</h3>
-            {[
+            {([
               { label: 'Analyze new JD', screen: 'analyzer', icon: <Zap size={15} />, color: '#2563EB' },
               { label: 'View improvement tips', screen: 'improvement', icon: <TrendingUp size={15} />, color: '#16A34A' },
               { label: 'Track application', screen: 'app-tracker', icon: <CheckSquare size={15} />, color: '#D97706' },
               { label: 'Browse JD library', screen: 'jd-library', icon: <FileText size={15} />, color: '#64748B' },
-            ].map(a => (
+            ] as const).map(a => (
               <button
                 key={a.screen}
                 onClick={() => onNavigate(a.screen)}

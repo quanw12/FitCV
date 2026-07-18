@@ -2,39 +2,29 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { AlertCircle, CheckSquare, ChevronDown, ChevronUp, Clipboard, Lightbulb, RefreshCw, Square } from 'lucide-react'
 import { fitcvApi } from '@/api/fitcvApi'
-import type { CvSection, ImprovementReport, ImprovementReportResponse, SuggestionPriority } from '@/types/improvement'
-
-const priorityRank: Record<SuggestionPriority, number> = { High: 0, Medium: 1, Low: 2 }
-const sectionLabel: Record<CvSection, string> = {
-  Summary: 'Summary', WorkExperience: 'Work Experience', Skills: 'Skills',
-  Education: 'Education', Projects: 'Projects', Other: 'Other',
-}
+import { priorityBadge, priorityRank, scoreLabel, sectionLabel } from '@/services/improvementReport'
+import type { ImprovementReportResponse } from '@/types/improvement'
 
 interface ImprovementScreenProps {
   matchResultId?: string | null
 }
 
-function priorityBadge(priority: SuggestionPriority): string {
-  return priority === 'High' ? 'fc-badge fc-badge--red' : priority === 'Medium' ? 'fc-badge fc-badge--amber' : 'fc-badge fc-badge--blue'
-}
-
-function scoreLabel(score: number): string {
-  return score >= 80 ? 'Strong Match' : score >= 50 ? 'Moderate Match' : 'Weak Match'
-}
-
-export default function ImprovementScreen({ matchResultId = 'demo' }: ImprovementScreenProps) {
+export default function ImprovementScreen({ matchResultId = null }: ImprovementScreenProps) {
   const [response, setResponse] = useState<ImprovementReportResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [completedWins, setCompletedWins] = useState<Set<string>>(new Set())
   const [copyMessage, setCopyMessage] = useState<Record<string, string>>({})
-  const cancelledRef = useRef(false)
+  const requestIdRef = useRef(0)
 
   const loadReport = useCallback(async (regenerate = false) => {
+    const requestId = requestIdRef.current + 1
+    requestIdRef.current = requestId
     if (!matchResultId) {
       setLoading(false)
       setResponse(null)
+      setError(null)
       return
     }
     setLoading(true)
@@ -50,26 +40,25 @@ export default function ImprovementScreen({ matchResultId = 'demo' }: Improvemen
       }
 
       for (let attempt = 0; attempt < 30 && ['Pending', 'Processing'].includes(current.status); attempt += 1) {
-        if (cancelledRef.current) return
+        if (requestIdRef.current !== requestId) return
         setResponse(current)
         await new Promise(resolve => window.setTimeout(resolve, 2000))
-        if (cancelledRef.current) return
+        if (requestIdRef.current !== requestId) return
         current = await fitcvApi.getImprovementReport(matchResultId)
       }
       if (['Pending', 'Processing'].includes(current.status)) throw new Error('Analysis is taking longer than expected. Please retry shortly.')
       if (current.status === 'Failed') throw new Error(current.errorMessage ?? 'AI suggestions could not be generated.')
-      if (!cancelledRef.current) setResponse(current)
+      if (requestIdRef.current === requestId) setResponse(current)
     } catch (caught) {
-      if (!cancelledRef.current) setError(caught instanceof Error ? caught.message : 'Unable to load improvement suggestions.')
+      if (requestIdRef.current === requestId) setError(caught instanceof Error ? caught.message : 'Unable to load improvement suggestions.')
     } finally {
-      if (!cancelledRef.current) setLoading(false)
+      if (requestIdRef.current === requestId) setLoading(false)
     }
   }, [matchResultId])
 
   useEffect(() => {
-    cancelledRef.current = false
     void loadReport()
-    return () => { cancelledRef.current = true }
+    return () => { requestIdRef.current += 1 }
   }, [loadReport])
 
   const report = response?.report
@@ -77,8 +66,6 @@ export default function ImprovementScreen({ matchResultId = 'demo' }: Improvemen
   const feedback = useMemo(() => [...(report?.sectionFeedback ?? [])].sort((a, b) => priorityRank[a.priority] - priorityRank[b.priority]), [report])
   const rewrites = report?.rewriteSuggestions ?? []
   const quickWins = useMemo(() => [...(report?.quickWins ?? [])].sort((a, b) => priorityRank[a.priority] - priorityRank[b.priority]), [report])
-  const sections = useMemo(() => Array.from(new Set([...feedback.map(item => item.section), ...rewrites.map(item => item.section)])), [feedback, rewrites])
-
   const toggleExpanded = (id: string) => setExpanded(previous => {
     const next = new Set(previous)
     next.has(id) ? next.delete(id) : next.add(id)
@@ -101,14 +88,16 @@ export default function ImprovementScreen({ matchResultId = 'demo' }: Improvemen
     window.setTimeout(() => setCopyMessage(previous => ({ ...previous, [id]: '' })), 1800)
   }
 
-  const isProcessing = loading || response?.status === 'Pending' || response?.status === 'Processing'
+  const isProcessing = Boolean(matchResultId) && (
+    loading || response?.status === 'Pending' || response?.status === 'Processing'
+  )
 
   return (
     <div className="improvement-layout">
       <aside className="fc-card improvement-sidebar" aria-label="Improvement report contents">
         <div className="improvement-eyebrow">Contents</div>
         <a href="#skill-gaps">Skill Gap Report</a>
-        {sections.map(section => <a key={section} href={`#section-${section}`}>{sectionLabel[section]}</a>)}
+        <a href="#section-feedback">Section Feedback</a>
         <a href="#rewrites">Rewrite Suggestions</a>
         <a href="#quick-wins">Quick Wins</a>
         {response?.overallScore != null && (
@@ -155,10 +144,10 @@ export default function ImprovementScreen({ matchResultId = 'demo' }: Improvemen
               )}
             </section>
 
-            <section className="fc-card improvement-section">
+            <section id="section-feedback" className="fc-card improvement-section">
               <SectionTitle title="Section-by-section Feedback" count={feedback.length} />
               {feedback.length === 0 ? <Empty message="No section-specific feedback is available." /> : feedback.map(item => (
-                <article id={`section-${item.section}`} key={item.id} className="feedback-item">
+                <article key={item.id} className="feedback-item">
                   <button onClick={() => toggleExpanded(item.id)} aria-expanded={expanded.has(item.id)} aria-controls={`feedback-${item.id}`}>
                     <span>{sectionLabel[item.section]} — {item.issue}</span>
                     <span className={priorityBadge(item.priority)}>{item.priority}</span>
