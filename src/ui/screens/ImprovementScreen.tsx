@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { AlertCircle, CheckSquare, ChevronDown, ChevronUp, Clipboard, Lightbulb, RefreshCw, Square } from 'lucide-react'
-import { fitcvApi } from '@/api/fitcvApi'
+import { improvementApi } from '@/api/improvementApi'
 import { priorityBadge, priorityRank, scoreLabel, sectionLabel } from '@/services/improvementReport'
 import type { ImprovementReportResponse } from '@/types/improvement'
 
@@ -31,11 +31,11 @@ export default function ImprovementScreen({ matchResultId = null }: ImprovementS
     setError(null)
     setCompletedWins(new Set())
     try {
-      let current = await fitcvApi.getImprovementReport(matchResultId)
+      let current = await improvementApi.getReport(matchResultId)
       if (current.status === 'Pending' && !current.report) {
-        await fitcvApi.generateImprovementReport(matchResultId, regenerate)
+        await improvementApi.generateReport(matchResultId, regenerate)
       } else if (regenerate) {
-        await fitcvApi.generateImprovementReport(matchResultId, true)
+        await improvementApi.generateReport(matchResultId, true)
         current = { ...current, status: 'Pending', report: null }
       }
 
@@ -44,7 +44,7 @@ export default function ImprovementScreen({ matchResultId = null }: ImprovementS
         setResponse(current)
         await new Promise(resolve => window.setTimeout(resolve, 2000))
         if (requestIdRef.current !== requestId) return
-        current = await fitcvApi.getImprovementReport(matchResultId)
+        current = await improvementApi.getReport(matchResultId)
       }
       if (['Pending', 'Processing'].includes(current.status)) throw new Error('Analysis is taking longer than expected. Please retry shortly.')
       if (current.status === 'Failed') throw new Error(current.errorMessage ?? 'AI suggestions could not be generated.')

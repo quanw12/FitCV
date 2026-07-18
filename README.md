@@ -52,7 +52,6 @@ cp .env.example .env.local
 ```env
 VITE_API_BASE_URL=http://127.0.0.1:8000
 VITE_GOOGLE_CLIENT_ID=<google-oauth-client-id>
-VITE_ANALYZER_FIXTURE=false
 ```
 
 Frontend production currently falls back to this backend URL if `VITE_API_BASE_URL` is not set:
@@ -105,10 +104,9 @@ JWT_SECRET_KEY=<local-secret>
 GOOGLE_CLIENT_ID=<google-oauth-client-id>
 RESEND_API_KEY=
 RESEND_FROM_EMAIL=
-IMPROVEMENT_PROVIDER=fixture
 ANALYZER_PROVIDER=deterministic
-GEMINI_API_KEY=
-GEMINI_MODEL=gemini-3.1-flash-lite
+GEMINI_API_KEY=<google-ai-studio-api-key>
+GEMINI_MODEL=gemini-3.5-flash
 ```
 
 Chạy backend:
@@ -152,33 +150,16 @@ POST /api/match-results/{match_result_id}/improvement-report/generate
 GET  /api/match-results/{match_result_id}/improvement-report
 ```
 
-Chạy nhanh bằng dữ liệu fixture deterministic:
+Feature luôn dùng backend và Gemini thật. Cấu hình trong `backend/.env`:
 
 ```env
-# backend/.env
-IMPROVEMENT_PROVIDER=fixture
-```
-
-Để chỉ test UI mà chưa cần database/backend, đặt trong `.env.local` ở thư mục root project:
-
-```env
-VITE_IMPROVEMENT_FIXTURE=true
-```
-
-Sau khi đổi biến `VITE_*`, restart Vite. Đặt `VITE_IMPROVEMENT_FIXTURE=false` khi test backend thật.
-
-Test với Gemini:
-
-```env
-# backend/.env
-IMPROVEMENT_PROVIDER=gemini
 GEMINI_API_KEY=<google-ai-studio-api-key>
-GEMINI_MODEL=gemini-3.1-flash-lite
+GEMINI_MODEL=gemini-3.5-flash
 ```
 
 Lấy key miễn phí tại Google AI Studio: https://aistudio.google.com/app/apikey. Không đặt `GEMINI_API_KEY` trong frontend `.env.local`, không commit key lên Git.
 
-Luồng backend thật cần Analyzer hoàn thành trước và trả về `match_result_id` của một CV đã parse thành công cùng JD tương ứng. Sau đó frontend truyền ID này sang màn hình `AI Suggestions`; nút `Regenerate` sẽ gọi lại provider đang cấu hình.
+Luồng backend cần Analyzer hoàn thành trước và trả về `match_result_id` của một CV đã parse thành công cùng JD tương ứng. Sau đó frontend truyền ID này sang màn hình `AI Suggestions`; nút `Regenerate` sẽ gọi Gemini lại.
 
 Backend không tự `create_all()` schema. Nếu database thật thiếu cột, phải migrate bằng SQL trước khi chạy API.
 
@@ -270,14 +251,14 @@ GET    /api/analyzer/matches/{match_result_id}
 - CV parsing và matching chạy bằng FastAPI background tasks. Frontend poll trạng thái `Pending`, `Processing`, `Success`, `Failed`.
 - MVP matcher dùng evidence có thể kiểm tra lại: Skills 45%, Experience 30%, Education 15%, Soft skills 10%. Nếu JD thiếu category, trọng số được phân bổ lại trên các category còn lại.
 - `ANALYZER_PROVIDER=deterministic` là mặc định và không gọi dịch vụ AI bên ngoài.
-- Để Gemini đọc text CV/JD và trích xuất keyword, đặt `ANALYZER_PROVIDER=gemini`, `GEMINI_API_KEY=<server-side-key>`, và `GEMINI_MODEL=gemini-3.1-flash-lite` trong `backend/.env`, sau đó restart backend.
+- Để Gemini đọc text CV/JD và trích xuất keyword, đặt `ANALYZER_PROVIDER=gemini`, `GEMINI_API_KEY=<server-side-key>`, và `GEMINI_MODEL=gemini-3.5-flash` trong `backend/.env`, sau đó restart backend.
 - Gemini chỉ làm bước semantic extraction; FitCV che các contact field phổ biến, yêu cầu quote bằng chứng có thật trong source, validate structured output bằng Pydantic, rồi mới tính score bằng trọng số cố định. PDF/DOCX binary không được gửi lên Gemini.
 - Không đặt `GEMINI_API_KEY` trong `.env.local`, biến `VITE_*`, frontend source, hoặc Git.
 - Pass probability là heuristic hỗ trợ quyết định, không phải dữ liệu tuyển dụng lịch sử và không tự động accept/reject ứng viên.
 - PDF dạng scan chưa có OCR; cần chuyển thành PDF có text hoặc DOCX trước khi upload.
 - Database hiện hữu cần chạy `database/migrations/003_add_cv_jd_analyzer.sql` trước khi bật API này.
 
-### Bật Gemini 3.1 Flash-Lite cho Analyzer
+### Bật Gemini 3.5 Flash cho Analyzer
 
 1. Mở [Google AI Studio](https://aistudio.google.com/app/apikey), đăng nhập và tạo Gemini API key.
 2. Mở `backend/.env` và đặt cấu hình sau. API key chỉ được lưu ở backend:
@@ -285,7 +266,7 @@ GET    /api/analyzer/matches/{match_result_id}
 ```env
 ANALYZER_PROVIDER=gemini
 GEMINI_API_KEY=<your-secret-key>
-GEMINI_MODEL=gemini-3.1-flash-lite
+GEMINI_MODEL=gemini-3.5-flash
 GEMINI_TIMEOUT_SECONDS=30
 GEMINI_MAX_RETRIES=2
 ```
@@ -294,7 +275,6 @@ GEMINI_MAX_RETRIES=2
 
 ```env
 VITE_API_BASE_URL=http://127.0.0.1:8000
-VITE_ANALYZER_FIXTURE=false
 ```
 
 4. Chạy migration `database/migrations/003_add_cv_jd_analyzer.sql` trên database FitCV hiện hữu. Nếu tạo database mới từ `database/full_schema.sql` thì không cần chạy lại migration này.
@@ -303,9 +283,9 @@ VITE_ANALYZER_FIXTURE=false
 
 Pipeline thật là: FitCV lấy text từ PDF/DOCX ở backend → che email, phone, URL, contact fields và name header phổ biến → gọi Gemini GenerateContent với JSON Schema → Gemini trích xuất kỹ năng, kinh nghiệm, học vấn, soft skills và quote nguồn → FitCV validate đúng schema, loại evidence không xuất hiện trong source rồi tự tính điểm bằng trọng số cố định. File binary, API key và quyết định tuyển dụng không được gửi ra frontend.
 
-`gemini-3.1-flash-lite` hỗ trợ structured output. Backend gửi API key bằng header `x-goog-api-key`, không đặt key trong URL, rồi vẫn validate kết quả bằng Pydantic trước khi chấm điểm. Output sai schema hoặc evidence không có trong source sẽ fail an toàn. Redaction là best-effort, không thay thế consent và privacy policy; khi test nên dùng CV giả hoặc đã ẩn danh.
+`gemini-3.5-flash` hỗ trợ structured output. Backend gửi API key bằng header `x-goog-api-key`, không đặt key trong URL, rồi vẫn validate kết quả bằng Pydantic trước khi chấm điểm. Output sai schema hoặc evidence không có trong source sẽ fail an toàn. Redaction là best-effort, không thay thế consent và privacy policy; khi test nên dùng CV giả hoặc đã ẩn danh.
 
-Analyzer chỉ dùng dữ liệu demo khi bạn chủ động đặt `VITE_ANALYZER_FIXTURE=true`. Nếu quên `VITE_API_BASE_URL`, UI sẽ báo lỗi cấu hình thay vì âm thầm trả kết quả hard-code.
+Analyzer luôn gọi backend thật; không còn nhánh fixture hoặc kết quả hard-code ở frontend.
 
 Lỗi thường gặp:
 

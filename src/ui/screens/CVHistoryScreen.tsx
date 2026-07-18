@@ -9,7 +9,7 @@ import {
   Upload,
 } from "lucide-react"
 
-import { fitcvApi } from "@/api/fitcvApi"
+import { analyzerApi } from "@/api/analyzerApi"
 import type { CvVersion } from "@/types/analyzer"
 
 const MAX_CV_BYTES = 10 * 1024 * 1024
@@ -27,7 +27,7 @@ export default function CVHistoryScreen() {
     setLoading(true)
     setError(null)
     try {
-      setCvs(await fitcvApi.listCvs())
+      setCvs(await analyzerApi.listCvs())
     } catch (caught) {
       setError(
         caught instanceof Error ? caught.message : "Unable to load CV history.",
@@ -51,7 +51,7 @@ export default function CVHistoryScreen() {
     setUploading(true)
     setError(null)
     try {
-      await fitcvApi.uploadCv(file)
+      await analyzerApi.uploadCv(file)
       await loadCvs()
     } catch (caught) {
       setError(
@@ -68,7 +68,7 @@ export default function CVHistoryScreen() {
     setDeletingId(cv.cvId)
     setError(null)
     try {
-      await fitcvApi.deleteCv(cv.cvId)
+      await analyzerApi.deleteCv(cv.cvId)
       setSelected((current) => current.filter((id) => id !== cv.cvId))
       await loadCvs()
     } catch (caught) {

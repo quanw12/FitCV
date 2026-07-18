@@ -60,12 +60,6 @@ function emptyAnalyzerDraft(): AnalyzerDraftState {
   return { cvFile: null, uploadedCvId: null, jdText: "", result: null }
 }
 
-function initialImprovementMatchResultId(): string | null {
-  const seededMatchResultId = import.meta.env.VITE_IMPROVEMENT_DEMO_MATCH_RESULT_ID?.trim()
-  if (seededMatchResultId) return seededMatchResultId
-  return import.meta.env.VITE_IMPROVEMENT_FIXTURE === 'true' ? 'demo' : null
-}
-
 export default function App() {
   const [session, setSession] = useState<AuthSession | null>(() =>
     authApi.getSession(),
@@ -79,8 +73,7 @@ export default function App() {
       : ""
   })
   const [improvementMatchResultId, setImprovementMatchResultId] =
-    useState<string | null>(() => initialImprovementMatchResultId())
-  // ponytail: App memory preserves the browser File across screen switches; use IndexedDB only if refresh persistence is later required.
+    useState<string | null>(null)
   const [analyzerDraft, setAnalyzerDraft] =
     useState<AnalyzerDraftState>(emptyAnalyzerDraft)
   const portal = session?.user.role
@@ -90,7 +83,7 @@ export default function App() {
   const handleAuth = (nextSession: AuthSession) => {
     setSession(nextSession)
     setAnalyzerDraft(emptyAnalyzerDraft())
-    setImprovementMatchResultId(initialImprovementMatchResultId())
+    setImprovementMatchResultId(null)
 
     if (nextSession.user.role) {
       const nextPortal = portalFromAccountRole(nextSession.user.role)

@@ -1,7 +1,7 @@
 import { useRef, useState } from "react"
 import { AlertCircle, FileText, Trash2, Upload, Zap } from "lucide-react"
 
-import { fitcvApi } from "@/api/fitcvApi"
+import { analyzerApi } from "@/api/analyzerApi"
 import { getScoreTone } from "@/services/matchScore"
 import type { AnalyzerDraftState, MatchAnalysis } from "@/types/analyzer"
 import ScoreRing from "../components/ScoreRing"
@@ -59,7 +59,7 @@ export default function AnalyzerScreen({
     setClearing(true)
     setError(null)
     try {
-      if (uploadedCvId != null) await fitcvApi.deleteCv(uploadedCvId)
+      if (uploadedCvId != null) await analyzerApi.deleteCv(uploadedCvId)
       if (cvInputRef.current) cvInputRef.current.value = ""
       setDraft((current) => ({
         ...current,
@@ -96,7 +96,7 @@ export default function AnalyzerScreen({
       let cvId = uploadedCvId
       if (cvId == null) {
         setProgress("Uploading CV…")
-        const uploaded = await fitcvApi.uploadCv(cvFile)
+        const uploaded = await analyzerApi.uploadCv(cvFile)
         cvId = uploaded.cvId
         setDraft((current) => ({ ...current, uploadedCvId: cvId }))
         if (uploaded.parseStatus !== "Success") {
@@ -106,7 +106,7 @@ export default function AnalyzerScreen({
       }
 
       setProgress("Extracting JD requirements…")
-      let analysis = await fitcvApi.analyzeCv({
+      let analysis = await analyzerApi.analyzeCv({
         cvId,
         jobDescription: jdText.trim(),
       })
@@ -666,7 +666,7 @@ export default function AnalyzerScreen({
 
 async function waitForCv(cvId: number) {
   for (let attempt = 0; attempt < 60; attempt += 1) {
-    const cv = await fitcvApi.getCv(cvId)
+    const cv = await analyzerApi.getCv(cvId)
     if (cv.parseStatus === "Success") return cv
     if (cv.parseStatus === "Failed")
       throw new Error(cv.errorMessage ?? "CV parsing failed.")
@@ -679,7 +679,7 @@ async function waitForCv(cvId: number) {
 
 async function waitForMatch(matchResultId: string) {
   for (let attempt = 0; attempt < 60; attempt += 1) {
-    const match = await fitcvApi.getMatchResult(matchResultId)
+    const match = await analyzerApi.getMatchResult(matchResultId)
     if (match.status === "Success") return match
     if (match.status === "Failed")
       throw new Error(match.errorMessage ?? "CV/JD matching failed.")
