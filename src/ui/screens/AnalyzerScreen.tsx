@@ -10,18 +10,7 @@ const breakdowns = [
   { label: 'Soft Skills', score: 62 },
 ]
 
-function demoMatchResultId(): string | null {
-  const seededMatchResultId = import.meta.env.VITE_IMPROVEMENT_DEMO_MATCH_RESULT_ID?.trim()
-  if (seededMatchResultId) return seededMatchResultId
-  return import.meta.env.VITE_IMPROVEMENT_FIXTURE === 'true' ? 'demo' : null
-}
-
-interface AnalyzerScreenProps {
-  onAnalysisComplete?: (matchResultId: string) => void
-  onViewSuggestions?: () => void
-}
-
-export default function AnalyzerScreen({ onAnalysisComplete, onViewSuggestions }: AnalyzerScreenProps) {
+export default function AnalyzerScreen() {
   const [analyzed, setAnalyzed] = useState(false)
   const [loading, setLoading] = useState(false)
   const [cvFile, setCvFile] = useState<string | null>(null)
@@ -33,9 +22,6 @@ export default function AnalyzerScreen({ onAnalysisComplete, onViewSuggestions }
     setTimeout(() => {
       setLoading(false)
       setAnalyzed(true)
-      // Temporary adapter until the Analyzer backend returns its real matchResultId.
-      const matchResultId = demoMatchResultId()
-      if (matchResultId) onAnalysisComplete?.(matchResultId)
     }, 1800)
   }
 
@@ -217,11 +203,6 @@ export default function AnalyzerScreen({ onAnalysisComplete, onViewSuggestions }
                 ))}
               </div>
             </div>
-            {onViewSuggestions && (
-              <button className="fc-btn fc-btn--primary" onClick={onViewSuggestions} style={{ marginTop: 18 }}>
-                View improvement suggestions
-              </button>
-            )}
           </div>
         </div>
       )}

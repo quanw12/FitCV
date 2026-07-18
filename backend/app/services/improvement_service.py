@@ -7,11 +7,13 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.db.session import SessionLocal
-from app.models.account import Account, AccountRole
+from app.models.account import Account
 from app.models.improvement import AiTask, AiTaskStatus, MatchResult
 from app.repositories import improvements
 from app.schemas.improvement import GenerateImprovementResponse, ImprovementReportResponse
-from app.services.improvement_provider import ImprovementProviderError, get_improvement_provider, validate_report_grounding
+from app.services.improvement_provider import ImprovementProviderError, get_improvement_provider
+from app.services.improvement_report_mapper import report_to_suggestions, suggestions_to_report
+from app.services.improvement_validator import ImprovementValidationError, validate_report_grounding
 
 logger = logging.getLogger(__name__)
 
@@ -28,11 +30,6 @@ def _owned_match_or_404(
     )
     if match is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Match result not found.")
-    if account.role != AccountRole.student:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Improvement suggestions are available for student accounts.",
-        )
     return match
 
 
@@ -47,19 +44,32 @@ def _mark_stale_task_failed(db: Session, task: AiTask) -> None:
 def _validate_generation_context(parsed_cv: dict | str | None, job_description: str) -> None:
     cv_text = json.dumps(parsed_cv, ensure_ascii=False) if isinstance(parsed_cv, dict) else str(parsed_cv or "")
     if not cv_text.strip():
-        raise ImprovementProviderError("A successful CV parse is required before generating improvements.")
+        raise ImprovementValidationError("A successful CV parse is required before generating improvements.")
     if not job_description.strip():
-        raise ImprovementProviderError("A job description is required before generating improvements.")
+        raise ImprovementValidationError("A job description is required before generating improvements.")
     if len(cv_text) > settings.improvement_max_cv_chars:
-        raise ImprovementProviderError("The parsed CV is too large for improvement generation.")
+        raise ImprovementValidationError("The parsed CV is too large for improvement generation.")
     if len(job_description) > settings.improvement_max_jd_chars:
-        raise ImprovementProviderError("The job description is too large for improvement generation.")
+        raise ImprovementValidationError("The job description is too large for improvement generation.")
 
 
 def _safe_error_message(exc: Exception) -> str:
-    if isinstance(exc, ImprovementProviderError):
+    if isinstance(exc, (ImprovementProviderError, ImprovementValidationError)):
         return str(exc)[:1000] or "Improvement generation failed."
     return "Improvement generation failed. Please try again."
+
+
+def _is_report_stale(
+    db: Session,
+    match_result_id: int,
+    completed_at: datetime | None,
+) -> bool:
+    if completed_at is None:
+        return True
+    timestamps = improvements.get_report_source_timestamps(db, match_result_id)
+    return not timestamps or any(
+        value is not None and value > completed_at for value in timestamps
+    )
 
 
 def request_generation(
@@ -122,7 +132,8 @@ def run_generation_task(task_id: int) -> None:
             },
         )
         validate_report_grounding(report, parsed_cv, description)
-        improvements.replace_report(db, task.resource_id, report)
+        rows = report_to_suggestions(task.resource_id, report)
+        improvements.replace_suggestions(db, task.resource_id, rows)
         task.status = AiTaskStatus.success
         task.error_message = None
         task.completed_at = _utcnow_naive()
@@ -135,7 +146,7 @@ def run_generation_task(task_id: int) -> None:
             task.completed_at = _utcnow_naive()
             db.add(task)
             db.commit()
-        if not isinstance(exc, ImprovementProviderError):
+        if not isinstance(exc, (ImprovementProviderError, ImprovementValidationError)):
             logger.exception("Unexpected improvement generation failure for task %s", task_id)
     finally:
         db.close()
@@ -149,8 +160,16 @@ def get_report(db: Session, *, match_result_id: int, account: Account) -> Improv
             match_result_id=match_result_id, status=AiTaskStatus.pending,
             overall_score=float(match.overall_score),
         )
-    report = improvements.load_report(db, match_result_id) if task.status == AiTaskStatus.success else None
-    stale = task.status == AiTaskStatus.success and improvements.is_report_stale(db, match_result_id, task.completed_at)
+    report = (
+        suggestions_to_report(improvements.get_suggestions(db, match_result_id))
+        if task.status == AiTaskStatus.success
+        else None
+    )
+    stale = task.status == AiTaskStatus.success and _is_report_stale(
+        db,
+        match_result_id,
+        task.completed_at,
+    )
     return ImprovementReportResponse(
         match_result_id=match_result_id,
         status=task.status,

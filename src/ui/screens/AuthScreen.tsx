@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type CSSProperties, type FormEvent, type ReactNode } from 'react'
-import { ArrowLeft, ArrowRight, Briefcase, Eye, EyeOff, Lock, Mail, RotateCcw, User, Users, Zap, Sparkles, Check, Compass } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Briefcase, Eye, EyeOff, Lock, Mail, RotateCcw, User, Users, Zap, Sparkles, Check } from 'lucide-react'
 import { authApi } from '@/api'
 import { hasAuthErrors, validateEmail, validateLogin, validateRegister, validateResetPassword, validateVerifyResetCode } from '@/services'
 import type { AccountRole, AuthFormErrors, AuthMode, AuthSession } from '@/types/auth'
@@ -80,15 +80,10 @@ export default function AuthScreen({ onAuth, startInRoleSelection = false }: Aut
   const [notice, setNotice] = useState('')
   const [googleError, setGoogleError] = useState('')
   const [loading, setLoading] = useState(false)
-  const [demoOpen, setDemoOpen] = useState(false)
 
   const resetFeedback = () => {
     setErrors({})
     setNotice('')
-  }
-
-  const startDemo = (role: AccountRole) => {
-    onAuth(authApi.createDemoSession(role))
   }
 
   const finishAuth = (session: AuthSession) => {
@@ -480,36 +475,6 @@ export default function AuthScreen({ onAuth, startInRoleSelection = false }: Aut
                 </button>
               </form>
 
-              {/* Explore without backend toggle */}
-              <div style={{ marginTop: 22 }}>
-                {!demoOpen ? (
-                  <button
-                    onClick={() => setDemoOpen(true)}
-                    style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '11px 16px', borderRadius: 11, border: '1px dashed var(--border-strong)', background: 'transparent', cursor: 'pointer', color: 'var(--text-secondary)', fontSize: 13.5, fontWeight: 600 }}
-                  >
-                    <Compass size={15} /> Explore the product without an account
-                  </button>
-                ) : (
-                  <div style={{ padding: 16, borderRadius: 14, border: '1px solid var(--border)', background: 'var(--surface)', animation: 'fc-pop 0.16s ease' }}>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 12 }}>Preview a workspace</div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                      <button onClick={() => startDemo('Student')} style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 6, padding: '14px 14px', borderRadius: 12, border: '1px solid var(--border)', background: 'var(--surface-2)', cursor: 'pointer', textAlign: 'left' }}>
-                        <span style={{ width: 34, height: 34, borderRadius: 10, background: 'var(--accent-soft)', color: 'var(--accent-ink)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><User size={17} /></span>
-                        <span style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--text-primary)' }}>Job Seeker</span>
-                        <span style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>Analyze & improve CVs</span>
-                      </button>
-                      <button onClick={() => startDemo('HR')} style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 6, padding: '14px 14px', borderRadius: 12, border: '1px solid var(--border)', background: 'var(--surface-2)', cursor: 'pointer', textAlign: 'left' }}>
-                        <span style={{ width: 34, height: 34, borderRadius: 10, background: 'var(--accent-soft)', color: 'var(--accent-ink)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Briefcase size={17} /></span>
-                        <span style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--text-primary)' }}>HR Recruiter</span>
-                        <span style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>Rank & pipeline</span>
-                      </button>
-                    </div>
-                    <button onClick={() => setDemoOpen(false)} style={{ width: '100%', marginTop: 10, background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: 12.5, cursor: 'pointer', padding: 4, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 5 }}>
-                      <ArrowLeft size={13} /> Back to sign in
-                    </button>
-                  </div>
-                )}
-              </div>
             </>
           ) : (
             <>

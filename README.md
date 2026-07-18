@@ -96,9 +96,8 @@ JWT_SECRET_KEY=<local-secret>
 GOOGLE_CLIENT_ID=<google-oauth-client-id>
 RESEND_API_KEY=
 RESEND_FROM_EMAIL=
-IMPROVEMENT_PROVIDER=fixture
-GEMINI_API_KEY=
-GEMINI_MODEL=gemini-2.5-flash
+GEMINI_API_KEY=<google-ai-studio-api-key>
+GEMINI_MODEL=gemini-3.5-flash
 ```
 
 Chạy backend:
@@ -142,33 +141,16 @@ POST /api/match-results/{match_result_id}/improvement-report/generate
 GET  /api/match-results/{match_result_id}/improvement-report
 ```
 
-Chạy nhanh bằng dữ liệu fixture deterministic:
+Feature luôn dùng backend và Gemini thật. Cấu hình trong `backend/.env`:
 
 ```env
-# backend/.env
-IMPROVEMENT_PROVIDER=fixture
-```
-
-Để chỉ test UI mà chưa cần database/backend, đặt trong `.env.local` ở thư mục root project:
-
-```env
-VITE_IMPROVEMENT_FIXTURE=true
-```
-
-Sau khi đổi biến `VITE_*`, restart Vite. Đặt `VITE_IMPROVEMENT_FIXTURE=false` khi test backend thật.
-
-Test với Gemini:
-
-```env
-# backend/.env
-IMPROVEMENT_PROVIDER=gemini
 GEMINI_API_KEY=<google-ai-studio-api-key>
-GEMINI_MODEL=gemini-2.5-flash
+GEMINI_MODEL=gemini-3.5-flash
 ```
 
 Lấy key miễn phí tại Google AI Studio: https://aistudio.google.com/app/apikey. Không đặt `GEMINI_API_KEY` trong frontend `.env.local`, không commit key lên Git.
 
-Luồng backend thật cần Analyzer hoàn thành trước và trả về `match_result_id` của một CV đã parse thành công cùng JD tương ứng. Sau đó frontend truyền ID này sang màn hình `AI Suggestions`; nút `Regenerate` sẽ gọi lại provider đang cấu hình.
+Luồng backend cần Analyzer hoàn thành trước và trả về `match_result_id` của một CV đã parse thành công cùng JD tương ứng. Sau đó frontend truyền ID này sang màn hình `AI Suggestions`; nút `Regenerate` sẽ gọi Gemini lại.
 
 Backend không tự `create_all()` schema. Nếu database thật thiếu cột, phải migrate bằng SQL trước khi chạy API.
 
