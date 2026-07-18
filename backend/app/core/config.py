@@ -27,6 +27,8 @@ class Settings(BaseSettings):
     improvement_task_stale_minutes: int = 10
     improvement_max_cv_chars: int = 120_000
     improvement_max_jd_chars: int = 60_000
+    analyzer_provider: str = "deterministic"
+    upload_dir: Path = BACKEND_ROOT / "uploads"
     cors_origins: list[str] = [
         "http://localhost:5173",
         "http://127.0.0.1:5173",

@@ -8,13 +8,16 @@ interface ApiRequestOptions extends RequestInit {
 export async function requestJson<T>(path: string, options: ApiRequestOptions = {}): Promise<T> {
   const { authenticated = false, headers, ...init } = options
   const token = authenticated ? getStoredSession()?.accessToken : undefined
+  const requestHeaders = new Headers(headers)
+
+  if (init.body != null && !(init.body instanceof FormData) && !requestHeaders.has('Content-Type')) {
+    requestHeaders.set('Content-Type', 'application/json')
+  }
+  if (token) requestHeaders.set('Authorization', `Bearer ${token}`)
+
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...init,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...headers,
-    },
+    headers: requestHeaders,
   })
 
   if (!response.ok) {

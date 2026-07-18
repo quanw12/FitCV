@@ -12,6 +12,7 @@ from app.models.improvement import (
     Job,
     MatchResult,
 )
+from app.models.analyzer import JobDescription
 
 TASK_TYPE = "ImprovementReport"
 
@@ -39,7 +40,7 @@ def get_owned_match_result(
 def get_generation_context(
     db: Session,
     match_result_id: int,
-) -> tuple[MatchResult, CvParseResult | None, Job]:
+) -> tuple[MatchResult, CvParseResult | None, str]:
     match = db.get(MatchResult, match_result_id)
     if match is None:
         raise LookupError("Match result not found.")
@@ -51,10 +52,19 @@ def get_generation_context(
         )
         .order_by(CvParseResult.parsed_at.desc())
     )
-    job = db.get(Job, match.job_id)
-    if job is None:
+    if match.job_id is not None:
+        job = db.get(Job, match.job_id)
+        if job is None:
+            raise LookupError("Job description not found.")
+        description = "\n".join(part for part in [job.description, job.requirements] if part)
+    elif match.job_description_id is not None:
+        job_description = db.get(JobDescription, match.job_description_id)
+        if job_description is None:
+            raise LookupError("Job description not found.")
+        description = job_description.raw_text
+    else:
         raise LookupError("Job description not found.")
-    return match, parsed, job
+    return match, parsed, description
 
 
 def get_latest_task(db: Session, match_result_id: int) -> AiTask | None:
@@ -118,14 +128,24 @@ def get_report_source_timestamps(
     db: Session,
     match_result_id: int,
 ) -> list[datetime | None]:
-    match, parsed, job = get_generation_context(db, match_result_id)
+    match, parsed, _ = get_generation_context(db, match_result_id)
     cv = db.get(Cv, match.cv_id)
     if cv is None:
         return []
+
+    job_timestamps: list[datetime | None] = []
+    if match.job_id is not None:
+        job = db.get(Job, match.job_id)
+        if job is not None:
+            job_timestamps.extend([job.updated_at, job.created_at])
+    elif match.job_description_id is not None:
+        job_description = db.get(JobDescription, match.job_description_id)
+        if job_description is not None:
+            job_timestamps.append(job_description.created_at)
+
     return [
         cv.uploaded_at,
         parsed.parsed_at if parsed else None,
-        job.updated_at,
-        job.created_at,
+        *job_timestamps,
         match.generated_at,
     ]
