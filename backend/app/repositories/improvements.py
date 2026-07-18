@@ -15,6 +15,7 @@ from app.models.improvement import (
     SuggestionPriority,
     SuggestionType,
 )
+from app.models.analyzer import JobDescription
 from app.schemas.improvement import ImprovementReportData
 
 TASK_TYPE = "ImprovementReport"
@@ -38,7 +39,7 @@ def get_owned_match_result(
     return db.scalar(statement)
 
 
-def get_generation_context(db: Session, match_result_id: int) -> tuple[MatchResult, CvParseResult | None, Job]:
+def get_generation_context(db: Session, match_result_id: int) -> tuple[MatchResult, CvParseResult | None, str]:
     match = db.get(MatchResult, match_result_id)
     if match is None:
         raise LookupError("Match result not found.")
@@ -47,10 +48,19 @@ def get_generation_context(db: Session, match_result_id: int) -> tuple[MatchResu
         .where(CvParseResult.cv_id == match.cv_id, CvParseResult.parse_status == "Success")
         .order_by(CvParseResult.parsed_at.desc())
     )
-    job = db.get(Job, match.job_id)
-    if job is None:
+    if match.job_id is not None:
+        job = db.get(Job, match.job_id)
+        if job is None:
+            raise LookupError("Job description not found.")
+        description = "\n".join(part for part in [job.description, job.requirements] if part)
+    elif match.job_description_id is not None:
+        job_description = db.get(JobDescription, match.job_description_id)
+        if job_description is None:
+            raise LookupError("Job description not found.")
+        description = job_description.raw_text
+    else:
         raise LookupError("Job description not found.")
-    return match, parsed, job
+    return match, parsed, description
 
 
 def get_latest_task(db: Session, match_result_id: int) -> AiTask | None:
@@ -152,15 +162,23 @@ def replace_report(db: Session, match_result_id: int, report: ImprovementReportD
 
 
 def is_report_stale(db: Session, match_result_id: int, completed_at: datetime | None) -> bool:
-    match, parsed, job = get_generation_context(db, match_result_id)
+    match, parsed, _ = get_generation_context(db, match_result_id)
     cv = db.get(Cv, match.cv_id)
     if cv is None or completed_at is None:
         return True
+    job_timestamps: list[datetime | None] = []
+    if match.job_id is not None:
+        job = db.get(Job, match.job_id)
+        if job is not None:
+            job_timestamps.extend([job.updated_at, job.created_at])
+    elif match.job_description_id is not None:
+        job_description = db.get(JobDescription, match.job_description_id)
+        if job_description is not None:
+            job_timestamps.append(job_description.created_at)
     source_timestamps = [
         cv.uploaded_at,
         parsed.parsed_at if parsed else None,
-        job.updated_at,
-        job.created_at,
+        *job_timestamps,
         match.generated_at,
     ]
     return any(value is not None and value > completed_at for value in source_timestamps)

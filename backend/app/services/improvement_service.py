@@ -65,7 +65,9 @@ def _safe_error_message(exc: Exception) -> str:
 def request_generation(
     db: Session, *, match_result_id: int, account: Account, regenerate: bool
 ) -> tuple[GenerateImprovementResponse, bool]:
-    _owned_match_or_404(db, match_result_id, account, for_update=True)
+    match = _owned_match_or_404(db, match_result_id, account, for_update=True)
+    if match.status != "Success" or match.overall_score is None:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="CV/JD analysis is not complete.")
     latest = improvements.get_latest_task(db, match_result_id)
     if latest and latest.status in {AiTaskStatus.pending, AiTaskStatus.processing}:
         started_at = latest.started_at or latest.created_at
@@ -103,14 +105,13 @@ def run_generation_task(task_id: int) -> None:
         task.started_at = _utcnow_naive()
         db.commit()
 
-        match, parsed, job = improvements.get_generation_context(db, task.resource_id)
+        match, parsed, job_description = improvements.get_generation_context(db, task.resource_id)
         provider = get_improvement_provider()
         parsed_cv = parsed.parsed_json if parsed and parsed.parsed_json else (parsed.parsed_text if parsed else None)
-        description = "\n".join(part for part in [job.description, job.requirements] if part)
-        _validate_generation_context(parsed_cv, description)
+        _validate_generation_context(parsed_cv, job_description)
         report = provider.generate_improvement_report(
             parsed_cv=parsed_cv,
-            job_description=description,
+            job_description=job_description,
             match_result={
                 "overall_score": float(match.overall_score),
                 "skill_score": float(match.skill_score) if match.skill_score is not None else None,
@@ -121,7 +122,7 @@ def run_generation_task(task_id: int) -> None:
                 "weaknesses": match.weaknesses,
             },
         )
-        validate_report_grounding(report, parsed_cv, description)
+        validate_report_grounding(report, parsed_cv, job_description)
         improvements.replace_report(db, task.resource_id, report)
         task.status = AiTaskStatus.success
         task.error_message = None
@@ -143,6 +144,8 @@ def run_generation_task(task_id: int) -> None:
 
 def get_report(db: Session, *, match_result_id: int, account: Account) -> ImprovementReportResponse:
     match = _owned_match_or_404(db, match_result_id, account)
+    if match.status != "Success" or match.overall_score is None:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="CV/JD analysis is not complete.")
     task = improvements.get_latest_task(db, match_result_id)
     if task is None:
         return ImprovementReportResponse(

@@ -1,152 +1,440 @@
-import { useState } from 'react'
-import { Upload, FileText, GitCompare, TrendingUp, Calendar } from 'lucide-react'
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
+import { useCallback, useEffect, useRef, useState } from "react"
+import {
+  AlertCircle,
+  Check,
+  FileText,
+  GitCompare,
+  RefreshCw,
+  Trash2,
+  Upload,
+} from "lucide-react"
 
-const cvVersions = [
-  { id: 1, name: 'CV_v1_General.pdf', date: 'Jan 15, 2025', score: 55, size: '245 KB', role: 'General' },
-  { id: 2, name: 'CV_v2_Marketing.pdf', date: 'Feb 10, 2025', score: 63, size: '268 KB', role: 'Marketing' },
-  { id: 3, name: 'CV_v3_Backend.pdf', date: 'Mar 22, 2025', score: 72, size: '291 KB', role: 'Backend' },
-  { id: 4, name: 'CV_v4_Dev_latest.pdf', date: 'Jun 30, 2025', score: 78, size: '310 KB', role: 'Backend Dev' },
-]
+import { fitcvApi } from "@/api/fitcvApi"
+import type { CvVersion } from "@/types/analyzer"
 
-const chartData = [
-  { version: 'v1', score: 55, date: 'Jan' },
-  { version: 'v2', score: 63, date: 'Feb' },
-  { version: 'v3', score: 72, date: 'Mar' },
-  { version: 'v4', score: 78, date: 'Jun' },
-]
+const MAX_CV_BYTES = 10 * 1024 * 1024
 
 export default function CVHistoryScreen() {
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [cvs, setCvs] = useState<CvVersion[]>([])
   const [selected, setSelected] = useState<number[]>([])
-  const [comparing, setComparing] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [uploading, setUploading] = useState(false)
+  const [deletingId, setDeletingId] = useState<number | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
-  const toggleSelect = (id: number) => {
-    if (selected.includes(id)) {
-      setSelected(p => p.filter(x => x !== id))
-    } else if (selected.length < 2) {
-      setSelected(p => [...p, id])
+  const loadCvs = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      setCvs(await fitcvApi.listCvs())
+    } catch (caught) {
+      setError(
+        caught instanceof Error ? caught.message : "Unable to load CV history.",
+      )
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    void loadCvs()
+  }, [loadCvs])
+
+  const uploadVersion = async (file?: File) => {
+    if (!file) return
+    const validationError = validateCv(file)
+    if (validationError) {
+      setError(validationError)
+      return
+    }
+    setUploading(true)
+    setError(null)
+    try {
+      await fitcvApi.uploadCv(file)
+      await loadCvs()
+    } catch (caught) {
+      setError(
+        caught instanceof Error ? caught.message : "Unable to upload this CV.",
+      )
+    } finally {
+      setUploading(false)
     }
   }
 
-  const compareItems = cvVersions.filter(v => selected.includes(v.id))
+  const deleteVersion = async (cv: CvVersion) => {
+    if (!window.confirm(`Delete ${cv.fileName} and its saved match results?`))
+      return
+    setDeletingId(cv.cvId)
+    setError(null)
+    try {
+      await fitcvApi.deleteCv(cv.cvId)
+      setSelected((current) => current.filter((id) => id !== cv.cvId))
+      await loadCvs()
+    } catch (caught) {
+      setError(
+        caught instanceof Error ? caught.message : "Unable to delete this CV.",
+      )
+    } finally {
+      setDeletingId(null)
+    }
+  }
+
+  const toggleSelect = (cvId: number) => {
+    setSelected((current) => {
+      if (current.includes(cvId)) return current.filter((id) => id !== cvId)
+      return current.length < 2 ? [...current, cvId] : current
+    })
+  }
+
+  const compareItems = cvs.filter((cv) => selected.includes(cv.cvId))
 
   return (
     <div>
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 24 }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "flex-start",
+          justifyContent: "space-between",
+          gap: 16,
+          marginBottom: 24,
+          flexWrap: "wrap",
+        }}
+      >
         <div>
-          <h1 style={{ fontSize: 22, fontWeight: 800, color: 'var(--text-primary)', marginBottom: 4 }}>CV History</h1>
-          <p style={{ color: 'var(--text-secondary)', fontSize: 14 }}>Track your progress across different CV versions.</p>
+          <h1
+            style={{
+              fontSize: 22,
+              fontWeight: 800,
+              color: "var(--text-primary)",
+              marginBottom: 4,
+            }}
+          >
+            CV History
+          </h1>
+          <p style={{ color: "var(--text-secondary)", fontSize: 14 }}>
+            Review every uploaded CV version and its parser status.
+          </p>
         </div>
-        <div style={{ display: 'flex', gap: 10 }}>
-          {selected.length === 2 && (
-            <button className="fitcv-btn-secondary" onClick={() => setComparing(!comparing)} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <GitCompare size={15} /> {comparing ? 'Hide' : 'Compare'} Versions
-            </button>
-          )}
-          <button className="fitcv-btn-primary">
-            <Upload size={15} /> Upload New Version
+        <div style={{ display: "flex", gap: 10 }}>
+          <button
+            type="button"
+            className="fitcv-btn-secondary"
+            onClick={() => void loadCvs()}
+            disabled={loading}
+          >
+            <RefreshCw size={15} /> Refresh
           </button>
+          <button
+            type="button"
+            className="fitcv-btn-primary"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploading}
+          >
+            <Upload size={15} />
+            {uploading ? "Uploading…" : "Upload new version"}
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            hidden
+            onClick={(event) => {
+              event.currentTarget.value = ""
+            }}
+            onChange={(event) => void uploadVersion(event.target.files?.[0])}
+          />
         </div>
       </div>
 
-      {/* Chart */}
-      <div className="fitcv-card" style={{ padding: 24, marginBottom: 20 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-          <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)' }}>Score Improvement Over Time</h3>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <TrendingUp size={16} color="#10B981" />
-            <span style={{ fontSize: 14, fontWeight: 600, color: '#10B981' }}>+23pts total improvement</span>
-          </div>
-        </div>
-        <ResponsiveContainer width="100%" height={200}>
-          <LineChart data={chartData}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#F3F4F6" />
-            <XAxis dataKey="date" tick={{ fontSize: 12, fill: '#6B7280' }} axisLine={false} tickLine={false} />
-            <YAxis domain={[40, 100]} tick={{ fontSize: 12, fill: '#6B7280' }} axisLine={false} tickLine={false} />
-            <Tooltip
-              contentStyle={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 10, fontSize: 13 }}
-              formatter={(v: unknown) => [`${v}%`, 'Match Score']}
-            />
-            <Line type="monotone" dataKey="score" stroke="#4F46E5" strokeWidth={3} dot={{ r: 5, fill: '#4F46E5', stroke: 'white', strokeWidth: 2 }} />
-          </LineChart>
-        </ResponsiveContainer>
-      </div>
-
-      {/* CV grid */}
-      {selected.length > 0 && selected.length < 2 && (
-        <div style={{ padding: '10px 16px', background: 'var(--indigo-light)', borderRadius: 10, marginBottom: 14, fontSize: 13, color: 'var(--indigo)', fontWeight: 500 }}>
-          Select one more CV to compare ({2 - selected.length} remaining)
+      {error && (
+        <div role="alert" style={alertStyle}>
+          <AlertCircle size={18} /> {error}
         </div>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14, marginBottom: 24 }}>
-        {cvVersions.map(cv => {
-          const isSelected = selected.includes(cv.id)
-          const scoreColor = cv.score >= 75 ? '#10B981' : cv.score >= 60 ? '#4F46E5' : '#F59E0B'
-          const latestTag = cv.id === Math.max(...cvVersions.map(v => v.id))
-          return (
-            <div
-              key={cv.id}
-              onClick={() => toggleSelect(cv.id)}
-              style={{
-                padding: 20, borderRadius: 16, border: `2px solid ${isSelected ? 'var(--indigo)' : 'var(--border)'}`,
-                background: isSelected ? 'var(--indigo-light)' : 'white', cursor: 'pointer',
-                transition: 'all 0.15s', position: 'relative',
-              }}
-            >
-              {latestTag && (
-                <span className="badge-green" style={{ position: 'absolute', top: 12, right: 12, fontSize: 10 }}>Latest</span>
-              )}
-              <div style={{ width: 44, height: 44, borderRadius: 12, background: `${scoreColor}15`, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 14 }}>
-                <FileText size={22} color={scoreColor} />
-              </div>
-              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 4 }}>{cv.name}</div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 12, color: 'var(--text-muted)', fontSize: 12 }}>
-                <Calendar size={11} /> {cv.date} · {cv.size}
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)' }}>Match Score</span>
-                <span style={{ fontSize: 20, fontWeight: 800, color: scoreColor, fontFamily: 'Plus Jakarta Sans' }}>{cv.score}%</span>
-              </div>
-              <div style={{ height: 5, borderRadius: 3, background: '#E5E7EB', overflow: 'hidden', marginTop: 8 }}>
-                <div style={{ width: `${cv.score}%`, height: '100%', background: scoreColor, borderRadius: 3 }} />
-              </div>
-            </div>
-          )
-        })}
-      </div>
+      {selected.length === 1 && (
+        <div style={selectionHintStyle}>
+          Select one more CV to compare metadata.
+        </div>
+      )}
 
-      {/* Comparison panel */}
-      {comparing && compareItems.length === 2 && (
-        <div className="fitcv-card" style={{ padding: 24 }}>
-          <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 16 }}>Version Comparison</h3>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
-            {compareItems.map(cv => (
-              <div key={cv.id}>
-                <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--text-primary)', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <FileText size={16} color="var(--indigo)" /> {cv.name}
+      {loading ? (
+        <div className="fitcv-card" style={emptyStyle}>
+          Loading CV history…
+        </div>
+      ) : cvs.length === 0 ? (
+        <div className="fitcv-card" style={emptyStyle}>
+          <FileText size={34} color="#94A3B8" />
+          <strong>No CV versions yet</strong>
+          <span>Upload a PDF or DOCX (max 10 MB) to create version 1.</span>
+        </div>
+      ) : (
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+            gap: 14,
+            marginBottom: 24,
+          }}
+        >
+          {cvs.map((cv) => {
+            const isSelected = selected.includes(cv.cvId)
+            return (
+              <article
+                key={cv.cvId}
+                className="fitcv-card"
+                style={{
+                  padding: 20,
+                  border: `2px solid ${
+                    isSelected ? "#2563EB" : "var(--border)"
+                  }`,
+                  background: isSelected ? "#EFF6FF" : "white",
+                  position: "relative",
+                }}
+              >
+                {cv.isLatest && (
+                  <span
+                    className="badge-green"
+                    style={{ position: "absolute", top: 12, right: 12 }}
+                  >
+                    Latest
+                  </span>
+                )}
+                <div style={fileIconStyle}>
+                  <FileText size={22} />
                 </div>
-                {[
-                  { label: 'Overall Score', value: `${cv.score}%`, color: cv.score >= 75 ? '#10B981' : '#F59E0B' },
-                  { label: 'Upload Date', value: cv.date, color: 'var(--text-primary)' },
-                  { label: 'Target Role', value: cv.role, color: 'var(--indigo)' },
-                  { label: 'File Size', value: cv.size, color: 'var(--text-secondary)' },
-                ].map(r => (
-                  <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
-                    <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>{r.label}</span>
-                    <span style={{ fontSize: 14, fontWeight: 700, color: r.color }}>{r.value}</span>
-                  </div>
-                ))}
+                <div
+                  title={cv.fileName}
+                  style={{
+                    fontSize: 14,
+                    fontWeight: 700,
+                    color: "var(--text-primary)",
+                    marginBottom: 6,
+                    overflowWrap: "anywhere",
+                    paddingRight: cv.isLatest ? 48 : 0,
+                  }}
+                >
+                  {cv.fileName}
+                </div>
+                <div style={metadataStyle}>
+                  Version {cv.versionNumber} · {cv.fileType} ·{" "}
+                  {formatFileSize(cv.fileSizeKb)}
+                </div>
+                <div style={metadataStyle}>{formatDate(cv.uploadedAt)}</div>
+                <div style={{ marginTop: 14 }}>
+                  <StatusBadge cv={cv} />
+                </div>
+                <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
+                  <button
+                    type="button"
+                    className="fitcv-btn-secondary"
+                    onClick={() => toggleSelect(cv.cvId)}
+                    style={{ flex: 1, justifyContent: "center" }}
+                  >
+                    {isSelected ? (
+                      <Check size={14} />
+                    ) : (
+                      <GitCompare size={14} />
+                    )}
+                    {isSelected ? "Selected" : "Compare"}
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={`Delete ${cv.fileName}`}
+                    onClick={() => void deleteVersion(cv)}
+                    disabled={deletingId === cv.cvId}
+                    style={deleteButtonStyle}
+                  >
+                    <Trash2 size={15} />
+                  </button>
+                </div>
+              </article>
+            )
+          })}
+        </div>
+      )}
+
+      {compareItems.length === 2 && (
+        <div className="fitcv-card" style={{ padding: 24 }}>
+          <h3
+            style={{
+              fontSize: 16,
+              fontWeight: 700,
+              color: "var(--text-primary)",
+              marginBottom: 16,
+            }}
+          >
+            Version comparison
+          </h3>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+              gap: 24,
+            }}
+          >
+            {compareItems.map((cv) => (
+              <div key={cv.cvId}>
+                <strong style={{ overflowWrap: "anywhere" }}>
+                  {cv.fileName}
+                </strong>
+                <ComparisonRow label="Version" value={`v${cv.versionNumber}`} />
+                <ComparisonRow
+                  label="Uploaded"
+                  value={formatDate(cv.uploadedAt)}
+                />
+                <ComparisonRow label="Type" value={cv.fileType} />
+                <ComparisonRow
+                  label="Size"
+                  value={formatFileSize(cv.fileSizeKb)}
+                />
+                <ComparisonRow
+                  label="Parser"
+                  value={cv.parserVersion ?? "Pending"}
+                />
               </div>
             ))}
           </div>
-          {compareItems[1].score > compareItems[0].score && (
-            <div style={{ marginTop: 16, padding: '12px 16px', background: '#F0FDF4', borderRadius: 10, fontSize: 14, color: '#065F46', fontWeight: 500 }}>
-              🎉 {compareItems[1].name} is <strong>{compareItems[1].score - compareItems[0].score} points higher</strong> than {compareItems[0].name}. Great progress!
-            </div>
-          )}
         </div>
       )}
     </div>
   )
+}
+
+function StatusBadge({ cv }: { cv: CvVersion }) {
+  const config = {
+    Success: { label: "Parsed", color: "#166534", background: "#DCFCE7" },
+    Failed: { label: "Parse failed", color: "#B91C1C", background: "#FEE2E2" },
+    Processing: { label: "Parsing", color: "#1D4ED8", background: "#DBEAFE" },
+    Pending: { label: "Queued", color: "#92400E", background: "#FEF3C7" },
+  }[cv.parseStatus]
+  return (
+    <span
+      title={cv.errorMessage ?? undefined}
+      style={{
+        display: "inline-flex",
+        color: config.color,
+        background: config.background,
+        borderRadius: 999,
+        padding: "4px 9px",
+        fontSize: 11,
+        fontWeight: 700,
+      }}
+    >
+      {config.label}
+    </span>
+  )
+}
+
+interface ComparisonRowProps {
+  label: string
+  value: string
+}
+
+function ComparisonRow({ label, value }: ComparisonRowProps) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        justifyContent: "space-between",
+        gap: 12,
+        padding: "10px 0",
+        borderBottom: "1px solid var(--border)",
+      }}
+    >
+      <span style={{ color: "var(--text-secondary)", fontSize: 13 }}>
+        {label}
+      </span>
+      <span
+        style={{ color: "var(--text-primary)", fontSize: 13, fontWeight: 700 }}
+      >
+        {value}
+      </span>
+    </div>
+  )
+}
+
+function validateCv(file: File): string | null {
+  const lowerName = file.name.toLowerCase()
+  if (!lowerName.endsWith(".pdf") && !lowerName.endsWith(".docx"))
+    return "Only PDF and DOCX CV files are supported."
+  if (file.size === 0) return "The selected CV is empty."
+  if (file.size > MAX_CV_BYTES) return "CV files must be 10 MB or smaller."
+  return null
+}
+
+function formatFileSize(kilobytes: number | null) {
+  if (kilobytes == null) return "Unknown size"
+  return kilobytes >= 1024
+    ? `${(kilobytes / 1024).toFixed(1)} MB`
+    : `${kilobytes} KB`
+}
+
+function formatDate(value: string) {
+  return new Intl.DateTimeFormat(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(new Date(value))
+}
+
+const alertStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 8,
+  color: "#B91C1C",
+  background: "#FEF2F2",
+  border: "1px solid #FECACA",
+  borderRadius: 10,
+  padding: "11px 14px",
+  marginBottom: 16,
+  fontSize: 13,
+}
+const selectionHintStyle: React.CSSProperties = {
+  padding: "10px 16px",
+  background: "#EFF6FF",
+  borderRadius: 10,
+  marginBottom: 14,
+  fontSize: 13,
+  color: "#1D4ED8",
+  fontWeight: 600,
+}
+const emptyStyle: React.CSSProperties = {
+  minHeight: 220,
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: 8,
+  color: "var(--text-secondary)",
+  textAlign: "center",
+  padding: 24,
+}
+const fileIconStyle: React.CSSProperties = {
+  width: 44,
+  height: 44,
+  borderRadius: 12,
+  background: "#DBEAFE",
+  color: "#2563EB",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  marginBottom: 14,
+}
+const metadataStyle: React.CSSProperties = {
+  color: "var(--text-muted)",
+  fontSize: 12,
+  lineHeight: 1.6,
+}
+const deleteButtonStyle: React.CSSProperties = {
+  width: 38,
+  height: 38,
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  color: "#B91C1C",
+  background: "#FEF2F2",
+  border: "1px solid #FECACA",
+  borderRadius: 8,
+  cursor: "pointer",
 }
