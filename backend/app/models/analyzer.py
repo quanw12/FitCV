@@ -44,14 +44,20 @@ class CvParseResult(Base):
 class Job(Base):
     __tablename__ = "job"
 
-    job_id: Mapped[int] = mapped_column(ID_TYPE, primary_key=True)
-    company_id: Mapped[int] = mapped_column(ID_TYPE)
-    created_by_account_id: Mapped[int] = mapped_column(ID_TYPE)
-    title: Mapped[str] = mapped_column(String(200))
+    job_id: Mapped[int] = mapped_column(ID_TYPE, primary_key=True, autoincrement=True)
+    company_id: Mapped[int] = mapped_column(ID_TYPE, ForeignKey("company.company_id"), nullable=False)
+    created_by_account_id: Mapped[int] = mapped_column(ID_TYPE, ForeignKey("account.account_id"), nullable=False)
+    position_id: Mapped[int | None] = mapped_column(ID_TYPE, ForeignKey("position.position_id"), nullable=True)
+    level_id: Mapped[int | None] = mapped_column(ID_TYPE, ForeignKey("level.level_id"), nullable=True)
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     requirements: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
-    updated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    location: Mapped[str | None] = mapped_column(String(150), nullable=True)
+    employment_type: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    status: Mapped[str] = mapped_column(String(20), default="Draft", nullable=False)
+    deadline: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    updated_at: Mapped[datetime | None] = mapped_column(DateTime, onupdate=func.now(), nullable=True)
 
 
 class JobDescription(Base):

@@ -141,6 +141,16 @@ Nếu tạo database mới:
 2. Chạy toàn bộ `database/full_schema.sql` bằng MySQL user có quyền tạo bảng/index.
 3. Backend runtime user cần quyền `SELECT`, `INSERT`, `UPDATE`, `DELETE`.
 
+### Job Post Management
+
+Job Post Management requires no database migration or schema changes. Its
+separate form/detail sections are versioned and serialized into the existing
+`job.description` LONGTEXT column; `job.requirements` remains a normal column.
+Active jobs are served to authenticated Student accounts under
+`GET /api/jobs/public` and `GET /api/jobs/public/{id}`. Authenticated HR,
+HiringManager, and Admin accounts use the company-scoped manage, create,
+update, publish, and close endpoints under `/api/jobs`.
+
 ## AI Improvement Suggestions
 
 Feature này dùng backend thật tại:
