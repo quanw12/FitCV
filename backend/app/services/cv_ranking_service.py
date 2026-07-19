@@ -7,40 +7,17 @@ from zipfile import ZipFile
 from fastapi import HTTPException, UploadFile, status
 
 from app.schemas.cv_ranking import BatchParseResponse, ParsedCandidateResponse, ScoreBreakdown
+from app.services.document_parser import parse_cv_text, parse_jd_text
+from app.services.matching_service import match_documents
 
 
 MAX_FILE_SIZE = 10 * 1024 * 1024
-KNOWN_SKILLS = [
-    "Node.js",
-    "TypeScript",
-    "JavaScript",
-    "Python",
-    "Java",
-    "Spring Boot",
-    "Django",
-    "PostgreSQL",
-    "MySQL",
-    "MongoDB",
-    "Redis",
-    "Docker",
-    "Kubernetes",
-    "AWS",
-    "REST API",
-    "GraphQL",
-    "FastAPI",
-    "React",
-    "Next.js",
-]
 
 
 def _format_bytes(size: int) -> str:
     if size < 1024 * 1024:
         return f"{max(1, round(size / 1024))} KB"
     return f"{size / (1024 * 1024):.1f} MB"
-
-
-def _normalize(value: str) -> str:
-    return re.sub(r"[^a-z0-9+#.]+", " ", value.lower())
 
 
 def _candidate_name_from_file(file_name: str) -> str:
@@ -94,16 +71,6 @@ def _extract_text(file_name: str, content: bytes) -> tuple[str, str | None]:
     return "", "Unsupported file type."
 
 
-def _extract_skills(source: str) -> list[str]:
-    normalized = _normalize(source)
-    return [skill for skill in KNOWN_SKILLS if _normalize(skill).strip() in normalized]
-
-
-def _required_skills(job_description: str) -> list[str]:
-    skills = _extract_skills(job_description)
-    return skills if skills else ["Node.js", "TypeScript", "PostgreSQL", "Docker"]
-
-
 def _first_match(pattern: str, source: str, default: str) -> str:
     match = re.search(pattern, source, flags=re.IGNORECASE)
     return match.group(0).strip() if match else default
@@ -117,39 +84,19 @@ def _infer_name(text: str, file_name: str) -> str:
     return _candidate_name_from_file(file_name)
 
 
-def _infer_experience_years(source: str) -> int:
-    match = re.search(r"(\d+)\s*(?:years?|yrs?)", source, flags=re.IGNORECASE)
-    if match:
-        return int(match.group(1))
-    if re.search(r"senior|lead|principal", source, flags=re.IGNORECASE):
-        return 5
-    if re.search(r"middle|mid", source, flags=re.IGNORECASE):
-        return 3
-    if re.search(r"junior|intern|fresher", source, flags=re.IGNORECASE):
-        return 1
-    return 2
-
-
-def _infer_education(source: str) -> str:
-    if re.search(r"master|msc", source, flags=re.IGNORECASE):
-        return "Master degree mentioned"
-    if re.search(r"bachelor|bs|bsc|computer science|software engineering|cs\b", source, flags=re.IGNORECASE):
-        return "Bachelor or CS background mentioned"
-    return "Education not detected"
-
-
 def _score_candidate(
-    skills: list[str], experience_years: int, education: str, required_skills: list[str]
-) -> tuple[int, ScoreBreakdown]:
-    matched_count = len([skill for skill in required_skills if skill in skills])
-    skill_score = round((matched_count / len(required_skills)) * 100) if required_skills else 0
-    experience_score = min(100, round((experience_years / 5) * 100))
-    education_score = 45 if education == "Education not detected" else 85
-    total = round(skill_score * 0.6 + experience_score * 0.3 + education_score * 0.1)
-    return max(0, min(100, total)), ScoreBreakdown(
-        skills=skill_score,
-        experience=experience_score,
-        education=education_score,
+    cv_payload: dict, jd_payload: dict
+) -> tuple[int, ScoreBreakdown, dict]:
+    result = match_documents(cv_payload, jd_payload)
+    breakdown = result["breakdown"]
+    return (
+        round(result["overall_score"]),
+        ScoreBreakdown(
+            skills=round(breakdown.get("skills", {}).get("score", 0)),
+            experience=round(breakdown.get("experience", {}).get("score", 0)),
+            education=round(breakdown.get("education", {}).get("score", 0)),
+        ),
+        result,
     )
 
 
@@ -157,7 +104,28 @@ async def parse_batch(files: list[UploadFile], job_description: str) -> BatchPar
     if not files:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="At least one CV file is required.")
 
-    required = _required_skills(job_description)
+    try:
+        jd_payload = parse_jd_text(job_description)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        ) from exc
+    if not any(
+        (
+            jd_payload.get("required_skills"),
+            jd_payload.get("preferred_skills"),
+            jd_payload.get("experience_years") is not None,
+            jd_payload.get("education"),
+            jd_payload.get("soft_skills"),
+        )
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="The job description has no scorable requirements.",
+        )
+
+    required = list(jd_payload.get("required_skills") or [])
     warnings: list[str] = []
     candidates: list[ParsedCandidateResponse] = []
 
@@ -173,12 +141,23 @@ async def parse_batch(files: list[UploadFile], job_description: str) -> BatchPar
             continue
 
         parsed_text, parse_warning = _extract_text(file.filename, content)
-        source = "\n".join([file.filename, parsed_text])
-        skills = _extract_skills(source)
-        missing_skills = [skill for skill in required if skill not in skills]
-        experience_years = _infer_experience_years(source)
-        education = _infer_education(source)
-        score, score_breakdown = _score_candidate(skills, experience_years, education, required)
+        try:
+            cv_payload = parse_cv_text(parsed_text)
+            score, score_breakdown, match_result = _score_candidate(
+                cv_payload, jd_payload
+            )
+        except ValueError as exc:
+            warnings.append(f"{file.filename}: {exc}")
+            continue
+
+        skills = list(cv_payload.get("skills") or [])
+        missing_skills = list(
+            match_result.get("breakdown", {})
+            .get("skills", {})
+            .get("missing", [])
+        )
+        experience_years = int(cv_payload.get("experience_years") or 0)
+        education = str(cv_payload.get("education") or "Education not detected")
 
         notes = [
             "MVP parser extracts text when local parser dependencies are available.",

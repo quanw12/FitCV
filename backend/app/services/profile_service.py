@@ -33,10 +33,19 @@ def update_profile(db: Session, account: Account, payload: ProfileUpdate) -> Pro
     company_roles = {AccountRole.hr, AccountRole.hiring_manager, AccountRole.admin}
     if sent_company_keys and account.role not in company_roles:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Company fields can only be updated by HR, HiringManager, or Admin accounts.")
-    if sent_company_keys and account.company_id is None and not values.get("company_name"):
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Company name is required when creating a company.")
+    if sent_company_keys and account.company_id is None:
+        if not values.get("company_name"):
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Company name is required when creating a company.")
+        if not values.get("industry_name"):
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Industry is required when creating a company.")
     if "company_name" in values and values["company_name"] is None:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Company name cannot be empty.")
+    if (
+        account.role in company_roles
+        and "industry_name" in values
+        and values["industry_name"] is None
+    ):
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Industry cannot be empty.")
 
     account_fields = {key: _url(values[key]) for key in ("full_name", "avatar_url") if key in values}
     save_profile(

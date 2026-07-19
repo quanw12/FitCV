@@ -45,14 +45,12 @@ npm install
 
 Tạo hoặc cập nhật `.env.local`:
 
-```bash
-cp .env.example .env.local
-```
-
 ```env
 VITE_API_BASE_URL=http://127.0.0.1:8000
 VITE_GOOGLE_CLIENT_ID=<google-oauth-client-id>
 ```
+
+Use local backend while testing on your machine. If `.env.local` points to Render, requests will go to Render and the local backend terminal will not show auth logs.
 
 Frontend production currently falls back to this backend URL if `VITE_API_BASE_URL` is not set:
 
@@ -61,6 +59,13 @@ https://fitcv-0cab.onrender.com
 ```
 
 Still set `VITE_API_BASE_URL` explicitly in Vercel so future backend URL changes do not require code changes.
+
+Vercel environment:
+
+```env
+VITE_API_BASE_URL=https://fitcv-0cab.onrender.com
+VITE_GOOGLE_CLIENT_ID=<google-oauth-client-id>
+```
 
 Chạy frontend:
 
@@ -94,37 +99,22 @@ pip install -r requirements.txt
 
 Tạo hoặc cập nhật `backend/.env`:
 
-```bash
-cp .env.example .env
-```
-
 ```env
 DATABASE_URL=mysql+pymysql://<db_user>:<url_encoded_password>@<db_host>:3306/fitcv
 JWT_SECRET_KEY=<local-secret>
 GOOGLE_CLIENT_ID=<google-oauth-client-id>
+CORS_ORIGINS=["http://localhost:5173","http://127.0.0.1:5173","https://fit-cv.vercel.app"]
 RESEND_API_KEY=
 RESEND_FROM_EMAIL=
+<<<<<<< HEAD
+=======
 AVATAR_STORAGE=local
 BACKEND_PUBLIC_URL=http://127.0.0.1:8000
 ANALYZER_PROVIDER=deterministic
 GEMINI_API_KEY=<google-ai-studio-api-key>
 GEMINI_MODEL=gemini-3.1-flash-lite
+>>>>>>> d68daf017d6fa570074fb77c4014cb910ba78b50
 ```
-
-Avatar nhận JPG, PNG và WebP tối đa 5 MB. `AVATAR_STORAGE=local` lưu file trong
-`backend/uploads/avatars` (đã được Git ignore) và chỉ phù hợp cho phát triển local.
-Trên Render, dùng Cloudinary vì ổ đĩa local là tạm thời:
-
-```env
-AVATAR_STORAGE=cloudinary
-CLOUDINARY_CLOUD_NAME=<cloud-name>
-CLOUDINARY_API_KEY=<api-key>
-CLOUDINARY_API_SECRET=<api-secret>
-BACKEND_PUBLIC_URL=https://<your-backend>.onrender.com
-```
-
-Không commit secret Cloudinary. Nếu chọn `cloudinary` nhưng thiếu cấu hình,
-backend sẽ báo lỗi rõ ràng thay vì âm thầm lưu vào ổ đĩa tạm thời.
 
 Chạy backend:
 
@@ -144,6 +134,39 @@ Health check:
 http://127.0.0.1:8000/api/health
 ```
 
+## Deploy Backend Render
+
+Khi deploy backend lên Render, vào Render service > Environment và thêm các biến:
+
+```env
+DATABASE_URL=mysql+pymysql://<db_user>:<url_encoded_password>@<db_host>:3306/fitcv
+JWT_SECRET_KEY=<strong-secret>
+GOOGLE_CLIENT_ID=<google-oauth-client-id>
+CORS_ORIGINS=["http://localhost:5173","http://127.0.0.1:5173","https://fit-cv.vercel.app"]
+RESEND_API_KEY=
+RESEND_FROM_EMAIL=
+```
+
+Nếu frontend Vercel đổi domain, thêm domain mới vào `CORS_ORIGINS`, ví dụ:
+
+```env
+CORS_ORIGINS=["http://localhost:5173","http://127.0.0.1:5173","https://fit-cv.vercel.app","https://your-preview.vercel.app"]
+```
+
+Sau khi đổi env trên Render, phải redeploy backend.
+
+Render health check:
+
+```text
+https://fitcv-0cab.onrender.com/api/health
+```
+
+Nếu browser báo CORS khi register/login, kiểm tra:
+
+- Request origin trên DevTools là domain nào.
+- Domain đó có nằm trong `CORS_ORIGINS` của Render không.
+- Render đã redeploy sau khi sửa env chưa.
+
 ## Database
 
 Schema chính nằm ở:
@@ -158,6 +181,8 @@ Nếu tạo database mới:
 2. Chạy toàn bộ `database/full_schema.sql` bằng MySQL user có quyền tạo bảng/index.
 3. Backend runtime user cần quyền `SELECT`, `INSERT`, `UPDATE`, `DELETE`.
 
+<<<<<<< HEAD
+=======
 ## AI Improvement Suggestions
 
 Feature này dùng backend thật tại:
@@ -178,6 +203,7 @@ Lấy key miễn phí tại Google AI Studio: https://aistudio.google.com/app/ap
 
 Luồng backend cần Analyzer hoàn thành trước và trả về `match_result_id` của một CV đã parse thành công cùng JD tương ứng. Sau đó frontend truyền ID này sang màn hình `AI Suggestions`; nút `Regenerate` sẽ gọi Gemini lại.
 
+>>>>>>> d68daf017d6fa570074fb77c4014cb910ba78b50
 Backend không tự `create_all()` schema. Nếu database thật thiếu cột, phải migrate bằng SQL trước khi chạy API.
 
 Với database hiện hữu đã chạy migration 002 một phần hoặc đang thiếu bảng `ai_task`, chạy
@@ -260,6 +286,8 @@ POST /api/auth/verify-reset-code
 POST /api/auth/reset-password
 ```
 
+<<<<<<< HEAD
+=======
 ## CV & JD Match Analyzer API
 
 ```text
@@ -320,6 +348,7 @@ Lỗi thường gặp:
 - `Analyzer backend is not configured`: thêm `VITE_API_BASE_URL` vào `.env.local` rồi restart Vite.
 - Không commit hoặc gửi `GEMINI_API_KEY` vào chat, Git, frontend source, `.env.local`, hay bất kỳ biến `VITE_*` nào.
 
+>>>>>>> d68daf017d6fa570074fb77c4014cb910ba78b50
 Role hợp lệ theo database:
 
 ```text
@@ -355,6 +384,8 @@ cd backend
 python -c "from app.main import app; print('BACKEND_IMPORT_OK')"
 ```
 
+<<<<<<< HEAD
+=======
 Backend tests:
 
 ```bash
@@ -376,18 +407,45 @@ Test này tạo Student/CV/JD tổng hợp, chạy Analyzer → AI Improvement b
 `match_result_id`, rồi xóa account, dữ liệu AI và file upload trong bước cleanup. Không bật
 biến này trong CI thường xuyên vì test sử dụng database và quota Gemini thật.
 
+>>>>>>> d68daf017d6fa570074fb77c4014cb910ba78b50
 TypeScript check:
 
 ```bash
 npx tsc --noEmit
 ```
 
+<<<<<<< HEAD
+## OCR Cho PDF Scan
+
+Backend doc text truc tiep bang `pypdf` truoc. Neu PDF khong co text layer,
+backend tu dong gui PDF den Gemini Document OCR, sau do tiep tuc parse JSON va
+cham diem bang cung workflow Analyzer/CV Ranking.
+
+Them cac bien sau vao `backend/.env` khi test local va Render Environment khi deploy:
+
+```env
+GEMINI_API_KEY=<gemini-api-key>
+GEMINI_MODEL=gemini-3.5-flash
+OCR_PROVIDER=gemini
+OCR_MODEL=
+OCR_TIMEOUT_SECONDS=60
+OCR_MAX_OUTPUT_TOKENS=20000
+```
+
+- De trong `OCR_MODEL` de OCR dung chung `GEMINI_MODEL`.
+- Dat `OCR_PROVIDER=disabled` neu khong muon gui PDF scan den Gemini.
+- PDF native text khong goi OCR, do do nhanh hon va khong ton request Gemini.
+- PDF scan chua thong tin ca nhan se duoc gui den Gemini de nhan dang text.
+- Application bi fail co the chay lai bang nut `Retry OCR` trong Application Tracker.
+
+=======
 Frontend tests:
 
 ```bash
 npm test
 ```
 
+>>>>>>> d68daf017d6fa570074fb77c4014cb910ba78b50
 ## Troubleshooting
 
 Google OAuth lỗi `invalid_request`:
@@ -396,6 +454,18 @@ Google OAuth lỗi `invalid_request`:
 - URL phải nằm trong Authorized JavaScript origins.
 - Dùng Chrome/Edge thật, không dùng browser nhúng trong IDE.
 - Với local, dùng `localhost` hoặc `127.0.0.1`.
+
+Backend trả lỗi `Google auth dependency is not installed.`:
+
+- Kiểm tra `backend/requirements.txt` có `google-auth>=2.29.0,<3.0.0`.
+- Commit và push `backend/requirements.txt`.
+- Trên Render, chạy Manual Deploy / Clear build cache and deploy để Render cài lại dependency.
+- Kiểm tra Render env có `GOOGLE_CLIENT_ID`.
+- Nếu vẫn lỗi, vào Render Shell và chạy:
+
+```bash
+python -c "import google.auth; print('GOOGLE_AUTH_INSTALLED')"
+```
 
 Reset code đúng nhưng verify lỗi:
 

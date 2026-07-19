@@ -1,6 +1,7 @@
 import { authApi } from './authApi'
 import { API_BASE_URL } from './config'
-import type { BatchParseCvResponse, ParsedCvCandidate } from '@/types/cvRanking'
+import type { BatchParseCvResponse, ParsedCvCandidate, RankedApplication } from '@/types/cvRanking'
+import { requestJson } from './httpClient'
 
 interface BackendParsedCandidate {
   id: string
@@ -36,6 +37,11 @@ function sessionToken(): string | undefined {
   return authApi.getSession()?.accessToken
 }
 
+async function responseError(response: Response, fallback: string): Promise<Error> {
+  const payload = await response.json().catch(() => null) as { detail?: string } | null
+  return new Error(payload?.detail ?? fallback)
+}
+
 function normalizeCandidate(candidate: BackendParsedCandidate): ParsedCvCandidate {
   return {
     id: candidate.id,
@@ -59,6 +65,20 @@ function normalizeCandidate(candidate: BackendParsedCandidate): ParsedCvCandidat
 }
 
 export const cvRankingApi = {
+  listApplications: (jobId: number) =>
+    requestJson<RankedApplication[]>(`/api/hr/cv-ranking/jobs/${jobId}/applications`, {
+      authenticated: true,
+    }),
+  async getApplicationCv(applicationId: number): Promise<Blob> {
+    const token = sessionToken()
+    const response = await fetch(`${API_BASE_URL}/api/hr/cv-ranking/applications/${applicationId}/cv`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    })
+    if (!response.ok) {
+      throw await responseError(response, `Unable to load CV (status ${response.status}).`)
+    }
+    return response.blob()
+  },
   async parseBatch(files: File[], jobDescription: string): Promise<BatchParseCvResponse> {
     if (!API_BASE_URL) throw new Error('API base URL is not configured.')
 

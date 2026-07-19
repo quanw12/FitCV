@@ -96,6 +96,31 @@ def match_documents(cv: dict[str, Any], jd: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def supplement_semantic_cv(
+    semantic_cv: dict[str, Any], parsed_cv: dict[str, Any]
+) -> dict[str, Any]:
+    """Keep locally grounded CV facts that the semantic extractor omitted."""
+    supplemented = dict(semantic_cv)
+    for field in ("skills", "soft_skills"):
+        supplemented[field] = _merge_terms(
+            semantic_cv.get(field) or [],
+            parsed_cv.get(field) or [],
+        )
+    for field in ("experience_years", "education"):
+        if supplemented.get(field) is None and parsed_cv.get(field) is not None:
+            supplemented[field] = parsed_cv[field]
+    return supplemented
+
+
+def _merge_terms(primary: list[str], supplemental: list[str]) -> list[str]:
+    merged: dict[str, str] = {}
+    for value in [*primary, *supplemental]:
+        key = _term_key(value)
+        if key:
+            merged.setdefault(key, value)
+    return sorted(merged.values(), key=str.casefold)
+
+
 def _ratio(matched: set[str], required: set[str]) -> float:
     return round((len(matched) / len(required)) * 100.0, 2) if required else 100.0
 

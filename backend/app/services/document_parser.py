@@ -1,9 +1,10 @@
 import re
+import unicodedata
 from io import BytesIO
 from pathlib import Path
 from zipfile import BadZipFile, ZipFile
 
-PARSER_VERSION = "fitcv-parser-v1"
+PARSER_VERSION = "fitcv-parser-v3-preprocess"
 MAX_CV_BYTES = 10 * 1024 * 1024
 
 SKILL_ALIASES: dict[str, tuple[str, ...]] = {
@@ -99,6 +100,14 @@ def extract_document_text(file_path: Path, file_type: str) -> str:
         except ImportError as exc:
             raise RuntimeError("PDF parsing is unavailable; install backend requirements.") from exc
         text = "\n".join(page.extract_text() or "" for page in PdfReader(str(file_path)).pages)
+        normalized = preprocess_document_text(text)
+        if len(normalized) < 20:
+            from app.services.ocr_service import OcrError, extract_pdf_text
+
+            try:
+                normalized = preprocess_document_text(extract_pdf_text(file_path))
+            except OcrError as exc:
+                raise ValueError(str(exc)) from exc
     elif file_type == "DOCX":
         from docx import Document
 
@@ -106,17 +115,17 @@ def extract_document_text(file_path: Path, file_type: str) -> str:
         paragraphs = [paragraph.text for paragraph in document.paragraphs]
         table_rows = [" | ".join(cell.text for cell in row.cells) for table in document.tables for row in table.rows]
         text = "\n".join([*paragraphs, *table_rows])
+        normalized = preprocess_document_text(text)
     else:
         raise ValueError("Unsupported CV file type.")
 
-    normalized = _normalize_text(text)
     if len(normalized) < 20:
-        raise ValueError("No readable CV text was found. Scanned PDFs require OCR before upload.")
+        raise ValueError("No readable CV text was found after OCR.")
     return normalized
 
 
 def parse_cv_text(text: str) -> dict:
-    normalized = _normalize_text(text)
+    normalized = preprocess_document_text(text)
     if len(normalized) < 20:
         raise ValueError("CV text is empty or too short to parse.")
     return {
@@ -129,7 +138,7 @@ def parse_cv_text(text: str) -> dict:
 
 
 def parse_jd_text(text: str) -> dict:
-    normalized = _normalize_text(text)
+    normalized = preprocess_document_text(text)
     if len(normalized) < 50:
         raise ValueError("Job description must contain at least 50 readable characters.")
 
@@ -155,8 +164,17 @@ def parse_jd_text(text: str) -> dict:
     }
 
 
+def preprocess_document_text(value: str) -> str:
+    prepared = unicodedata.normalize(
+        "NFKC",
+        value.replace("\x00", "").replace("\u00ad", ""),
+    )
+    prepared = re.sub(r"(?<=[A-Za-z])-\s*\n\s*(?=[a-z])", "", prepared)
+    return _normalize_text(prepared)
+
+
 def _normalize_text(value: str) -> str:
-    lines = [re.sub(r"[ \t]+", " ", line).strip() for line in value.replace("\x00", "").splitlines()]
+    lines = [re.sub(r"[ \t]+", " ", line).strip() for line in value.splitlines()]
     return "\n".join(line for line in lines if line).strip()
 
 
@@ -182,9 +200,37 @@ def _extract_years(text: str) -> float | None:
 def _extract_education(text: str) -> str | None:
     lowered = text.casefold()
     levels = (
-        ("Doctorate", ("phd", "ph.d", "doctorate")),
-        ("Master", ("master's", "masters degree", "master degree", "msc", "m.sc")),
-        ("Bachelor", ("bachelor's", "bachelors degree", "bachelor degree", "bachelor of", "bsc", "b.sc")),
+        (
+            "Doctorate",
+            ("phd", "ph.d", "doctorate", "doctor of philosophy"),
+        ),
+        (
+            "Master",
+            (
+                "master's",
+                "masters degree",
+                "master degree",
+                "master of",
+                "master in",
+                "msc",
+                "m.sc",
+                "mba",
+            ),
+        ),
+        (
+            "Bachelor",
+            (
+                "bachelor's",
+                "bachelors degree",
+                "bachelor degree",
+                "bachelor of",
+                "bachelor in",
+                "bsc",
+                "b.sc",
+                "beng",
+                "b.eng",
+            ),
+        ),
         ("Associate", ("associate degree",)),
         ("High School", ("high school",)),
     )

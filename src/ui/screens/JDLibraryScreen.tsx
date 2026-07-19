@@ -1,189 +1,546 @@
-import { Calendar, TrendingUp, BookOpen, FileText } from 'lucide-react'
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
+import { type ChangeEvent, type FormEvent, useEffect, useMemo, useState } from 'react'
+import {
+  Briefcase,
+  Building2,
+  Calendar,
+  CheckCircle2,
+  ExternalLink,
+  FileText,
+  LoaderCircle,
+  MapPin,
+  Search,
+  Send,
+  Upload,
+  X,
+} from 'lucide-react'
+import { applicationsApi } from '@/api/applicationsApi'
+import { jobsApi } from '@/api/jobsApi'
+import { profileApi } from '@/api/profileApi'
+import type { JobPost } from '@/types/jobs'
+import type { StudentApplication } from '@/types/applications'
 
-const jdCards = [
-  { company: 'VNG Corp', title: 'Senior Backend Developer', score: 78, date: 'Jul 2, 2025', tags: ['Node.js', 'Docker', 'PostgreSQL'] },
-  { company: 'Shopee Vietnam', title: 'Fullstack Engineer', score: 65, date: 'Jun 20, 2025', tags: ['React', 'Node.js', 'MySQL'] },
-  { company: 'MoMo Payment', title: 'Backend Developer', score: 71, date: 'Jun 5, 2025', tags: ['Java', 'Spring Boot', 'Kafka'] },
-  { company: 'Tiki E-commerce', title: 'Node.js Developer', score: 58, date: 'May 28, 2025', tags: ['Node.js', 'Redis', 'AWS'] },
-  { company: 'Zalo (VNG)', title: 'Software Engineer', score: 82, date: 'May 15, 2025', tags: ['C++', 'Go', 'Kubernetes'] },
-  { company: 'KMS Technology', title: 'Java Backend Dev', score: 54, date: 'Jul 1, 2025', tags: ['Java', 'Microservices', 'Docker'] },
-]
+const MAX_CV_BYTES = 10 * 1024 * 1024
 
-const topSkillsData = [
-  { skill: 'Docker', count: 5 },
-  { skill: 'Node.js', count: 4 },
-  { skill: 'PostgreSQL', count: 3 },
-  { skill: 'Kubernetes', count: 3 },
-  { skill: 'Redis', count: 3 },
-  { skill: 'Microservices', count: 2 },
-]
+const sections = [
+  ['about_job', 'About the job'],
+  ['responsibilities', 'Responsibilities'],
+  ['requirements', 'Requirements'],
+  ['we_offer', 'We offer'],
+  ['life_at_company', 'Life at company'],
+  ['hiring_process', 'How we hire'],
+] as const
 
-const missingSkillsData = [
-  { skill: 'Docker', count: 5, pct: 83 },
-  { skill: 'Kubernetes', count: 4, pct: 67 },
-  { skill: 'Redis', count: 3, pct: 50 },
-  { skill: 'Kafka', count: 2, pct: 33 },
-  { skill: 'GraphQL', count: 2, pct: 33 },
-]
-
-const roadmap = [
-  { icon: '🐳', skill: 'Docker & Containerization', priority: 1, time: '2 weeks', demand: 83 },
-  { icon: '☸️', skill: 'Kubernetes Basics', priority: 2, time: '3 weeks', demand: 67 },
-  { icon: '⚡', skill: 'Redis & Caching', priority: 3, time: '1 week', demand: 50 },
-  { icon: '📨', skill: 'Apache Kafka', priority: 4, time: '2 weeks', demand: 33 },
-]
-
-// Spec score colors: >=75 green, 60-74 blue, else amber
-const scoreColor = (s: number) => (s >= 75 ? 'var(--success)' : s >= 60 ? '#2563EB' : 'var(--warning)')
-const scoreBadge = (s: number) => (s >= 75 ? 'fc-badge--green' : s >= 60 ? 'fc-badge--blue' : 'fc-badge--amber')
-
-const tooltipStyle = {
-  background: 'var(--surface)',
-  border: '1px solid var(--border)',
-  borderRadius: 'var(--r-sm)',
-  fontSize: 13,
-  color: 'var(--text-primary)',
-  boxShadow: 'var(--shadow-lg)',
-  padding: '8px 12px',
+interface ApplyForm {
+  fullName: string
+  email: string
+  phone: string
 }
 
-const axisTick = { fontSize: 12, fill: 'var(--text-muted)', fontWeight: 600 }
+const emptyApplyForm: ApplyForm = {
+  fullName: '',
+  email: '',
+  phone: '',
+}
 
-export default function JDLibraryScreen() {
+function validateApplication(form: ApplyForm, file: File | null): string | null {
+  if (form.fullName.trim().length < 2) return 'Enter your full name.'
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) return 'Enter a valid email address.'
+  if (!/^\+?[\d\s().-]{7,20}$/.test(form.phone.trim())) return 'Enter a valid phone number.'
+  if (!file) return 'Choose your CV in PDF format.'
+  if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
+    return 'Only PDF files are accepted.'
+  }
+  if (file.size > MAX_CV_BYTES) return 'Your PDF must be 10MB or smaller.'
+  return null
+}
+
+interface JDLibraryScreenProps {
+  onViewTracking: (applicationId: number) => void
+}
+
+export default function JDLibraryScreen({ onViewTracking }: JDLibraryScreenProps) {
+  const [jobs, setJobs] = useState<JobPost[]>([])
+  const [applications, setApplications] = useState<StudentApplication[]>([])
+  const [recentApplications, setRecentApplications] = useState<Record<number, number>>({})
+  const [selected, setSelected] = useState<JobPost | null>(null)
+  const [applyJob, setApplyJob] = useState<JobPost | null>(null)
+  const [applyForm, setApplyForm] = useState<ApplyForm>(emptyApplyForm)
+  const [cvFile, setCvFile] = useState<File | null>(null)
+  const [query, setQuery] = useState('')
+  const [location, setLocation] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [profileLoading, setProfileLoading] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [submittedApplicationId, setSubmittedApplicationId] = useState<number | null>(null)
+  const [error, setError] = useState('')
+  const [applyError, setApplyError] = useState('')
+
+  useEffect(() => {
+    Promise.all([jobsApi.listPublic(), applicationsApi.listMine()])
+      .then(([availableJobs, trackedApplications]) => {
+        setJobs(availableJobs)
+        setApplications(trackedApplications)
+      })
+      .catch(cause => setError(cause instanceof Error ? cause.message : 'Could not load jobs and applications.'))
+      .finally(() => setLoading(false))
+  }, [])
+
+  useEffect(() => {
+    if (!applyJob) return
+
+    let active = true
+    setApplyForm(emptyApplyForm)
+    setCvFile(null)
+    setApplyError('')
+    setSubmittedApplicationId(null)
+    setProfileLoading(true)
+
+    profileApi
+      .get()
+      .then(profile => {
+        if (!active) return
+        setApplyForm({
+          fullName: profile.fullName ?? '',
+          email: profile.email ?? '',
+          phone: profile.phone ?? '',
+        })
+      })
+      .catch(() => {
+        if (active) setApplyError('Profile details could not be prefilled. You can enter them below.')
+      })
+      .finally(() => {
+        if (active) setProfileLoading(false)
+      })
+
+    return () => {
+      active = false
+    }
+  }, [applyJob])
+
+  const locations = useMemo(
+    () => [...new Set(jobs.map(job => job.location).filter((item): item is string => Boolean(item)))],
+    [jobs],
+  )
+
+  const applicationByJob = useMemo(() => {
+    const result = new Map<number, number>()
+    applications.forEach(application => {
+      if (!result.has(application.job_id)) {
+        result.set(application.job_id, application.application_id)
+      }
+    })
+    Object.entries(recentApplications).forEach(([jobId, applicationId]) => {
+      result.set(Number(jobId), applicationId)
+    })
+    return result
+  }, [applications, recentApplications])
+
+  const filtered = jobs.filter(job =>
+    `${job.title} ${job.company.name} ${job.location ?? ''} ${job.employment_type ?? ''}`
+      .toLowerCase()
+      .includes(query.toLowerCase())
+    && (!location || job.location === location),
+  )
+
+  const closeApply = () => {
+    if (!submitting) setApplyJob(null)
+  }
+
+  const chooseCv = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0] ?? null
+    setCvFile(file)
+    setApplyError('')
+  }
+
+  const submitApplication = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (!applyJob) return
+
+    const validationError = validateApplication(applyForm, cvFile)
+    if (validationError) {
+      setApplyError(validationError)
+      return
+    }
+
+    setSubmitting(true)
+    setApplyError('')
+    try {
+      const created = await jobsApi.apply(applyJob.job_id, {
+        fullName: applyForm.fullName.trim(),
+        email: applyForm.email.trim(),
+        phone: applyForm.phone.trim(),
+        file: cvFile!,
+      })
+      setRecentApplications(current => ({
+        ...current,
+        [applyJob.job_id]: created.application_id,
+      }))
+      setSubmittedApplicationId(created.application_id)
+    } catch (cause) {
+      setApplyError(cause instanceof Error ? cause.message : 'Could not submit your application.')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const viewTracking = (applicationId: number) => {
+    setApplyJob(null)
+    setSelected(null)
+    onViewTracking(applicationId)
+  }
+
   return (
     <div className="fc-stagger">
-      {/* Page head */}
       <div className="fc-page-head">
         <div>
-          <div className="fc-eyebrow" style={{ marginBottom: 8 }}>Market Intelligence</div>
-          <h1>JD Library &amp; Market Insights</h1>
-          <p style={{ marginTop: 6 }}>Browse your analyzed job descriptions and discover where the market is heading.</p>
-        </div>
-        <div className="fc-badge fc-badge--blue" style={{ fontFamily: 'var(--font-display)', fontSize: 13 }}>
-          {jdCards.length} JDs analyzed
+          <div className="fc-eyebrow">Opportunities</div>
+          <h1>Job Library</h1>
+          <p>Browse active jobs published by FitCV companies.</p>
         </div>
       </div>
 
-      {/* JD grid */}
-      <div className="fc-section-title" style={{ marginBottom: 16 }}>
-        <FileText size={17} color="var(--accent)" />
-        <h2>Analyzed Job Descriptions</h2>
-        <span>Most recent first</span>
+      <div
+        className="fc-card fc-card--pad"
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))',
+          gap: 12,
+          marginBottom: 20,
+        }}
+      >
+        <label>
+          <span className="fc-field-label">Search jobs</span>
+          <div style={{ position: 'relative' }}>
+            <Search size={16} style={{ position: 'absolute', left: 12, top: 12 }} />
+            <input
+              className="fc-input"
+              style={{ paddingLeft: 38 }}
+              value={query}
+              onChange={event => setQuery(event.target.value)}
+              placeholder="Title, company, or type"
+            />
+          </div>
+        </label>
+        <label>
+          <span className="fc-field-label">Location</span>
+          <select className="fc-input" value={location} onChange={event => setLocation(event.target.value)}>
+            <option value="">All locations</option>
+            {locations.map(item => <option key={item}>{item}</option>)}
+          </select>
+        </label>
       </div>
-      <div className="fc-stagger" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 18, marginBottom: 32 }}>
-        {jdCards.map(jd => (
-          <div key={jd.company + jd.title} className="fc-card fc-card--pad fc-card--lift" style={{ cursor: 'pointer', display: 'flex', flexDirection: 'column' }}>
-            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10, marginBottom: 14 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
-                <div style={{ width: 42, height: 42, borderRadius: 13, background: 'var(--accent-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, fontWeight: 800, color: 'var(--accent-ink)', flexShrink: 0 }}>
-                  {jd.company[0]}
-                </div>
+
+      {error && (
+        <div role="alert" className="fc-panel" style={{ padding: 14, color: 'var(--danger)' }}>
+          {error}
+        </div>
+      )}
+
+      {loading ? (
+        <div className="fc-card fc-card--pad">Loading active jobs...</div>
+      ) : filtered.length === 0 ? (
+        <div className="fc-card fc-card--pad">No active jobs match your filters.</div>
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(280px,1fr))', gap: 16 }}>
+          {filtered.map(job => (
+            <button
+              key={job.job_id}
+              className="fc-card fc-card--pad fc-card--lift"
+              onClick={() => setSelected(job)}
+              style={{
+                textAlign: 'left',
+                border: '1px solid var(--border)',
+                cursor: 'pointer',
+                background: 'var(--surface)',
+              }}
+            >
+              <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                {job.company.logo_url ? (
+                  <img src={job.company.logo_url} alt="" style={{ width: 44, height: 44, objectFit: 'contain' }} />
+                ) : (
+                  <Building2 size={32} />
+                )}
                 <div>
-                  <div style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600, letterSpacing: '0.02em' }}>{jd.company}</div>
-                  <div style={{ fontSize: 11.5, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 4 }}>
-                    <Calendar size={11} /> {jd.date}
-                  </div>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{job.company.name}</div>
+                  <h3>{job.title}</h3>
                 </div>
               </div>
-              <span className={`fc-badge ${scoreBadge(jd.score)}`} style={{ fontFamily: 'var(--font-display)', fontSize: 13 }}>
-                {jd.score}% match
-              </span>
-            </div>
-
-            <div style={{ fontWeight: 700, fontSize: 16, color: 'var(--text-primary)', marginBottom: 12, lineHeight: 1.3, letterSpacing: '-0.01em' }}>{jd.title}</div>
-
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 16 }}>
-              {jd.tags.map(t => <span key={t} className="fc-chip">{t}</span>)}
-            </div>
-
-            <div style={{ marginTop: 'auto', paddingTop: 14, borderTop: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-                <div className="fc-progress" style={{ width: 90 }}>
-                  <div style={{ width: `${jd.score}%`, background: scoreColor(jd.score) }} />
-                </div>
-                <span style={{ fontSize: 11, fontWeight: 800, color: scoreColor(jd.score), fontFamily: 'var(--font-display)' }}>{jd.score}</span>
+              <p><MapPin size={13} style={{ display: 'inline' }} /> {job.location} - {job.employment_type}</p>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <span className="fc-badge fc-badge--green">{job.openings_count} openings</span>
+                {applicationByJob.has(job.job_id) && (
+                  <span className="fc-badge fc-badge--blue">Applied</span>
+                )}
+                <span>
+                  <Calendar size={12} style={{ display: 'inline' }} /> Apply by{' '}
+                  {job.deadline ? new Date(job.deadline).toLocaleDateString() : 'open'}
+                </span>
               </div>
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12.5, fontWeight: 600, color: 'var(--accent-ink)' }}>
-                View <span style={{ fontSize: 14, lineHeight: 1 }}>→</span>
-              </span>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Market insights */}
-      <div className="fc-section-title" style={{ marginBottom: 16 }}>
-        <TrendingUp size={17} color="var(--accent)" />
-        <h2>Market Insights</h2>
-        <span>Across {jdCards.length} analyzed JDs</span>
-      </div>
-      <div className="fc-stagger" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 18, marginBottom: 32 }}>
-        <div className="fc-card fc-card--pad">
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18 }}>
-            <span style={{ width: 36, height: 36, borderRadius: 11, background: 'var(--accent-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--accent)' }}>
-              <TrendingUp size={18} color="var(--accent)" />
-            </span>
-            <h3 style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>Top Skills Across Analyzed JDs</h3>
-          </div>
-          <ResponsiveContainer width="100%" height={172}>
-            <BarChart data={topSkillsData} layout="vertical" margin={{ left: 4, right: 8, top: 2, bottom: 2 }}>
-              <XAxis type="number" hide />
-              <YAxis dataKey="skill" type="category" tick={axisTick} axisLine={false} tickLine={false} width={94} />
-              <Tooltip contentStyle={tooltipStyle} cursor={{ fill: 'var(--accent-soft)' }} formatter={(v: unknown) => [`${v} JDs`, 'Appearances']} />
-              <Bar dataKey="count" fill="var(--accent)" radius={[0, 6, 6, 0]} barSize={13} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-
-        <div className="fc-card fc-card--pad">
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18 }}>
-            <span style={{ width: 36, height: 36, borderRadius: 11, background: 'var(--warning-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>⚠️</span>
-            <h3 style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>Skills You&apos;re Missing Most Often</h3>
-          </div>
-          <ResponsiveContainer width="100%" height={172}>
-            <BarChart data={missingSkillsData} layout="vertical" margin={{ left: 4, right: 8, top: 2, bottom: 2 }}>
-              <XAxis type="number" hide />
-              <YAxis dataKey="skill" type="category" tick={axisTick} axisLine={false} tickLine={false} width={94} />
-              <Tooltip contentStyle={tooltipStyle} cursor={{ fill: 'var(--warning-soft)' }} formatter={(v: unknown) => [`${v} JDs`, 'Missing in']} />
-              <Bar dataKey="count" radius={[0, 6, 6, 0]} barSize={13}>
-                {missingSkillsData.map((_, i) => <Cell key={i} fill="var(--warning)" />)}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-
-      {/* Learning roadmap */}
-      <div className="fc-card fc-card--pad">
-        <div className="fc-section-title" style={{ marginBottom: 20 }}>
-          <BookOpen size={17} color="var(--accent)" />
-          <h2>Personalized Learning Roadmap</h2>
-          <span className="fc-badge fc-badge--blue">Based on {jdCards.length} JDs</span>
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {roadmap.map(r => (
-            <div key={r.skill} className="fc-panel" style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '16px 18px' }}>
-              <div style={{ width: 36, height: 36, borderRadius: 11, background: 'var(--surface)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 19, flexShrink: 0, border: '1px solid var(--border)' }}>
-                {r.icon}
-              </div>
-              <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: 12, fontWeight: 800, flexShrink: 0 }}>
-                {r.priority}
-              </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontWeight: 700, fontSize: 14.5, color: 'var(--text-primary)', marginBottom: 3, letterSpacing: '-0.01em' }}>{r.skill}</div>
-                <div style={{ fontSize: 12.5, color: 'var(--text-secondary)' }}>Est. {r.time} · Appears in {r.demand}% of JDs</div>
-              </div>
-              <div style={{ textAlign: 'right', flexShrink: 0, minWidth: 120 }}>
-                <div className="fc-progress" style={{ marginBottom: 7 }}>
-                  <div style={{ width: `${r.demand}%`, background: r.demand >= 75 ? 'var(--success)' : r.demand >= 60 ? '#2563EB' : 'var(--warning)' }} />
-                </div>
-                <span style={{ fontSize: 11.5, color: 'var(--text-muted)', fontWeight: 600 }}>{r.demand}% demand</span>
-              </div>
-            </div>
+              <p>
+                {job.about_job?.slice(0, 150)}
+                {(job.about_job?.length ?? 0) > 150 ? '...' : ''}
+              </p>
+            </button>
           ))}
         </div>
-      </div>
+      )}
+
+      {selected && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="job-detail-title"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(15,23,42,.55)',
+            zIndex: 100,
+            display: 'grid',
+            placeItems: 'center',
+            padding: 20,
+          }}
+          onClick={() => setSelected(null)}
+        >
+          <article
+            className="fc-card fc-card--pad"
+            onClick={event => event.stopPropagation()}
+            style={{ width: 'min(820px,100%)', maxHeight: '90vh', overflowY: 'auto' }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 14 }}>
+              <div>
+                <div className="fc-eyebrow">{selected.company.name}</div>
+                <h2 id="job-detail-title">{selected.title}</h2>
+                <p>
+                  <MapPin size={13} style={{ display: 'inline' }} /> {selected.location} -{' '}
+                  {selected.employment_type} - {selected.openings_count} openings
+                </p>
+              </div>
+              <button
+                className="fc-btn fc-btn--secondary"
+                aria-label="Close details"
+                onClick={() => setSelected(null)}
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 14 }}>
+              {applicationByJob.has(selected.job_id) ? (
+                <button
+                  className="fc-btn fc-btn--primary"
+                  onClick={() => viewTracking(applicationByJob.get(selected.job_id)!)}
+                >
+                  <ExternalLink size={15} /> View tracking
+                </button>
+              ) : (
+                <button className="fc-btn fc-btn--primary" onClick={() => setApplyJob(selected)}>
+                  <Send size={15} /> Apply now
+                </button>
+              )}
+              {selected.company.website_url && (
+                <a
+                  href={selected.company.website_url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="fc-btn fc-btn--secondary"
+                >
+                  <ExternalLink size={14} /> Company website
+                </a>
+              )}
+            </div>
+
+            {sections.map(([key, label]) => (
+              <section key={key} style={{ marginTop: 22 }}>
+                <div className="fc-section-title">
+                  <Briefcase size={15} />
+                  <h3>{label}</h3>
+                </div>
+                <p style={{ whiteSpace: 'pre-wrap', lineHeight: 1.65 }}>
+                  {selected[key] || 'Not provided.'}
+                </p>
+              </section>
+            ))}
+          </article>
+        </div>
+      )}
+
+      {applyJob && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="apply-dialog-title"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(15,23,42,.68)',
+            zIndex: 120,
+            display: 'grid',
+            placeItems: 'center',
+            padding: 20,
+          }}
+          onClick={closeApply}
+        >
+          <article
+            className="fc-card fc-card--pad"
+            onClick={event => event.stopPropagation()}
+            style={{ width: 'min(620px,100%)', maxHeight: '92vh', overflowY: 'auto' }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, marginBottom: 18 }}>
+              <div>
+                <div className="fc-eyebrow">Application</div>
+                <h2 id="apply-dialog-title">Apply for {applyJob.title}</h2>
+                <p>{applyJob.company.name}</p>
+              </div>
+              <button
+                type="button"
+                className="fc-icon-btn"
+                aria-label="Close application"
+                onClick={closeApply}
+                disabled={submitting}
+              >
+                <X size={17} />
+              </button>
+            </div>
+
+            {submittedApplicationId ? (
+              <div style={{ textAlign: 'center', padding: '28px 10px 10px' }}>
+                <CheckCircle2 size={48} color="var(--success)" style={{ margin: '0 auto 14px' }} />
+                <h3>Application submitted</h3>
+                <p style={{ color: 'var(--text-secondary)', margin: '8px auto 22px', maxWidth: 420 }}>
+                  Your information and CV were sent to {applyJob.company.name}. You can follow the next
+                  steps in your application tracker.
+                </p>
+                <button
+                  className="fc-btn fc-btn--primary"
+                  onClick={() => viewTracking(submittedApplicationId)}
+                >
+                  <ExternalLink size={15} /> View application tracking
+                </button>
+              </div>
+            ) : (
+              <form onSubmit={submitApplication}>
+                {profileLoading && (
+                  <div className="fc-panel" style={{ padding: 12, marginBottom: 14 }}>
+                    <LoaderCircle
+                      size={15}
+                      style={{
+                        display: 'inline',
+                        marginRight: 8,
+                        animation: 'fc-spin .8s linear infinite',
+                      }}
+                    />
+                    Loading your profile...
+                  </div>
+                )}
+
+                {applyError && (
+                  <div role="alert" className="fc-panel" style={{ padding: 12, marginBottom: 14, color: 'var(--danger)' }}>
+                    {applyError}
+                  </div>
+                )}
+
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))',
+                    gap: 14,
+                  }}
+                >
+                  <label style={{ gridColumn: '1 / -1' }}>
+                    <span className="fc-field-label">Full name</span>
+                    <input
+                      className="fc-input"
+                      value={applyForm.fullName}
+                      onChange={event => setApplyForm(current => ({ ...current, fullName: event.target.value }))}
+                      autoComplete="name"
+                      disabled={submitting}
+                    />
+                  </label>
+                  <label>
+                    <span className="fc-field-label">Email</span>
+                    <input
+                      className="fc-input"
+                      type="email"
+                      value={applyForm.email}
+                      onChange={event => setApplyForm(current => ({ ...current, email: event.target.value }))}
+                      autoComplete="email"
+                      disabled={submitting}
+                    />
+                  </label>
+                  <label>
+                    <span className="fc-field-label">Phone</span>
+                    <input
+                      className="fc-input"
+                      type="tel"
+                      value={applyForm.phone}
+                      onChange={event => setApplyForm(current => ({ ...current, phone: event.target.value }))}
+                      autoComplete="tel"
+                      disabled={submitting}
+                    />
+                  </label>
+                </div>
+
+                <label
+                  style={{
+                    display: 'block',
+                    border: '1px dashed var(--border-strong)',
+                    borderRadius: 8,
+                    padding: 18,
+                    marginTop: 16,
+                    background: 'var(--surface-2)',
+                    cursor: submitting ? 'default' : 'pointer',
+                  }}
+                >
+                  <input
+                    type="file"
+                    accept=".pdf,application/pdf"
+                    onChange={chooseCv}
+                    disabled={submitting}
+                    style={{ position: 'absolute', width: 1, height: 1, opacity: 0 }}
+                  />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <div
+                      style={{
+                        width: 42,
+                        height: 42,
+                        borderRadius: 8,
+                        background: 'var(--accent-soft)',
+                        color: 'var(--accent)',
+                        display: 'grid',
+                        placeItems: 'center',
+                        flexShrink: 0,
+                      }}
+                    >
+                      {cvFile ? <FileText size={21} /> : <Upload size={21} />}
+                    </div>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontWeight: 700, overflowWrap: 'anywhere' }}>
+                        {cvFile ? cvFile.name : 'Choose your CV'}
+                      </div>
+                      <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 3 }}>
+                        PDF only, maximum 10MB. Scanned PDFs are processed automatically with OCR.
+                        {cvFile ? ` - ${(cvFile.size / 1024 / 1024).toFixed(2)}MB` : ''}
+                      </div>
+                    </div>
+                  </div>
+                </label>
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20, flexWrap: 'wrap' }}>
+                  <button type="button" className="fc-btn fc-btn--secondary" onClick={closeApply} disabled={submitting}>
+                    Cancel
+                  </button>
+                  <button type="submit" className="fc-btn fc-btn--primary" disabled={submitting || profileLoading}>
+                    {submitting
+                      ? <LoaderCircle size={15} style={{ animation: 'fc-spin .8s linear infinite' }} />
+                      : <Send size={15} />}
+                    {submitting ? 'Submitting...' : 'Submit application'}
+                  </button>
+                </div>
+              </form>
+            )}
+          </article>
+        </div>
+      )}
     </div>
   )
 }

@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 import uvicorn
 
-from app.api.routes import analyzer, auth, cv_ranking, improvements, profile
+from app.api.routes import analyzer, applications, auth, cv_ranking, improvements, jobs, profile
 from app.core.config import settings
 
 app = FastAPI(title="FitCV API", version="0.1.0")
@@ -27,9 +27,11 @@ app.add_middleware(
 
 app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
 app.include_router(analyzer.router, prefix="/api", tags=["cv-jd-analyzer"])
+app.include_router(applications.router, prefix="/api/applications", tags=["applications"])
 app.include_router(cv_ranking.router, prefix="/api/hr/cv-ranking", tags=["cv-ranking"])
 app.include_router(improvements.router, prefix="/api/match-results", tags=["improvement-reports"])
 app.include_router(profile.router, prefix="/api/profile", tags=["profile"])
+app.include_router(jobs.router, prefix="/api/jobs", tags=["jobs"])
 
 
 @app.get("/api/health")
