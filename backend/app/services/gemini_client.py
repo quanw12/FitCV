@@ -47,9 +47,7 @@ class GeminiClient:
                 )
                 if response.status_code == 429 or response.status_code >= 500:
                     if attempt + 1 < attempts:
-                        retry_after = response.headers.get("Retry-After")
-                        delay = float(retry_after) if retry_after else 0.5 * (2 ** attempt)
-                        time.sleep(max(0.0, delay))
+                        time.sleep(_retry_delay(response, attempt))
                         continue
                     raise GeminiClientError(
                         "Gemini is busy or the free quota was reached. Try again later."
@@ -58,8 +56,13 @@ class GeminiClient:
                     raise GeminiClientError(
                         "Gemini rejected the API key. Check GEMINI_API_KEY and its restrictions."
                     )
+                if response.status_code >= 400:
+                    detail = _safe_error_detail(response)
+                    message = f"Gemini request failed with HTTP {response.status_code}"
+                    raise GeminiClientError(
+                        f"{message}: {detail}" if detail else f"{message}."
+                    )
 
-                response.raise_for_status()
                 payload = response.json()
                 content = payload["candidates"][0]["content"]["parts"][0]["text"]
                 parsed = json.loads(_strip_code_fence(content))
@@ -70,6 +73,7 @@ class GeminiClient:
                 raise
             except requests.Timeout as exc:
                 if attempt + 1 < attempts:
+                    time.sleep(0.5 * (2 ** attempt))
                     continue
                 raise GeminiClientError("Gemini timed out. Try again later.") from exc
             except requests.RequestException as exc:
@@ -86,3 +90,30 @@ def _strip_code_fence(value: str) -> str:
         stripped = stripped.split("\n", 1)[-1]
         stripped = stripped.rsplit("```", 1)[0]
     return stripped.strip()
+
+
+def _retry_delay(response: requests.Response, attempt: int) -> float:
+    retry_after = response.headers.get("Retry-After")
+    if retry_after:
+        try:
+            return max(0.0, float(retry_after))
+        except ValueError:
+            pass
+    return 0.5 * (2 ** attempt)
+
+
+def _safe_error_detail(response: requests.Response) -> str | None:
+    try:
+        payload = response.json()
+    except (TypeError, ValueError):
+        return None
+    if not isinstance(payload, dict):
+        return None
+    error = payload.get("error")
+    message = error.get("message") if isinstance(error, dict) else None
+    if not isinstance(message, str) or not message.strip():
+        return None
+    sanitized = " ".join(message.split())
+    if settings.gemini_api_key:
+        sanitized = sanitized.replace(settings.gemini_api_key, "[redacted]")
+    return sanitized[:500]

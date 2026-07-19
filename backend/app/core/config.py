@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     resend_api_key: str | None = None
     resend_from_email: str | None = None
     gemini_api_key: str | None = None
-    gemini_model: str = "gemini-3.5-flash"
+    gemini_model: str = "gemini-3.1-flash-lite"
     gemini_timeout_seconds: float = 30.0
     gemini_max_retries: int = 2
     improvement_task_stale_minutes: int = 10

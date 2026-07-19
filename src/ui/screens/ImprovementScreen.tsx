@@ -17,48 +17,84 @@ export default function ImprovementScreen({ matchResultId = null }: ImprovementS
   const [completedWins, setCompletedWins] = useState<Set<string>>(new Set())
   const [copyMessage, setCopyMessage] = useState<Record<string, string>>({})
   const requestIdRef = useRef(0)
+  const activeRequestRef = useRef<AbortController | null>(null)
 
   const loadReport = useCallback(async (regenerate = false) => {
+    activeRequestRef.current?.abort()
     const requestId = requestIdRef.current + 1
     requestIdRef.current = requestId
+    const controller = new AbortController()
+    activeRequestRef.current = controller
+    const isCurrentRequest = () => (
+      requestIdRef.current === requestId
+      && activeRequestRef.current === controller
+      && !controller.signal.aborted
+    )
+
     if (!matchResultId) {
-      setLoading(false)
-      setResponse(null)
-      setError(null)
+      if (isCurrentRequest()) {
+        activeRequestRef.current = null
+        setLoading(false)
+        setResponse(null)
+        setError(null)
+      }
       return
     }
     setLoading(true)
     setError(null)
     setCompletedWins(new Set())
     try {
-      let current = await improvementApi.getReport(matchResultId)
+      let current = await improvementApi.getReport(
+        matchResultId,
+        controller.signal,
+      )
+      if (!isCurrentRequest()) return
       if (current.status === 'Pending' && !current.report) {
-        await improvementApi.generateReport(matchResultId, regenerate)
+        await improvementApi.generateReport(
+          matchResultId,
+          regenerate,
+          controller.signal,
+        )
       } else if (regenerate) {
-        await improvementApi.generateReport(matchResultId, true)
+        await improvementApi.generateReport(
+          matchResultId,
+          true,
+          controller.signal,
+        )
         current = { ...current, status: 'Pending', report: null }
       }
 
       for (let attempt = 0; attempt < 30 && ['Pending', 'Processing'].includes(current.status); attempt += 1) {
-        if (requestIdRef.current !== requestId) return
+        if (!isCurrentRequest()) return
         setResponse(current)
-        await new Promise(resolve => window.setTimeout(resolve, 2000))
-        if (requestIdRef.current !== requestId) return
-        current = await improvementApi.getReport(matchResultId)
+        await abortableDelay(2000, controller.signal)
+        if (!isCurrentRequest()) return
+        current = await improvementApi.getReport(
+          matchResultId,
+          controller.signal,
+        )
       }
       if (['Pending', 'Processing'].includes(current.status)) throw new Error('Analysis is taking longer than expected. Please retry shortly.')
       if (current.status === 'Failed') throw new Error(current.errorMessage ?? 'AI suggestions could not be generated.')
-      if (requestIdRef.current === requestId) setResponse(current)
+      if (isCurrentRequest()) setResponse(current)
     } catch (caught) {
-      if (requestIdRef.current === requestId) setError(caught instanceof Error ? caught.message : 'Unable to load improvement suggestions.')
+      if (isAbortError(caught) || !isCurrentRequest()) return
+      setError(caught instanceof Error ? caught.message : 'Unable to load improvement suggestions.')
     } finally {
-      if (requestIdRef.current === requestId) setLoading(false)
+      if (isCurrentRequest()) {
+        activeRequestRef.current = null
+        setLoading(false)
+      }
     }
   }, [matchResultId])
 
   useEffect(() => {
     void loadReport()
-    return () => { requestIdRef.current += 1 }
+    return () => {
+      requestIdRef.current += 1
+      activeRequestRef.current?.abort()
+      activeRequestRef.current = null
+    }
   }, [loadReport])
 
   const report = response?.report
@@ -201,4 +237,31 @@ function Empty({ message }: { message: string }) {
 
 function StateCard({ title, message, loading, action }: { title: string; message: string; loading?: boolean; action?: ReactNode }) {
   return <div className="fc-card improvement-state" role="status">{loading && <div className="state-spinner" />}<h2>{title}</h2><p>{message}</p>{action}</div>
+}
+
+function abortableDelay(milliseconds: number, signal: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal.aborted) {
+      reject(createAbortError())
+      return
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      signal.removeEventListener('abort', handleAbort)
+      resolve()
+    }, milliseconds)
+    const handleAbort = () => {
+      window.clearTimeout(timeoutId)
+      reject(createAbortError())
+    }
+    signal.addEventListener('abort', handleAbort, { once: true })
+  })
+}
+
+function createAbortError(): DOMException {
+  return new DOMException('The improvement request was cancelled.', 'AbortError')
+}
+
+function isAbortError(error: unknown): boolean {
+  return error instanceof DOMException && error.name === 'AbortError'
 }

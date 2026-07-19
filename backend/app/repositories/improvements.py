@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, select, update
 from sqlalchemy.orm import Session
 
 from app.models.improvement import (
@@ -9,7 +9,6 @@ from app.models.improvement import (
     Cv,
     CvImprovementSuggestion,
     CvParseResult,
-    Job,
     MatchResult,
 )
 from app.models.analyzer import JobDescription
@@ -44,26 +43,37 @@ def get_generation_context(
     match = db.get(MatchResult, match_result_id)
     if match is None:
         raise LookupError("Match result not found.")
-    parsed = db.scalar(
-        select(CvParseResult)
-        .where(
-            CvParseResult.cv_id == match.cv_id,
-            CvParseResult.parse_status == "Success",
+    if match.cv_parse_id is not None:
+        parsed = db.scalar(
+            select(CvParseResult).where(
+                CvParseResult.cv_parse_id == match.cv_parse_id,
+                CvParseResult.cv_id == match.cv_id,
+                CvParseResult.parse_status == "Success",
+            )
         )
-        .order_by(CvParseResult.parsed_at.desc())
-    )
-    if match.job_id is not None:
-        job = db.get(Job, match.job_id)
-        if job is None:
-            raise LookupError("Job description not found.")
-        description = "\n".join(part for part in [job.description, job.requirements] if part)
-    elif match.job_description_id is not None:
+        if parsed is None:
+            raise LookupError("Successful CV parse linked to match not found.")
+    else:
+        # Legacy match rows predate cv_parse_id. Only those rows may fall back to the
+        # latest successful parse for the CV.
+        parsed = db.scalar(
+            select(CvParseResult)
+            .where(
+                CvParseResult.cv_id == match.cv_id,
+                CvParseResult.parse_status == "Success",
+            )
+            .order_by(CvParseResult.parsed_at.desc(), CvParseResult.cv_parse_id.desc())
+            .limit(1)
+        )
+    if match.job_description_id is not None:
         job_description = db.get(JobDescription, match.job_description_id)
         if job_description is None:
             raise LookupError("Job description not found.")
         description = job_description.raw_text
     else:
-        raise LookupError("Job description not found.")
+        raise LookupError(
+            "Immutable job-description snapshot not found. Run the analysis again."
+        )
     return match, parsed, description
 
 
@@ -95,6 +105,72 @@ def create_task(
     db.commit()
     db.refresh(task)
     return task
+
+
+def mark_active_task_failed(
+    db: Session,
+    task_id: int,
+    *,
+    error_message: str,
+    completed_at: datetime,
+) -> bool:
+    result = db.execute(
+        update(AiTask)
+        .where(
+            AiTask.ai_task_id == task_id,
+            AiTask.status.in_([AiTaskStatus.pending, AiTaskStatus.processing]),
+        )
+        .values(
+            status=AiTaskStatus.failed,
+            error_message=error_message,
+            completed_at=completed_at,
+        )
+        .execution_options(synchronize_session=False)
+    )
+    return result.rowcount == 1
+
+
+def claim_task(db: Session, task_id: int, *, started_at: datetime) -> AiTask | None:
+    result = db.execute(
+        update(AiTask)
+        .where(
+            AiTask.ai_task_id == task_id,
+            AiTask.status == AiTaskStatus.pending,
+        )
+        .values(status=AiTaskStatus.processing, started_at=started_at)
+        .execution_options(synchronize_session=False)
+    )
+    if result.rowcount != 1:
+        db.rollback()
+        return None
+    db.commit()
+    return db.get(AiTask, task_id)
+
+
+def complete_claimed_task(
+    db: Session,
+    task_id: int,
+    *,
+    completed_at: datetime,
+) -> bool:
+    result = db.execute(
+        update(AiTask)
+        .where(
+            AiTask.ai_task_id == task_id,
+            AiTask.status == AiTaskStatus.processing,
+        )
+        .values(
+            status=AiTaskStatus.success,
+            error_message=None,
+            completed_at=completed_at,
+        )
+        .execution_options(synchronize_session=False)
+    )
+    if result.rowcount != 1:
+        db.rollback()
+        return False
+    db.commit()
+    return True
 
 
 def get_suggestions(
@@ -134,15 +210,10 @@ def get_report_source_timestamps(
         return []
 
     job_timestamps: list[datetime | None] = []
-    if match.job_id is not None:
-        job = db.get(Job, match.job_id)
-        if job is not None:
-            job_timestamps.extend([job.updated_at, job.created_at])
-    elif match.job_description_id is not None:
+    if match.job_description_id is not None:
         job_description = db.get(JobDescription, match.job_description_id)
         if job_description is not None:
             job_timestamps.append(job_description.created_at)
-
     return [
         cv.uploaded_at,
         parsed.parsed_at if parsed else None,
