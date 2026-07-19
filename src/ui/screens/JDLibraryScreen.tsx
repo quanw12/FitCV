@@ -1,4 +1,4 @@
-import { Calendar, TrendingUp, BookOpen } from 'lucide-react'
+import { Calendar, TrendingUp, BookOpen, FileText } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 
 const jdCards = [
@@ -34,72 +34,120 @@ const roadmap = [
   { icon: '📨', skill: 'Apache Kafka', priority: 4, time: '2 weeks', demand: 33 },
 ]
 
+// Spec score colors: >=75 green, 60-74 blue, else amber
+const scoreColor = (s: number) => (s >= 75 ? 'var(--success)' : s >= 60 ? '#2563EB' : 'var(--warning)')
+const scoreBadge = (s: number) => (s >= 75 ? 'fc-badge--green' : s >= 60 ? 'fc-badge--blue' : 'fc-badge--amber')
+
+const tooltipStyle = {
+  background: 'var(--surface)',
+  border: '1px solid var(--border)',
+  borderRadius: 'var(--r-sm)',
+  fontSize: 13,
+  color: 'var(--text-primary)',
+  boxShadow: 'var(--shadow-lg)',
+  padding: '8px 12px',
+}
+
+const axisTick = { fontSize: 12, fill: 'var(--text-muted)', fontWeight: 600 }
+
 export default function JDLibraryScreen() {
   return (
-    <div>
-      <div style={{ marginBottom: 24 }}>
-        <h1 style={{ fontSize: 22, fontWeight: 800, color: 'var(--text-primary)', marginBottom: 4 }}>JD Library & Market Insights</h1>
-        <p style={{ color: 'var(--text-secondary)', fontSize: 14 }}>Browse your analyzed job descriptions and discover market trends.</p>
+    <div className="fc-stagger">
+      {/* Page head */}
+      <div className="fc-page-head">
+        <div>
+          <div className="fc-eyebrow" style={{ marginBottom: 8 }}>Market Intelligence</div>
+          <h1>JD Library &amp; Market Insights</h1>
+          <p style={{ marginTop: 6 }}>Browse your analyzed job descriptions and discover where the market is heading.</p>
+        </div>
+        <div className="fc-badge fc-badge--blue" style={{ fontFamily: 'var(--font-display)', fontSize: 13 }}>
+          {jdCards.length} JDs analyzed
+        </div>
       </div>
 
       {/* JD grid */}
-      <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 14 }}>Analyzed Job Descriptions</h3>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14, marginBottom: 28 }}>
-        {jdCards.map((jd, i) => {
-          const sc = jd.score >= 75 ? { color: '#10B981', bg: '#D1FAE5' } : jd.score >= 60 ? { color: '#4F46E5', bg: '#EEF2FF' } : { color: '#F59E0B', bg: '#FEF3C7' }
-          return (
-            <div key={i} className="fitcv-card" style={{ padding: 18, cursor: 'pointer', transition: 'box-shadow 0.15s' }}
-              onMouseOver={e => (e.currentTarget.style.boxShadow = '0 4px 20px rgba(0,0,0,0.1)')}
-              onMouseOut={e => (e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.06)')}>
-              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 10 }}>
-                <div style={{ width: 36, height: 36, borderRadius: 10, background: sc.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 700, color: sc.color }}>
+      <div className="fc-section-title" style={{ marginBottom: 16 }}>
+        <FileText size={17} color="var(--accent)" />
+        <h2>Analyzed Job Descriptions</h2>
+        <span>Most recent first</span>
+      </div>
+      <div className="fc-stagger" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 18, marginBottom: 32 }}>
+        {jdCards.map(jd => (
+          <div key={jd.company + jd.title} className="fc-card fc-card--pad fc-card--lift" style={{ cursor: 'pointer', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10, marginBottom: 14 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
+                <div style={{ width: 42, height: 42, borderRadius: 13, background: 'var(--accent-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, fontWeight: 800, color: 'var(--accent-ink)', flexShrink: 0 }}>
                   {jd.company[0]}
                 </div>
-                <span style={{ background: sc.bg, color: sc.color, borderRadius: 20, padding: '4px 10px', fontSize: 12, fontWeight: 700 }}>{jd.score}%</span>
+                <div>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600, letterSpacing: '0.02em' }}>{jd.company}</div>
+                  <div style={{ fontSize: 11.5, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <Calendar size={11} /> {jd.date}
+                  </div>
+                </div>
               </div>
-              <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--text-primary)', marginBottom: 2 }}>{jd.title}</div>
-              <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 10 }}>{jd.company}</div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 10 }}>
-                {jd.tags.map(t => <span key={t} className="badge-indigo" style={{ fontSize: 11 }}>{t}</span>)}
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'var(--text-muted)', fontSize: 11 }}>
-                <Calendar size={10} /> {jd.date}
-              </div>
+              <span className={`fc-badge ${scoreBadge(jd.score)}`} style={{ fontFamily: 'var(--font-display)', fontSize: 13 }}>
+                {jd.score}% match
+              </span>
             </div>
-          )
-        })}
+
+            <div style={{ fontWeight: 700, fontSize: 16, color: 'var(--text-primary)', marginBottom: 12, lineHeight: 1.3, letterSpacing: '-0.01em' }}>{jd.title}</div>
+
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 16 }}>
+              {jd.tags.map(t => <span key={t} className="fc-chip">{t}</span>)}
+            </div>
+
+            <div style={{ marginTop: 'auto', paddingTop: 14, borderTop: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                <div className="fc-progress" style={{ width: 90 }}>
+                  <div style={{ width: `${jd.score}%`, background: scoreColor(jd.score) }} />
+                </div>
+                <span style={{ fontSize: 11, fontWeight: 800, color: scoreColor(jd.score), fontFamily: 'var(--font-display)' }}>{jd.score}</span>
+              </div>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12.5, fontWeight: 600, color: 'var(--accent-ink)' }}>
+                View <span style={{ fontSize: 14, lineHeight: 1 }}>→</span>
+              </span>
+            </div>
+          </div>
+        ))}
       </div>
 
       {/* Market insights */}
-      <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 14 }}>Market Insights</h3>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 20 }}>
-        <div className="fitcv-card" style={{ padding: 22 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
-            <TrendingUp size={18} color="var(--indigo)" />
-            <h4 style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)' }}>Top Skills Across Analyzed JDs</h4>
+      <div className="fc-section-title" style={{ marginBottom: 16 }}>
+        <TrendingUp size={17} color="var(--accent)" />
+        <h2>Market Insights</h2>
+        <span>Across {jdCards.length} analyzed JDs</span>
+      </div>
+      <div className="fc-stagger" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 18, marginBottom: 32 }}>
+        <div className="fc-card fc-card--pad">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18 }}>
+            <span style={{ width: 36, height: 36, borderRadius: 11, background: 'var(--accent-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--accent)' }}>
+              <TrendingUp size={18} color="var(--accent)" />
+            </span>
+            <h3 style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>Top Skills Across Analyzed JDs</h3>
           </div>
-          <ResponsiveContainer width="100%" height={160}>
-            <BarChart data={topSkillsData} layout="vertical">
+          <ResponsiveContainer width="100%" height={172}>
+            <BarChart data={topSkillsData} layout="vertical" margin={{ left: 4, right: 8, top: 2, bottom: 2 }}>
               <XAxis type="number" hide />
-              <YAxis dataKey="skill" type="category" tick={{ fontSize: 12, fill: '#6B7280' }} axisLine={false} tickLine={false} width={90} />
-              <Tooltip contentStyle={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 8, fontSize: 13 }} formatter={(v: unknown) => [`${v} JDs`, 'Appearances']} />
-              <Bar dataKey="count" fill="#4F46E5" radius={[0, 6, 6, 0]} barSize={12} />
+              <YAxis dataKey="skill" type="category" tick={axisTick} axisLine={false} tickLine={false} width={94} />
+              <Tooltip contentStyle={tooltipStyle} cursor={{ fill: 'var(--accent-soft)' }} formatter={(v: unknown) => [`${v} JDs`, 'Appearances']} />
+              <Bar dataKey="count" fill="var(--accent)" radius={[0, 6, 6, 0]} barSize={13} />
             </BarChart>
           </ResponsiveContainer>
         </div>
 
-        <div className="fitcv-card" style={{ padding: 22 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
-            <span style={{ fontSize: 16 }}>⚠️</span>
-            <h4 style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)' }}>Skills You&apos;re Missing Most Often</h4>
+        <div className="fc-card fc-card--pad">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18 }}>
+            <span style={{ width: 36, height: 36, borderRadius: 11, background: 'var(--warning-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>⚠️</span>
+            <h3 style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>Skills You&apos;re Missing Most Often</h3>
           </div>
-          <ResponsiveContainer width="100%" height={160}>
-            <BarChart data={missingSkillsData} layout="vertical">
+          <ResponsiveContainer width="100%" height={172}>
+            <BarChart data={missingSkillsData} layout="vertical" margin={{ left: 4, right: 8, top: 2, bottom: 2 }}>
               <XAxis type="number" hide />
-              <YAxis dataKey="skill" type="category" tick={{ fontSize: 12, fill: '#6B7280' }} axisLine={false} tickLine={false} width={90} />
-              <Tooltip contentStyle={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 8, fontSize: 13 }} formatter={(v: unknown) => [`${v} JDs`, 'Missing in']} />
-              <Bar dataKey="count" radius={[0, 6, 6, 0]} barSize={12}>
-                {missingSkillsData.map((_, i) => <Cell key={i} fill="#F59E0B" />)}
+              <YAxis dataKey="skill" type="category" tick={axisTick} axisLine={false} tickLine={false} width={94} />
+              <Tooltip contentStyle={tooltipStyle} cursor={{ fill: 'var(--warning-soft)' }} formatter={(v: unknown) => [`${v} JDs`, 'Missing in']} />
+              <Bar dataKey="count" radius={[0, 6, 6, 0]} barSize={13}>
+                {missingSkillsData.map((_, i) => <Cell key={i} fill="var(--warning)" />)}
               </Bar>
             </BarChart>
           </ResponsiveContainer>
@@ -107,30 +155,30 @@ export default function JDLibraryScreen() {
       </div>
 
       {/* Learning roadmap */}
-      <div className="fitcv-card" style={{ padding: 24 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18 }}>
-          <BookOpen size={18} color="var(--indigo)" />
-          <h4 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)' }}>Personalized Learning Roadmap</h4>
-          <span className="badge-indigo" style={{ marginLeft: 'auto' }}>Based on 6 JDs</span>
+      <div className="fc-card fc-card--pad">
+        <div className="fc-section-title" style={{ marginBottom: 20 }}>
+          <BookOpen size={17} color="var(--accent)" />
+          <h2>Personalized Learning Roadmap</h2>
+          <span className="fc-badge fc-badge--blue">Based on {jdCards.length} JDs</span>
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {roadmap.map(r => (
-            <div key={r.skill} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 16px', background: 'var(--bg)', borderRadius: 12 }}>
-              <div style={{ width: 32, height: 32, borderRadius: 10, background: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, flexShrink: 0, border: '1px solid var(--border)' }}>
+            <div key={r.skill} className="fc-panel" style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '16px 18px' }}>
+              <div style={{ width: 36, height: 36, borderRadius: 11, background: 'var(--surface)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 19, flexShrink: 0, border: '1px solid var(--border)' }}>
                 {r.icon}
               </div>
-              <div style={{ width: 24, height: 24, borderRadius: '50%', background: 'var(--indigo)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: 11, fontWeight: 800, flexShrink: 0 }}>
+              <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: 12, fontWeight: 800, flexShrink: 0 }}>
                 {r.priority}
               </div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--text-primary)', marginBottom: 2 }}>{r.skill}</div>
-                <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Est. {r.time} · Appears in {r.demand}% of JDs</div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontWeight: 700, fontSize: 14.5, color: 'var(--text-primary)', marginBottom: 3, letterSpacing: '-0.01em' }}>{r.skill}</div>
+                <div style={{ fontSize: 12.5, color: 'var(--text-secondary)' }}>Est. {r.time} · Appears in {r.demand}% of JDs</div>
               </div>
-              <div style={{ textAlign: 'right' }}>
-                <div style={{ height: 6, width: 80, borderRadius: 3, background: '#E5E7EB', overflow: 'hidden' }}>
-                  <div style={{ width: `${r.demand}%`, height: '100%', background: '#F59E0B', borderRadius: 3 }} />
+              <div style={{ textAlign: 'right', flexShrink: 0, minWidth: 120 }}>
+                <div className="fc-progress" style={{ marginBottom: 7 }}>
+                  <div style={{ width: `${r.demand}%`, background: r.demand >= 75 ? 'var(--success)' : r.demand >= 60 ? '#2563EB' : 'var(--warning)' }} />
                 </div>
-                <span style={{ fontSize: 11, color: '#92400E', fontWeight: 600 }}>{r.demand}% demand</span>
+                <span style={{ fontSize: 11.5, color: 'var(--text-muted)', fontWeight: 600 }}>{r.demand}% demand</span>
               </div>
             </div>
           ))}

@@ -66,6 +66,14 @@ const steps = [
   { label: 'HR Approves & Sends', icon: <Send size={16} />, done: false },
 ]
 
+const badgeFor = (color: string) => {
+  if (color === '#10B981') return 'fc-badge fc-badge--green'
+  if (color === '#4F46E5') return 'fc-badge fc-badge--blue'
+  if (color === '#EF4444') return 'fc-badge fc-badge--red'
+  if (color === '#F59E0B') return 'fc-badge fc-badge--amber'
+  return 'fc-badge fc-badge--gray'
+}
+
 export default function AutoEmailScreen() {
   const [selectedTemplate, setSelectedTemplate] = useState('shortlist')
   const [sent, setSent] = useState(false)
@@ -75,115 +83,172 @@ export default function AutoEmailScreen() {
   const renderBody = (text: string) => {
     let result = text
     Object.entries(highlights).forEach(([k, v]) => {
-      result = result.split(k).join(`<mark style="background:#EEF2FF;color:#4F46E5;padding:1px 4px;border-radius:4px;font-weight:600;">${v}</mark>`)
+      result = result.split(k).join(`<mark style="background:var(--accent-soft);color:var(--accent-ink);padding:1px 5px;border-radius:5px;font-weight:600;">${v}</mark>`)
     })
     return result
   }
 
   return (
     <div>
-      <div style={{ marginBottom: 24 }}>
-        <h1 style={{ fontSize: 22, fontWeight: 800, color: 'var(--text-primary)', marginBottom: 4 }}>Auto Email & Smart Reply</h1>
-        <p style={{ color: 'var(--text-secondary)', fontSize: 14 }}>AI-drafted emails, personalized per candidate.</p>
+      <div className="fc-page-head">
+        <div>
+          <div className="fc-eyebrow" style={{ marginBottom: 6 }}>HR · Smart Communications</div>
+          <h1>Auto Email &amp; Smart Reply</h1>
+          <p>AI-drafted emails, personalized per candidate.</p>
+        </div>
+        <span className="fc-badge fc-badge--amber"><Sparkles size={12} /> AI-Powered</span>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '260px 1fr', gap: 20 }}>
-        {/* Template library */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <div className="fitcv-card" style={{ padding: 16 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 12 }}>Template Library</div>
-            {templates.map(t => (
-              <button
-                key={t.id}
-                onClick={() => { setSelectedTemplate(t.id); setSent(false) }}
-                style={{
-                  width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '12px 12px',
-                  borderRadius: 10, border: selectedTemplate === t.id ? `1px solid ${t.color}` : '1px solid transparent',
-                  background: selectedTemplate === t.id ? t.bg : 'transparent', cursor: 'pointer',
-                  marginBottom: 6, transition: 'all 0.15s',
-                }}
-              >
-                <span style={{ fontSize: 20 }}>{t.icon}</span>
-                <span style={{ fontSize: 13, fontWeight: selectedTemplate === t.id ? 700 : 500, color: selectedTemplate === t.id ? t.color : 'var(--text-secondary)', textAlign: 'left' }}>
-                  {t.label}
-                </span>
-              </button>
-            ))}
+      <div className="fc-stagger" style={{ display: 'grid', gridTemplateColumns: '260px 1fr', gap: 20, alignItems: 'start' }}>
+        {/* Left column — library + analytics */}
+        <div className="fc-stagger" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {/* Template library */}
+          <div className="fc-card fc-card--pad">
+            <div className="fc-section-title" style={{ marginBottom: 14 }}>
+              <Mail size={16} color="var(--accent)" />
+              <h3>Template Library</h3>
+            </div>
+            {templates.map(t => {
+              const active = selectedTemplate === t.id
+              return (
+                <button
+                  key={t.id}
+                  onClick={() => { setSelectedTemplate(t.id); setSent(false) }}
+                  className="fc-chip"
+                  style={{
+                    width: '100%', justifyContent: 'flex-start', padding: '12px 14px', marginBottom: 8,
+                    border: active ? `1px solid ${t.color}` : '1px solid var(--border)',
+                    background: active ? `${t.color}1a` : 'var(--surface)',
+                    color: active ? t.color : 'var(--text-secondary)',
+                    fontWeight: active ? 700 : 500,
+                  }}
+                >
+                  <span style={{ fontSize: 18 }}>{t.icon}</span>
+                  <span style={{ flex: 1, textAlign: 'left' }}>{t.label}</span>
+                  {active && <span className={badgeFor(t.color)} style={{ fontSize: 10, padding: '2px 8px' }}>Active</span>}
+                </button>
+              )
+            })}
           </div>
 
-          {/* Analytics preview */}
-          <div className="fitcv-card" style={{ padding: 16 }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 12 }}>Email Analytics</div>
-            {[{ label: 'Open Rate', value: '84%', icon: '👁️' }, { label: 'Click Rate', value: '31%', icon: '🔗' }, { label: 'Reply Rate', value: '22%', icon: '↩️' }].map(a => (
-              <div key={a.label} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{a.icon} {a.label}</span>
-                <span style={{ fontSize: 14, fontWeight: 800, color: 'var(--text-primary)', fontFamily: 'Plus Jakarta Sans' }}>{a.value}</span>
+          {/* Email analytics */}
+          <div className="fc-card fc-card--pad">
+            <div className="fc-eyebrow" style={{ marginBottom: 14 }}>Email Analytics</div>
+            {[
+              { label: 'Open Rate', value: '84%', icon: '👁️' },
+              { label: 'Click Rate', value: '31%', icon: '🔗' },
+              { label: 'Reply Rate', value: '22%', icon: '↩️' },
+            ].map((a, i) => (
+              <div
+                key={a.label}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 12,
+                  padding: '11px 0',
+                  borderBottom: i < 2 ? '1px solid var(--border)' : 'none',
+                }}
+              >
+                <div className="fc-stat__icon" style={{ width: 34, height: 34, background: 'var(--surface-2)', color: 'var(--text-secondary)', fontSize: 15, borderRadius: 10 }}>
+                  {a.icon}
+                </div>
+                <span style={{ flex: 1, fontSize: 13, color: 'var(--text-secondary)', fontWeight: 500 }}>{a.label}</span>
+                <span className="fc-stat__value" style={{ fontSize: 20 }}>{a.value}</span>
               </div>
             ))}
           </div>
         </div>
 
-        {/* Email preview */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          {/* Workflow indicator */}
-          <div className="fitcv-card" style={{ padding: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0 }}>
-            {steps.map((step, i) => (
-              <div key={step.label} style={{ display: 'flex', alignItems: 'center' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
-                  <div style={{
-                    width: 36, height: 36, borderRadius: '50%',
-                    background: step.done ? (i === steps.length - 1 ? '#10B981' : '#4F46E5') : 'var(--bg)',
-                    border: step.done ? 'none' : '2px solid var(--border)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    color: step.done ? 'white' : 'var(--text-muted)',
-                  }}>
-                    {step.done && i < steps.length - 1 ? <Check size={16} /> : step.icon}
+        {/* Right column — workflow + preview */}
+        <div className="fc-stagger" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {/* Workflow stepper */}
+          <div className="fc-card fc-card--pad">
+            <div className="fc-eyebrow" style={{ marginBottom: 16, textAlign: 'center' }}>Review Workflow</div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              {steps.map((step, i) => (
+                <div key={step.label} style={{ display: 'flex', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+                    <div
+                      style={{
+                        width: 40, height: 40, borderRadius: '50%',
+                        background: step.done ? 'var(--accent)' : 'var(--surface)',
+                        border: step.done ? 'none' : '2px solid var(--accent-soft-2)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        color: step.done ? '#fff' : 'var(--accent)',
+                        boxShadow: step.done ? '0 6px 16px var(--accent-glow)' : 'none',
+                      }}
+                    >
+                      {step.done ? <Check size={17} /> : step.icon}
+                    </div>
+                    <span
+                      style={{
+                        fontSize: 11.5, fontWeight: step.done ? 700 : 500,
+                        color: step.done ? 'var(--text-primary)' : 'var(--accent)',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {step.label}
+                    </span>
                   </div>
-                  <span style={{ fontSize: 11, fontWeight: step.done ? 700 : 400, color: step.done ? 'var(--text-primary)' : 'var(--text-muted)', whiteSpace: 'nowrap' }}>
-                    {step.label}
-                  </span>
+                  {i < steps.length - 1 && (
+                    <div
+                      style={{
+                        width: 78, height: 2,
+                        background: step.done ? 'var(--accent)' : 'var(--border)',
+                        margin: '0 10px', marginBottom: 24, borderRadius: 2,
+                      }}
+                    />
+                  )}
                 </div>
-                {i < steps.length - 1 && (
-                  <div style={{ width: 80, height: 2, background: steps[i + 1].done ? '#4F46E5' : 'var(--border)', margin: '0 8px', marginBottom: 22 }} />
-                )}
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
 
-          {/* Email card */}
-          <div className="fitcv-card" style={{ padding: 24 }}>
-            <div style={{ padding: '14px 18px', background: 'var(--bg)', borderRadius: 10, marginBottom: 18 }}>
-              <div style={{ display: 'flex', gap: 12, marginBottom: 6 }}>
-                <span style={{ fontSize: 12, color: 'var(--text-muted)', width: 48 }}>To:</span>
-                <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>Nguyen Thanh Minh &lt;ntminh@gmail.com&gt;</span>
+          {/* Email preview */}
+          <div className="fc-card fc-card--pad">
+            <div className="fc-section-title" style={{ marginBottom: 16 }}>
+              <Send size={16} color="var(--accent)" />
+              <h3>Email Preview</h3>
+              <span>Draft · {templates.find(t => t.id === selectedTemplate)?.label}</span>
+            </div>
+
+            <div className="fc-panel" style={{ padding: '14px 18px', marginBottom: 18 }}>
+              <div style={{ display: 'flex', gap: 12, marginBottom: 8 }}>
+                <span style={{ fontSize: 12, color: 'var(--text-muted)', width: 48, fontWeight: 600 }}>To:</span>
+                <span style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--text-primary)' }}>Nguyen Thanh Minh &lt;ntminh@gmail.com&gt;</span>
               </div>
               <div style={{ display: 'flex', gap: 12 }}>
-                <span style={{ fontSize: 12, color: 'var(--text-muted)', width: 48 }}>Subject:</span>
-                <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{content.subject}</span>
+                <span style={{ fontSize: 12, color: 'var(--text-muted)', width: 48, fontWeight: 600 }}>Subject:</span>
+                <span style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--text-primary)' }}>{content.subject}</span>
               </div>
             </div>
 
             <div style={{ borderTop: '1px solid var(--border)', paddingTop: 18 }}>
               {content.body.map((para, i) => (
-                <p key={i} style={{ fontSize: 14, color: 'var(--text-primary)', lineHeight: 1.7, marginBottom: 14, whiteSpace: 'pre-line' }}
-                  dangerouslySetInnerHTML={{ __html: renderBody(para) }} />
+                <p
+                  key={i}
+                  style={{ fontSize: 14, color: 'var(--text-primary)', lineHeight: 1.7, marginBottom: 14, whiteSpace: 'pre-line' }}
+                  dangerouslySetInnerHTML={{ __html: renderBody(para) }}
+                />
               ))}
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 20, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 22, flexWrap: 'wrap' }}>
               {sent ? (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 20px', background: '#D1FAE5', borderRadius: 10, color: '#065F46', fontWeight: 700, fontSize: 14 }}>
-                  <CheckCircle size={18} color="#10B981" /> Email sent successfully!
+                <div
+                  className="fc-panel"
+                  style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 16px', background: 'var(--success-soft)', borderColor: '#bbf7d0' }}
+                >
+                  <CheckCircle size={18} color="var(--success)" />
+                  <span style={{ color: 'var(--success)', fontWeight: 700, fontSize: 14 }}>Email sent successfully!</span>
                 </div>
               ) : (
                 <>
-                  <button onClick={() => setSent(true)} className="fitcv-btn-primary" style={{ gap: 8 }}>
-                    <Send size={15} /> Approve & Send
+                  <button onClick={() => setSent(true)} className="fc-btn fc-btn--primary">
+                    <Send size={15} /> Approve &amp; Send
                   </button>
-                  <button style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 16px', borderRadius: 10, border: '1px solid var(--border)', background: 'white', cursor: 'pointer', fontSize: 14, fontWeight: 500, color: 'var(--text-secondary)' }}>
+                  <button className="fc-btn fc-btn--secondary">
                     <Users size={15} /> Bulk Send to Filtered Group
                   </button>
-                  <button style={{ padding: '10px 16px', borderRadius: 10, border: '1px solid var(--border)', background: 'white', cursor: 'pointer', fontSize: 14, fontWeight: 500, color: 'var(--text-secondary)' }}>
+                  <button className="fc-btn fc-btn--secondary">
                     Edit Draft
                   </button>
                 </>
