@@ -1,8 +1,19 @@
-import { Briefcase, FileText, TrendingUp, Upload, Plus, ArrowRight, Star } from 'lucide-react'
+import { Briefcase, FileText, TrendingUp, Upload, Plus, ArrowRight, Star, BarChart3 } from 'lucide-react'
 import type { ScreenId } from '@/types/app'
 
 interface HRDashboardProps {
   onNavigate: (screen: ScreenId) => void
+}
+
+function MiniBars({ values, color }: { values: number[]; color: string }) {
+  const max = Math.max(...values) || 1
+  return (
+    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 3, height: 34 }}>
+      {values.map((v, i) => (
+        <div key={i} style={{ width: 7, height: `${(v / max) * 100}%`, borderRadius: 3, background: color, opacity: 0.45 + (i / values.length) * 0.55 }} />
+      ))}
+    </div>
+  )
 }
 
 const jobPosts = [
@@ -12,87 +23,89 @@ const jobPosts = [
   { title: 'Frontend Developer', dept: 'Engineering', cvCount: 18, avgScore: 79, progress: 90, status: 'Active' },
 ]
 
+const scoreColor = (s: number) => (s >= 70 ? '#16A34A' : s >= 60 ? '#2563EB' : '#D97706')
+
 export default function HRDashboard({ onNavigate }: HRDashboardProps) {
   return (
-    <div>
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 28 }}>
+    <div className="fc-stagger">
+      <div className="fc-page-head">
         <div>
-          <h1 style={{ fontSize: 26, fontWeight: 800, color: 'var(--text-primary)', marginBottom: 4 }}>HR Dashboard</h1>
-          <p style={{ color: 'var(--text-secondary)', fontSize: 15 }}>TechViet Solutions · Recruitment Overview</p>
+          <h1>HR Dashboard</h1>
+          <p>TechViet Solutions · Recruitment overview</p>
         </div>
         <div style={{ display: 'flex', gap: 10 }}>
-          <button className="fitcv-btn-secondary" onClick={() => onNavigate('cv-ranking')}><Upload size={15} /> Upload CVs</button>
-          <button className="fitcv-btn-primary" onClick={() => onNavigate('job-posts')}><Plus size={15} /> Create Job Post</button>
+          <button className="fc-btn fc-btn--secondary" onClick={() => onNavigate('cv-ranking')}><Upload size={15} /> Upload CVs</button>
+          <button className="fc-btn fc-btn--primary" onClick={() => onNavigate('job-posts')}><Plus size={15} /> Create Job Post</button>
         </div>
       </div>
 
       {/* Stat cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 16 }}>
         {[
-          { label: 'Active Job Posts', value: '4', icon: <Briefcase size={18} />, color: '#4F46E5', bg: '#EEF2FF', delta: '+1 this week' },
-          { label: 'Total CVs Reviewed', value: '119', icon: <FileText size={18} />, color: '#10B981', bg: '#D1FAE5', delta: '+23 today' },
-          { label: 'Avg. Candidate Score', value: '68%', icon: <Star size={18} />, color: '#F59E0B', bg: '#FEF3C7', delta: '+4pts vs last month' },
-          { label: 'Review Progress', value: '58%', icon: <TrendingUp size={18} />, color: '#6B7280', bg: '#F3F4F6', delta: '3 posts active' },
+          { label: 'Active Job Posts', value: '4', icon: <Briefcase size={18} />, color: '#2563EB', soft: 'var(--accent-soft)', delta: '+1 this week', spark: [2, 3, 3, 4] },
+          { label: 'Total CVs Reviewed', value: '119', icon: <FileText size={18} />, color: '#16A34A', soft: 'var(--success-soft)', delta: '+23 today', spark: [60, 78, 91, 119] },
+          { label: 'Avg. Candidate Score', value: '68%', icon: <Star size={18} />, color: '#D97706', soft: 'var(--warning-soft)', delta: '+4pts vs last mo.', spark: [60, 62, 65, 68] },
+          { label: 'Review Progress', value: '58%', icon: <TrendingUp size={18} />, color: '#64748B', soft: 'var(--gray-soft)', delta: '3 posts active', spark: [30, 42, 51, 58] },
         ].map(s => (
-          <div key={s.label} className="fitcv-card" style={{ padding: 20 }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-              <div style={{ width: 40, height: 40, borderRadius: 12, background: s.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', color: s.color }}>
-                {s.icon}
-              </div>
+          <div key={s.label} className="fc-stat" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div className="fc-stat__icon" style={{ background: s.soft, color: s.color }}>{s.icon}</div>
+              <MiniBars values={s.spark} color={s.color} />
             </div>
-            <div style={{ fontSize: 28, fontWeight: 800, color: 'var(--text-primary)', fontFamily: 'Plus Jakarta Sans', lineHeight: 1, marginBottom: 4 }}>{s.value}</div>
-            <div style={{ fontSize: 13, color: 'var(--text-secondary)', fontWeight: 500, marginBottom: 4 }}>{s.label}</div>
-            <div style={{ fontSize: 12, color: s.color, fontWeight: 600 }}>{s.delta}</div>
+            <div style={{ marginTop: 12 }}>
+              <div className="fc-stat__value" style={{ fontSize: 28 }}>{s.value}</div>
+              <div className="fc-stat__label">{s.label}</div>
+              <div className="fc-stat__delta" style={{ color: s.color, marginTop: 6 }}>{s.delta}</div>
+            </div>
           </div>
         ))}
       </div>
 
       {/* Active job posts table */}
-      <div className="fitcv-card" style={{ overflow: 'hidden' }}>
-        <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)' }}>Active Job Posts</h3>
-          <button onClick={() => onNavigate('job-posts')} style={{ fontSize: 13, color: 'var(--indigo)', fontWeight: 600, background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
+      <div className="fc-card" style={{ overflow: 'hidden' }}>
+        <div style={{ padding: '18px 22px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div className="fc-section-title">
+            <BarChart3 size={17} color="var(--accent)" />
+            <h3>Active Job Posts</h3>
+          </div>
+          <button onClick={() => onNavigate('job-posts')} className="fc-chip" style={{ cursor: 'pointer', border: 'none' }}>
             View all <ArrowRight size={13} />
           </button>
         </div>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <table className="fc-table">
           <thead>
-            <tr style={{ background: 'var(--bg)' }}>
+            <tr>
               {['Job Title', 'Department', 'CVs', 'Avg. Score', 'Review Progress', 'Action'].map(h => (
-                <th key={h} style={{ padding: '12px 20px', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', textAlign: 'left', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{h}</th>
+                <th key={h}>{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
             {jobPosts.map((job, i) => (
-              <tr key={i} style={{ borderTop: '1px solid var(--border)', transition: 'background 0.15s' }}
-                onMouseOver={e => (e.currentTarget.style.background = 'var(--bg)')}
-                onMouseOut={e => (e.currentTarget.style.background = 'white')}>
-                <td style={{ padding: '16px 20px' }}>
+              <tr key={i}>
+                <td>
                   <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--text-primary)' }}>{job.title}</div>
                 </td>
-                <td style={{ padding: '16px 20px' }}>
-                  <span className="badge-indigo">{job.dept}</span>
-                </td>
-                <td style={{ padding: '16px 20px' }}>
+                <td><span className="fc-badge fc-badge--blue">{job.dept}</span></td>
+                <td>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span style={{ fontSize: 16, fontWeight: 800, color: 'var(--text-primary)', fontFamily: 'Plus Jakarta Sans' }}>{job.cvCount}</span>
+                    <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', fontFamily: 'var(--font-display)' }}>{job.cvCount}</span>
                     <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>CVs</span>
                   </div>
                 </td>
-                <td style={{ padding: '16px 20px' }}>
-                  <span style={{ fontSize: 16, fontWeight: 800, fontFamily: 'Plus Jakarta Sans', color: job.avgScore >= 70 ? '#10B981' : job.avgScore >= 60 ? '#4F46E5' : '#F59E0B' }}>{job.avgScore}%</span>
+                <td>
+                  <span style={{ fontSize: 16, fontWeight: 700, fontFamily: 'var(--font-display)', color: scoreColor(job.avgScore) }}>{job.avgScore}%</span>
                 </td>
-                <td style={{ padding: '16px 20px', minWidth: 160 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <div style={{ flex: 1, height: 6, borderRadius: 3, background: '#E5E7EB', overflow: 'hidden' }}>
-                      <div style={{ width: `${job.progress}%`, height: '100%', background: job.progress >= 80 ? '#10B981' : '#4F46E5', borderRadius: 3, transition: 'width 0.6s ease' }} />
+                <td style={{ minWidth: 170 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+                    <div className="fc-progress" style={{ flex: 1 }}>
+                      <div style={{ width: `${job.progress}%`, background: job.progress >= 80 ? 'var(--success)' : 'var(--accent)' }} />
                     </div>
-                    <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', width: 36 }}>{job.progress}%</span>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', width: 38 }}>{job.progress}%</span>
                   </div>
                 </td>
-                <td style={{ padding: '16px 20px' }}>
-                  <button onClick={() => onNavigate('cv-ranking')} style={{ fontSize: 13, color: 'var(--indigo)', fontWeight: 600, background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
+                <td>
+                  <button onClick={() => onNavigate('cv-ranking')} className="fc-chip" style={{ cursor: 'pointer', border: 'none', color: 'var(--accent-ink)', background: 'var(--accent-soft)' }}>
                     View CVs <ArrowRight size={13} />
                   </button>
                 </td>

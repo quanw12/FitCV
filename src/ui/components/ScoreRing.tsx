@@ -16,7 +16,7 @@ export default function ScoreRing({ score, size = 100, strokeWidth = 10, label, 
 
   return (
     <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
-      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ filter: `drop-shadow(0 4px 10px ${color}22)` }}>
         <circle
           cx={size / 2} cy={size / 2} r={radius}
           fill="none" stroke={trackColor} strokeWidth={strokeWidth}
@@ -26,12 +26,12 @@ export default function ScoreRing({ score, size = 100, strokeWidth = 10, label, 
           fill="none" stroke={color} strokeWidth={strokeWidth}
           strokeDasharray={circumference} strokeDashoffset={dashOffset}
           strokeLinecap="round" transform={`rotate(-90 ${size / 2} ${size / 2})`}
-          style={{ transition: 'stroke-dashoffset 0.8s ease' }}
+          style={{ transition: 'stroke-dashoffset 0.8s cubic-bezier(0.22, 1, 0.36, 1)' }}
         />
       </svg>
       {showLabel && (
         <div style={{ position: 'absolute', textAlign: 'center' }}>
-          <div style={{ fontFamily: 'Plus Jakarta Sans', fontWeight: 800, fontSize: size * 0.2, color: 'var(--text-primary)', lineHeight: 1 }}>
+          <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: size * 0.2, color: 'var(--text-primary)', lineHeight: 1 }}>
             {score}%
           </div>
           {label && <div style={{ fontSize: size * 0.11, color: 'var(--text-secondary)', fontWeight: 500, marginTop: 2 }}>{label}</div>}

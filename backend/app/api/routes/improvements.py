@@ -1,9 +1,9 @@
 from fastapi import APIRouter, BackgroundTasks, Depends, Query, status
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_account
 from app.db.session import get_db
-from app.models.account import Account
+from app.middleware.auth_guard import require_role
+from app.models.account import Account, AccountRole
 from app.schemas.improvement import GenerateImprovementResponse, ImprovementReportResponse
 from app.services import improvement_service
 
@@ -19,7 +19,7 @@ def generate_improvement_report(
     match_result_id: int,
     background_tasks: BackgroundTasks,
     regenerate: bool = Query(False),
-    account: Account = Depends(get_current_account),
+    account: Account = Depends(require_role(AccountRole.student)),
     db: Session = Depends(get_db),
 ) -> GenerateImprovementResponse:
     response, should_start = improvement_service.request_generation(
@@ -33,7 +33,7 @@ def generate_improvement_report(
 @router.get("/{match_result_id}/improvement-report", response_model=ImprovementReportResponse)
 def get_improvement_report(
     match_result_id: int,
-    account: Account = Depends(get_current_account),
+    account: Account = Depends(require_role(AccountRole.student)),
     db: Session = Depends(get_db),
 ) -> ImprovementReportResponse:
     return improvement_service.get_report(db, match_result_id=match_result_id, account=account)

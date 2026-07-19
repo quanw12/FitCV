@@ -1,5 +1,8 @@
-export * from './app'
-export * from './auth'
-export * from './cvRanking'
-export * from './improvement'
-export * from './profile'
+export * from "./app"
+
+export * from "./auth"
+
+export * from "./improvement"
+export * from "./analyzer"
+export * from "./cvRanking"
+export * from "./profile"

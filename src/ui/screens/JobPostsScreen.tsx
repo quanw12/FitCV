@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Plus, Copy, QrCode, ToggleLeft, ToggleRight, Sparkles, ChevronDown } from 'lucide-react'
+import { Plus, Copy, QrCode, ToggleLeft, ToggleRight, Sparkles, ChevronDown, Briefcase } from 'lucide-react'
 
 const existingPosts = [
   { title: 'Senior Backend Developer', dept: 'Engineering', created: 'Jun 28, 2025', cvCount: 47, status: true },
@@ -11,6 +11,12 @@ const existingPosts = [
 const extractedSkills = ['Node.js', 'Docker', 'Kubernetes', 'PostgreSQL', 'Redis', 'REST APIs', 'TypeScript', 'Microservices']
 const extractedExp = 'Senior (5+ years)'
 const extractedEdu = "Bachelor's in Computer Science or related"
+
+const weightMeta = [
+  { key: 'skills', label: 'Skills Match', color: 'var(--accent)' },
+  { key: 'experience', label: 'Experience', color: 'var(--success)' },
+  { key: 'education', label: 'Education', color: 'var(--warning)' },
+]
 
 export default function JobPostsScreen() {
   const [title, setTitle] = useState('')
@@ -38,79 +44,105 @@ Requirements:
   const totalW = weights.skills + weights.experience + weights.education
 
   return (
-    <div>
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 24 }}>
+    <div className="fc-stagger">
+      {/* Page head */}
+      <div className="fc-page-head">
         <div>
-          <h1 style={{ fontSize: 22, fontWeight: 800, color: 'var(--text-primary)', marginBottom: 4 }}>Job Post Management</h1>
-          <p style={{ color: 'var(--text-secondary)', fontSize: 14 }}>Create job posts and configure AI screening weights.</p>
+          <div className="fc-eyebrow" style={{ marginBottom: 8 }}>Recruitment</div>
+          <h1>Job Post Management</h1>
+          <p style={{ marginTop: 6 }}>Create job posts and configure how the AI screens incoming candidates.</p>
+        </div>
+        <div className="fc-badge fc-badge--amber" style={{ fontFamily: 'var(--font-display)', fontSize: 13 }}>
+          {posts.length} active posts
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 20, marginBottom: 28 }}>
+      <div className="fc-stagger" style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 20, marginBottom: 32 }}>
         {/* Form */}
-        <div className="fitcv-card" style={{ padding: 28 }}>
-          <h3 style={{ fontSize: 17, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 20 }}>Create / Edit Job Post</h3>
+        <div className="fc-card fc-card--pad">
+          <div className="fc-section-title" style={{ marginBottom: 24 }}>
+            <Briefcase size={17} color="var(--accent)" />
+            <h2>Create / Edit Job Post</h2>
+          </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 18 }}>
             <div>
-              <label style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', display: 'block', marginBottom: 6 }}>Job Title</label>
-              <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Senior Backend Developer"
-                style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: '1px solid var(--border)', fontSize: 14, fontFamily: 'Inter', outline: 'none', background: 'var(--bg)' }} />
+              <label className="fc-field-label">Job Title</label>
+              <input
+                className="fc-input"
+                value={title}
+                onChange={e => setTitle(e.target.value)}
+                placeholder="Senior Backend Developer"
+              />
             </div>
             <div>
-              <label style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', display: 'block', marginBottom: 6 }}>Department</label>
+              <label className="fc-field-label">Department</label>
               <div style={{ position: 'relative' }}>
-                <select value={dept} onChange={e => setDept(e.target.value)}
-                  style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: '1px solid var(--border)', fontSize: 14, fontFamily: 'Inter', outline: 'none', background: 'var(--bg)', appearance: 'none' }}>
+                <select
+                  className="fc-input"
+                  value={dept}
+                  onChange={e => setDept(e.target.value)}
+                  style={{ appearance: 'none', cursor: 'pointer' }}
+                >
                   <option value="">Select department</option>
                   {['Engineering', 'Design', 'Analytics', 'Marketing', 'Sales', 'HR'].map(d => <option key={d}>{d}</option>)}
                 </select>
-                <ChevronDown size={14} color="var(--text-muted)" style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
+                <ChevronDown size={14} color="var(--text-muted)" style={{ position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
               </div>
             </div>
           </div>
 
-          <div style={{ marginBottom: 14 }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-              <label style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>Job Description</label>
-              <button onClick={handleExtract} style={{
-                display: 'flex', alignItems: 'center', gap: 6, background: 'linear-gradient(135deg, #4F46E5, #7C3AED)',
-                color: 'white', border: 'none', borderRadius: 8, padding: '6px 12px', fontSize: 12, fontWeight: 600, cursor: 'pointer',
-              }}>
+          <div style={{ marginBottom: 20 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+              <label className="fc-field-label" style={{ marginBottom: 0 }}>Job Description</label>
+              <button onClick={handleExtract} className="fc-btn fc-btn--primary" style={{ fontSize: 12, padding: '7px 13px' }}>
                 <Sparkles size={13} /> AI Auto-Extract
               </button>
             </div>
-            <textarea value={jdText} onChange={e => setJdText(e.target.value)}
+            <textarea
+              className="fc-input"
+              value={jdText}
+              onChange={e => setJdText(e.target.value)}
               placeholder="Paste the full job description here..."
-              style={{ width: '100%', minHeight: 140, padding: '12px 14px', borderRadius: 10, border: '1px solid var(--border)', fontSize: 13, fontFamily: 'Inter', outline: 'none', background: 'var(--bg)', resize: 'vertical', lineHeight: 1.6 }} />
+              style={{ minHeight: 140, resize: 'vertical', lineHeight: 1.6 }}
+            />
           </div>
 
           {/* Scoring weights */}
-          <div style={{ padding: 18, background: 'var(--bg)', borderRadius: 12, marginBottom: 18 }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-              <h4 style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>AI Screening Weights</h4>
-              <span style={{ fontSize: 12, color: totalW === 100 ? '#10B981' : '#EF4444', fontWeight: 700 }}>Total: {totalW}%</span>
+          <div className="fc-panel" style={{ padding: 22, marginBottom: 22 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+              <div>
+                <h3 style={{ fontSize: 14.5, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>AI Screening Weights</h3>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>How the candidate score is balanced</div>
+              </div>
+              <span
+                className="fc-badge"
+                style={{ background: totalW === 100 ? 'var(--success-soft)' : 'var(--danger-soft)', color: totalW === 100 ? 'var(--success)' : 'var(--danger)', fontFamily: 'var(--font-display)', fontSize: 13 }}
+              >
+                Total: {totalW}%
+              </span>
             </div>
 
             {/* Stacked bar */}
-            <div style={{ height: 10, borderRadius: 5, overflow: 'hidden', display: 'flex', marginBottom: 14 }}>
-              <div style={{ width: `${weights.skills}%`, background: '#4F46E5', transition: 'width 0.2s' }} />
-              <div style={{ width: `${weights.experience}%`, background: '#10B981', transition: 'width 0.2s' }} />
-              <div style={{ width: `${weights.education}%`, background: '#F59E0B', transition: 'width 0.2s' }} />
+            <div style={{ height: 12, borderRadius: 99, overflow: 'hidden', display: 'flex', marginBottom: 18, background: 'var(--bg-grain)', boxShadow: 'inset 0 1px 2px rgba(15,23,42,0.06)' }}>
+              <div style={{ width: `${weights.skills}%`, background: 'var(--accent)', transition: 'width 0.2s' }} />
+              <div style={{ width: `${weights.experience}%`, background: 'var(--success)', transition: 'width 0.2s' }} />
+              <div style={{ width: `${weights.education}%`, background: 'var(--warning)', transition: 'width 0.2s' }} />
             </div>
 
-            {[
-              { key: 'skills', label: 'Skills Match', color: '#4F46E5' },
-              { key: 'experience', label: 'Experience', color: '#10B981' },
-              { key: 'education', label: 'Education', color: '#F59E0B' },
-            ].map(w => (
-              <div key={w.key} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-                <div style={{ width: 10, height: 10, borderRadius: '50%', background: w.color, flexShrink: 0 }} />
-                <span style={{ fontSize: 13, color: 'var(--text-secondary)', width: 110 }}>{w.label}</span>
-                <input type="range" min="0" max="100" value={weights[w.key as keyof typeof weights]}
+            {weightMeta.map(w => (
+              <div key={w.key} style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 }}>
+                <div style={{ width: 11, height: 11, borderRadius: '50%', background: w.color, flexShrink: 0 }} />
+                <span style={{ fontSize: 13, color: 'var(--text-secondary)', width: 112, fontWeight: 500 }}>{w.label}</span>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={weights[w.key as keyof typeof weights]}
                   onChange={e => setWeights(p => ({ ...p, [w.key]: Number(e.target.value) }))}
-                  style={{ flex: 1, accentColor: w.color }} />
-                <span style={{ fontSize: 14, fontWeight: 800, color: w.color, width: 36, textAlign: 'right', fontFamily: 'Plus Jakarta Sans' }}>
+                  style={{ flex: 1, accentColor: w.color, cursor: 'pointer' }}
+                />
+                <span style={{ fontSize: 14, fontWeight: 800, color: w.color, width: 42, textAlign: 'right', fontFamily: 'var(--font-display)' }}>
                   {weights[w.key as keyof typeof weights]}%
                 </span>
               </div>
@@ -118,47 +150,47 @@ Requirements:
           </div>
 
           <div style={{ display: 'flex', gap: 10 }}>
-            <button className="fitcv-btn-primary" style={{ flex: 1, justifyContent: 'center' }}><Plus size={15} /> Save & Publish</button>
-            <button className="fitcv-btn-secondary">Save Draft</button>
+            <button className="fc-btn fc-btn--primary" style={{ flex: 1, justifyContent: 'center' }}><Plus size={15} /> Save &amp; Publish</button>
+            <button className="fc-btn fc-btn--secondary">Save Draft</button>
           </div>
         </div>
 
         {/* Side panel — extracted */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           {extracted && (
-            <div className="fitcv-card" style={{ padding: 20 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
-                <Sparkles size={16} color="var(--indigo)" />
-                <h4 style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>Auto-Extracted Requirements</h4>
+            <div className="fc-card fc-card--pad">
+              <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 18 }}>
+                <span style={{ width: 34, height: 34, borderRadius: 10, background: 'var(--accent-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Sparkles size={16} color="var(--accent)" /></span>
+                <h3 style={{ fontSize: 14.5, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>Auto-Extracted Requirements</h3>
               </div>
-              <div style={{ marginBottom: 12 }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 6 }}>Skills</div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
-                  {extractedSkills.map(s => <span key={s} className="badge-green" style={{ fontSize: 11 }}>{s}</span>)}
+              <div style={{ marginBottom: 16 }}>
+                <div className="fc-eyebrow" style={{ marginBottom: 8 }}>Skills</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                  {extractedSkills.map(s => <span key={s} className="fc-badge fc-badge--green" style={{ fontSize: 11 }}>{s}</span>)}
                 </div>
               </div>
-              <div style={{ marginBottom: 10 }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 4 }}>Experience Level</div>
-                <span className="badge-indigo">{extractedExp}</span>
+              <div style={{ marginBottom: 14 }}>
+                <div className="fc-eyebrow" style={{ marginBottom: 7 }}>Experience Level</div>
+                <span className="fc-badge fc-badge--blue">{extractedExp}</span>
               </div>
               <div>
-                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 4 }}>Education</div>
+                <div className="fc-eyebrow" style={{ marginBottom: 7 }}>Education</div>
                 <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>{extractedEdu}</span>
               </div>
             </div>
           )}
 
           {/* Shareable link */}
-          <div className="fitcv-card" style={{ padding: 20 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-              <QrCode size={16} color="var(--indigo)" />
-              <h4 style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>Shareable JD Link</h4>
+          <div className="fc-card fc-card--pad">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 16 }}>
+              <span style={{ width: 34, height: 34, borderRadius: 10, background: 'var(--accent-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><QrCode size={16} color="var(--accent)" /></span>
+              <h3 style={{ fontSize: 14.5, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>Shareable JD Link</h3>
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
-              <div style={{ flex: 1, padding: '8px 12px', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12, color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <div style={{ flex: 1, padding: '9px 12px', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 'var(--r-sm)', fontSize: 12, color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 fitcv.io/j/senior-backend-dev
               </div>
-              <button style={{ background: 'var(--indigo-light)', border: 'none', borderRadius: 8, padding: '8px 12px', cursor: 'pointer', color: 'var(--indigo)', display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, fontWeight: 600 }}>
+              <button className="fc-btn fc-btn--secondary" style={{ padding: '9px 13px', fontSize: 12 }}>
                 <Copy size={13} /> Copy
               </button>
             </div>
@@ -167,28 +199,37 @@ Requirements:
       </div>
 
       {/* Existing posts */}
-      <div className="fitcv-card" style={{ overflow: 'hidden' }}>
-        <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)' }}>
-          <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)' }}>All Job Posts</h3>
+      <div className="fc-card" style={{ overflow: 'hidden' }}>
+        <div style={{ padding: '18px 22px', borderBottom: '1px solid var(--border)' }}>
+          <div className="fc-section-title">
+            <Briefcase size={17} color="var(--accent)" />
+            <h2>All Job Posts</h2>
+            <span>{posts.length} total</span>
+          </div>
         </div>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <table className="fc-table">
           <thead>
-            <tr style={{ background: 'var(--bg)' }}>
+            <tr>
               {['Title', 'Department', 'Created', 'CVs', 'Status'].map(h => (
-                <th key={h} style={{ padding: '10px 20px', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', textAlign: 'left', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{h}</th>
+                <th key={h}>{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
             {posts.map((p, i) => (
-              <tr key={i} style={{ borderTop: '1px solid var(--border)' }}>
-                <td style={{ padding: '14px 20px', fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>{p.title}</td>
-                <td style={{ padding: '14px 20px' }}><span className="badge-indigo">{p.dept}</span></td>
-                <td style={{ padding: '14px 20px', fontSize: 13, color: 'var(--text-secondary)' }}>{p.created}</td>
-                <td style={{ padding: '14px 20px', fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>{p.cvCount}</td>
-                <td style={{ padding: '14px 20px' }}>
-                  <button onClick={() => togglePost(i)} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, color: p.status ? '#10B981' : 'var(--text-muted)', fontWeight: 600, fontSize: 13 }}>
-                    {p.status ? <ToggleRight size={22} color="#10B981" /> : <ToggleLeft size={22} color="#D1D5DB" />}
+              <tr key={i}>
+                <td style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{p.title}</td>
+                <td><span className="fc-badge fc-badge--blue">{p.dept}</span></td>
+                <td style={{ color: 'var(--text-secondary)' }}>{p.created}</td>
+                <td>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', fontFamily: 'var(--font-display)' }}>{p.cvCount}</span>
+                    <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>CVs</span>
+                  </div>
+                </td>
+                <td>
+                  <button onClick={() => togglePost(i)} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, color: p.status ? 'var(--success)' : 'var(--text-muted)', fontWeight: 600, fontSize: 13 }}>
+                    {p.status ? <ToggleRight size={22} color="var(--success)" /> : <ToggleLeft size={22} color="var(--text-muted)" />}
                     {p.status ? 'Active' : 'Archived'}
                   </button>
                 </td>

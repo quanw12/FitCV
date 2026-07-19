@@ -5,11 +5,7 @@
 -- - Authentication is handled by the application, so account.password_hash is included.
 -- - Use utf8mb4 for Vietnamese and multilingual text support.
 
-CREATE DATABASE IF NOT EXISTS fitcv
-    CHARACTER SET utf8mb4
-    COLLATE utf8mb4_unicode_ci;
-
-USE fitcv;
+USE railway;
 
 CREATE TABLE industry (
     industry_id    BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
@@ -84,6 +80,8 @@ CREATE TABLE cv (
     file_path     VARCHAR(400) NOT NULL,
     file_type     ENUM('PDF', 'DOCX') NOT NULL,
     file_size_kb  INT UNSIGNED NULL,
+    file_sha256   CHAR(64) NULL,
+    version_number INT UNSIGNED NOT NULL DEFAULT 1,
     is_latest     BOOLEAN NOT NULL DEFAULT TRUE,
     uploaded_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
@@ -94,7 +92,9 @@ CREATE TABLE cv (
         FOREIGN KEY (candidate_id) REFERENCES candidate(candidate_id)
         ON DELETE CASCADE,
     CONSTRAINT chk_cv_has_owner
-        CHECK (account_id IS NOT NULL OR candidate_id IS NOT NULL)
+        CHECK (account_id IS NOT NULL OR candidate_id IS NOT NULL),
+    CONSTRAINT uq_cv_account_version
+        UNIQUE (account_id, version_number)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
 
 CREATE TABLE cv_parse_result (
@@ -103,6 +103,7 @@ CREATE TABLE cv_parse_result (
     parsed_text    LONGTEXT NULL,
     parsed_json    JSON NULL,
     parse_status   ENUM('Pending', 'Processing', 'Success', 'Failed') NOT NULL DEFAULT 'Pending',
+    parser_version VARCHAR(50) NOT NULL DEFAULT 'fitcv-parser-v1',
     error_message  VARCHAR(500) NULL,
     parsed_at      DATETIME NULL,
 
@@ -155,6 +156,38 @@ CREATE TABLE job_hr (
         ON DELETE CASCADE
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
 
+CREATE TABLE job_description (
+    job_description_id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+    account_id         BIGINT UNSIGNED NOT NULL,
+    job_id             BIGINT UNSIGNED NULL,
+    title              VARCHAR(200) NOT NULL DEFAULT 'Pasted job description',
+    source_type        ENUM('PastedText', 'UploadedFile', 'Job') NOT NULL DEFAULT 'PastedText',
+    raw_text           LONGTEXT NOT NULL,
+    content_sha256     CHAR(64) NOT NULL,
+    created_at         DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_job_description_account
+        FOREIGN KEY (account_id) REFERENCES account(account_id)
+        ON DELETE CASCADE,
+    CONSTRAINT fk_job_description_job
+        FOREIGN KEY (job_id) REFERENCES job(job_id)
+        ON DELETE SET NULL
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
+
+CREATE TABLE jd_parse_result (
+    jd_parse_id        BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+    job_description_id BIGINT UNSIGNED NOT NULL,
+    parsed_json        JSON NULL,
+    parse_status       ENUM('Pending', 'Processing', 'Success', 'Failed') NOT NULL DEFAULT 'Pending',
+    parser_version     VARCHAR(50) NOT NULL DEFAULT 'fitcv-parser-v1',
+    error_message      VARCHAR(500) NULL,
+    parsed_at          DATETIME NULL,
+
+    CONSTRAINT fk_jd_parse_description
+        FOREIGN KEY (job_description_id) REFERENCES job_description(job_description_id)
+        ON DELETE CASCADE
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
+
 CREATE TABLE application (
     application_id  BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
     candidate_id    BIGINT UNSIGNED NOT NULL,
@@ -179,19 +212,29 @@ CREATE TABLE application (
 CREATE TABLE match_result (
     match_result_id   BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
     cv_id             BIGINT UNSIGNED NOT NULL,
-    job_id            BIGINT UNSIGNED NOT NULL,
+    job_id            BIGINT UNSIGNED NULL,
+    job_description_id BIGINT UNSIGNED NULL,
+    cv_parse_id       BIGINT UNSIGNED NULL,
+    jd_parse_id       BIGINT UNSIGNED NULL,
     application_id    BIGINT UNSIGNED NULL,
-    overall_score     DECIMAL(5,2) NOT NULL,
+    status            ENUM('Pending', 'Processing', 'Success', 'Failed') NOT NULL DEFAULT 'Pending',
+    overall_score     DECIMAL(5,2) NULL,
     skill_score       DECIMAL(5,2) NULL,
     experience_score  DECIMAL(5,2) NULL,
     education_score   DECIMAL(5,2) NULL,
     soft_skill_score  DECIMAL(5,2) NULL,
+    pass_probability  DECIMAL(5,2) NULL,
+    match_label       VARCHAR(30) NULL,
+    evidence_json     JSON NULL,
     match_summary     LONGTEXT NULL,
     strengths         LONGTEXT NULL,
     weaknesses        LONGTEXT NULL,
     recommendation    LONGTEXT NULL,
+    algorithm_version VARCHAR(50) NOT NULL DEFAULT 'fitcv-deterministic-v1',
     model_name        VARCHAR(100) NULL,
+    error_message     VARCHAR(1000) NULL,
     generated_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    completed_at      DATETIME NULL,
 
     CONSTRAINT fk_match_result_cv
         FOREIGN KEY (cv_id) REFERENCES cv(cv_id)
@@ -199,11 +242,20 @@ CREATE TABLE match_result (
     CONSTRAINT fk_match_result_job
         FOREIGN KEY (job_id) REFERENCES job(job_id)
         ON DELETE CASCADE,
+    CONSTRAINT fk_match_result_job_description
+        FOREIGN KEY (job_description_id) REFERENCES job_description(job_description_id)
+        ON DELETE CASCADE,
+    CONSTRAINT fk_match_result_cv_parse
+        FOREIGN KEY (cv_parse_id) REFERENCES cv_parse_result(cv_parse_id)
+        ON DELETE CASCADE,
+    CONSTRAINT fk_match_result_jd_parse
+        FOREIGN KEY (jd_parse_id) REFERENCES jd_parse_result(jd_parse_id)
+        ON DELETE CASCADE,
     CONSTRAINT fk_match_result_application
         FOREIGN KEY (application_id) REFERENCES application(application_id)
         ON DELETE SET NULL,
     CONSTRAINT chk_match_result_overall_score
-        CHECK (overall_score BETWEEN 0 AND 100),
+        CHECK (overall_score IS NULL OR overall_score BETWEEN 0 AND 100),
     CONSTRAINT chk_match_result_skill_score
         CHECK (skill_score IS NULL OR skill_score BETWEEN 0 AND 100),
     CONSTRAINT chk_match_result_experience_score
@@ -211,7 +263,13 @@ CREATE TABLE match_result (
     CONSTRAINT chk_match_result_education_score
         CHECK (education_score IS NULL OR education_score BETWEEN 0 AND 100),
     CONSTRAINT chk_match_result_soft_skill_score
-        CHECK (soft_skill_score IS NULL OR soft_skill_score BETWEEN 0 AND 100)
+        CHECK (soft_skill_score IS NULL OR soft_skill_score BETWEEN 0 AND 100),
+    CONSTRAINT chk_match_result_pass_probability
+        CHECK (pass_probability IS NULL OR pass_probability BETWEEN 0 AND 100),
+    CONSTRAINT chk_match_result_has_job_source
+        CHECK (job_id IS NOT NULL OR job_description_id IS NOT NULL),
+    CONSTRAINT uq_match_exact_versions
+        UNIQUE (cv_parse_id, jd_parse_id, algorithm_version)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
 
 CREATE TABLE cv_improvement_suggestion (
@@ -254,12 +312,17 @@ CREATE INDEX idx_account_reset_token_hash ON account(reset_token_hash);
 CREATE INDEX idx_candidate_account_id ON candidate(account_id);
 CREATE INDEX idx_candidate_created_by_hr ON candidate(created_by_hr_account_id);
 CREATE INDEX idx_cv_account_id ON cv(account_id);
+CREATE INDEX idx_cv_account_latest ON cv(account_id, is_latest, uploaded_at);
 CREATE INDEX idx_cv_candidate_id ON cv(candidate_id);
 CREATE INDEX idx_cv_parse_result_cv_id ON cv_parse_result(cv_id);
 CREATE INDEX idx_job_company_id ON job(company_id);
 CREATE INDEX idx_job_created_by_account_id ON job(created_by_account_id);
+CREATE INDEX idx_job_description_account_created ON job_description(account_id, created_at);
+CREATE INDEX idx_job_description_account_hash ON job_description(account_id, content_sha256);
+CREATE INDEX idx_jd_parse_description ON jd_parse_result(job_description_id, jd_parse_id);
 CREATE INDEX idx_application_candidate_id ON application(candidate_id);
 CREATE INDEX idx_application_job_id ON application(job_id);
 CREATE INDEX idx_match_result_cv_job ON match_result(cv_id, job_id);
+CREATE INDEX idx_match_cv_generated ON match_result(cv_id, generated_at);
 CREATE INDEX idx_cv_improvement_suggestion_match_result_id ON cv_improvement_suggestion(match_result_id);
 CREATE INDEX idx_suggestion_match_type_order ON cv_improvement_suggestion(match_result_id, suggestion_type, sort_order);
