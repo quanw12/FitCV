@@ -6,12 +6,16 @@ if __package__ in {None, ""}:
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 import uvicorn
 
-from app.api.routes import analyzer, auth, improvements
+from app.api.routes import analyzer, auth, cv_ranking, improvements, profile
 from app.core.config import settings
 
 app = FastAPI(title="FitCV API", version="0.1.0")
+
+settings.upload_dir.mkdir(parents=True, exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=settings.upload_dir), name="uploads")
 
 app.add_middleware(
     CORSMiddleware,
@@ -23,7 +27,9 @@ app.add_middleware(
 
 app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
 app.include_router(analyzer.router, prefix="/api", tags=["cv-jd-analyzer"])
+app.include_router(cv_ranking.router, prefix="/api/hr/cv-ranking", tags=["cv-ranking"])
 app.include_router(improvements.router, prefix="/api/match-results", tags=["improvement-reports"])
+app.include_router(profile.router, prefix="/api/profile", tags=["profile"])
 
 
 @app.get("/api/health")

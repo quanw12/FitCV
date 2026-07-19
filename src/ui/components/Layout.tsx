@@ -12,9 +12,10 @@ interface LayoutProps {
   onLogout: () => void
   children: React.ReactNode
   userName?: string
+  userAvatarUrl?: string | null
 }
 
-export default function Layout({ portal, currentScreen, onNavigate, onLogout, children, userName = 'Nguyen Minh' }: LayoutProps) {
+export default function Layout({ portal, currentScreen, onNavigate, onLogout, children, userName = 'Nguyen Minh', userAvatarUrl }: LayoutProps) {
   const [collapsed, setCollapsed] = useState(false)
   const [showUserMenu, setShowUserMenu] = useState(false)
 
@@ -92,7 +93,26 @@ export default function Layout({ portal, currentScreen, onNavigate, onLogout, ch
               className="fc-navitem"
               style={{ flexDirection: 'row', gap: 10, padding: '5px 8px 5px 6px', background: 'var(--surface)', border: '1px solid var(--border)' }}
             >
-              <span className="fc-avatar">{avatarInitials}</span>
+              <span className="fc-avatar" style={{ position: 'relative', overflow: 'hidden' }}>
+                {avatarInitials}
+                {userAvatarUrl && (
+                  <img
+                    key={userAvatarUrl}
+                    src={userAvatarUrl}
+                    alt=""
+                    onError={event => {
+                      event.currentTarget.style.display = 'none'
+                    }}
+                    style={{
+                      position: 'absolute',
+                      inset: 0,
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'cover',
+                    }}
+                  />
+                )}
+              </span>
               <span style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--text-primary)' }}>{userName}</span>
               <ChevronDown size={14} color="var(--text-muted)" />
             </button>

@@ -20,6 +20,11 @@ class Settings(BaseSettings):
     google_client_id: str | None = None
     resend_api_key: str | None = None
     resend_from_email: str | None = None
+    avatar_storage: str = "local"
+    backend_public_url: str | None = None
+    cloudinary_cloud_name: str | None = None
+    cloudinary_api_key: str | None = None
+    cloudinary_api_secret: str | None = None
     gemini_api_key: str | None = None
     gemini_model: str = "gemini-3.5-flash"
     gemini_timeout_seconds: float = 30.0

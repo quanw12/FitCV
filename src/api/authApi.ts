@@ -54,6 +54,19 @@ export const authApi = {
 
   logout: clearStoredSession,
 
+  updateCurrentUser(
+    patch: Partial<Pick<AuthSession['user'], 'fullName' | 'avatarUrl'>>,
+  ): AuthSession | null {
+    const current = getStoredSession()
+    if (!current) return null
+    const updated = {
+      ...current,
+      user: { ...current.user, ...patch },
+    }
+    storeSession(updated)
+    return updated
+  },
+
   async register(payload: RegisterRequest): Promise<AuthSession> {
     const response = await requestJson<BackendAuthSession>('/api/auth/register', {
       method: 'POST',

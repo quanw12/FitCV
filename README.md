@@ -104,10 +104,27 @@ JWT_SECRET_KEY=<local-secret>
 GOOGLE_CLIENT_ID=<google-oauth-client-id>
 RESEND_API_KEY=
 RESEND_FROM_EMAIL=
+AVATAR_STORAGE=local
+BACKEND_PUBLIC_URL=http://127.0.0.1:8000
 ANALYZER_PROVIDER=deterministic
 GEMINI_API_KEY=<google-ai-studio-api-key>
 GEMINI_MODEL=gemini-3.5-flash
 ```
+
+Avatar nhận JPG, PNG và WebP tối đa 5 MB. `AVATAR_STORAGE=local` lưu file trong
+`backend/uploads/avatars` (đã được Git ignore) và chỉ phù hợp cho phát triển local.
+Trên Render, dùng Cloudinary vì ổ đĩa local là tạm thời:
+
+```env
+AVATAR_STORAGE=cloudinary
+CLOUDINARY_CLOUD_NAME=<cloud-name>
+CLOUDINARY_API_KEY=<api-key>
+CLOUDINARY_API_SECRET=<api-secret>
+BACKEND_PUBLIC_URL=https://<your-backend>.onrender.com
+```
+
+Không commit secret Cloudinary. Nếu chọn `cloudinary` nhưng thiếu cấu hình,
+backend sẽ báo lỗi rõ ràng thay vì âm thầm lưu vào ổ đĩa tạm thời.
 
 Chạy backend:
 
