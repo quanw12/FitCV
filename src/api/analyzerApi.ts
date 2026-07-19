@@ -73,13 +73,14 @@ function normalizeMatch(payload: BackendMatchAnalysis): MatchAnalysis {
 }
 
 export const analyzerApi = {
-  async uploadCv(file: File): Promise<CvVersion> {
+  async uploadCv(file: File, signal?: AbortSignal): Promise<CvVersion> {
     const body = new FormData()
     body.append('file', file)
     const payload = await requestJson<BackendCvVersion>('/api/cvs', {
       method: 'POST',
       authenticated: true,
       body,
+      signal,
     })
     return normalizeCv(payload)
   },
@@ -91,9 +92,10 @@ export const analyzerApi = {
     return payload.map(normalizeCv)
   },
 
-  async getCv(cvId: number): Promise<CvVersion> {
+  async getCv(cvId: number, signal?: AbortSignal): Promise<CvVersion> {
     const payload = await requestJson<BackendCvVersion>(`/api/cvs/${cvId}`, {
       authenticated: true,
+      signal,
     })
     return normalizeCv(payload)
   },
@@ -105,7 +107,10 @@ export const analyzerApi = {
     })
   },
 
-  async analyzeCv(request: AnalyzeCvRequest): Promise<MatchAnalysis> {
+  async analyzeCv(
+    request: AnalyzeCvRequest,
+    signal?: AbortSignal,
+  ): Promise<MatchAnalysis> {
     const payload = await requestJson<BackendMatchAnalysis>('/api/analyzer/matches', {
       method: 'POST',
       authenticated: true,
@@ -114,14 +119,18 @@ export const analyzerApi = {
         job_description: request.jobDescription,
         title: request.title ?? 'Pasted job description',
       }),
+      signal,
     })
     return normalizeMatch(payload)
   },
 
-  async getMatchResult(matchResultId: string): Promise<MatchAnalysis> {
+  async getMatchResult(
+    matchResultId: string,
+    signal?: AbortSignal,
+  ): Promise<MatchAnalysis> {
     const payload = await requestJson<BackendMatchAnalysis>(
       `/api/analyzer/matches/${matchResultId}`,
-      { authenticated: true },
+      { authenticated: true, signal },
     )
     return normalizeMatch(payload)
   },

@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     cloudinary_api_key: str | None = None
     cloudinary_api_secret: str | None = None
     gemini_api_key: str | None = None
-    gemini_model: str = "gemini-3.5-flash"
+    gemini_model: str = "gemini-3.1-flash-lite"
     gemini_timeout_seconds: float = 30.0
     gemini_max_retries: int = 2
     ocr_provider: str = "gemini"

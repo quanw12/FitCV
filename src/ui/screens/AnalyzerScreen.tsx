@@ -1,4 +1,4 @@
-import { useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { AlertCircle, FileText, Trash2, Upload, Zap } from "lucide-react"
 
 import { analyzerApi } from "@/api/analyzerApi"
@@ -18,7 +18,7 @@ interface AnalyzerScreenProps {
   draft: AnalyzerDraftState
   setDraft: React.Dispatch<React.SetStateAction<AnalyzerDraftState>>
   onAnalysisComplete?: (matchResultId: string) => void
-  onUploadCleared?: () => void
+  onAnalysisInvalidated?: () => void
   onViewSuggestions?: () => void
 }
 
@@ -26,7 +26,7 @@ export default function AnalyzerScreen({
   draft,
   setDraft,
   onAnalysisComplete,
-  onUploadCleared,
+  onAnalysisInvalidated,
   onViewSuggestions,
 }: AnalyzerScreenProps) {
   const cvInputRef = useRef<HTMLInputElement>(null)
@@ -37,6 +37,26 @@ export default function AnalyzerScreen({
   const [clearing, setClearing] = useState(false)
   const [progress, setProgress] = useState("")
   const [error, setError] = useState<string | null>(null)
+  const activeAnalysisRef = useRef<AbortController | null>(null)
+
+  const cancelActiveAnalysis = useCallback(() => {
+    activeAnalysisRef.current?.abort()
+    activeAnalysisRef.current = null
+  }, [])
+
+  useEffect(
+    () => () => {
+      cancelActiveAnalysis()
+    },
+    [cancelActiveAnalysis],
+  )
+
+  const invalidateAnalysis = () => {
+    cancelActiveAnalysis()
+    setLoading(false)
+    setProgress("")
+    onAnalysisInvalidated?.()
+  }
 
   const selectCv = (file?: File) => {
     if (!file) return
@@ -45,6 +65,7 @@ export default function AnalyzerScreen({
       setError(validationError)
       return
     }
+    invalidateAnalysis()
     setDraft((current) => ({
       ...current,
       cvFile: file,
@@ -67,7 +88,7 @@ export default function AnalyzerScreen({
         uploadedCvId: null,
         result: null,
       }))
-      onUploadCleared?.()
+      invalidateAnalysis()
     } catch (caught) {
       setError(
         caught instanceof Error
@@ -89,6 +110,11 @@ export default function AnalyzerScreen({
       return
     }
 
+    cancelActiveAnalysis()
+    onAnalysisInvalidated?.()
+    const controller = new AbortController()
+    activeAnalysisRef.current = controller
+
     setLoading(true)
     setError(null)
     setDraft((current) => ({ ...current, result: null }))
@@ -96,12 +122,14 @@ export default function AnalyzerScreen({
       let cvId = uploadedCvId
       if (cvId == null) {
         setProgress("Uploading CV…")
-        const uploaded = await analyzerApi.uploadCv(cvFile)
+        const uploaded = await analyzerApi.uploadCv(cvFile, controller.signal)
+        if (!isCurrentAnalysis(activeAnalysisRef, controller)) return
         cvId = uploaded.cvId
         setDraft((current) => ({ ...current, uploadedCvId: cvId }))
         if (uploaded.parseStatus !== "Success") {
           setProgress("Parsing CV…")
-          await waitForCv(cvId)
+          await waitForCv(cvId, controller.signal)
+          if (!isCurrentAnalysis(activeAnalysisRef, controller)) return
         }
       }
 
@@ -109,22 +137,36 @@ export default function AnalyzerScreen({
       let analysis = await analyzerApi.analyzeCv({
         cvId,
         jobDescription: jdText.trim(),
-      })
+      }, controller.signal)
+      if (!isCurrentAnalysis(activeAnalysisRef, controller)) return
       if (analysis.status !== "Success") {
         setProgress("Matching evidence…")
-        analysis = await waitForMatch(analysis.matchResultId)
+        analysis = await waitForMatch(
+          analysis.matchResultId,
+          controller.signal,
+        )
+        if (!isCurrentAnalysis(activeAnalysisRef, controller)) return
       }
       setDraft((current) => ({ ...current, result: analysis }))
       onAnalysisComplete?.(analysis.matchResultId)
     } catch (caught) {
+      if (
+        isAbortError(caught) ||
+        !isCurrentAnalysis(activeAnalysisRef, controller)
+      ) {
+        return
+      }
       setError(
         caught instanceof Error
           ? caught.message
           : "Unable to analyze this CV and job description.",
       )
     } finally {
-      setLoading(false)
-      setProgress("")
+      if (isCurrentAnalysis(activeAnalysisRef, controller)) {
+        activeAnalysisRef.current = null
+        setLoading(false)
+        setProgress("")
+      }
     }
   }
 
@@ -136,6 +178,7 @@ export default function AnalyzerScreen({
     }
     try {
       const text = await file.text()
+      invalidateAnalysis()
       setDraft((current) => ({ ...current, jdText: text, result: null }))
       setError(null)
     } catch {
@@ -337,6 +380,7 @@ export default function AnalyzerScreen({
             value={jdText}
             onChange={(event) => {
               const value = event.target.value
+              invalidateAnalysis()
               setDraft((current) => ({
                 ...current,
                 jdText: value,
@@ -664,34 +708,68 @@ export default function AnalyzerScreen({
   )
 }
 
-async function waitForCv(cvId: number) {
+async function waitForCv(cvId: number, signal: AbortSignal) {
   for (let attempt = 0; attempt < 60; attempt += 1) {
-    const cv = await analyzerApi.getCv(cvId)
+    throwIfAborted(signal)
+    const cv = await analyzerApi.getCv(cvId, signal)
     if (cv.parseStatus === "Success") return cv
     if (cv.parseStatus === "Failed")
       throw new Error(cv.errorMessage ?? "CV parsing failed.")
-    await delay(500)
+    await delay(500, signal)
   }
   throw new Error(
     "CV parsing is taking longer than expected. Please retry shortly.",
   )
 }
 
-async function waitForMatch(matchResultId: string) {
+async function waitForMatch(matchResultId: string, signal: AbortSignal) {
   for (let attempt = 0; attempt < 60; attempt += 1) {
-    const match = await analyzerApi.getMatchResult(matchResultId)
+    throwIfAborted(signal)
+    const match = await analyzerApi.getMatchResult(matchResultId, signal)
     if (match.status === "Success") return match
     if (match.status === "Failed")
       throw new Error(match.errorMessage ?? "CV/JD matching failed.")
-    await delay(500)
+    await delay(500, signal)
   }
   throw new Error(
     "Matching is taking longer than expected. Please retry shortly.",
   )
 }
 
-function delay(milliseconds: number) {
-  return new Promise((resolve) => window.setTimeout(resolve, milliseconds))
+function delay(milliseconds: number, signal: AbortSignal) {
+  return new Promise<void>((resolve, reject) => {
+    throwIfAborted(signal)
+    const timeoutId = window.setTimeout(() => {
+      signal.removeEventListener("abort", handleAbort)
+      resolve()
+    }, milliseconds)
+    const handleAbort = () => {
+      window.clearTimeout(timeoutId)
+      reject(createAbortError())
+    }
+    signal.addEventListener("abort", handleAbort, { once: true })
+  })
+}
+
+function throwIfAborted(signal: AbortSignal): void {
+  if (signal.aborted) throw createAbortError()
+}
+
+function createAbortError(): DOMException {
+  return new DOMException("The analysis was cancelled.", "AbortError")
+}
+
+function isAbortError(error: unknown): boolean {
+  return error instanceof DOMException && error.name === "AbortError"
+}
+
+function isCurrentAnalysis(
+  activeAnalysisRef: React.RefObject<AbortController | null>,
+  controller: AbortController,
+): boolean {
+  return (
+    activeAnalysisRef.current === controller && !controller.signal.aborted
+  )
 }
 
 function validateCv(file: File): string | null {
