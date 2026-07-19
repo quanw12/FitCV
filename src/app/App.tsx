@@ -29,28 +29,12 @@ import PipelineScreen from "@/ui/screens/PipelineScreen"
 import AutoEmailScreen from "@/ui/screens/AutoEmailScreen"
 
 import ReportsScreen from "@/ui/screens/ReportsScreen"
+import ProfileScreen from "@/ui/screens/ProfileScreen"
 
 import type { Portal, ScreenId } from "@/types/app"
 import type { AnalyzerDraftState } from "@/types/analyzer"
 
 import { portalFromAccountRole, type AuthSession } from "@/types/auth"
-
-function ProfilePlaceholder() {
-  return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        height: 300,
-        color: "var(--text-muted)",
-        fontSize: 16,
-      }}
-    >
-      Profile settings coming soon...
-    </div>
-  )
-}
 
 function defaultScreen(portal: Portal) {
   return portal === "seeker" ? "seeker-dashboard" : "hr-dashboard"
@@ -142,7 +126,7 @@ export default function App() {
         return <JDLibraryScreen />
 
       case "profile":
-        return <ProfilePlaceholder />
+        return <ProfileScreen session={session} onSessionChange={setSession} />
       // HR
 
       case "hr-dashboard":
@@ -164,7 +148,7 @@ export default function App() {
         return <ReportsScreen />
 
       case "hr-settings":
-        return <ProfilePlaceholder />
+        return <ProfileScreen session={session} onSessionChange={setSession} />
 
       default:
         return portal === "seeker" ? (
@@ -182,6 +166,7 @@ export default function App() {
       onNavigate={handleNavigate}
       onLogout={handleLogout}
       userName={session.user.fullName}
+      userAvatarUrl={session.user.avatarUrl}
     >
       {renderScreen()}
     </Layout>
