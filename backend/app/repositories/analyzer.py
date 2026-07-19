@@ -246,12 +246,15 @@ def set_match_success(db: Session, match: MatchResult, result: dict) -> None:
     match.soft_skill_score = _score(breakdown, "soft_skills")
     match.pass_probability = result["pass_probability"]
     match.match_label = result["match_label"]
-    match.evidence_json = {
+    evidence = {
         "breakdown": breakdown,
         "strengths": result["strengths"],
         "weaknesses": result["weaknesses"],
         "suggestions": result["suggestions"],
     }
+    if isinstance(result.get("matching_inputs"), dict):
+        evidence["matching_inputs"] = result["matching_inputs"]
+    match.evidence_json = evidence
     match.match_summary = result["match_summary"]
     match.strengths = json.dumps(result["strengths"], ensure_ascii=False)
     match.weaknesses = json.dumps(result["weaknesses"], ensure_ascii=False)

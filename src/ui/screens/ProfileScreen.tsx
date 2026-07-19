@@ -46,7 +46,7 @@ const inputStyle = {
   font: "inherit",
   color: "var(--text-primary)",
   background: "white",
-  outlineColor: "var(--indigo)",
+  outlineColor: "var(--accent)",
 }
 
 function formFrom(profile: UserProfile): FormState {
@@ -517,7 +517,7 @@ export default function ProfileScreen({
               onDragOver={(event) => { event.preventDefault(); setDragging(true) }}
               onDragLeave={() => setDragging(false)}
               onDrop={(event: DragEvent<HTMLDivElement>) => { event.preventDefault(); setDragging(false); void chooseAvatar(event.dataTransfer.files[0]) }}
-              style={{ border: `1px dashed ${dragging ? "var(--indigo)" : "var(--border)"}`, borderRadius: 12, padding: 16, background: dragging ? "var(--indigo-light)" : "transparent", display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}
+              style={{ border: `1px dashed ${dragging ? "var(--accent)" : "var(--border)"}`, borderRadius: 12, padding: 16, background: dragging ? "var(--accent-soft)" : "transparent", display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}
             >
               <div style={{ flex: "1 1 240px" }}>
                 <div style={{ fontSize: 13, color: "var(--text-secondary)", marginBottom: 7 }}>Drag and drop an image here, or choose one from your device.</div>
@@ -544,7 +544,7 @@ export default function ProfileScreen({
                 border: 0,
                 borderRadius: 10,
                 padding: "11px 18px",
-                background: "var(--indigo)",
+                background: "var(--accent)",
                 color: "white",
                 display: "flex",
                 gap: 8,

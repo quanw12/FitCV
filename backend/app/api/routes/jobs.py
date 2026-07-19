@@ -1,11 +1,13 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, UploadFile, status
+from pydantic import EmailStr
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.middleware.auth_guard import require_role
 from app.models.account import Account, AccountRole
+from app.schemas.applications import ApplicationCreatedResponse
 from app.schemas.jobs import JobCreate, JobResponse, JobUpdate
-from app.services import jobs_service
+from app.services import application_service, jobs_service
 
 router = APIRouter()
 student = require_role(AccountRole.student)
@@ -20,6 +22,34 @@ def list_public(db: Session = Depends(get_db), account: Account = Depends(studen
 @router.get("/public/{job_id}", response_model=JobResponse)
 def get_public(job_id: int, db: Session = Depends(get_db), account: Account = Depends(student)):
     return jobs_service.get_public(db, job_id)
+
+
+@router.post(
+    "/{job_id}/apply",
+    response_model=ApplicationCreatedResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def apply_to_job(
+    job_id: int,
+    background_tasks: BackgroundTasks,
+    full_name: str = Form(..., min_length=1, max_length=150),
+    email: EmailStr = Form(..., max_length=150),
+    phone: str = Form(..., min_length=1, max_length=30),
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    account: Account = Depends(student),
+):
+    response = await application_service.apply(
+        db,
+        job_id=job_id,
+        full_name=full_name,
+        email=str(email),
+        phone=phone,
+        file=file,
+        account=account,
+    )
+    background_tasks.add_task(application_service.run_analysis, response.application_id)
+    return response
 
 
 @router.get("/manage", response_model=list[JobResponse])

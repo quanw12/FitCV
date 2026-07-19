@@ -17,7 +17,9 @@ class Cv(Base):
 
     cv_id: Mapped[int] = mapped_column(ID_TYPE, primary_key=True, autoincrement=True)
     account_id: Mapped[int | None] = mapped_column(ID_TYPE, ForeignKey("account.account_id"), nullable=True)
-    candidate_id: Mapped[int | None] = mapped_column(ID_TYPE, nullable=True)
+    candidate_id: Mapped[int | None] = mapped_column(
+        ID_TYPE, ForeignKey("candidate.candidate_id", ondelete="CASCADE"), nullable=True
+    )
     file_name: Mapped[str] = mapped_column(String(255), nullable=False)
     file_path: Mapped[str] = mapped_column(String(400), nullable=False)
     file_type: Mapped[str] = mapped_column(String(10), nullable=False)
@@ -110,7 +112,9 @@ class MatchResult(Base):
     jd_parse_id: Mapped[int | None] = mapped_column(
         ID_TYPE, ForeignKey("jd_parse_result.jd_parse_id", ondelete="CASCADE"), nullable=True
     )
-    application_id: Mapped[int | None] = mapped_column(ID_TYPE, nullable=True)
+    application_id: Mapped[int | None] = mapped_column(
+        ID_TYPE, ForeignKey("application.application_id", ondelete="SET NULL"), nullable=True
+    )
     status: Mapped[str] = mapped_column(String(20), default="Pending", nullable=False)
     overall_score: Mapped[float | None] = mapped_column(Numeric(5, 2), nullable=True)
     skill_score: Mapped[float | None] = mapped_column(Numeric(5, 2), nullable=True)

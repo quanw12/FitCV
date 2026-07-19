@@ -21,7 +21,11 @@ from app.services.document_parser import (
     parse_jd_text,
     validate_cv_content,
 )
-from app.services.matching_service import ALGORITHM_VERSION, match_documents
+from app.services.matching_service import (
+    ALGORITHM_VERSION,
+    match_documents,
+    supplement_semantic_cv,
+)
 from app.services.gemini_analyzer import (
     GEMINI_EXTRACTOR_VERSION,
     GeminiAnalyzerError,
@@ -171,21 +175,30 @@ def run_match_task(match_result_id: int) -> None:
         if not parsed_cv.parsed_json or not parsed_jd.parsed_json:
             raise ValueError("Parsed CV or job description data is missing.")
         if match.algorithm_version == ALGORITHM_VERSION:
-            result = match_documents(parsed_cv.parsed_json, parsed_jd.parsed_json)
+            score_cv = parsed_cv.parsed_json
+            score_jd = parsed_jd.parsed_json
         elif match.algorithm_version.startswith("fitcv-gemini-"):
             if not parsed_cv.parsed_text:
                 raise ValueError("Readable CV text is missing.")
-            cv_payload, jd_payload = extract_match_inputs(
+            semantic_cv, semantic_jd = extract_match_inputs(
                 cv_text=parsed_cv.parsed_text,
                 job_description=description.raw_text,
                 model_name=match.model_name,
             )
-            result = match_documents(cv_payload, jd_payload)
-            result["match_summary"] = (
-                f"{result['match_label']} using Gemini semantic extraction and FitCV's weighted evidence scorer."
+            score_cv = supplement_semantic_cv(
+                semantic_cv,
+                parsed_cv.parsed_json,
             )
+            score_jd = semantic_jd
         else:
             raise ValueError(f"Unsupported analyzer version: {match.algorithm_version}")
+        result = match_documents(score_cv, score_jd)
+        result["matching_inputs"] = {"cv": score_cv, "jd": score_jd}
+        if match.algorithm_version.startswith("fitcv-gemini-"):
+            result["match_summary"] = (
+                f"{result['match_label']} using Gemini semantic extraction, "
+                "locally verified CV terms, and FitCV's weighted evidence scorer."
+            )
         analyzer.set_match_success(db, match, result)
     except Exception as exc:
         db.rollback()

@@ -43,13 +43,31 @@ class JobHr(Base):
     role_type: Mapped[str | None] = mapped_column(String(50), nullable=True)
 
 
+class Candidate(Base):
+    __tablename__ = "candidate"
+
+    candidate_id: Mapped[int] = mapped_column(ID_TYPE, primary_key=True, autoincrement=True)
+    account_id: Mapped[int | None] = mapped_column(
+        ID_TYPE, ForeignKey("account.account_id", ondelete="SET NULL"), nullable=True
+    )
+    full_name: Mapped[str | None] = mapped_column(String(150), nullable=True)
+    email: Mapped[str | None] = mapped_column(String(150), nullable=True)
+    phone: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    created_by_hr_account_id: Mapped[int | None] = mapped_column(
+        ID_TYPE, ForeignKey("account.account_id", ondelete="SET NULL"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
+
+
 class Application(Base):
     __tablename__ = "application"
 
     application_id: Mapped[int] = mapped_column(ID_TYPE, primary_key=True, autoincrement=True)
-    candidate_id: Mapped[int] = mapped_column(ID_TYPE, nullable=False)
+    candidate_id: Mapped[int] = mapped_column(
+        ID_TYPE, ForeignKey("candidate.candidate_id", ondelete="CASCADE"), nullable=False
+    )
     job_id: Mapped[int] = mapped_column(ID_TYPE, ForeignKey("job.job_id", ondelete="CASCADE"), nullable=False)
-    cv_id: Mapped[int] = mapped_column(ID_TYPE, nullable=False)
+    cv_id: Mapped[int] = mapped_column(ID_TYPE, ForeignKey("cv.cv_id", ondelete="RESTRICT"), nullable=False)
     current_stage: Mapped[str] = mapped_column(String(20), default="Applied", nullable=False)
     status: Mapped[str] = mapped_column(String(20), default="Active", nullable=False)
     applied_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)

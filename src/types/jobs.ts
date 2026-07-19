@@ -41,3 +41,17 @@ export interface JobWrite {
   deadline?: string | null
   openings_count?: number
 }
+
+export interface JobApplicationWrite {
+  fullName: string
+  email: string
+  phone: string
+  file: File
+}
+
+export interface JobApplicationCreated {
+  application_id: number
+  cv_id: number
+  match_result_id: number
+  analysis_status: string
+}

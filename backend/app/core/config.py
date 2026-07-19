@@ -29,6 +29,10 @@ class Settings(BaseSettings):
     gemini_model: str = "gemini-3.5-flash"
     gemini_timeout_seconds: float = 30.0
     gemini_max_retries: int = 2
+    ocr_provider: str = "gemini"
+    ocr_model: str = ""
+    ocr_timeout_seconds: float = 60.0
+    ocr_max_output_tokens: int = 20_000
     improvement_task_stale_minutes: int = 10
     improvement_max_cv_chars: int = 120_000
     improvement_max_jd_chars: int = 60_000

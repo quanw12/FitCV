@@ -66,6 +66,8 @@ export default function App() {
     useState<string | null>(null)
   const [analyzerDraft, setAnalyzerDraft] =
     useState<AnalyzerDraftState>(emptyAnalyzerDraft)
+  const [trackerFocusApplicationId, setTrackerFocusApplicationId] =
+    useState<number | null>(null)
   const [companyProfileGate, setCompanyProfileGate] =
     useState<CompanyProfileGate>("checking")
   const portal = session?.user.role
@@ -106,6 +108,7 @@ export default function App() {
     setCompanyProfileGate("checking")
     setAnalyzerDraft(emptyAnalyzerDraft())
     setImprovementMatchResultId(null)
+    setTrackerFocusApplicationId(null)
 
     if (nextSession.user.role) {
       const nextPortal = portalFromAccountRole(nextSession.user.role)
@@ -123,9 +126,18 @@ export default function App() {
     setScreen("")
     setAnalyzerDraft(emptyAnalyzerDraft())
     setImprovementMatchResultId(null)
+    setTrackerFocusApplicationId(null)
   }
 
-  const handleNavigate = (s: ScreenId) => setScreen(s)
+  const handleNavigate = (s: ScreenId) => {
+    if (s !== "app-tracker") setTrackerFocusApplicationId(null)
+    setScreen(s)
+  }
+
+  const handleViewTracking = (applicationId: number) => {
+    setTrackerFocusApplicationId(applicationId)
+    setScreen("app-tracker")
+  }
 
   if (!session || session.requiresRoleSelection || !portal) {
     return (
@@ -155,7 +167,10 @@ export default function App() {
 
     if (companyProfileGate === "required") {
       return (
-        <div style={{ minHeight: "100vh", background: "var(--bg)" }}>
+        <div
+          data-portal="hr"
+          style={{ minHeight: "100vh", background: "var(--bg)" }}
+        >
           <header
             style={{
               minHeight: 64,
@@ -225,10 +240,14 @@ export default function App() {
         return <CVHistoryScreen />
 
       case "app-tracker":
-        return <AppTrackerScreen />
+        return (
+          <AppTrackerScreen
+            focusApplicationId={trackerFocusApplicationId}
+          />
+        )
 
       case "jd-library":
-        return <JDLibraryScreen />
+        return <JDLibraryScreen onViewTracking={handleViewTracking} />
 
       case "profile":
         return <ProfileScreen session={session} onSessionChange={setSession} />

@@ -1,4 +1,9 @@
-import type { JobPost, JobWrite } from '@/types/jobs'
+import type {
+  JobApplicationCreated,
+  JobApplicationWrite,
+  JobPost,
+  JobWrite,
+} from '@/types/jobs'
 import { requestJson } from './httpClient'
 
 export const jobsApi = {
@@ -17,4 +22,16 @@ export const jobsApi = {
   close: (jobId: number) => requestJson<JobPost>(`/api/jobs/${jobId}/close`, {
     authenticated: true, method: 'POST',
   }),
+  apply: (jobId: number, payload: JobApplicationWrite) => {
+    const formData = new FormData()
+    formData.append('full_name', payload.fullName)
+    formData.append('email', payload.email)
+    formData.append('phone', payload.phone)
+    formData.append('file', payload.file)
+    return requestJson<JobApplicationCreated>(`/api/jobs/${jobId}/apply`, {
+      authenticated: true,
+      method: 'POST',
+      body: formData,
+    })
+  },
 }
