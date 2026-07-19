@@ -17,6 +17,8 @@ import type { ProfileUpdate, UserProfile } from "@/types/profile"
 interface ProfileScreenProps {
   session: AuthSession
   onSessionChange: (session: AuthSession) => void
+  companyOnboarding?: boolean
+  onProfileSaved?: (profile: UserProfile) => void
 }
 interface FormState {
   fullName: string
@@ -106,6 +108,8 @@ function Field({
 export default function ProfileScreen({
   session,
   onSessionChange,
+  companyOnboarding = false,
+  onProfileSaved,
 }: ProfileScreenProps) {
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [form, setForm] = useState<FormState>(blank)
@@ -177,6 +181,13 @@ export default function ProfileScreen({
       setError("Full name must be at least 2 characters.")
       return
     }
+    if (
+      hasCompanyRole &&
+      (!form.companyName.trim() || !form.industryName.trim())
+    ) {
+      setError("Company name and industry are required.")
+      return
+    }
 
     setSaving(true)
     const update: ProfileUpdate = {
@@ -195,6 +206,7 @@ export default function ProfileScreen({
       setForm(formFrom(saved))
       const nextSession = authApi.getSession()
       if (nextSession) onSessionChange(nextSession)
+      onProfileSaved?.(saved)
       setSuccess("Profile saved successfully.")
     } catch (reason) {
       setError(
@@ -288,7 +300,9 @@ export default function ProfileScreen({
       <style>{`.fitcv-profile-grid{display:grid;grid-template-columns:280px minmax(0,1fr);gap:20px}.fitcv-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}@keyframes fitcv-spin{to{transform:rotate(360deg)}}.fitcv-spin{animation:fitcv-spin 1s linear infinite}@media(max-width:760px){.fitcv-profile-grid,.fitcv-form-grid{grid-template-columns:1fr}}`}</style>
       <div style={{ marginBottom: 22 }}>
         <h1 style={{ margin: 0, fontSize: 26, color: "var(--text-primary)" }}>
-          Profile settings
+          {companyOnboarding
+            ? "Complete your company profile"
+            : "Profile settings"}
         </h1>
         <p
           style={{
@@ -297,7 +311,9 @@ export default function ProfileScreen({
             fontSize: 14,
           }}
         >
-          Keep your professional information accurate and ready for work.
+          {companyOnboarding
+            ? "Add your company details before entering the hiring workspace."
+            : "Keep your professional information accurate and ready for work."}
         </p>
       </div>
       {error && (
@@ -472,7 +488,7 @@ export default function ProfileScreen({
               </h2>
               <div className="fitcv-form-grid">
                 <Field label="Company name" value={form.companyName} onChange={set("companyName")} maxLength={200} required placeholder="FitCV Technologies" />
-                <Field label="Industry" value={form.industryName} onChange={set("industryName")} maxLength={100} placeholder="Information Technology" />
+                <Field label="Industry" value={form.industryName} onChange={set("industryName")} maxLength={100} required placeholder="Information Technology" />
                 <Field label="Company website" value={form.companyWebsiteUrl} onChange={set("companyWebsiteUrl")} type="url" maxLength={300} placeholder="https://example.com" />
                 <Field label="Company logo URL" value={form.companyLogoUrl} onChange={set("companyLogoUrl")} type="url" maxLength={400} placeholder="https://example.com/logo.png" />
               </div>
@@ -517,7 +533,12 @@ export default function ProfileScreen({
           </section>
           <div style={{ display: "flex", justifyContent: "flex-end" }}>
             <button
-              disabled={saving || form.fullName.trim().length < 2}
+              disabled={
+                saving ||
+                form.fullName.trim().length < 2 ||
+                (hasCompanyRole &&
+                  (!form.companyName.trim() || !form.industryName.trim()))
+              }
               type="submit"
               style={{
                 border: 0,
@@ -538,7 +559,11 @@ export default function ProfileScreen({
               ) : (
                 <Save size={17} />
               )}
-              {saving ? "Saving..." : "Save changes"}
+              {saving
+                ? "Saving..."
+                : companyOnboarding
+                  ? "Continue to workspace"
+                  : "Save changes"}
             </button>
           </div>
         </div>
