@@ -34,6 +34,12 @@ import ProfileScreen from "@/ui/screens/ProfileScreen"
 import type { Portal, ScreenId } from "@/types/app"
 import type { AnalyzerDraftState } from "@/types/analyzer"
 
+import {
+  clearStoredImprovementMatchResultId,
+  getStoredImprovementMatchResultId,
+  storeImprovementMatchResultId,
+} from "@/services/improvementSelection"
+
 import { portalFromAccountRole, type AuthSession } from "@/types/auth"
 
 function defaultScreen(portal: Portal) {
@@ -57,7 +63,12 @@ export default function App() {
       : ""
   })
   const [improvementMatchResultId, setImprovementMatchResultId] =
-    useState<string | null>(null)
+    useState<string | null>(() => {
+      const currentSession = authApi.getSession()
+      return currentSession
+        ? getStoredImprovementMatchResultId(currentSession.user.accountId)
+        : null
+    })
   const [analyzerDraft, setAnalyzerDraft] =
     useState<AnalyzerDraftState>(emptyAnalyzerDraft)
   const portal = session?.user.role
@@ -65,6 +76,10 @@ export default function App() {
     : null
 
   const handleAuth = (nextSession: AuthSession) => {
+    if (session) {
+      clearStoredImprovementMatchResultId(session.user.accountId)
+    }
+    clearStoredImprovementMatchResultId(nextSession.user.accountId)
     setSession(nextSession)
     setAnalyzerDraft(emptyAnalyzerDraft())
     setImprovementMatchResultId(null)
@@ -77,6 +92,9 @@ export default function App() {
   }
 
   const handleLogout = () => {
+    if (session) {
+      clearStoredImprovementMatchResultId(session.user.accountId)
+    }
     authApi.logout()
 
     setSession(null)
@@ -87,6 +105,19 @@ export default function App() {
   }
 
   const handleNavigate = (s: ScreenId) => setScreen(s)
+
+  const clearImprovementSelection = () => {
+    if (session) {
+      clearStoredImprovementMatchResultId(session.user.accountId)
+    }
+    setImprovementMatchResultId(null)
+  }
+
+  const selectImprovementMatch = (matchResultId: string) => {
+    if (!session) return
+    storeImprovementMatchResultId(session.user.accountId, matchResultId)
+    setImprovementMatchResultId(matchResultId)
+  }
 
   if (!session || session.requiresRoleSelection || !portal) {
     return (
@@ -108,8 +139,8 @@ export default function App() {
           <AnalyzerScreen
             draft={analyzerDraft}
             setDraft={setAnalyzerDraft}
-            onAnalysisComplete={setImprovementMatchResultId}
-            onUploadCleared={() => setImprovementMatchResultId(null)}
+            onAnalysisComplete={selectImprovementMatch}
+            onAnalysisInvalidated={clearImprovementSelection}
             onViewSuggestions={() => setScreen("improvement")}
           />
         )

@@ -82,10 +82,14 @@ function normalizeResponse(payload: BackendReportResponse): ImprovementReportRes
 }
 
 export const improvementApi = {
-  async generateReport(matchResultId: string, regenerate = false): Promise<GenerateImprovementResponse> {
+  async generateReport(
+    matchResultId: string,
+    regenerate = false,
+    signal?: AbortSignal,
+  ): Promise<GenerateImprovementResponse> {
     const payload = await requestJson<BackendGenerateResponse>(
       `/api/match-results/${matchResultId}/improvement-report/generate?regenerate=${regenerate}`,
-      { method: 'POST', authenticated: true },
+      { method: 'POST', authenticated: true, signal },
     )
     return {
       matchResultId: String(payload.match_result_id),
@@ -94,10 +98,13 @@ export const improvementApi = {
     }
   },
 
-  async getReport(matchResultId: string): Promise<ImprovementReportResponse> {
+  async getReport(
+    matchResultId: string,
+    signal?: AbortSignal,
+  ): Promise<ImprovementReportResponse> {
     const payload = await requestJson<BackendReportResponse>(
       `/api/match-results/${matchResultId}/improvement-report`,
-      { authenticated: true },
+      { authenticated: true, signal },
     )
     return normalizeResponse(payload)
   },
