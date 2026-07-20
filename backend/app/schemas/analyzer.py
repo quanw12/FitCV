@@ -55,3 +55,61 @@ class MatchResultResponse(BaseModel):
         "This score and screening probability are decision-support estimates, "
         "not guarantees or automatic hiring decisions."
     )
+
+
+class CvScorePointResponse(BaseModel):
+    cv_id: int
+    version_number: int
+    file_name: str
+    uploaded_at: datetime
+    match_result_id: int
+    overall_score: float
+    skill_score: float | None = None
+    experience_score: float | None = None
+    education_score: float | None = None
+    soft_skill_score: float | None = None
+    match_label: str | None = None
+    completed_at: datetime | None = None
+    delta_from_previous: float | None = None
+
+
+class CvComparisonSeriesResponse(BaseModel):
+    job_description_id: int
+    title: str
+    created_at: datetime
+    best_score: float
+    latest_score: float
+    latest_delta: float | None = None
+    versions: list[CvScorePointResponse] = Field(default_factory=list)
+
+
+class JdLibraryItemResponse(BaseModel):
+    job_description_id: int
+    title: str
+    source_type: str
+    raw_text: str
+    created_at: datetime
+    parse_status: str
+    required_skills: list[str] = Field(default_factory=list)
+    preferred_skills: list[str] = Field(default_factory=list)
+    soft_skills: list[str] = Field(default_factory=list)
+    experience_years: float | None = None
+    education: str | None = None
+    match_count: int = 0
+    latest_score: float | None = None
+    latest_match_label: str | None = None
+
+
+class SkillFrequencyResponse(BaseModel):
+    skill: str
+    count: int
+    percentage: float
+
+
+class JdLibraryInsightsResponse(BaseModel):
+    total_job_descriptions: int
+    total_matches: int
+    average_match_score: float | None = None
+    required_skills: list[SkillFrequencyResponse] = Field(default_factory=list)
+    preferred_skills: list[SkillFrequencyResponse] = Field(default_factory=list)
+    missing_skills: list[SkillFrequencyResponse] = Field(default_factory=list)
