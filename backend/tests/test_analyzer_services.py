@@ -1,5 +1,6 @@
 import json
 import unittest
+import base64
 from io import BytesIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -23,10 +24,16 @@ from app.services.document_parser import (
     extract_document_text,
     parse_cv_text,
     parse_jd_text,
+    preprocess_document_text,
     validate_cv_content,
 )
-from app.services.matching_service import ALGORITHM_VERSION, match_documents
+from app.services.matching_service import (
+    ALGORITHM_VERSION,
+    match_documents,
+    supplement_semantic_cv,
+)
 from app.services.analyzer_service import _selected_analyzer_config
+from app.services import ocr_service
 from app.services.gemini_analyzer import (
     GeminiAnalyzerError,
     extract_match_inputs,
@@ -55,6 +62,17 @@ class DocumentParserTests(unittest.TestCase):
         self.assertNotIn("Redis", jd["required_skills"])
         self.assertEqual(jd["experience_years"], 3.0)
 
+    def test_preprocesses_ocr_text_and_recognizes_master_of_science(self) -> None:
+        text = preprocess_document_text(
+            "EDUCATION\nMaster of Science in Artificial\n"
+            "Intelligence\nProficient in profes-\nsional Python development."
+        )
+        parsed = parse_cv_text(text)
+
+        self.assertIn("professional Python", text)
+        self.assertEqual(parsed["education"], "Master")
+        self.assertIn("Python", parsed["skills"])
+
     def test_rejects_fake_pdf(self) -> None:
         with self.assertRaisesRegex(ValueError, "valid PDF"):
             validate_cv_content("resume.pdf", b"not a pdf")
@@ -67,6 +85,99 @@ class DocumentParserTests(unittest.TestCase):
             document.add_paragraph("Python, FastAPI, MySQL")
             document.save(path)
             self.assertIn("FastAPI", extract_document_text(path, "DOCX"))
+
+    def test_scanned_pdf_uses_ocr_fallback(self) -> None:
+        with TemporaryDirectory() as directory:
+            path = Path(directory) / "scanned.pdf"
+            path.write_bytes(b"%PDF-1.4\nscanned")
+            page = MagicMock()
+            page.extract_text.return_value = ""
+            reader = MagicMock()
+            reader.pages = [page]
+            with (
+                patch("pypdf.PdfReader", return_value=reader),
+                patch(
+                    "app.services.ocr_service.extract_pdf_text",
+                    return_value=(
+                        "Technical Skills\nPython FastAPI SQL\n"
+                        "Experience\nThree years building APIs"
+                    ),
+                ) as ocr,
+            ):
+                text = extract_document_text(path, "PDF")
+
+        self.assertIn("FastAPI", text)
+        ocr.assert_called_once_with(path)
+
+
+class OcrServiceTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.original_provider = settings.ocr_provider
+        self.original_model = settings.ocr_model
+        self.original_key = settings.gemini_api_key
+        self.original_timeout = settings.ocr_timeout_seconds
+        settings.ocr_provider = "gemini"
+        settings.ocr_model = "gemini-ocr-test"
+        settings.gemini_api_key = "test-key"
+        settings.ocr_timeout_seconds = 7
+
+    def tearDown(self) -> None:
+        settings.ocr_provider = self.original_provider
+        settings.ocr_model = self.original_model
+        settings.gemini_api_key = self.original_key
+        settings.ocr_timeout_seconds = self.original_timeout
+
+    def test_sends_pdf_inline_and_returns_transcription(self) -> None:
+        response = MagicMock()
+        response.status_code = 200
+        response.json.return_value = {
+            "candidates": [
+                {
+                    "finishReason": "STOP",
+                    "content": {
+                        "parts": [
+                            {
+                                "text": (
+                                    "Technical Skills\nPython, FastAPI\n"
+                                    "Experience\n3 years"
+                                )
+                            }
+                        ]
+                    },
+                }
+            ]
+        }
+        with TemporaryDirectory() as directory:
+            path = Path(directory) / "scan.pdf"
+            pdf_bytes = b"%PDF-1.4\nimage-only"
+            path.write_bytes(pdf_bytes)
+            with patch(
+                "app.services.ocr_service.requests.post",
+                return_value=response,
+            ) as post:
+                text = ocr_service.extract_pdf_text(path)
+
+        self.assertIn("FastAPI", text)
+        request = post.call_args
+        self.assertEqual(
+            request.args[0],
+            (
+                "https://generativelanguage.googleapis.com/v1beta/models/"
+                "gemini-ocr-test:generateContent"
+            ),
+        )
+        self.assertEqual(request.kwargs["timeout"], 7)
+        inline = request.kwargs["json"]["contents"][0]["parts"][0]["inlineData"]
+        self.assertEqual(inline["mimeType"], "application/pdf")
+        self.assertEqual(base64.b64decode(inline["data"]), pdf_bytes)
+
+    def test_requires_api_key_for_scanned_pdf_ocr(self) -> None:
+        settings.gemini_api_key = None
+        with TemporaryDirectory() as directory:
+            path = Path(directory) / "scan.pdf"
+            path.write_bytes(b"%PDF-1.4\nimage-only")
+            with self.assertRaisesRegex(ocr_service.OcrError, "GEMINI_API_KEY"):
+                ocr_service.extract_pdf_text(path)
 
 
 class MatchingServiceTests(unittest.TestCase):
@@ -124,6 +235,35 @@ class MatchingServiceTests(unittest.TestCase):
         )
         self.assertEqual(result["breakdown"]["skills"]["score"], 100.0)
         self.assertEqual(result["breakdown"]["skills"]["matched"], ["REST API"])
+
+    def test_supplements_semantic_cv_with_locally_parsed_terms(self) -> None:
+        semantic_cv = {
+            "skills": ["TensorFlow"],
+            "experience_years": None,
+            "education": None,
+            "soft_skills": [],
+        }
+        parsed_cv = {
+            "skills": ["Machine Learning", "Python"],
+            "experience_years": None,
+            "education": "Master",
+            "soft_skills": ["Problem Solving"],
+        }
+        jd = {
+            "required_skills": ["Python", "FastAPI"],
+            "preferred_skills": [],
+            "experience_years": None,
+            "education": None,
+            "soft_skills": [],
+        }
+
+        supplemented = supplement_semantic_cv(semantic_cv, parsed_cv)
+        result = match_documents(supplemented, jd)
+
+        self.assertIn("Python", supplemented["skills"])
+        self.assertEqual(supplemented["education"], "Master")
+        self.assertEqual(result["breakdown"]["skills"]["matched"], ["Python"])
+        self.assertEqual(result["breakdown"]["skills"]["score"], 50.0)
 
 
 class GeminiAnalyzerTests(unittest.TestCase):

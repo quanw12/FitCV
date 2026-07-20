@@ -42,17 +42,13 @@ Từ thư mục root:
 ```bash
 npm install
 ```
-
 Tạo hoặc cập nhật `.env.local`:
-
-```bash
-cp .env.example .env.local
-```
 
 ```env
 VITE_API_BASE_URL=http://127.0.0.1:8000
 VITE_GOOGLE_CLIENT_ID=<google-oauth-client-id>
 ```
+Use local backend while testing on your machine. If `.env.local` points to Render, requests will go to Render and the local backend terminal will not show auth logs.
 
 Frontend production currently falls back to this backend URL if `VITE_API_BASE_URL` is not set:
 
@@ -61,6 +57,13 @@ https://fitcv-0cab.onrender.com
 ```
 
 Still set `VITE_API_BASE_URL` explicitly in Vercel so future backend URL changes do not require code changes.
+
+Vercel environment:
+
+```env
+VITE_API_BASE_URL=https://fitcv-0cab.onrender.com
+VITE_GOOGLE_CLIENT_ID=<google-oauth-client-id>
+```
 
 Chạy frontend:
 
@@ -94,19 +97,18 @@ pip install -r requirements.txt
 
 Tạo hoặc cập nhật `backend/.env`:
 
-```bash
-cp .env.example .env
-```
-
 ```env
 DATABASE_URL=mysql+pymysql://<db_user>:<url_encoded_password>@<db_host>:3306/fitcv
 JWT_SECRET_KEY=<local-secret>
 GOOGLE_CLIENT_ID=<google-oauth-client-id>
+CORS_ORIGINS=["http://localhost:5173","http://127.0.0.1:5173","https://fit-cv.vercel.app"]
 RESEND_API_KEY=
 RESEND_FROM_EMAIL=
+AVATAR_STORAGE=local
+BACKEND_PUBLIC_URL=http://127.0.0.1:8000
 ANALYZER_PROVIDER=deterministic
 GEMINI_API_KEY=<google-ai-studio-api-key>
-GEMINI_MODEL=gemini-3.5-flash
+GEMINI_MODEL=gemini-3.1-flash-lite
 ```
 
 Chạy backend:
@@ -126,6 +128,39 @@ Health check:
 ```text
 http://127.0.0.1:8000/api/health
 ```
+
+## Deploy Backend Render
+
+Khi deploy backend lên Render, vào Render service > Environment và thêm các biến:
+
+```env
+DATABASE_URL=mysql+pymysql://<db_user>:<url_encoded_password>@<db_host>:3306/fitcv
+JWT_SECRET_KEY=<strong-secret>
+GOOGLE_CLIENT_ID=<google-oauth-client-id>
+CORS_ORIGINS=["http://localhost:5173","http://127.0.0.1:5173","https://fit-cv.vercel.app"]
+RESEND_API_KEY=
+RESEND_FROM_EMAIL=
+```
+
+Nếu frontend Vercel đổi domain, thêm domain mới vào `CORS_ORIGINS`, ví dụ:
+
+```env
+CORS_ORIGINS=["http://localhost:5173","http://127.0.0.1:5173","https://fit-cv.vercel.app","https://your-preview.vercel.app"]
+```
+
+Sau khi đổi env trên Render, phải redeploy backend.
+
+Render health check:
+
+```text
+https://fitcv-0cab.onrender.com/api/health
+```
+
+Nếu browser báo CORS khi register/login, kiểm tra:
+
+- Request origin trên DevTools là domain nào.
+- Domain đó có nằm trong `CORS_ORIGINS` của Render không.
+- Render đã redeploy sau khi sửa env chưa.
 
 ## Database
 
@@ -154,7 +189,7 @@ Feature luôn dùng backend và Gemini thật. Cấu hình trong `backend/.env`:
 
 ```env
 GEMINI_API_KEY=<google-ai-studio-api-key>
-GEMINI_MODEL=gemini-3.5-flash
+GEMINI_MODEL=gemini-3.1-flash-lite
 ```
 
 Lấy key miễn phí tại Google AI Studio: https://aistudio.google.com/app/apikey. Không đặt `GEMINI_API_KEY` trong frontend `.env.local`, không commit key lên Git.
@@ -162,6 +197,13 @@ Lấy key miễn phí tại Google AI Studio: https://aistudio.google.com/app/ap
 Luồng backend cần Analyzer hoàn thành trước và trả về `match_result_id` của một CV đã parse thành công cùng JD tương ứng. Sau đó frontend truyền ID này sang màn hình `AI Suggestions`; nút `Regenerate` sẽ gọi Gemini lại.
 
 Backend không tự `create_all()` schema. Nếu database thật thiếu cột, phải migrate bằng SQL trước khi chạy API.
+
+Với database hiện hữu đã chạy migration 002 một phần hoặc đang thiếu bảng `ai_task`, chạy
+`database/migrations/004_reconcile_improvement_runtime.sql` bằng MySQL 8 với đúng database đã được chọn.
+Migration 004 có thể chạy lại: nó kiểm tra `information_schema`, backfill dữ liệu suggestion cũ rồi mới
+siết constraint, và chỉ tạo lại index khi cấu trúc hiện tại chưa đúng. Nếu bảng `ai_task` đã tồn tại
+nhưng thiếu/sai cột runtime, migration sẽ dừng rõ ràng thay vì báo thành công giả; đối chiếu preflight
+trước khi sửa schema thủ công. Không cần chạy lại migration 002.
 
 Các cột auth quan trọng trong bảng `account`:
 
@@ -251,14 +293,14 @@ GET    /api/analyzer/matches/{match_result_id}
 - CV parsing và matching chạy bằng FastAPI background tasks. Frontend poll trạng thái `Pending`, `Processing`, `Success`, `Failed`.
 - MVP matcher dùng evidence có thể kiểm tra lại: Skills 45%, Experience 30%, Education 15%, Soft skills 10%. Nếu JD thiếu category, trọng số được phân bổ lại trên các category còn lại.
 - `ANALYZER_PROVIDER=deterministic` là mặc định và không gọi dịch vụ AI bên ngoài.
-- Để Gemini đọc text CV/JD và trích xuất keyword, đặt `ANALYZER_PROVIDER=gemini`, `GEMINI_API_KEY=<server-side-key>`, và `GEMINI_MODEL=gemini-3.5-flash` trong `backend/.env`, sau đó restart backend.
+- Để Gemini đọc text CV/JD và trích xuất keyword, đặt `ANALYZER_PROVIDER=gemini`, `GEMINI_API_KEY=<server-side-key>`, và `GEMINI_MODEL=gemini-3.1-flash-lite` trong `backend/.env`, sau đó restart backend.
 - Gemini chỉ làm bước semantic extraction; FitCV che các contact field phổ biến, yêu cầu quote bằng chứng có thật trong source, validate structured output bằng Pydantic, rồi mới tính score bằng trọng số cố định. PDF/DOCX binary không được gửi lên Gemini.
 - Không đặt `GEMINI_API_KEY` trong `.env.local`, biến `VITE_*`, frontend source, hoặc Git.
 - Pass probability là heuristic hỗ trợ quyết định, không phải dữ liệu tuyển dụng lịch sử và không tự động accept/reject ứng viên.
 - PDF dạng scan chưa có OCR; cần chuyển thành PDF có text hoặc DOCX trước khi upload.
 - Database hiện hữu cần chạy `database/migrations/003_add_cv_jd_analyzer.sql` trước khi bật API này.
 
-### Bật Gemini 3.5 Flash cho Analyzer
+### Bật Gemini 3.1 Flash-Lite cho Analyzer
 
 1. Mở [Google AI Studio](https://aistudio.google.com/app/apikey), đăng nhập và tạo Gemini API key.
 2. Mở `backend/.env` và đặt cấu hình sau. API key chỉ được lưu ở backend:
@@ -266,7 +308,7 @@ GET    /api/analyzer/matches/{match_result_id}
 ```env
 ANALYZER_PROVIDER=gemini
 GEMINI_API_KEY=<your-secret-key>
-GEMINI_MODEL=gemini-3.5-flash
+GEMINI_MODEL=gemini-3.1-flash-lite
 GEMINI_TIMEOUT_SECONDS=30
 GEMINI_MAX_RETRIES=2
 ```
@@ -283,9 +325,109 @@ VITE_API_BASE_URL=http://127.0.0.1:8000
 
 Pipeline thật là: FitCV lấy text từ PDF/DOCX ở backend → che email, phone, URL, contact fields và name header phổ biến → gọi Gemini GenerateContent với JSON Schema → Gemini trích xuất kỹ năng, kinh nghiệm, học vấn, soft skills và quote nguồn → FitCV validate đúng schema, loại evidence không xuất hiện trong source rồi tự tính điểm bằng trọng số cố định. File binary, API key và quyết định tuyển dụng không được gửi ra frontend.
 
-`gemini-3.5-flash` hỗ trợ structured output. Backend gửi API key bằng header `x-goog-api-key`, không đặt key trong URL, rồi vẫn validate kết quả bằng Pydantic trước khi chấm điểm. Output sai schema hoặc evidence không có trong source sẽ fail an toàn. Redaction là best-effort, không thay thế consent và privacy policy; khi test nên dùng CV giả hoặc đã ẩn danh.
+`gemini-3.1-flash-lite` hỗ trợ structured output và là model mặc định đã được smoke-test cho Analyzer cùng AI Improvement. Có thể override `GEMINI_MODEL=gemini-3.5-flash` nếu cần model mạnh hơn. Backend gửi API key bằng header `x-goog-api-key`, không đặt key trong URL, rồi vẫn validate kết quả bằng Pydantic trước khi chấm điểm. Output sai schema hoặc evidence không có trong source sẽ fail an toàn. Redaction là best-effort, không thay thế consent và privacy policy; khi test nên dùng CV giả hoặc đã ẩn danh.
 
 Analyzer luôn gọi backend thật; không còn nhánh fixture hoặc kết quả hard-code ở frontend.
+
+Lỗi thường gặp:
+
+- `400`: model/schema/request không hợp lệ; kiểm tra `GEMINI_MODEL` và log backend.
+- `401`/`403`: Gemini key sai, bị thu hồi, hoặc project chưa có quyền gọi API.
+- `429`: project đã chạm quota/rate limit; chờ retry hoặc kiểm tra quota trong Google AI Studio.
+- `503` kèm `GEMINI_API_KEY is required`: backend chưa đọc đúng `backend/.env`, hoặc chưa restart.
+- `Analyzer backend is not configured`: thêm `VITE_API_BASE_URL` vào `.env.local` rồi restart Vite.
+- Không commit hoặc gửi `GEMINI_API_KEY` vào chat, Git, frontend source, `.env.local`, hay bất kỳ biến `VITE_*` nào.
+
+Role hợp lệ theo database:
+
+```text
+Student
+HR
+HiringManager
+Admin
+```
+
+Frontend portal map:
+
+- `Student` -> Job Seeker portal
+- `HR`, `HiringManager`, `Admin` -> HR portal
+
+## Lệnh Kiểm Tra
+
+Frontend build:
+
+```bash
+npm run build
+```
+
+Format:
+
+```bash
+npm run format
+```
+
+Backend import check:
+
+```bash
+cd backend
+python -c "from app.main import app; print('BACKEND_IMPORT_OK')"
+```
+
+Backend tests:
+
+```bash
+cd backend
+pip install -r requirements-dev.txt
+python -m pytest tests -q
+```
+
+Railway + Gemini E2E (chỉ chạy sau khi rotate credential và áp dụng migration 004):
+
+```powershell
+cd backend
+$env:FITCV_RUN_RAILWAY_E2E="1"
+python -m pytest tests/test_live_analyzer_improvement.py -q -s
+Remove-Item Env:FITCV_RUN_RAILWAY_E2E
+```
+
+Test này tạo Student/CV/JD tổng hợp, chạy Analyzer → AI Improvement bằng cùng
+`match_result_id`, rồi xóa account, dữ liệu AI và file upload trong bước cleanup. Không bật
+biến này trong CI thường xuyên vì test sử dụng database và quota Gemini thật.
+
+TypeScript check:
+
+```bash
+npx tsc --noEmit
+```
+
+## OCR Cho PDF Scan
+
+Backend doc text truc tiep bang `pypdf` truoc. Neu PDF khong co text layer,
+backend tu dong gui PDF den Gemini Document OCR, sau do tiep tuc parse JSON va
+cham diem bang cung workflow Analyzer/CV Ranking.
+
+Them cac bien sau vao `backend/.env` khi test local va Render Environment khi deploy:
+
+```env
+GEMINI_API_KEY=<gemini-api-key>
+GEMINI_MODEL=gemini-3.5-flash
+OCR_PROVIDER=gemini
+OCR_MODEL=
+OCR_TIMEOUT_SECONDS=60
+OCR_MAX_OUTPUT_TOKENS=20000
+```
+
+- De trong `OCR_MODEL` de OCR dung chung `GEMINI_MODEL`.
+- Dat `OCR_PROVIDER=disabled` neu khong muon gui PDF scan den Gemini.
+- PDF native text khong goi OCR, do do nhanh hon va khong ton request Gemini.
+- PDF scan chua thong tin ca nhan se duoc gui den Gemini de nhan dang text.
+- Application bi fail co the chay lai bang nut `Retry OCR` trong Application Tracker.
+
+Frontend tests:
+
+```bash
+npm test
+```
 
 ## Application Tracker
 
@@ -336,40 +478,6 @@ Frontend portal map:
 - `Student` -> Job Seeker portal
 - `HR`, `HiringManager`, `Admin` -> HR portal
 
-## Lệnh Kiểm Tra
-
-Frontend build:
-
-```bash
-npm run build
-```
-
-Format:
-
-```bash
-npm run format
-```
-
-Backend import check:
-
-```bash
-cd backend
-python -c "from app.main import app; print('BACKEND_IMPORT_OK')"
-```
-
-Backend tests (cài `backend/requirements-dev.txt` trước):
-
-```bash
-cd backend
-python -m pytest -q
-```
-
-TypeScript check:
-
-```bash
-npx tsc --noEmit
-```
-
 ## Troubleshooting
 
 Google OAuth lỗi `invalid_request`:
@@ -378,6 +486,18 @@ Google OAuth lỗi `invalid_request`:
 - URL phải nằm trong Authorized JavaScript origins.
 - Dùng Chrome/Edge thật, không dùng browser nhúng trong IDE.
 - Với local, dùng `localhost` hoặc `127.0.0.1`.
+
+Backend trả lỗi `Google auth dependency is not installed.`:
+
+- Kiểm tra `backend/requirements.txt` có `google-auth>=2.29.0,<3.0.0`.
+- Commit và push `backend/requirements.txt`.
+- Trên Render, chạy Manual Deploy / Clear build cache and deploy để Render cài lại dependency.
+- Kiểm tra Render env có `GOOGLE_CLIENT_ID`.
+- Nếu vẫn lỗi, vào Render Shell và chạy:
+
+```bash
+python -c "import google.auth; print('GOOGLE_AUTH_INSTALLED')"
+```
 
 Reset code đúng nhưng verify lỗi:
 

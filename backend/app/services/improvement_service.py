@@ -33,12 +33,13 @@ def _owned_match_or_404(
     return match
 
 
-def _mark_stale_task_failed(db: Session, task: AiTask) -> None:
-    task.status = AiTaskStatus.failed
-    task.error_message = "Improvement generation was interrupted. Please generate again."
-    task.completed_at = _utcnow_naive()
-    db.add(task)
-    db.commit()
+def _mark_stale_task_failed(db: Session, task: AiTask) -> bool:
+    return improvements.mark_active_task_failed(
+        db,
+        task.ai_task_id,
+        error_message="Improvement generation was interrupted. Please generate again.",
+        completed_at=_utcnow_naive(),
+    )
 
 
 def _validate_generation_context(parsed_cv: dict | str | None, job_description: str) -> None:
@@ -57,6 +58,51 @@ def _safe_error_message(exc: Exception) -> str:
     if isinstance(exc, (ImprovementProviderError, ImprovementValidationError)):
         return str(exc)[:1000] or "Improvement generation failed."
     return "Improvement generation failed. Please try again."
+
+
+def _decode_json_container(value: object) -> object:
+    if not isinstance(value, str) or not value.lstrip().startswith(("{", "[")):
+        return value
+    try:
+        parsed = json.loads(value)
+    except (TypeError, ValueError):
+        return value
+    return parsed if isinstance(parsed, (dict, list)) else value
+
+
+def _match_context_payload(match: MatchResult) -> dict:
+    evidence = _decode_json_container(match.evidence_json)
+    evidence_fields = evidence if isinstance(evidence, dict) else {}
+    return {
+        "overall_score": float(match.overall_score),
+        "skill_score": float(match.skill_score) if match.skill_score is not None else None,
+        "experience_score": (
+            float(match.experience_score) if match.experience_score is not None else None
+        ),
+        "education_score": (
+            float(match.education_score) if match.education_score is not None else None
+        ),
+        "soft_skill_score": (
+            float(match.soft_skill_score) if match.soft_skill_score is not None else None
+        ),
+        "match_summary": match.match_summary,
+        "strengths": (
+            evidence_fields["strengths"]
+            if "strengths" in evidence_fields
+            else _decode_json_container(match.strengths)
+        ),
+        "weaknesses": (
+            evidence_fields["weaknesses"]
+            if "weaknesses" in evidence_fields
+            else _decode_json_container(match.weaknesses)
+        ),
+        "recommendation": (
+            evidence_fields["suggestions"]
+            if "suggestions" in evidence_fields
+            else _decode_json_container(match.recommendation)
+        ),
+        "evidence_json": evidence,
+    }
 
 
 def _is_report_stale(
@@ -78,13 +124,23 @@ def request_generation(
     match = _owned_match_or_404(db, match_result_id, account, for_update=True)
     if match.status != "Success" or match.overall_score is None:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="CV/JD analysis is not complete.")
+    if match.job_description_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Analysis is missing an immutable job-description snapshot. Run it again.",
+        )
     latest = improvements.get_latest_task(db, match_result_id)
     if latest and latest.status in {AiTaskStatus.pending, AiTaskStatus.processing}:
         started_at = latest.started_at or latest.created_at
         stale_after = _utcnow_naive() - timedelta(minutes=settings.improvement_task_stale_minutes)
         if started_at and started_at < stale_after:
-            _mark_stale_task_failed(db, latest)
-            latest = None
+            if _mark_stale_task_failed(db, latest):
+                # create_task commits this state transition and the replacement task
+                # together while the owned MatchResult row remains locked.
+                latest = None
+            else:
+                db.expire(latest)
+                db.refresh(latest)
 
     if latest and (
         latest.status in {AiTaskStatus.pending, AiTaskStatus.processing}
@@ -108,45 +164,47 @@ def run_generation_task(task_id: int) -> None:
     db = SessionLocal()
     task = None
     try:
-        task = db.get(AiTask, task_id)
+        task = improvements.claim_task(db, task_id, started_at=_utcnow_naive())
         if task is None:
             return
-        task.status = AiTaskStatus.processing
-        task.started_at = _utcnow_naive()
-        db.commit()
 
         match, parsed, job_description = improvements.get_generation_context(db, task.resource_id)
         provider = get_improvement_provider()
         parsed_cv = parsed.parsed_json if parsed and parsed.parsed_json else (parsed.parsed_text if parsed else None)
+        raw_cv_text = parsed.parsed_text if parsed else None
         _validate_generation_context(parsed_cv, job_description)
         report = provider.generate_improvement_report(
             parsed_cv=parsed_cv,
             job_description=job_description,
-            match_result={
-                "overall_score": float(match.overall_score),
-                "skill_score": float(match.skill_score) if match.skill_score is not None else None,
-                "experience_score": float(match.experience_score) if match.experience_score is not None else None,
-                "education_score": float(match.education_score) if match.education_score is not None else None,
-                "soft_skill_score": float(match.soft_skill_score) if match.soft_skill_score is not None else None,
-                "strengths": match.strengths,
-                "weaknesses": match.weaknesses,
-            },
+            match_result=_match_context_payload(match),
+            raw_cv_text=raw_cv_text,
         )
-        validate_report_grounding(report, parsed_cv, job_description)
+        validate_report_grounding(
+            report,
+            parsed_cv,
+            job_description,
+            raw_cv_text=raw_cv_text,
+        )
         rows = report_to_suggestions(task.resource_id, report)
         improvements.replace_suggestions(db, task.resource_id, rows)
-        task.status = AiTaskStatus.success
-        task.error_message = None
-        task.completed_at = _utcnow_naive()
-        db.commit()
+        improvements.complete_claimed_task(
+            db,
+            task.ai_task_id,
+            completed_at=_utcnow_naive(),
+        )
     except Exception as exc:
         db.rollback()
         if task is not None:
-            task.status = AiTaskStatus.failed
-            task.error_message = _safe_error_message(exc)
-            task.completed_at = _utcnow_naive()
-            db.add(task)
-            db.commit()
+            marked_failed = improvements.mark_active_task_failed(
+                db,
+                task.ai_task_id,
+                error_message=_safe_error_message(exc),
+                completed_at=_utcnow_naive(),
+            )
+            if marked_failed:
+                db.commit()
+            else:
+                db.rollback()
         if not isinstance(exc, (ImprovementProviderError, ImprovementValidationError)):
             logger.exception("Unexpected improvement generation failure for task %s", task_id)
     finally:
@@ -157,6 +215,11 @@ def get_report(db: Session, *, match_result_id: int, account: Account) -> Improv
     match = _owned_match_or_404(db, match_result_id, account)
     if match.status != "Success" or match.overall_score is None:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="CV/JD analysis is not complete.")
+    if match.job_description_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Analysis is missing an immutable job-description snapshot. Run it again.",
+        )
     task = improvements.get_latest_task(db, match_result_id)
     if task is None:
         return ImprovementReportResponse(
