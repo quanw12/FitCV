@@ -287,6 +287,32 @@ Pipeline thật là: FitCV lấy text từ PDF/DOCX ở backend → che email, p
 
 Analyzer luôn gọi backend thật; không còn nhánh fixture hoặc kết quả hard-code ở frontend.
 
+## Application Tracker
+
+Application Tracker dùng backend thật và chỉ cho tài khoản có role `Student`. Mỗi tài khoản chỉ có thể đọc hoặc thay đổi application, note và status history thuộc chính mình.
+
+API chính:
+
+```text
+POST   /api/applications
+GET    /api/applications
+GET    /api/applications/stats
+GET    /api/applications/{application_id}
+PATCH  /api/applications/{application_id}
+DELETE /api/applications/{application_id}
+POST   /api/applications/{application_id}/notes
+PATCH  /api/applications/{application_id}/notes/{note_id}
+DELETE /api/applications/{application_id}/notes/{note_id}
+```
+
+Trạng thái hợp lệ là `Applied`, `Screening`, `Interview`, `Offer`, `Rejected`. Mỗi lần đổi trạng thái được lưu vào history. Reminder được xem là đến hạn khi ngày người dùng đặt đã qua; nếu không đặt ngày riêng, application ở `Applied`, `Screening`, hoặc `Interview` sẽ được cảnh báo sau 30 ngày không có cập nhật. `Offer` và `Rejected` không tạo cảnh báo stale.
+
+Database hiện hữu phải chạy migration sau trước khi dùng feature:
+
+```text
+database/migrations/004_add_application_tracker.sql
+```
+
 Lỗi thường gặp:
 
 - `400`: model/schema/request không hợp lệ; kiểm tra `GEMINI_MODEL` và log backend.
@@ -331,11 +357,11 @@ cd backend
 python -c "from app.main import app; print('BACKEND_IMPORT_OK')"
 ```
 
-Backend analyzer tests:
+Backend tests (cài `backend/requirements-dev.txt` trước):
 
 ```bash
 cd backend
-python -m unittest discover -s tests -v
+python -m pytest -q
 ```
 
 TypeScript check:
