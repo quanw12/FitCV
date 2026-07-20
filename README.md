@@ -42,14 +42,12 @@ Từ thư mục root:
 ```bash
 npm install
 ```
-
 Tạo hoặc cập nhật `.env.local`:
 
 ```env
 VITE_API_BASE_URL=http://127.0.0.1:8000
 VITE_GOOGLE_CLIENT_ID=<google-oauth-client-id>
 ```
-
 Use local backend while testing on your machine. If `.env.local` points to Render, requests will go to Render and the local backend terminal will not show auth logs.
 
 Frontend production currently falls back to this backend URL if `VITE_API_BASE_URL` is not set:
@@ -106,14 +104,11 @@ GOOGLE_CLIENT_ID=<google-oauth-client-id>
 CORS_ORIGINS=["http://localhost:5173","http://127.0.0.1:5173","https://fit-cv.vercel.app"]
 RESEND_API_KEY=
 RESEND_FROM_EMAIL=
-<<<<<<< HEAD
-=======
 AVATAR_STORAGE=local
 BACKEND_PUBLIC_URL=http://127.0.0.1:8000
 ANALYZER_PROVIDER=deterministic
 GEMINI_API_KEY=<google-ai-studio-api-key>
 GEMINI_MODEL=gemini-3.1-flash-lite
->>>>>>> d68daf017d6fa570074fb77c4014cb910ba78b50
 ```
 
 Chạy backend:
@@ -181,8 +176,6 @@ Nếu tạo database mới:
 2. Chạy toàn bộ `database/full_schema.sql` bằng MySQL user có quyền tạo bảng/index.
 3. Backend runtime user cần quyền `SELECT`, `INSERT`, `UPDATE`, `DELETE`.
 
-<<<<<<< HEAD
-=======
 ## AI Improvement Suggestions
 
 Feature này dùng backend thật tại:
@@ -203,7 +196,6 @@ Lấy key miễn phí tại Google AI Studio: https://aistudio.google.com/app/ap
 
 Luồng backend cần Analyzer hoàn thành trước và trả về `match_result_id` của một CV đã parse thành công cùng JD tương ứng. Sau đó frontend truyền ID này sang màn hình `AI Suggestions`; nút `Regenerate` sẽ gọi Gemini lại.
 
->>>>>>> d68daf017d6fa570074fb77c4014cb910ba78b50
 Backend không tự `create_all()` schema. Nếu database thật thiếu cột, phải migrate bằng SQL trước khi chạy API.
 
 Với database hiện hữu đã chạy migration 002 một phần hoặc đang thiếu bảng `ai_task`, chạy
@@ -286,8 +278,6 @@ POST /api/auth/verify-reset-code
 POST /api/auth/reset-password
 ```
 
-<<<<<<< HEAD
-=======
 ## CV & JD Match Analyzer API
 
 ```text
@@ -348,7 +338,6 @@ Lỗi thường gặp:
 - `Analyzer backend is not configured`: thêm `VITE_API_BASE_URL` vào `.env.local` rồi restart Vite.
 - Không commit hoặc gửi `GEMINI_API_KEY` vào chat, Git, frontend source, `.env.local`, hay bất kỳ biến `VITE_*` nào.
 
->>>>>>> d68daf017d6fa570074fb77c4014cb910ba78b50
 Role hợp lệ theo database:
 
 ```text
@@ -384,8 +373,6 @@ cd backend
 python -c "from app.main import app; print('BACKEND_IMPORT_OK')"
 ```
 
-<<<<<<< HEAD
-=======
 Backend tests:
 
 ```bash
@@ -407,14 +394,12 @@ Test này tạo Student/CV/JD tổng hợp, chạy Analyzer → AI Improvement b
 `match_result_id`, rồi xóa account, dữ liệu AI và file upload trong bước cleanup. Không bật
 biến này trong CI thường xuyên vì test sử dụng database và quota Gemini thật.
 
->>>>>>> d68daf017d6fa570074fb77c4014cb910ba78b50
 TypeScript check:
 
 ```bash
 npx tsc --noEmit
 ```
 
-<<<<<<< HEAD
 ## OCR Cho PDF Scan
 
 Backend doc text truc tiep bang `pypdf` truoc. Neu PDF khong co text layer,
@@ -438,14 +423,61 @@ OCR_MAX_OUTPUT_TOKENS=20000
 - PDF scan chua thong tin ca nhan se duoc gui den Gemini de nhan dang text.
 - Application bi fail co the chay lai bang nut `Retry OCR` trong Application Tracker.
 
-=======
 Frontend tests:
 
 ```bash
 npm test
 ```
 
->>>>>>> d68daf017d6fa570074fb77c4014cb910ba78b50
+## Application Tracker
+
+Application Tracker dùng backend thật và chỉ cho tài khoản có role `Student`. Mỗi tài khoản chỉ có thể đọc hoặc thay đổi application, note và status history thuộc chính mình.
+
+API chính:
+
+```text
+POST   /api/applications
+GET    /api/applications
+GET    /api/applications/stats
+GET    /api/applications/{application_id}
+PATCH  /api/applications/{application_id}
+DELETE /api/applications/{application_id}
+POST   /api/applications/{application_id}/notes
+PATCH  /api/applications/{application_id}/notes/{note_id}
+DELETE /api/applications/{application_id}/notes/{note_id}
+```
+
+Trạng thái hợp lệ là `Applied`, `Screening`, `Interview`, `Offer`, `Rejected`. Mỗi lần đổi trạng thái được lưu vào history. Reminder được xem là đến hạn khi ngày người dùng đặt đã qua; nếu không đặt ngày riêng, application ở `Applied`, `Screening`, hoặc `Interview` sẽ được cảnh báo sau 30 ngày không có cập nhật. `Offer` và `Rejected` không tạo cảnh báo stale.
+
+Database hiện hữu phải chạy migration sau trước khi dùng feature:
+
+```text
+database/migrations/004_add_application_tracker.sql
+```
+
+Lỗi thường gặp:
+
+- `400`: model/schema/request không hợp lệ; kiểm tra `GEMINI_MODEL` và log backend.
+- `401`/`403`: Gemini key sai, bị thu hồi, hoặc project chưa có quyền gọi API.
+- `429`: project đã chạm quota/rate limit; chờ retry hoặc kiểm tra quota trong Google AI Studio.
+- `503` kèm `GEMINI_API_KEY is required`: backend chưa đọc đúng `backend/.env`, hoặc chưa restart.
+- `Analyzer backend is not configured`: thêm `VITE_API_BASE_URL` vào `.env.local` rồi restart Vite.
+- Không commit hoặc gửi `GEMINI_API_KEY` vào chat, Git, frontend source, `.env.local`, hay bất kỳ biến `VITE_*` nào.
+
+Role hợp lệ theo database:
+
+```text
+Student
+HR
+HiringManager
+Admin
+```
+
+Frontend portal map:
+
+- `Student` -> Job Seeker portal
+- `HR`, `HiringManager`, `Admin` -> HR portal
+
 ## Troubleshooting
 
 Google OAuth lỗi `invalid_request`:

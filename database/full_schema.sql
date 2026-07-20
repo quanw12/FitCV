@@ -209,6 +209,52 @@ CREATE TABLE application (
         ON DELETE RESTRICT
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
 
+-- Student-owned applications tracked outside FitCV's recruiter pipeline.
+-- Kept separate from `application`, whose candidate/job/CV foreign keys model
+-- applications submitted to jobs managed inside FitCV.
+CREATE TABLE tracked_application (
+    tracked_application_id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+    account_id             BIGINT UNSIGNED NOT NULL,
+    company_name           VARCHAR(200) NOT NULL,
+    position_title         VARCHAR(200) NOT NULL,
+    applied_on             DATE NOT NULL,
+    source                 VARCHAR(50) NOT NULL,
+    status                 ENUM('Applied', 'Screening', 'Interview', 'Offer', 'Rejected') NOT NULL DEFAULT 'Applied',
+    job_url                VARCHAR(500) NULL,
+    reminder_at            DATETIME NULL,
+    last_activity_at       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_at             DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at             DATETIME NULL ON UPDATE CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_tracked_application_account
+        FOREIGN KEY (account_id) REFERENCES account(account_id)
+        ON DELETE CASCADE
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
+
+CREATE TABLE tracked_application_note (
+    note_id                BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+    tracked_application_id BIGINT UNSIGNED NOT NULL,
+    content                TEXT NOT NULL,
+    created_at             DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at             DATETIME NULL ON UPDATE CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_tracked_application_note_application
+        FOREIGN KEY (tracked_application_id) REFERENCES tracked_application(tracked_application_id)
+        ON DELETE CASCADE
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
+
+CREATE TABLE tracked_application_status_history (
+    status_history_id      BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+    tracked_application_id BIGINT UNSIGNED NOT NULL,
+    previous_status        ENUM('Applied', 'Screening', 'Interview', 'Offer', 'Rejected') NULL,
+    new_status             ENUM('Applied', 'Screening', 'Interview', 'Offer', 'Rejected') NOT NULL,
+    changed_at             DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_tracked_application_history_application
+        FOREIGN KEY (tracked_application_id) REFERENCES tracked_application(tracked_application_id)
+        ON DELETE CASCADE
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
+
 CREATE TABLE match_result (
     match_result_id   BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
     cv_id             BIGINT UNSIGNED NOT NULL,
@@ -322,6 +368,11 @@ CREATE INDEX idx_job_description_account_hash ON job_description(account_id, con
 CREATE INDEX idx_jd_parse_description ON jd_parse_result(job_description_id, jd_parse_id);
 CREATE INDEX idx_application_candidate_id ON application(candidate_id);
 CREATE INDEX idx_application_job_id ON application(job_id);
+CREATE INDEX idx_tracked_application_account_date ON tracked_application(account_id, applied_on);
+CREATE INDEX idx_tracked_application_account_status ON tracked_application(account_id, status);
+CREATE INDEX idx_tracked_application_reminder ON tracked_application(account_id, reminder_at);
+CREATE INDEX idx_tracked_application_note_application ON tracked_application_note(tracked_application_id, created_at);
+CREATE INDEX idx_tracked_application_history_application ON tracked_application_status_history(tracked_application_id, changed_at);
 CREATE INDEX idx_match_result_cv_job ON match_result(cv_id, job_id);
 CREATE INDEX idx_match_cv_generated ON match_result(cv_id, generated_at);
 CREATE INDEX idx_cv_improvement_suggestion_match_result_id ON cv_improvement_suggestion(match_result_id);
