@@ -236,6 +236,59 @@ class MatchingServiceTests(unittest.TestCase):
         self.assertEqual(result["breakdown"]["skills"]["score"], 100.0)
         self.assertEqual(result["breakdown"]["skills"]["matched"], ["REST API"])
 
+    def test_one_of_group_is_satisfied_by_one_matching_skill(self) -> None:
+        result = match_documents(
+            {
+                "skills": ["C++"],
+                "experience_years": None,
+                "education": None,
+                "soft_skills": [],
+            },
+            {
+                "required_skills": [],
+                "preferred_skills": [],
+                "required_skill_groups": [
+                    {
+                        "skills": ["C++", "Python", "C#", "Java"],
+                        "minimum_required": 1,
+                    }
+                ],
+                "experience_years": None,
+                "education": None,
+                "soft_skills": [],
+            },
+        )
+
+        skills = result["breakdown"]["skills"]
+        self.assertEqual(skills["score"], 100.0)
+        self.assertEqual(skills["matched"], ["C++"])
+        self.assertEqual(skills["missing"], [])
+        self.assertTrue(skills["groups"][0]["satisfied"])
+
+    def test_minimum_skill_group_reports_one_group_gap(self) -> None:
+        result = match_documents(
+            {"skills": ["Python"], "soft_skills": []},
+            {
+                "required_skills": [],
+                "preferred_skills": [],
+                "required_skill_groups": [
+                    {
+                        "skills": ["Python", "Java", "Go"],
+                        "minimum_required": 2,
+                    }
+                ],
+                "soft_skills": [],
+            },
+        )
+
+        skills = result["breakdown"]["skills"]
+        self.assertEqual(skills["score"], 50.0)
+        self.assertEqual(
+            skills["missing"],
+            ["At least 2 of: Go, Java, Python"],
+        )
+        self.assertFalse(skills["groups"][0]["satisfied"])
+
     def test_supplements_semantic_cv_with_locally_parsed_terms(self) -> None:
         semantic_cv = {
             "skills": ["TensorFlow"],
@@ -359,6 +412,10 @@ Bachelor student using Splunk, Wireshark, and Python. Communication.""",
         self.assertIn(
             "cv", request_body["generationConfig"]["responseJsonSchema"]["properties"]
         )
+        jd_schema = request_body["generationConfig"]["responseJsonSchema"][
+            "properties"
+        ]["jd"]
+        self.assertIn("required_skill_groups", jd_schema["properties"])
         submitted = json.loads(request_body["contents"][0]["parts"][0]["text"])[
             "cv_text"
         ]
@@ -368,6 +425,62 @@ Bachelor student using Splunk, Wireshark, and Python. Communication.""",
         self.assertEqual(cv["skills"], ["Python", "splunk", "Wireshark"])
         self.assertEqual(jd["required_skills"], ["Python", "splunk", "Wireshark"])
         self.assertEqual(match_documents(cv, jd)["match_label"], "Strong Match")
+
+    def test_extracts_and_scores_one_of_requirement_group(self) -> None:
+        jd_quote = "Know at least one of C++, Python, C#, or Java."
+        output = {
+            "cv": {
+                "skills": [{"name": "C++", "evidence": "C++ development"}],
+                "experience_years": None,
+                "experience_evidence": None,
+                "education": None,
+                "education_evidence": None,
+                "soft_skills": [],
+            },
+            "jd": {
+                "required_skills": [],
+                "preferred_skills": [],
+                "required_skill_groups": [
+                    {
+                        "skills": [
+                            {"name": skill, "evidence": jd_quote}
+                            for skill in ["C++", "Python", "C#", "Java"]
+                        ],
+                        "minimum_required": 1,
+                        "evidence": jd_quote,
+                    }
+                ],
+                "preferred_skill_groups": [],
+                "experience_years": None,
+                "experience_evidence": None,
+                "education": None,
+                "education_evidence": None,
+                "soft_skills": [],
+            },
+        }
+        response = MagicMock(status_code=200)
+        response.json.return_value = {
+            "candidates": [
+                {
+                    "content": {"parts": [{"text": json.dumps(output)}]},
+                    "finishReason": "STOP",
+                }
+            ]
+        }
+
+        with patch(
+            "app.services.gemini_analyzer.requests.post", return_value=response
+        ):
+            cv, jd = extract_match_inputs(
+                cv_text="Projects include C++ development and algorithms.",
+                job_description=jd_quote,
+            )
+
+        self.assertEqual(jd["required_skills"], [])
+        self.assertEqual(jd["required_skill_groups"][0]["minimum_required"], 1)
+        result = match_documents(cv, jd)
+        self.assertEqual(result["breakdown"]["skills"]["score"], 100.0)
+        self.assertEqual(result["breakdown"]["skills"]["missing"], [])
 
     def test_retries_rate_limit_once(self) -> None:
         output = {
@@ -424,7 +537,7 @@ Bachelor student using Splunk, Wireshark, and Python. Communication.""",
         algorithm_version, model_name = _selected_analyzer_config()
         self.assertTrue(algorithm_version.startswith("fitcv-gemini-"))
         self.assertLessEqual(len(algorithm_version), 50)
-        self.assertTrue(algorithm_version.endswith("-v1"))
+        self.assertTrue(algorithm_version.endswith("-v2"))
         self.assertEqual(model_name, "gemini-3.1-flash-lite")
 
 

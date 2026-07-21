@@ -6,13 +6,13 @@ from urllib.parse import quote
 
 import requests
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
 from app.core.config import settings
 
 MAX_SOURCE_CHARS = 100_000
 GEMINI_API_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models"
-GEMINI_EXTRACTOR_VERSION = "v1"
+GEMINI_EXTRACTOR_VERSION = "v2"
 
 EMAIL_PATTERN = re.compile(r"\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b", re.IGNORECASE)
 URL_PATTERN = re.compile(
@@ -62,11 +62,31 @@ class _CvExtraction(BaseModel):
     soft_skills: list[_EvidenceTerm] = Field(max_length=50)
 
 
+class _SkillRequirementGroup(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    skills: list[_EvidenceTerm] = Field(min_length=2, max_length=50)
+    minimum_required: int = Field(ge=1, le=50)
+    evidence: str = Field(min_length=1, max_length=500)
+
+    @model_validator(mode="after")
+    def validate_minimum(self):
+        if self.minimum_required > len(self.skills):
+            raise ValueError("minimum_required cannot exceed the number of skills")
+        return self
+
+
 class _JdExtraction(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     required_skills: list[_EvidenceTerm] = Field(max_length=100)
     preferred_skills: list[_EvidenceTerm] = Field(max_length=100)
+    required_skill_groups: list[_SkillRequirementGroup] = Field(
+        default_factory=list, max_length=50
+    )
+    preferred_skill_groups: list[_SkillRequirementGroup] = Field(
+        default_factory=list, max_length=50
+    )
     experience_years: float | None = Field(ge=0, le=50)
     experience_evidence: str | None = Field(max_length=300)
     education: Literal["High School", "Associate", "Bachelor", "Master", "Doctorate"] | None
@@ -88,6 +108,21 @@ _EVIDENCE_TERM_SCHEMA = {
         "evidence": {"type": "string"},
     },
     "required": ["name", "evidence"],
+}
+
+_SKILL_REQUIREMENT_GROUP_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "skills": {
+            "type": "array",
+            "items": _EVIDENCE_TERM_SCHEMA,
+            "minItems": 2,
+            "maxItems": 50,
+        },
+        "minimum_required": {"type": "integer", "minimum": 1, "maximum": 50},
+        "evidence": {"type": "string"},
+    },
+    "required": ["skills", "minimum_required", "evidence"],
 }
 
 _NULLABLE_NUMBER_SCHEMA = {"anyOf": [{"type": "number"}, {"type": "null"}]}
@@ -129,6 +164,14 @@ ANALYZER_RESPONSE_JSON_SCHEMA = {
             "properties": {
                 "required_skills": {"type": "array", "items": _EVIDENCE_TERM_SCHEMA},
                 "preferred_skills": {"type": "array", "items": _EVIDENCE_TERM_SCHEMA},
+                "required_skill_groups": {
+                    "type": "array",
+                    "items": _SKILL_REQUIREMENT_GROUP_SCHEMA,
+                },
+                "preferred_skill_groups": {
+                    "type": "array",
+                    "items": _SKILL_REQUIREMENT_GROUP_SCHEMA,
+                },
                 "experience_years": _NULLABLE_NUMBER_SCHEMA,
                 "experience_evidence": _NULLABLE_STRING_SCHEMA,
                 "education": _NULLABLE_EDUCATION_SCHEMA,
@@ -138,6 +181,8 @@ ANALYZER_RESPONSE_JSON_SCHEMA = {
             "required": [
                 "required_skills",
                 "preferred_skills",
+                "required_skill_groups",
+                "preferred_skill_groups",
                 "experience_years",
                 "experience_evidence",
                 "education",
@@ -158,9 +203,17 @@ employment eligibility, or facts not present in the documents. Do not use names 
 Use concise canonical skill names and use exactly the same spelling when the same skill appears in both
 documents. Every extracted term must include a short, exact quote from its own source document in
 evidence. experience_evidence and education_evidence must likewise be exact source quotes, or null when
-their value is null. Put mandatory JD skills in required_skills and clearly optional, preferred, bonus,
-or nice-to-have skills in preferred_skills. Education must use the supplied enum. Use null when years or
-education are not stated. Soft skills must be explicitly evidenced in the CV or requested by the JD.
+their value is null. Put standalone mandatory JD skills in required_skills and standalone optional,
+preferred, bonus, or nice-to-have skills in preferred_skills.
+
+Preserve explicit choice semantics. Put a mandatory phrase such as "one of A, B, or C" or "at least two
+of A, B, and C" in required_skill_groups, set minimum_required to the stated number, and copy one exact
+JD quote that proves the relationship into group evidence. Use preferred_skill_groups for optional choice
+groups. Do not duplicate grouped skills in required_skills or preferred_skills. Do not create a group for
+an ordinary list where every skill is independently required.
+
+Education must use the supplied enum. Use null when years or education are not stated. Soft skills must
+be explicitly evidenced in the CV or requested by the JD.
 Return only the structured extraction; do not make a hiring decision or invent a match score."""
 
 def extract_match_inputs(
@@ -344,13 +397,29 @@ def _normalize_extraction(
             extracted.cv.soft_skills, cv_source, soft_skill_names
         ),
     }
+    required_groups = _grounded_groups(
+        extracted.jd.required_skill_groups, jd_source, skill_names
+    )
+    preferred_groups = _grounded_groups(
+        extracted.jd.preferred_skill_groups, jd_source, skill_names
+    )
+    all_groups = [*required_groups, *preferred_groups]
+    required_skills = _without_grouped_terms(
+        _grounded_terms(extracted.jd.required_skills, jd_source, skill_names),
+        required_groups,
+    )
+    preferred_skills = _without_grouped_terms(
+        _grounded_terms(extracted.jd.preferred_skills, jd_source, skill_names),
+        all_groups,
+    )
+    required_keys = {value.casefold() for value in required_skills}
     jd = {
-        "required_skills": _grounded_terms(
-            extracted.jd.required_skills, jd_source, skill_names
-        ),
-        "preferred_skills": _grounded_terms(
-            extracted.jd.preferred_skills, jd_source, skill_names
-        ),
+        "required_skills": required_skills,
+        "preferred_skills": [
+            value for value in preferred_skills if value.casefold() not in required_keys
+        ],
+        "required_skill_groups": required_groups,
+        "preferred_skill_groups": preferred_groups,
         "experience_years": _grounded_value(
             extracted.jd.experience_years,
             extracted.jd.experience_evidence,
@@ -375,6 +444,36 @@ def _grounded_terms(
         item.name for item in values if _evidence_in_source(item.evidence, source)
     ]
     return _canonical_terms(grounded, names)
+
+
+def _grounded_groups(
+    values: list[_SkillRequirementGroup], source: str, names: dict[str, str]
+) -> list[dict]:
+    groups: list[dict] = []
+    for group in values:
+        if not _evidence_in_source(group.evidence, source):
+            continue
+        skills = _grounded_terms(group.skills, source, names)
+        if len(skills) < 2 or group.minimum_required > len(skills):
+            continue
+        groups.append(
+            {
+                "skills": skills,
+                "minimum_required": group.minimum_required,
+                "evidence": group.evidence.strip(),
+            }
+        )
+    return groups
+
+
+def _without_grouped_terms(values: list[str], groups: list[dict]) -> list[str]:
+    grouped = {
+        skill.casefold()
+        for group in groups
+        for skill in group.get("skills", [])
+        if isinstance(skill, str)
+    }
+    return [value for value in values if value.casefold() not in grouped]
 
 
 def _grounded_value(value, evidence: str | None, source: str):
