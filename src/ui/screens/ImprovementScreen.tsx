@@ -75,7 +75,10 @@ export default function ImprovementScreen({ matchResultId = null }: ImprovementS
         )
       }
       if (['Pending', 'Processing'].includes(current.status)) throw new Error('Analysis is taking longer than expected. Please retry shortly.')
-      if (current.status === 'Failed') throw new Error(current.errorMessage ?? 'AI suggestions could not be generated.')
+      if (current.status === 'Failed') {
+        if (isCurrentRequest()) setResponse(current)
+        throw new Error(current.errorMessage ?? 'AI suggestions could not be generated.')
+      }
       if (isCurrentRequest()) setResponse(current)
     } catch (caught) {
       if (isAbortError(caught) || !isCurrentRequest()) return
@@ -124,7 +127,7 @@ export default function ImprovementScreen({ matchResultId = null }: ImprovementS
     window.setTimeout(() => setCopyMessage(previous => ({ ...previous, [id]: '' })), 1800)
   }
 
-  const isProcessing = Boolean(matchResultId) && (
+  const isProcessing = !error && Boolean(matchResultId) && (
     loading || response?.status === 'Pending' || response?.status === 'Processing'
   )
 
