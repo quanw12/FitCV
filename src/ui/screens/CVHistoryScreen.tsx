@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react"
+
 import {
   AlertCircle,
+  BarChart3,
   Check,
   FileText,
   GitCompare,
@@ -8,26 +10,54 @@ import {
   Trash2,
   Upload,
 } from "lucide-react"
+import {
+  CartesianGrid,
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts"
 
 import { analyzerApi } from "@/api/analyzerApi"
-import type { CvVersion } from "@/types/analyzer"
+import type { CvComparisonSeries, CvVersion } from "@/types/analyzer"
 
 const MAX_CV_BYTES = 10 * 1024 * 1024
 
 export default function CVHistoryScreen() {
   const fileInputRef = useRef<HTMLInputElement>(null)
+
   const [cvs, setCvs] = useState<CvVersion[]>([])
+  const [comparisons, setComparisons] = useState<CvComparisonSeries[]>([])
+  const [selectedJdId, setSelectedJdId] = useState<number | null>(null)
   const [selected, setSelected] = useState<number[]>([])
+
   const [loading, setLoading] = useState(true)
+
   const [uploading, setUploading] = useState(false)
+
   const [deletingId, setDeletingId] = useState<number | null>(null)
+
   const [error, setError] = useState<string | null>(null)
 
   const loadCvs = useCallback(async () => {
     setLoading(true)
+
     setError(null)
     try {
-      setCvs(await analyzerApi.listCvs())
+      const [versions, scoreComparisons] = await Promise.all([
+        analyzerApi.listCvs(),
+        analyzerApi.listCvComparisons(),
+      ])
+      setCvs(versions)
+      setComparisons(scoreComparisons)
+      setSelectedJdId((current) =>
+        current != null &&
+        scoreComparisons.some((item) => item.jobDescriptionId === current)
+          ? current
+          : (scoreComparisons[0]?.jobDescriptionId ?? null),
+      )
     } catch (caught) {
       setError(
         caught instanceof Error ? caught.message : "Unable to load CV history.",
@@ -43,15 +73,22 @@ export default function CVHistoryScreen() {
 
   const uploadVersion = async (file?: File) => {
     if (!file) return
+
     const validationError = validateCv(file)
+
     if (validationError) {
       setError(validationError)
+
       return
     }
+
     setUploading(true)
+
     setError(null)
+
     try {
       await analyzerApi.uploadCv(file)
+
       await loadCvs()
     } catch (caught) {
       setError(
@@ -65,11 +102,16 @@ export default function CVHistoryScreen() {
   const deleteVersion = async (cv: CvVersion) => {
     if (!window.confirm(`Delete ${cv.fileName} and its saved match results?`))
       return
+
     setDeletingId(cv.cvId)
+
     setError(null)
+
     try {
       await analyzerApi.deleteCv(cv.cvId)
+
       setSelected((current) => current.filter((id) => id !== cv.cvId))
+
       await loadCvs()
     } catch (caught) {
       setError(
@@ -83,21 +125,32 @@ export default function CVHistoryScreen() {
   const toggleSelect = (cvId: number) => {
     setSelected((current) => {
       if (current.includes(cvId)) return current.filter((id) => id !== cvId)
+
       return current.length < 2 ? [...current, cvId] : current
     })
   }
 
   const compareItems = cvs.filter((cv) => selected.includes(cv.cvId))
+  const activeComparison =
+    comparisons.find((item) => item.jobDescriptionId === selectedJdId) ?? null
+  const scoreByCv = new Map(
+    activeComparison?.versions.map((point) => [point.cvId, point]) ?? [],
+  )
 
   return (
     <div>
       <div
         style={{
           display: "flex",
+
           alignItems: "flex-start",
+
           justifyContent: "space-between",
+
           gap: 16,
+
           marginBottom: 24,
+
           flexWrap: "wrap",
         }}
       >
@@ -105,15 +158,19 @@ export default function CVHistoryScreen() {
           <h1
             style={{
               fontSize: 22,
+
               fontWeight: 800,
+
               color: "var(--text-primary)",
+
               marginBottom: 4,
             }}
           >
             CV History
           </h1>
           <p style={{ color: "var(--text-secondary)", fontSize: 14 }}>
-            Review every uploaded CV version and its parser status.
+            Review every uploaded CV version and compare evidence-based scores
+            for the same JD.
           </p>
         </div>
         <div style={{ display: "flex", gap: 10 }}>
@@ -159,6 +216,122 @@ export default function CVHistoryScreen() {
         </div>
       )}
 
+      {comparisons.length > 0 && (
+        <div className="fitcv-card" style={{ padding: 24, marginBottom: 20 }}>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              gap: 16,
+              flexWrap: "wrap",
+            }}
+          >
+            <div>
+              <div className="fc-eyebrow">Score improvement</div>
+              <h2 style={{ fontSize: 17, marginTop: 4 }}>
+                Progress across CV versions
+              </h2>
+              <p
+                style={{
+                  color: "var(--text-secondary)",
+                  fontSize: 13,
+                  marginTop: 4,
+                }}
+              >
+                Scores are grouped by one immutable job description, so the
+                comparison stays fair.
+              </p>
+            </div>
+            <label style={{ minWidth: 240 }}>
+              <span className="fc-field-label">Comparison target</span>
+              <select
+                className="fc-input"
+                value={selectedJdId ?? ""}
+                onChange={(event) =>
+                  setSelectedJdId(Number(event.target.value))
+                }
+              >
+                {comparisons.map((item) => (
+                  <option
+                    key={item.jobDescriptionId}
+                    value={item.jobDescriptionId}
+                  >
+                    {item.title}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+          {activeComparison && (
+            <>
+              <div
+                style={{
+                  display: "flex",
+                  gap: 8,
+                  flexWrap: "wrap",
+                  marginTop: 16,
+                }}
+              >
+                <span className="fc-badge fc-badge--blue">
+                  Latest {activeComparison.latestScore.toFixed(1)}%
+                </span>
+                <span className="fc-badge fc-badge--green">
+                  Best {activeComparison.bestScore.toFixed(1)}%
+                </span>
+                <span className="fc-badge">
+                  {activeComparison.latestDelta == null
+                    ? "First scored version"
+                    : `${
+                        activeComparison.latestDelta >= 0 ? "+" : ""
+                      }${activeComparison.latestDelta.toFixed(1)} points from previous`}
+                </span>
+              </div>
+              <div
+                style={{ width: "100%", height: 260, marginTop: 18 }}
+                aria-label="CV score improvement chart"
+              >
+                <ResponsiveContainer>
+                  <LineChart
+                    data={activeComparison.versions}
+                    margin={{ top: 8, right: 18, left: -12, bottom: 4 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
+                    <XAxis
+                      dataKey="versionNumber"
+                      tickFormatter={(value) => `v${value}`}
+                    />
+                    <YAxis domain={[0, 100]} />
+                    <Tooltip
+                      formatter={(value) => [
+                        `${Number(value ?? 0).toFixed(1)}%`,
+                        "Match score",
+                      ]}
+                      labelFormatter={(value) => `CV version ${value}`}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="overallScore"
+                      stroke="#2563EB"
+                      strokeWidth={3}
+                      dot={{ r: 5, fill: "#2563EB" }}
+                      activeDot={{ r: 7 }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {!loading && cvs.length > 0 && comparisons.length === 0 && (
+        <div style={selectionHintStyle}>
+          <BarChart3 size={16} /> Analyze at least one CV against a JD to start
+          the score history. Analyze two versions against the same JD to see
+          improvement.
+        </div>
+      )}
+
       {loading ? (
         <div className="fitcv-card" style={emptyStyle}>
           Loading CV history…
@@ -173,23 +346,30 @@ export default function CVHistoryScreen() {
         <div
           style={{
             display: "grid",
+
             gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+
             gap: 14,
+
             marginBottom: 24,
           }}
         >
           {cvs.map((cv) => {
             const isSelected = selected.includes(cv.cvId)
+
             return (
               <article
                 key={cv.cvId}
                 className="fitcv-card"
                 style={{
                   padding: 20,
+
                   border: `2px solid ${
                     isSelected ? "#2563EB" : "var(--border)"
                   }`,
+
                   background: isSelected ? "#EFF6FF" : "white",
+
                   position: "relative",
                 }}
               >
@@ -208,10 +388,15 @@ export default function CVHistoryScreen() {
                   title={cv.fileName}
                   style={{
                     fontSize: 14,
+
                     fontWeight: 700,
+
                     color: "var(--text-primary)",
+
                     marginBottom: 6,
+
                     overflowWrap: "anywhere",
+
                     paddingRight: cv.isLatest ? 48 : 0,
                   }}
                 >
@@ -260,8 +445,11 @@ export default function CVHistoryScreen() {
           <h3
             style={{
               fontSize: 16,
+
               fontWeight: 700,
+
               color: "var(--text-primary)",
+
               marginBottom: 16,
             }}
           >
@@ -270,7 +458,9 @@ export default function CVHistoryScreen() {
           <div
             style={{
               display: "grid",
+
               gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+
               gap: 24,
             }}
           >
@@ -293,6 +483,30 @@ export default function CVHistoryScreen() {
                   label="Parser"
                   value={cv.parserVersion ?? "Pending"}
                 />
+                <ComparisonRow
+                  label="Match score"
+                  value={
+                    scoreByCv.get(cv.cvId)
+                      ? `${scoreByCv.get(cv.cvId)!.overallScore.toFixed(1)}%`
+                      : activeComparison
+                        ? "Not analyzed for this JD"
+                        : "Choose a comparison target"
+                  }
+                />
+                {scoreByCv.get(cv.cvId)?.matchLabel && (
+                  <ComparisonRow
+                    label="Meaning"
+                    value={scoreByCv.get(cv.cvId)!.matchLabel!}
+                  />
+                )}
+                {scoreByCv.get(cv.cvId)?.deltaFromPrevious != null && (
+                  <ComparisonRow
+                    label="Change"
+                    value={`${
+                      scoreByCv.get(cv.cvId)!.deltaFromPrevious! >= 0 ? "+" : ""
+                    }${scoreByCv.get(cv.cvId)!.deltaFromPrevious!.toFixed(1)} points`}
+                  />
+                )}
               </div>
             ))}
           </div>
@@ -305,20 +519,30 @@ export default function CVHistoryScreen() {
 function StatusBadge({ cv }: { cv: CvVersion }) {
   const config = {
     Success: { label: "Parsed", color: "#166534", background: "#DCFCE7" },
+
     Failed: { label: "Parse failed", color: "#B91C1C", background: "#FEE2E2" },
+
     Processing: { label: "Parsing", color: "#1D4ED8", background: "#DBEAFE" },
+
     Pending: { label: "Queued", color: "#92400E", background: "#FEF3C7" },
   }[cv.parseStatus]
+
   return (
     <span
       title={cv.errorMessage ?? undefined}
       style={{
         display: "inline-flex",
+
         color: config.color,
+
         background: config.background,
+
         borderRadius: 999,
+
         padding: "4px 9px",
+
         fontSize: 11,
+
         fontWeight: 700,
       }}
     >
@@ -329,6 +553,7 @@ function StatusBadge({ cv }: { cv: CvVersion }) {
 
 interface ComparisonRowProps {
   label: string
+
   value: string
 }
 
@@ -337,9 +562,13 @@ function ComparisonRow({ label, value }: ComparisonRowProps) {
     <div
       style={{
         display: "flex",
+
         justifyContent: "space-between",
+
         gap: 12,
+
         padding: "10px 0",
+
         borderBottom: "1px solid var(--border)",
       }}
     >
@@ -357,15 +586,20 @@ function ComparisonRow({ label, value }: ComparisonRowProps) {
 
 function validateCv(file: File): string | null {
   const lowerName = file.name.toLowerCase()
+
   if (!lowerName.endsWith(".pdf") && !lowerName.endsWith(".docx"))
     return "Only PDF and DOCX CV files are supported."
+
   if (file.size === 0) return "The selected CV is empty."
+
   if (file.size > MAX_CV_BYTES) return "CV files must be 10 MB or smaller."
+
   return null
 }
 
 function formatFileSize(kilobytes: number | null) {
   if (kilobytes == null) return "Unknown size"
+
   return kilobytes >= 1024
     ? `${(kilobytes / 1024).toFixed(1)} MB`
     : `${kilobytes} KB`
@@ -374,67 +608,115 @@ function formatFileSize(kilobytes: number | null) {
 function formatDate(value: string) {
   return new Intl.DateTimeFormat(undefined, {
     dateStyle: "medium",
+
     timeStyle: "short",
   }).format(new Date(value))
 }
 
 const alertStyle: React.CSSProperties = {
   display: "flex",
+
   alignItems: "center",
+
   gap: 8,
+
   color: "#B91C1C",
+
   background: "#FEF2F2",
+
   border: "1px solid #FECACA",
+
   borderRadius: 10,
+
   padding: "11px 14px",
+
   marginBottom: 16,
+
   fontSize: 13,
 }
+
 const selectionHintStyle: React.CSSProperties = {
   padding: "10px 16px",
+
   background: "#EFF6FF",
+
   borderRadius: 10,
+
   marginBottom: 14,
+
   fontSize: 13,
+
   color: "#1D4ED8",
+
   fontWeight: 600,
 }
+
 const emptyStyle: React.CSSProperties = {
   minHeight: 220,
+
   display: "flex",
+
   flexDirection: "column",
+
   alignItems: "center",
+
   justifyContent: "center",
+
   gap: 8,
+
   color: "var(--text-secondary)",
+
   textAlign: "center",
+
   padding: 24,
 }
+
 const fileIconStyle: React.CSSProperties = {
   width: 44,
+
   height: 44,
+
   borderRadius: 12,
+
   background: "#DBEAFE",
+
   color: "#2563EB",
+
   display: "flex",
+
   alignItems: "center",
+
   justifyContent: "center",
+
   marginBottom: 14,
 }
+
 const metadataStyle: React.CSSProperties = {
   color: "var(--text-muted)",
+
   fontSize: 12,
+
   lineHeight: 1.6,
 }
+
 const deleteButtonStyle: React.CSSProperties = {
   width: 38,
+
   height: 38,
+
   display: "inline-flex",
+
   alignItems: "center",
+
   justifyContent: "center",
+
   color: "#B91C1C",
+
   background: "#FEF2F2",
+
   border: "1px solid #FECACA",
+
   borderRadius: 8,
+
   cursor: "pointer",
 }
