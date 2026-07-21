@@ -56,7 +56,22 @@ _EMPLOYER_CLAIM_PATTERNS = (
         rf"\b(?:at|for|with)\s+)(?P<entity>{_NAMED_ENTITY})\b"
     ),
 )
-_GENERIC_ENTITY_PREFIXES = {"a", "an", "candidate", "cv", "jd", "the", "these", "this", "your"}
+_GENERIC_ENTITY_PREFIXES = {
+    "a",
+    "an",
+    "candidate",
+    "current",
+    "cv",
+    "jd",
+    "relevant",
+    "requested",
+    "some",
+    "the",
+    "these",
+    "this",
+    "verified",
+    "your",
+}
 _CASE_SENSITIVE_DOMAIN_TERMS = ("Agile", "React", "Scrum")
 _GO_TECH_CLAIM_PATTERN = re.compile(
     r"(?:\b(?:built|developed|implemented|using|with)\b[^.!?\n]{0,40}\bGo\b|"
@@ -66,6 +81,48 @@ _GO_TECH_CLAIM_PATTERN = re.compile(
 
 class ImprovementValidationError(RuntimeError):
     pass
+
+
+_REPORT_COLLECTIONS = (
+    "skill_gaps",
+    "section_feedback",
+    "rewrite_suggestions",
+    "quick_wins",
+)
+
+
+def filter_grounded_report(
+    report: ImprovementReportData,
+    parsed_cv: dict | str | None,
+    job_description: str,
+    *,
+    raw_cv_text: str | None = None,
+    require_any: bool = True,
+) -> ImprovementReportData:
+    """Keep safely grounded suggestions instead of rejecting an entire mixed report."""
+    grounded: dict[str, list] = {name: [] for name in _REPORT_COLLECTIONS}
+
+    for collection_name in _REPORT_COLLECTIONS:
+        for item in getattr(report, collection_name):
+            candidate = ImprovementReportData.model_validate(
+                {collection_name: [item]}
+            )
+            try:
+                validate_report_grounding(
+                    candidate,
+                    parsed_cv,
+                    job_description,
+                    raw_cv_text=raw_cv_text,
+                )
+            except ImprovementValidationError:
+                continue
+            grounded[collection_name].append(item)
+
+    if require_any and not any(grounded.values()):
+        raise ImprovementValidationError(
+            "Gemini did not return any safely grounded improvement advice."
+        )
+    return report.model_copy(update=grounded)
 
 
 def validate_report_grounding(

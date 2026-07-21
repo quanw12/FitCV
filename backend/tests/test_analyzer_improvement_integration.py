@@ -292,10 +292,13 @@ def test_analyzer_result_generates_and_persists_improvement_report(
     assert payload["match_result_id"] == match_id
     assert payload["status"] == "Success"
     assert payload["stale"] is False
-    assert len(payload["report"]["skill_gaps"]) == 1
-    assert len(payload["report"]["section_feedback"]) == 1
-    assert len(payload["report"]["rewrite_suggestions"]) == 1
-    assert len(payload["report"]["quick_wins"]) == 1
+    assert {item["skill"] for item in payload["report"]["skill_gaps"]} == {
+        "Kubernetes",
+        "REST API",
+    }
+    assert len(payload["report"]["section_feedback"]) >= 2
+    assert len(payload["report"]["rewrite_suggestions"]) >= 1
+    assert len(payload["report"]["quick_wins"]) >= 3
 
     duplicate = flow_harness.client.post(
         f"/api/match-results/{match_id}/improvement-report/generate"
@@ -321,7 +324,16 @@ def test_analyzer_result_generates_and_persists_improvement_report(
             )
         )
         assert task is not None and task.status == AiTaskStatus.success
-        assert suggestion_count == 4
+        report = payload["report"]
+        assert suggestion_count == sum(
+            len(report[collection])
+            for collection in (
+                "skill_gaps",
+                "section_feedback",
+                "rewrite_suggestions",
+                "quick_wins",
+            )
+        )
 
 
 def test_improvement_authorization_and_incomplete_match_errors(

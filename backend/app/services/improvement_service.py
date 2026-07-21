@@ -12,8 +12,12 @@ from app.models.improvement import AiTask, AiTaskStatus, MatchResult
 from app.repositories import improvements
 from app.schemas.improvement import GenerateImprovementResponse, ImprovementReportResponse
 from app.services.improvement_provider import ImprovementProviderError, get_improvement_provider
+from app.services.improvement_enricher import enrich_improvement_report
 from app.services.improvement_report_mapper import report_to_suggestions, suggestions_to_report
-from app.services.improvement_validator import ImprovementValidationError, validate_report_grounding
+from app.services.improvement_validator import (
+    ImprovementValidationError,
+    filter_grounded_report,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -173,13 +177,28 @@ def run_generation_task(task_id: int) -> None:
         parsed_cv = parsed.parsed_json if parsed and parsed.parsed_json else (parsed.parsed_text if parsed else None)
         raw_cv_text = parsed.parsed_text if parsed else None
         _validate_generation_context(parsed_cv, job_description)
+        match_context = _match_context_payload(match)
         report = provider.generate_improvement_report(
             parsed_cv=parsed_cv,
             job_description=job_description,
-            match_result=_match_context_payload(match),
+            match_result=match_context,
             raw_cv_text=raw_cv_text,
         )
-        validate_report_grounding(
+        report = filter_grounded_report(
+            report,
+            parsed_cv,
+            job_description,
+            raw_cv_text=raw_cv_text,
+            require_any=False,
+        )
+        report = enrich_improvement_report(
+            report,
+            parsed_cv=parsed_cv,
+            raw_cv_text=raw_cv_text,
+            job_description=job_description,
+            match_result=match_context,
+        )
+        report = filter_grounded_report(
             report,
             parsed_cv,
             job_description,

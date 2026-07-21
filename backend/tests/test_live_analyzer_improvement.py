@@ -164,6 +164,9 @@ def test_live_analyzer_to_improvement_flow_and_cleanup() -> None:
             ):
                 assert isinstance(report[section], list)
                 assert report[section], f"Live report returned an empty {section}."
+            assert len(report["section_feedback"]) >= 2
+            assert len(report["rewrite_suggestions"]) >= 1
+            assert len(report["quick_wins"]) >= 3
 
             reloaded = client.get(
                 f"/api/match-results/{match_id}/improvement-report",
