@@ -170,6 +170,16 @@ class OcrServiceTests(unittest.TestCase):
         inline = request.kwargs["json"]["contents"][0]["parts"][0]["inlineData"]
         self.assertEqual(inline["mimeType"], "application/pdf")
         self.assertEqual(base64.b64decode(inline["data"]), pdf_bytes)
+        self.assertEqual(
+            request.kwargs["json"]["generationConfig"]["thinkingConfig"],
+            {"thinkingLevel": "minimal"},
+        )
+
+    def test_reports_ocr_finish_reason(self) -> None:
+        with self.assertRaisesRegex(ocr_service.OcrError, "MAX_TOKENS"):
+            ocr_service._output_text(
+                {"candidates": [{"finishReason": "MAX_TOKENS", "content": {}}]}
+            )
 
     def test_requires_api_key_for_scanned_pdf_ocr(self) -> None:
         settings.gemini_api_key = None
@@ -416,6 +426,11 @@ Bachelor student using Splunk, Wireshark, and Python. Communication.""",
             "properties"
         ]["jd"]
         self.assertIn("required_skill_groups", jd_schema["properties"])
+        group_skills_schema = jd_schema["properties"]["required_skill_groups"][
+            "items"
+        ]["properties"]["skills"]
+        self.assertNotIn("minItems", group_skills_schema)
+        self.assertNotIn("maxItems", group_skills_schema)
         submitted = json.loads(request_body["contents"][0]["parts"][0]["text"])[
             "cv_text"
         ]

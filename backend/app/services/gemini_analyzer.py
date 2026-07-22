@@ -116,8 +116,6 @@ _SKILL_REQUIREMENT_GROUP_SCHEMA = {
         "skills": {
             "type": "array",
             "items": _EVIDENCE_TERM_SCHEMA,
-            "minItems": 2,
-            "maxItems": 50,
         },
         "minimum_required": {"type": "integer", "minimum": 1, "maximum": 50},
         "evidence": {"type": "string"},
