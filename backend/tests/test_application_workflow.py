@@ -52,6 +52,7 @@ def job(**overrides):
         "employment_type": "Full-time",
         "status": "Published",
         "deadline": datetime.now() + timedelta(days=2),
+        "archived_at": None,
     }
     values.update(overrides)
     return SimpleNamespace(**values)
@@ -111,6 +112,30 @@ class ApplicationValidationTests(unittest.IsolatedAsyncioTestCase):
                     phone="0900", file=upload, account=account,
                 )
         self.assertEqual(caught.exception.status_code, 409)
+        upload.read.assert_not_awaited()
+
+    async def test_rejects_archived_job_before_reading_file(self):
+        account = SimpleNamespace(account_id=4)
+        upload = SimpleNamespace(filename="resume.pdf", read=AsyncMock())
+        with (
+            patch.object(application_service.applications, "lock_account"),
+            patch.object(
+                application_service.applications,
+                "job_for_apply",
+                return_value=job(archived_at=datetime.now()),
+            ),
+        ):
+            with self.assertRaises(HTTPException) as caught:
+                await application_service.apply(
+                    MagicMock(),
+                    job_id=7,
+                    full_name="Student",
+                    email="s@example.com",
+                    phone="0900",
+                    file=upload,
+                    account=account,
+                )
+        self.assertEqual(caught.exception.status_code, 404)
         upload.read.assert_not_awaited()
 
 

@@ -53,8 +53,12 @@ async def apply_to_job(
 
 
 @router.get("/manage", response_model=list[JobResponse])
-def list_manage(db: Session = Depends(get_db), account: Account = Depends(manager)):
-    return jobs_service.list_managed(db, account)
+def list_manage(
+    archived: bool = False,
+    db: Session = Depends(get_db),
+    account: Account = Depends(manager),
+):
+    return jobs_service.list_managed(db, account, archived=archived)
 
 
 @router.post("", response_model=JobResponse, status_code=201)
@@ -75,4 +79,22 @@ def publish_job(job_id: int, db: Session = Depends(get_db), account: Account = D
 @router.post("/{job_id}/close", response_model=JobResponse)
 def close_job(job_id: int, db: Session = Depends(get_db), account: Account = Depends(manager)):
     return jobs_service.close(db, account, job_id)
+
+
+@router.post("/{job_id}/archive", response_model=JobResponse)
+def archive_job(
+    job_id: int,
+    db: Session = Depends(get_db),
+    account: Account = Depends(manager),
+):
+    return jobs_service.archive(db, account, job_id)
+
+
+@router.post("/{job_id}/unarchive", response_model=JobResponse)
+def unarchive_job(
+    job_id: int,
+    db: Session = Depends(get_db),
+    account: Account = Depends(manager),
+):
+    return jobs_service.unarchive(db, account, job_id)
 

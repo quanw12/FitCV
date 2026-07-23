@@ -98,6 +98,10 @@ async def apply(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Job not found."
         )
+    if job.archived_at is not None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Job not found."
+        )
     if job.status != "Published":
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,

@@ -197,6 +197,26 @@ chạy lại, nhưng vẫn phải backup database trước vì MySQL DDL tự co
 `005_rollback_job_archiving_and_scoring.sql` trước khi production bắt đầu lưu
 archive timestamp hoặc custom weights vì rollback sẽ xóa vĩnh viễn dữ liệu đó.
 
+### Job Post Management API
+
+Các endpoint quản lý yêu cầu role `HR`, `HiringManager` hoặc `Admin` và chỉ thao
+tác job thuộc company của tài khoản:
+
+```text
+GET   /api/jobs/manage?archived=false
+POST  /api/jobs
+PATCH /api/jobs/{job_id}
+POST  /api/jobs/{job_id}/publish
+POST  /api/jobs/{job_id}/close
+POST  /api/jobs/{job_id}/archive
+POST  /api/jobs/{job_id}/unarchive
+```
+
+Archive không thay đổi recruitment status. Job archived bị ẩn khỏi public list,
+public detail và không nhận application mới. Create/update có thể nhận
+`skill_weight`, `experience_weight`, `education_weight`, `soft_skill_weight`;
+tổng hiệu lực sau khi merge phải bằng 100.
+
 ## AI Improvement Suggestions
 
 Feature này dùng backend thật tại:

@@ -1,6 +1,17 @@
 from datetime import datetime
+from decimal import Decimal
 
 from pydantic import BaseModel, Field
+
+
+def scoring_weight(default: None = None):
+    return Field(
+        default=default,
+        ge=0,
+        le=100,
+        max_digits=5,
+        decimal_places=2,
+    )
 
 
 class JobWrite(BaseModel):
@@ -16,6 +27,10 @@ class JobWrite(BaseModel):
     employment_type: str | None = Field(default=None, max_length=50)
     deadline: datetime | None = None
     openings_count: int | None = Field(default=None, ge=1)
+    skill_weight: Decimal | None = scoring_weight()
+    experience_weight: Decimal | None = scoring_weight()
+    education_weight: Decimal | None = scoring_weight()
+    soft_skill_weight: Decimal | None = scoring_weight()
 
 
 class JobCreate(JobWrite):
@@ -46,6 +61,11 @@ class JobResponse(BaseModel):
     employment_type: str | None
     status: str
     deadline: datetime | None
+    archived_at: datetime | None
+    skill_weight: float
+    experience_weight: float
+    education_weight: float
+    soft_skill_weight: float
     openings_count: int
     application_count: int
     created_at: datetime

@@ -34,6 +34,11 @@ def make_job(**overrides):
         "employment_type": "Full-time",
         "deadline": datetime.now() + timedelta(days=1),
         "status": "Draft",
+        "archived_at": None,
+        "skill_weight": 45,
+        "experience_weight": 30,
+        "education_weight": 15,
+        "soft_skill_weight": 10,
     }
     values.update(overrides)
     return SimpleNamespace(**values)
@@ -104,12 +109,16 @@ class JobsServiceTests(unittest.TestCase):
             "requirements": "Python",
             "about_job": "virtual",
             "openings_count": 4,
+            "archived_at": datetime(2026, 7, 23),
+            "skill_weight": 40,
         })
 
         self.assertEqual(values, {
             "title": "Developer",
             "description": "encoded",
             "requirements": "Python",
+            "archived_at": datetime(2026, 7, 23),
+            "skill_weight": 40,
         })
 
     def test_publish_validation_uses_decoded_virtual_fields(self):
@@ -179,3 +188,45 @@ class JobsServiceTests(unittest.TestCase):
             jobs_service._clean({"title": "  Developer ", "openings_count": 2}),
             {"title": "Developer", "openings_count": 2},
         )
+
+    def test_update_rejects_weights_that_do_not_total_100(self):
+        job = make_job()
+
+        with patch.object(jobs_service, "_managed", return_value=job):
+            with self.assertRaises(HTTPException) as caught:
+                jobs_service.update(
+                    SimpleNamespace(),
+                    SimpleNamespace(company_id=4),
+                    10,
+                    JobUpdate(skill_weight=50),
+                )
+
+        self.assertEqual(caught.exception.status_code, 422)
+        self.assertEqual(
+            caught.exception.detail,
+            "Scoring weights must total 100.",
+        )
+
+    def test_archive_preserves_recruitment_status(self):
+        job = make_job(status="Published")
+        returned = SimpleNamespace(job_id=10, status="Published")
+
+        with (
+            patch.object(jobs_service, "_managed", return_value=job),
+            patch.object(jobs_service.jobs, "update_job") as update_job,
+            patch.object(
+                jobs_service,
+                "list_managed",
+                return_value=[returned],
+            ),
+        ):
+            result = jobs_service.archive(
+                SimpleNamespace(),
+                SimpleNamespace(company_id=4),
+                10,
+            )
+
+        persisted = update_job.call_args.args[2]
+        self.assertEqual(set(persisted), {"archived_at"})
+        self.assertIsInstance(persisted["archived_at"], datetime)
+        self.assertEqual(result.status, "Published")
