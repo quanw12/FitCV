@@ -256,7 +256,16 @@ def run_analysis(application_id: int) -> None:
             raise ValueError(
                 f"Unsupported analyzer version: {match.algorithm_version}"
             )
-        result = match_documents(score_cv, score_jd)
+        result = match_documents(
+            score_cv,
+            score_jd,
+            weights={
+                "skills": float(job.skill_weight),
+                "experience": float(job.experience_weight),
+                "education": float(job.education_weight),
+                "soft_skills": float(job.soft_skill_weight),
+            },
+        )
         result["matching_inputs"] = {"cv": score_cv, "jd": score_jd}
         if match.algorithm_version.startswith("fitcv-gemini-"):
             result["match_summary"] = (

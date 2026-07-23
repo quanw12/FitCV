@@ -204,6 +204,9 @@ tác job thuộc company của tài khoản:
 
 ```text
 GET   /api/jobs/manage?archived=false
+GET   /api/jobs/public
+GET   /api/jobs/public/{job_id}
+POST  /api/jobs/extract
 POST  /api/jobs
 PATCH /api/jobs/{job_id}
 POST  /api/jobs/{job_id}/publish
@@ -216,6 +219,49 @@ Archive không thay đổi recruitment status. Job archived bị ẩn khỏi pub
 public detail và không nhận application mới. Create/update có thể nhận
 `skill_weight`, `experience_weight`, `education_weight`, `soft_skill_weight`;
 tổng hiệu lực sau khi merge phải bằng 100.
+
+Hai public endpoint chỉ trả job `Published`, chưa archived và chưa quá deadline;
+không yêu cầu đăng nhập để share JD ra ngoài. `POST /api/jobs/extract` yêu cầu
+role quản lý, dùng Gemini server-side để đề xuất draft và không tự save/publish.
+Scoring application dùng bốn trọng số của đúng job, đồng thời chuẩn hóa lại trên
+những nhóm thực sự có yêu cầu trong JD.
+
+### Recruiter Pipeline And Candidate Email
+
+Database hiện hữu cần chạy tuần tự hai migration sau trước khi bật màn hình
+Pipeline và Auto Email:
+
+```text
+database/migrations/006_add_recruiter_pipeline.sql
+database/migrations/007_add_candidate_email_workflow.sql
+```
+
+Migration 006 thêm notes và lịch sử cho sáu stage backend hiện tại:
+`Applied`, `Screening`, `Interview`, `Offer`, `Hired`, `Rejected`. Migration 007
+lưu AI draft, bước HR approval, provider message ID, trạng thái `Failed` và thời
+điểm gửi. Cả hai migration có preflight/postflight, có thể chạy lại, và có file
+rollback tương ứng; rollback sẽ xóa vĩnh viễn dữ liệu workflow đã tạo.
+
+```text
+GET   /api/hr/pipeline
+PATCH /api/hr/pipeline/applications/{application_id}/stage
+GET   /api/hr/pipeline/applications/{application_id}/notes
+POST  /api/hr/pipeline/applications/{application_id}/notes
+GET   /api/hr/pipeline/applications/{application_id}/history
+
+GET   /api/hr/emails/templates
+GET   /api/hr/emails/drafts
+POST  /api/hr/emails/drafts/generate
+PATCH /api/hr/emails/drafts/{email_id}
+POST  /api/hr/emails/drafts/{email_id}/approve
+POST  /api/hr/emails/drafts/{email_id}/send
+POST  /api/hr/emails/bulk-send
+```
+
+Email ứng viên luôn theo luồng `Draft -> Approved -> Sent`. Backend từ chối gửi
+Draft chưa được HR duyệt. Khác password-reset fallback, candidate email không
+giả lập thành công khi thiếu Resend; record chuyển `Failed`, hiển thị lỗi và cho
+Retry sau khi cấu hình `RESEND_API_KEY` cùng `RESEND_FROM_EMAIL`.
 
 ## AI Improvement Suggestions
 

@@ -234,3 +234,12 @@ class JobsApiIntegrationTests(unittest.TestCase):
             f"/api/jobs/public/{job.job_id}",
         )
         self.assertEqual(visible_again.status_code, 200)
+
+    def test_public_job_does_not_require_authentication(self) -> None:
+        job = self.create_published_job()
+        app.dependency_overrides.pop(get_current_account, None)
+
+        response = self.client.get(f"/api/jobs/public/{job.job_id}")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["job_id"], job.job_id)

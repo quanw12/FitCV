@@ -1,4 +1,4 @@
-export type JobStatus = 'Draft' | 'Published' | 'Closed'
+export type JobStatus = "Draft" | "Published" | "Closed"
 
 export interface JobCompany {
   name: string
@@ -63,4 +63,20 @@ export interface JobApplicationCreated {
   cv_id: number
   match_result_id: number
   analysis_status: string
+}
+
+export interface JobExtraction {
+  title: string
+  about_job: string
+  responsibilities: string
+  requirements: string
+  we_offer: string
+  life_at_company: string
+  hiring_process: string
+  location: string
+  employment_type: string
+  required_skills: string[]
+  preferred_skills: string[]
+  experience_summary: string
+  warnings: string[]
 }

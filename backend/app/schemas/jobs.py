@@ -1,7 +1,7 @@
 from datetime import datetime
 from decimal import Decimal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 def scoring_weight(default: None = None):
@@ -71,4 +71,32 @@ class JobResponse(BaseModel):
     created_at: datetime
     updated_at: datetime | None
     company: CompanyPublic
+
+
+class JobExtractionRequest(BaseModel):
+    jd_text: str = Field(min_length=80, max_length=60_000)
+
+    @field_validator("jd_text")
+    @classmethod
+    def clean_jd_text(cls, value: str) -> str:
+        cleaned = value.strip()
+        if len(cleaned) < 80:
+            raise ValueError("Job description must contain at least 80 characters.")
+        return cleaned
+
+
+class JobExtractionResponse(BaseModel):
+    title: str = Field(max_length=200)
+    about_job: str = Field(max_length=10_000)
+    responsibilities: str = Field(max_length=10_000)
+    requirements: str = Field(max_length=10_000)
+    we_offer: str = Field(max_length=10_000)
+    life_at_company: str = Field(max_length=10_000)
+    hiring_process: str = Field(max_length=10_000)
+    location: str = Field(max_length=150)
+    employment_type: str = Field(max_length=50)
+    required_skills: list[str] = Field(max_length=50)
+    preferred_skills: list[str] = Field(max_length=50)
+    experience_summary: str = Field(max_length=1_000)
+    warnings: list[str] = Field(max_length=20)
 

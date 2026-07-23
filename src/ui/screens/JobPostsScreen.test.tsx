@@ -11,6 +11,7 @@ const jobsMocks = vi.hoisted(() => ({
   close: vi.fn(),
   archive: vi.fn(),
   unarchive: vi.fn(),
+  extract: vi.fn(),
 }))
 
 vi.mock("@/api/jobsApi", () => ({
@@ -60,6 +61,10 @@ const archivedJob: JobPost = {
 describe("JobPostsScreen", () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText: vi.fn().mockResolvedValue(undefined) },
+    })
     jobsMocks.listManaged.mockImplementation((archived = false) =>
       Promise.resolve(archived ? [archivedJob] : [activeJob]),
     )
@@ -80,6 +85,21 @@ describe("JobPostsScreen", () => {
     jobsMocks.unarchive.mockResolvedValue({
       ...archivedJob,
       archived_at: null,
+    })
+    jobsMocks.extract.mockResolvedValue({
+      title: "AI Platform Engineer",
+      about_job: "Build an AI recruitment platform.",
+      responsibilities: "Design reliable APIs.",
+      requirements: "Python, FastAPI, and three years of experience.",
+      we_offer: "Flexible working hours.",
+      life_at_company: "Collaborative product team.",
+      hiring_process: "Screening and technical interview.",
+      location: "Ho Chi Minh City",
+      employment_type: "Full-time",
+      required_skills: ["Python", "FastAPI"],
+      preferred_skills: [],
+      experience_summary: "Three years of backend experience.",
+      warnings: ["Salary was not specified."],
     })
   })
 
@@ -146,6 +166,33 @@ describe("JobPostsScreen", () => {
     ).toBeInTheDocument()
   })
 
+  it("extracts an AI draft and keeps it in review before saving", async () => {
+    render(<JobPostsScreen />)
+    await screen.findByText("Backend Engineer")
+    fireEvent.click(screen.getByRole("button", { name: "New job" }))
+
+    fireEvent.change(screen.getByLabelText("Full job description"), {
+      target: {
+        value:
+          "We need an experienced backend engineer to build reliable APIs with Python and FastAPI in Ho Chi Minh City.",
+      },
+    })
+    fireEvent.click(
+      screen.getByRole("button", { name: "Extract fields with AI" }),
+    )
+
+    expect(
+      await screen.findByDisplayValue("AI Platform Engineer"),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText(
+        "AI extracted a draft. Review every field before saving or publishing.",
+      ),
+    ).toBeInTheDocument()
+    expect(screen.getByText("Salary was not specified.")).toBeInTheDocument()
+    expect(jobsMocks.create).not.toHaveBeenCalled()
+  })
+
   it("publishes and closes a job without reloading the list", async () => {
     render(<JobPostsScreen />)
     await screen.findByText("Backend Engineer")
@@ -161,6 +208,26 @@ describe("JobPostsScreen", () => {
       await screen.findByRole("button", { name: "Reopen" }),
     ).toBeInTheDocument()
     expect(jobsMocks.close).toHaveBeenCalledWith(activeJob.job_id)
+  })
+
+  it("copies an anonymous public link for a published job", async () => {
+    jobsMocks.listManaged.mockImplementation((archived = false) =>
+      Promise.resolve(archived ? [] : [{ ...activeJob, status: "Published" }]),
+    )
+
+    render(<JobPostsScreen />)
+    await screen.findByText("Backend Engineer")
+
+    fireEvent.click(screen.getByRole("button", { name: "Copy public link" }))
+
+    await waitFor(() => {
+      expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
+        expect.stringMatching(/[?&]job=12$/),
+      )
+    })
+    expect(
+      await screen.findByText("Copied the public link for “Backend Engineer”."),
+    ).toBeInTheDocument()
   })
 
   it("loads a draft into the editor and saves its changes", async () => {

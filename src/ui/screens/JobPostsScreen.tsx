@@ -6,11 +6,13 @@ import {
   CalendarDays,
   CheckCircle2,
   Edit3,
+  Link2,
   MapPin,
   Plus,
   RefreshCw,
   RotateCcw,
   Save,
+  Sparkles,
   SlidersHorizontal,
   Users,
   XCircle,
@@ -125,6 +127,9 @@ export default function JobPostsScreen() {
   const [editorOpen, setEditorOpen] = useState(false)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [extracting, setExtracting] = useState(false)
+  const [rawJobDescription, setRawJobDescription] = useState("")
+  const [extractionWarnings, setExtractionWarnings] = useState<string[]>([])
   const [pendingAction, setPendingAction] = useState<{
     jobId: number
     action: JobAction
@@ -192,6 +197,8 @@ export default function JobPostsScreen() {
     setFormError("")
     setActionError("")
     setSuccess("")
+    setRawJobDescription("")
+    setExtractionWarnings([])
     setEditorOpen(true)
     scrollToEditor()
   }
@@ -218,6 +225,8 @@ export default function JobPostsScreen() {
     setFormError("")
     setActionError("")
     setSuccess("")
+    setRawJobDescription("")
+    setExtractionWarnings([])
     setEditorOpen(true)
     scrollToEditor()
   }
@@ -227,6 +236,46 @@ export default function JobPostsScreen() {
     setEditingId(null)
     setEditorOpen(false)
     setFormError("")
+    setRawJobDescription("")
+    setExtractionWarnings([])
+  }
+
+  const extractJobDescription = async () => {
+    const value = rawJobDescription.trim()
+    if (value.length < 80) {
+      setFormError(
+        "Paste at least 80 characters so AI has enough job context to extract.",
+      )
+      return
+    }
+    setExtracting(true)
+    setFormError("")
+    setSuccess("")
+    try {
+      const result = await jobsApi.extract(value)
+      setForm((current) => ({
+        ...current,
+        title: result.title || current.title,
+        about_job: result.about_job,
+        responsibilities: result.responsibilities,
+        requirements: result.requirements,
+        we_offer: result.we_offer,
+        life_at_company: result.life_at_company,
+        hiring_process: result.hiring_process,
+        location: result.location,
+        employment_type: result.employment_type,
+      }))
+      setExtractionWarnings(result.warnings)
+      setSuccess(
+        "AI extracted a draft. Review every field before saving or publishing.",
+      )
+    } catch (cause) {
+      setFormError(
+        errorMessage(cause, "Could not extract this job description."),
+      )
+    } finally {
+      setExtracting(false)
+    }
   }
 
   const save = async (event: FormEvent) => {
@@ -335,6 +384,24 @@ export default function JobPostsScreen() {
     }
   }
 
+  const copyShareLink = async (job: JobPost) => {
+    setActionError("")
+    setSuccess("")
+    const shareUrl = new URL(window.location.href)
+    shareUrl.search = ""
+    shareUrl.hash = ""
+    shareUrl.searchParams.set("job", String(job.job_id))
+    try {
+      if (!navigator.clipboard?.writeText) {
+        throw new Error("Clipboard access is unavailable in this browser.")
+      }
+      await navigator.clipboard.writeText(shareUrl.toString())
+      setSuccess(`Copied the public link for “${job.title}”.`)
+    } catch (cause) {
+      setActionError(errorMessage(cause, "Could not copy the public job link."))
+    }
+  }
+
   return (
     <div className="fc-stagger">
       <div className="fc-page-head">
@@ -433,6 +500,56 @@ export default function JobPostsScreen() {
               <span>{formError}</span>
             </div>
           )}
+
+          <section
+            className="job-editor-section job-ai-extractor"
+            aria-labelledby="job-ai-extractor-title"
+          >
+            <div className="job-editor-section-title">
+              <div>
+                <h3 id="job-ai-extractor-title">
+                  <Sparkles size={16} aria-hidden="true" />
+                  AI job description extractor
+                </h3>
+                <p>
+                  Paste an existing JD. FitCV will suggest fields without saving
+                  or publishing anything automatically.
+                </p>
+              </div>
+            </div>
+            <label>
+              <span className="fc-field-label">Full job description</span>
+              <textarea
+                className="fc-input"
+                rows={7}
+                value={rawJobDescription}
+                onChange={(event) => setRawJobDescription(event.target.value)}
+                placeholder="Paste the full job description here..."
+              />
+            </label>
+            <div className="job-ai-actions">
+              <button
+                className="fc-btn fc-btn--secondary"
+                type="button"
+                disabled={extracting || saving}
+                onClick={() => void extractJobDescription()}
+              >
+                <Sparkles size={15} aria-hidden="true" />
+                {extracting ? "Extracting..." : "Extract fields with AI"}
+              </button>
+              <span>AI output is a draft and requires recruiter review.</span>
+            </div>
+            {extractionWarnings.length > 0 && (
+              <div className="job-extraction-warnings" role="status">
+                <strong>Review notes</strong>
+                <ul>
+                  {extractionWarnings.map((warning) => (
+                    <li key={warning}>{warning}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </section>
 
           <section
             className="job-editor-section"
@@ -797,16 +914,26 @@ export default function JobPostsScreen() {
                             </button>
                           )}
                           {job.status === "Published" && (
-                            <button
-                              className="fc-btn fc-btn--secondary"
-                              disabled={Boolean(busyAction)}
-                              onClick={() => void runAction(job, "close")}
-                            >
-                              <XCircle size={14} aria-hidden="true" />
-                              {busyAction === "close"
-                                ? actionLabels.close
-                                : "Close"}
-                            </button>
+                            <>
+                              <button
+                                className="fc-btn fc-btn--secondary"
+                                disabled={Boolean(busyAction)}
+                                onClick={() => void copyShareLink(job)}
+                              >
+                                <Link2 size={14} aria-hidden="true" />
+                                Copy public link
+                              </button>
+                              <button
+                                className="fc-btn fc-btn--secondary"
+                                disabled={Boolean(busyAction)}
+                                onClick={() => void runAction(job, "close")}
+                              >
+                                <XCircle size={14} aria-hidden="true" />
+                                {busyAction === "close"
+                                  ? actionLabels.close
+                                  : "Close"}
+                              </button>
+                            </>
                           )}
                           <button
                             className="fc-btn fc-btn--ghost job-archive-action"

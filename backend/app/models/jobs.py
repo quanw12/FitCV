@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, func
+from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.session import Base
@@ -72,3 +72,65 @@ class Application(Base):
     status: Mapped[str] = mapped_column(String(20), default="Active", nullable=False)
     applied_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
     updated_at: Mapped[datetime | None] = mapped_column(DateTime, onupdate=func.now(), nullable=True)
+
+
+class ApplicationStageHistory(Base):
+    __tablename__ = "application_stage_history"
+    __table_args__ = (
+        Index(
+            "idx_application_stage_history_application_changed",
+            "application_id",
+            "changed_at",
+        ),
+    )
+
+    stage_history_id: Mapped[int] = mapped_column(
+        ID_TYPE, primary_key=True, autoincrement=True
+    )
+    application_id: Mapped[int] = mapped_column(
+        ID_TYPE,
+        ForeignKey("application.application_id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    previous_stage: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    new_stage: Mapped[str] = mapped_column(String(20), nullable=False)
+    changed_by_account_id: Mapped[int | None] = mapped_column(
+        ID_TYPE,
+        ForeignKey("account.account_id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    changed_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), nullable=False
+    )
+
+
+class ApplicationNote(Base):
+    __tablename__ = "application_note"
+    __table_args__ = (
+        Index(
+            "idx_application_note_application_created",
+            "application_id",
+            "created_at",
+        ),
+    )
+
+    note_id: Mapped[int] = mapped_column(
+        ID_TYPE, primary_key=True, autoincrement=True
+    )
+    application_id: Mapped[int] = mapped_column(
+        ID_TYPE,
+        ForeignKey("application.application_id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    author_account_id: Mapped[int | None] = mapped_column(
+        ID_TYPE,
+        ForeignKey("account.account_id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime | None] = mapped_column(
+        DateTime, onupdate=func.now(), nullable=True
+    )
