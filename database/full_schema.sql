@@ -125,6 +125,11 @@ CREATE TABLE job (
     employment_type        VARCHAR(50) NULL,
     status                 ENUM('Draft', 'Published', 'Closed') NOT NULL DEFAULT 'Draft',
     deadline               DATETIME NULL,
+    archived_at            DATETIME NULL,
+    skill_weight           DECIMAL(5,2) NOT NULL DEFAULT 45.00,
+    experience_weight      DECIMAL(5,2) NOT NULL DEFAULT 30.00,
+    education_weight       DECIMAL(5,2) NOT NULL DEFAULT 15.00,
+    soft_skill_weight      DECIMAL(5,2) NOT NULL DEFAULT 10.00,
     created_at             DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at             DATETIME NULL ON UPDATE CURRENT_TIMESTAMP,
 
@@ -139,7 +144,19 @@ CREATE TABLE job (
         ON DELETE SET NULL,
     CONSTRAINT fk_job_level
         FOREIGN KEY (level_id) REFERENCES level(level_id)
-        ON DELETE SET NULL
+        ON DELETE SET NULL,
+    CONSTRAINT chk_job_skill_weight
+        CHECK (skill_weight BETWEEN 0 AND 100),
+    CONSTRAINT chk_job_experience_weight
+        CHECK (experience_weight BETWEEN 0 AND 100),
+    CONSTRAINT chk_job_education_weight
+        CHECK (education_weight BETWEEN 0 AND 100),
+    CONSTRAINT chk_job_soft_skill_weight
+        CHECK (soft_skill_weight BETWEEN 0 AND 100),
+    CONSTRAINT chk_job_weight_total
+        CHECK (
+            skill_weight + experience_weight + education_weight + soft_skill_weight = 100
+        )
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
 
 CREATE TABLE job_hr (
@@ -363,6 +380,8 @@ CREATE INDEX idx_cv_candidate_id ON cv(candidate_id);
 CREATE INDEX idx_cv_parse_result_cv_id ON cv_parse_result(cv_id);
 CREATE INDEX idx_job_company_id ON job(company_id);
 CREATE INDEX idx_job_created_by_account_id ON job(created_by_account_id);
+CREATE INDEX idx_job_company_archive_status ON job(company_id, archived_at, status);
+CREATE INDEX idx_job_public_visibility ON job(status, archived_at, deadline);
 CREATE INDEX idx_job_description_account_created ON job_description(account_id, created_at);
 CREATE INDEX idx_job_description_account_hash ON job_description(account_id, content_sha256);
 CREATE INDEX idx_jd_parse_description ON jd_parse_result(job_description_id, jd_parse_id);

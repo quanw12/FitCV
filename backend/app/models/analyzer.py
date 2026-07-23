@@ -1,6 +1,19 @@
 from datetime import datetime
 
-from sqlalchemy import BigInteger, DateTime, ForeignKey, Index, Integer, JSON, Numeric, String, Text, UniqueConstraint, func
+from sqlalchemy import (
+    BigInteger,
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    JSON,
+    Numeric,
+    String,
+    Text,
+    UniqueConstraint,
+    func,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.session import Base
@@ -45,6 +58,40 @@ class CvParseResult(Base):
 
 class Job(Base):
     __tablename__ = "job"
+    __table_args__ = (
+        CheckConstraint(
+            "skill_weight >= 0 AND skill_weight <= 100",
+            name="chk_job_skill_weight",
+        ),
+        CheckConstraint(
+            "experience_weight >= 0 AND experience_weight <= 100",
+            name="chk_job_experience_weight",
+        ),
+        CheckConstraint(
+            "education_weight >= 0 AND education_weight <= 100",
+            name="chk_job_education_weight",
+        ),
+        CheckConstraint(
+            "soft_skill_weight >= 0 AND soft_skill_weight <= 100",
+            name="chk_job_soft_skill_weight",
+        ),
+        CheckConstraint(
+            "skill_weight + experience_weight + education_weight + soft_skill_weight = 100",
+            name="chk_job_weight_total",
+        ),
+        Index(
+            "idx_job_company_archive_status",
+            "company_id",
+            "archived_at",
+            "status",
+        ),
+        Index(
+            "idx_job_public_visibility",
+            "status",
+            "archived_at",
+            "deadline",
+        ),
+    )
 
     job_id: Mapped[int] = mapped_column(ID_TYPE, primary_key=True, autoincrement=True)
     company_id: Mapped[int] = mapped_column(ID_TYPE, ForeignKey("company.company_id"), nullable=False)
@@ -59,6 +106,31 @@ class Job(Base):
     employment_type: Mapped[str | None] = mapped_column(String(50), nullable=True)
     status: Mapped[str] = mapped_column(String(20), default="Draft", nullable=False)
     deadline: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    archived_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    skill_weight: Mapped[float] = mapped_column(
+        Numeric(5, 2),
+        default=45.0,
+        server_default="45.00",
+        nullable=False,
+    )
+    experience_weight: Mapped[float] = mapped_column(
+        Numeric(5, 2),
+        default=30.0,
+        server_default="30.00",
+        nullable=False,
+    )
+    education_weight: Mapped[float] = mapped_column(
+        Numeric(5, 2),
+        default=15.0,
+        server_default="15.00",
+        nullable=False,
+    )
+    soft_skill_weight: Mapped[float] = mapped_column(
+        Numeric(5, 2),
+        default=10.0,
+        server_default="10.00",
+        nullable=False,
+    )
     updated_at: Mapped[datetime | None] = mapped_column(DateTime, onupdate=func.now(), nullable=True)
 
 

@@ -176,6 +176,27 @@ Nếu tạo database mới:
 2. Chạy toàn bộ `database/full_schema.sql` bằng MySQL user có quyền tạo bảng/index.
 3. Backend runtime user cần quyền `SELECT`, `INSERT`, `UPDATE`, `DELETE`.
 
+### Job Post Archiving And Scoring Schema
+
+Database hiện hữu phải chạy migration sau trước khi deploy backend sử dụng
+`archived_at` hoặc custom scoring weights:
+
+```text
+database/migrations/005_add_job_archiving_and_scoring.sql
+```
+
+Migration giữ nguyên recruitment status `Draft`, `Published`, `Closed`, thêm
+thời điểm lưu trữ độc lập và bốn trọng số mặc định:
+
+```text
+Skills 45% · Experience 30% · Education 15% · Soft Skills 10%
+```
+
+Bốn trọng số phải nằm trong khoảng 0-100 và có tổng bằng 100. Migration có thể
+chạy lại, nhưng vẫn phải backup database trước vì MySQL DDL tự commit. Chỉ dùng
+`005_rollback_job_archiving_and_scoring.sql` trước khi production bắt đầu lưu
+archive timestamp hoặc custom weights vì rollback sẽ xóa vĩnh viễn dữ liệu đó.
+
 ## AI Improvement Suggestions
 
 Feature này dùng backend thật tại:
