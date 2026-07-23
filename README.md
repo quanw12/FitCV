@@ -289,6 +289,106 @@ POST   /api/analyzer/matches
 GET    /api/analyzer/matches/{match_result_id}
 ```
 
+## HR CV Ranking
+
+CV Ranking supports two CV sources while preserving one parser and score engine.
+
+### Upload CV Batch
+
+Use this flow for externally sourced CVs. It does not require candidates to
+apply through FitCV and it does not require HR to publish a FitCV job first.
+
+```text
+POST /api/hr/cv-ranking/parse
+```
+
+Send a `multipart/form-data` request with:
+
+- `job_description`: the JD or screening criteria entered by HR, minimum 50 characters.
+- `files`: 1-20 PDF/DOCX CV files, maximum 10MB per file.
+
+Processing pipeline:
+
+```text
+HR JD + bulk CV files
+  -> PDF/DOCX validation
+  -> native text extraction or OCR for scanned PDF
+  -> preprocessing and structured CV parsing
+  -> Gemini evidence extraction when ANALYZER_PROVIDER=gemini
+  -> FitCV weighted score engine
+  -> ranked list with matched/missing evidence
+  -> manual or score-threshold selection by HR
+```
+
+### Unified CV/JD scoring contract
+
+Student Analyzer, Upload CV Batch, and Job Applicants now call the same backend
+orchestrator: `backend/app/services/match_engine.py`.
+
+- Framework version: `fitcv-source-grounded-v2`.
+- Weights: Skills 45%, Experience 30%, Education 15%, Soft skills 10%.
+- Missing JD categories are excluded and the remaining weights are normalized.
+- Gemini performs evidence extraction only. Pydantic validation, local
+  parser supplementation, and deterministic weighted aggregation remain in
+  FitCV.
+- The same local parser facts are merged into both semantic CV and semantic JD
+  data so an LLM omission does not silently remove verified source evidence.
+- `match_result.evidence_json` records `matching_inputs`, engine metadata,
+  rubric, eligibility state, strengths, weaknesses, and category evidence.
+- Improvement Suggestions use that completed `match_result` and do not run a
+  separate scoring formula.
+
+For a published job, only Title, About the job, Responsibilities, and
+Requirements form the scoring document. We Offer, benefits, Life at company,
+Hiring Process, location, employment type, deadline, and openings count are
+kept for display/workflow but do not affect candidate fit.
+
+Existing successful `match_result` rows keep their historical score. Use
+Re-analyze/Retry Analysis to recompute them with `fitcv-source-grounded-v2`;
+the retry path updates the stored algorithm/model version before processing.
+
+The source-grounding, explicit-gap, eligibility-gate, and shared-rubric ideas
+were adapted from the public
+[AI Job Search evaluation workflow](https://github.com/MadsLorentzen/ai-job-search/blob/master/.claude/skills/job-application-assistant/04-job-evaluation.md).
+FitCV keeps its own four evidence categories because it does not currently have
+verified behavioral-interview or career-goal profile data. Source documents are
+untrusted input and are never treated as model instructions.
+
+The selection made in the current CV Ranking screen is session-local because
+the current database schema has no screening-batch or shortlist table. Do not
+store it in `application`, because that table represents a candidate applying
+to a published FitCV job. Add a dedicated schema/migration only when the team
+agrees that screening sessions must be persisted.
+
+### Job Applicants
+
+Use this flow for CVs submitted by Students to an existing company job post.
+
+```text
+GET /api/jobs/manage
+GET /api/hr/cv-ranking/jobs/{job_id}/applications
+GET /api/hr/cv-ranking/jobs/{job_id}/cvs/archive
+GET /api/applications/{application_id}/cv/download
+POST /api/applications/{application_id}/retry-analysis
+```
+
+```text
+job
+  -> application
+  -> candidate + cv
+  -> cv_parse_result + jd_parse_result
+  -> match_result
+  -> ranked applicant list
+```
+
+The backend checks the manager account's `company_id` before returning a job or
+its applications. Existing parse and match records are reused. Both tabs support
+side-by-side raw CV and parsed-score review, manual selection, and score-threshold
+selection. Job Applicants can download one CV or a ZIP containing all available
+CVs for the selected job. Neither flow automatically accepts or rejects an
+applicant. Selection remains local to the current screen until the team adds an
+agreed shortlist or screening-session schema.
+
 - Upload chỉ nhận PDF/DOCX tối đa 10 MB; backend xác minh nội dung file trước khi lưu.
 - CV parsing và matching chạy bằng FastAPI background tasks. Frontend poll trạng thái `Pending`, `Processing`, `Success`, `Failed`.
 - MVP matcher dùng evidence có thể kiểm tra lại: Skills 45%, Experience 30%, Education 15%, Soft skills 10%. Nếu JD thiếu category, trọng số được phân bổ lại trên các category còn lại.
@@ -422,6 +522,9 @@ OCR_MAX_OUTPUT_TOKENS=20000
 - PDF native text khong goi OCR, do do nhanh hon va khong ton request Gemini.
 - PDF scan chua thong tin ca nhan se duoc gui den Gemini de nhan dang text.
 - Application bi fail co the chay lai bang nut `Retry OCR` trong Application Tracker.
+- `OCR service is unavailable after retries`: kiem tra ket noi HTTPS/DNS/SSL/proxy
+  cua backend toi `generativelanguage.googleapis.com`, sau do retry. Backend log
+  se ghi loai loi ket noi va tu dong retry theo `GEMINI_MAX_RETRIES`.
 
 Frontend tests:
 

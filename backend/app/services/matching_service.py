@@ -1,7 +1,8 @@
 import re
 from typing import Any
 
-ALGORITHM_VERSION = "fitcv-deterministic-v1"
+ALGORITHM_VERSION = "fitcv-evidence-v2"
+SCORING_FRAMEWORK_VERSION = "fitcv-source-grounded-v2"
 CATEGORY_WEIGHTS = {"skills": 45.0, "experience": 30.0, "education": 15.0, "soft_skills": 10.0}
 EDUCATION_RANK = {"High School": 1, "Associate": 2, "Bachelor": 3, "Master": 4, "Doctorate": 5}
 
@@ -122,6 +123,22 @@ def match_documents(cv: dict[str, Any], jd: dict[str, Any]) -> dict[str, Any]:
         "suggestions": suggestions,
         "match_summary": f"{label} based on the requirements explicitly found in the supplied job description.",
         "algorithm_version": ALGORITHM_VERSION,
+        "framework_version": SCORING_FRAMEWORK_VERSION,
+        "rubric": {
+            "weights": CATEGORY_WEIGHTS,
+            "active_categories": list(breakdown),
+            "missing_categories": [
+                name for name in CATEGORY_WEIGHTS if name not in breakdown
+            ],
+        },
+        "eligibility": {
+            "status": "not_evaluated",
+            "gates": [],
+            "detail": (
+                "No verified hard eligibility criteria were supplied. "
+                "Eligibility is not inferred from CV content."
+            ),
+        },
     }
 
 
@@ -138,6 +155,42 @@ def supplement_semantic_cv(
     for field in ("experience_years", "education"):
         if supplemented.get(field) is None and parsed_cv.get(field) is not None:
             supplemented[field] = parsed_cv[field]
+    return supplemented
+
+
+def supplement_semantic_jd(
+    semantic_jd: dict[str, Any], parsed_jd: dict[str, Any]
+) -> dict[str, Any]:
+    """Keep locally grounded JD requirements omitted by semantic extraction."""
+    supplemented = dict(semantic_jd)
+    required = _merge_terms(
+        semantic_jd.get("required_skills") or [],
+        parsed_jd.get("required_skills") or [],
+    )
+    required_keys = {_term_key(value) for value in required}
+    preferred = [
+        value
+        for value in _merge_terms(
+            semantic_jd.get("preferred_skills") or [],
+            parsed_jd.get("preferred_skills") or [],
+        )
+        if _term_key(value) not in required_keys
+    ]
+    supplemented["required_skills"] = required
+    supplemented["preferred_skills"] = preferred
+    supplemented["required_skill_groups"] = list(
+        semantic_jd.get("required_skill_groups") or []
+    )
+    supplemented["preferred_skill_groups"] = list(
+        semantic_jd.get("preferred_skill_groups") or []
+    )
+    supplemented["soft_skills"] = _merge_terms(
+        semantic_jd.get("soft_skills") or [],
+        parsed_jd.get("soft_skills") or [],
+    )
+    for field in ("experience_years", "education"):
+        if supplemented.get(field) is None and parsed_jd.get(field) is not None:
+            supplemented[field] = parsed_jd[field]
     return supplemented
 
 

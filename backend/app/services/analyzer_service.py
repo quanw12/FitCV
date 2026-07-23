@@ -1,6 +1,5 @@
 import hashlib
 import logging
-import re
 from collections import Counter
 from pathlib import Path
 from uuid import uuid4
@@ -31,15 +30,11 @@ from app.services.document_parser import (
     parse_jd_text,
     validate_cv_content,
 )
-from app.services.matching_service import (
-    ALGORITHM_VERSION,
-    match_documents,
-    supplement_semantic_cv,
-)
-from app.services.gemini_analyzer import (
-    GEMINI_EXTRACTOR_VERSION,
-    GeminiAnalyzerError,
-    extract_match_inputs,
+from app.services.gemini_analyzer import GeminiAnalyzerError
+from app.services.match_engine import (
+    normalize_scoring_jd_text,
+    score_match,
+    selected_analyzer_config,
 )
 
 logger = logging.getLogger(__name__)
@@ -319,8 +314,9 @@ def request_analysis(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=parsed_cv.error_message if parsed_cv else "CV parsing failed.",
         )
+    scoring_jd = normalize_scoring_jd_text(request.job_description)
     try:
-        parsed_jd_payload = parse_jd_text(request.job_description)
+        parsed_jd_payload = parse_jd_text(scoring_jd)
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
@@ -376,31 +372,17 @@ def run_match_task(match_result_id: int) -> None:
         )
         if not parsed_cv.parsed_json or not parsed_jd.parsed_json:
             raise ValueError("Parsed CV or job description data is missing.")
-        if match.algorithm_version == ALGORITHM_VERSION:
-            score_cv = parsed_cv.parsed_json
-            score_jd = parsed_jd.parsed_json
-        elif match.algorithm_version.startswith("fitcv-gemini-"):
-            if not parsed_cv.parsed_text:
-                raise ValueError("Readable CV text is missing.")
-            semantic_cv, semantic_jd = extract_match_inputs(
-                cv_text=parsed_cv.parsed_text,
-                job_description=description.raw_text,
-                model_name=match.model_name,
-            )
-            score_cv = supplement_semantic_cv(
-                semantic_cv,
-                parsed_cv.parsed_json,
-            )
-            score_jd = semantic_jd
-        else:
-            raise ValueError(f"Unsupported analyzer version: {match.algorithm_version}")
-        result = match_documents(score_cv, score_jd)
-        result["matching_inputs"] = {"cv": score_cv, "jd": score_jd}
-        if match.algorithm_version.startswith("fitcv-gemini-"):
-            result["match_summary"] = (
-                f"{result['match_label']} using Gemini semantic extraction, "
-                "locally verified CV terms, and FitCV's weighted evidence scorer."
-            )
+        if not parsed_cv.parsed_text:
+            raise ValueError("Readable CV text is missing.")
+        result = score_match(
+            cv_text=parsed_cv.parsed_text,
+            jd_text=description.raw_text,
+            parsed_cv=parsed_cv.parsed_json,
+            parsed_jd=parsed_jd.parsed_json,
+            algorithm_version=match.algorithm_version,
+            model_name=match.model_name,
+            source_scope="student-analyzer",
+        )
         analyzer.set_match_success(db, match, result)
     except Exception as exc:
         db.rollback()
@@ -552,21 +534,4 @@ def _stored_file_path(file_path: str) -> Path:
 
 
 def _selected_analyzer_config() -> tuple[str, str | None]:
-    provider = settings.analyzer_provider.strip().lower()
-    if provider == "deterministic":
-        return ALGORITHM_VERSION, None
-    if provider == "gemini":
-        if not settings.gemini_api_key:
-            raise GeminiAnalyzerError(
-                "GEMINI_API_KEY is required when ANALYZER_PROVIDER=gemini."
-            )
-        model_slug = re.sub(r"[^a-zA-Z0-9._-]+", "-", settings.gemini_model).strip("-")
-        if not model_slug:
-            raise GeminiAnalyzerError("GEMINI_MODEL must not be empty.")
-        return (
-            f"fitcv-gemini-{model_slug[:31]}-{GEMINI_EXTRACTOR_VERSION}",
-            settings.gemini_model,
-        )
-    raise GeminiAnalyzerError(
-        f"Unsupported ANALYZER_PROVIDER: {settings.analyzer_provider}"
-    )
+    return selected_analyzer_config()

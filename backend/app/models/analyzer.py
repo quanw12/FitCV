@@ -128,7 +128,9 @@ class MatchResult(Base):
     strengths: Mapped[str | None] = mapped_column(Text, nullable=True)
     weaknesses: Mapped[str | None] = mapped_column(Text, nullable=True)
     recommendation: Mapped[str | None] = mapped_column(Text, nullable=True)
-    algorithm_version: Mapped[str] = mapped_column(String(50), default="fitcv-deterministic-v1", nullable=False)
+    algorithm_version: Mapped[str] = mapped_column(
+        String(50), default="fitcv-evidence-v2", nullable=False
+    )
     model_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
     error_message: Mapped[str | None] = mapped_column(String(1000), nullable=True)
     generated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)

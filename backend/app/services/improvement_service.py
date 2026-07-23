@@ -79,6 +79,8 @@ def _match_context_payload(match: MatchResult) -> dict:
     evidence_fields = evidence if isinstance(evidence, dict) else {}
     return {
         "overall_score": float(match.overall_score),
+        "algorithm_version": match.algorithm_version,
+        "model_name": match.model_name,
         "skill_score": float(match.skill_score) if match.skill_score is not None else None,
         "experience_score": (
             float(match.experience_score) if match.experience_score is not None else None
