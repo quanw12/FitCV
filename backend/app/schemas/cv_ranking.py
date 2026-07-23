@@ -5,10 +5,12 @@ class ScoreBreakdown(BaseModel):
     skills: int = Field(ge=0, le=100)
     experience: int = Field(ge=0, le=100)
     education: int = Field(ge=0, le=100)
+    soft_skills: int = Field(ge=0, le=100)
 
 
 class ParsedCandidateResponse(BaseModel):
     id: str
+    source_index: int = Field(ge=0)
     file_name: str
     file_type: str
     file_size_label: str
@@ -18,16 +20,21 @@ class ParsedCandidateResponse(BaseModel):
     location: str
     position: str
     skills: list[str]
+    matched_skills: list[str]
     missing_skills: list[str]
-    experience_years: int
+    experience_years: float
     education: str
     score: int = Field(ge=0, le=100)
+    match_label: str
     score_breakdown: ScoreBreakdown
     status: str
+    strengths: list[str]
+    weaknesses: list[str]
     parse_notes: list[str]
 
 
 class BatchParseResponse(BaseModel):
     required_skills: list[str]
+    preferred_skills: list[str]
     candidates: list[ParsedCandidateResponse]
     warnings: list[str] = Field(default_factory=list)

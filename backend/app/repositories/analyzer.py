@@ -374,6 +374,12 @@ def set_match_success(db: Session, match: MatchResult, result: dict) -> None:
     }
     if isinstance(result.get("matching_inputs"), dict):
         evidence["matching_inputs"] = result["matching_inputs"]
+    if isinstance(result.get("engine"), dict):
+        evidence["engine"] = result["engine"]
+    if isinstance(result.get("rubric"), dict):
+        evidence["rubric"] = result["rubric"]
+    if isinstance(result.get("eligibility"), dict):
+        evidence["eligibility"] = result["eligibility"]
     match.evidence_json = evidence
     match.match_summary = result["match_summary"]
     match.strengths = json.dumps(result["strengths"], ensure_ascii=False)

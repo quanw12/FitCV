@@ -3,7 +3,7 @@
 FitCV is an AI-powered CV screening and job readiness platform for two user groups:
 
 - Job Seekers / Students: upload CVs, compare CVs with job descriptions, view match scores, skill gaps, AI improvement suggestions, CV history, application tracking, and JD market insights.
-- HR / Recruiters: create job posts, upload candidate CVs, rank candidates with AI, manage a hiring pipeline, draft candidate emails, and view reports.
+- HR / Recruiters: create job posts, bulk upload externally sourced candidate CVs, rank candidates against an HR-supplied JD with AI-assisted evidence extraction, manage a hiring pipeline, draft candidate emails, and view reports.
 
 This repository contains the React/Vite frontend prototype generated for the FitCV UI and a FastAPI backend foundation for the Auth & Role Selection flow. The planned backend architecture is a FastAPI modular monolith with async AI processing, MySQL, file storage, Gemini API, and Resend email.
 
@@ -72,8 +72,44 @@ Core MVP use cases:
 - UC-02: Analyze CV against Job Description
 - UC-03: View AI Improvement Suggestions
 - UC-04: Create Job Post
-- UC-05: Upload Candidate CV
-- UC-06: View Candidate Ranking
+- UC-05: Upload Candidate CVs or Collect Job Applications
+- UC-06: Rank Candidates Against an HR-Supplied or Published JD
+
+HR CV Ranking is an internal screening tool, not a second job marketplace:
+
+- `Upload CV Batch`: HR pastes a JD or screening criteria and uploads up to 20
+  externally sourced PDF/DOCX CVs. This flow does not require a published FitCV
+  job or a Student application.
+- `Job Applicants`: HR selects a company job post and ranks CVs already linked
+  through `application`, `candidate`, and `cv`.
+- The backend applies OCR/text extraction, preprocessing, structured parsing,
+  evidence-based AI extraction, and the same weighted score engine to both flows.
+- Job applicants reuse stored `cv_parse_result`, `jd_parse_result`, and
+  `match_result` records instead of uploading or scoring the same CV again.
+- Both flows provide a side-by-side raw CV and parsed-score review.
+- Job Applicants can download one stored CV or all CVs for the selected job as
+  a company-scoped ZIP archive.
+- HR may select candidates manually or select everyone above a score threshold.
+- A score supports review; it must never automatically accept or reject a candidate.
+
+Unified matching engine rules:
+
+- `backend/app/services/match_engine.py` is the only orchestration entry point
+  for Student Analyzer, HR Batch Ranking, and Job Applicant Ranking.
+- All flows use framework `fitcv-source-grounded-v2` and the same weighted
+  scorer in `matching_service.py`.
+- A published job is scored from Title, About the job, Responsibilities, and
+  Requirements. Benefits, We Offer, Life at company, Hiring Process, deadline,
+  location, employment type, and vacancy count are not weighted requirements.
+- Gemini extracts source-grounded facts only. The deterministic parser then
+  supplements omitted facts for both CV and JD before scoring.
+- Hard eligibility rules must be represented separately from weighted fit.
+  FitCV currently reports eligibility as `not_evaluated` because the schema
+  does not provide verified work-authorization or other gate data.
+- `match_result.evidence_json` stores normalized `matching_inputs`, engine
+  version, rubric, eligibility state, and category evidence for debugging.
+- AI Improvement consumes the completed `match_result`; it must not calculate
+  another independent CV/JD score.
 
 ## Proposed System Architecture
 
@@ -183,6 +219,11 @@ Recommended ownership by feature area:
 - `src/index.css` - Global CSS variables, shared classes, Tailwind import
 - `src/ui/components/Layout.tsx` - Shared authenticated layout and navigation
 - `src/ui/components/ScoreRing.tsx` - Match score ring component
+- `src/ui/screens/CVRankingScreen.tsx` - HR ranking source tabs
+- `src/ui/screens/BulkCvRankingPanel.tsx` - External CV batch workflow
+- `src/ui/screens/JobApplicantsRankingPanel.tsx` - Job application ranking workflow
+- `src/api/cvRankingApi.ts` - Both HR ranking API contracts
+- `backend/app/api/routes/cv_ranking.py` - HR ranking endpoints
 - `src/ui/screens/*` - The 13 FitCV screens
 - `src/data/navigation.tsx` - Portal navigation configuration
 - `src/services/matchScore.ts` - Score label/color logic
@@ -217,7 +258,7 @@ HR portal:
 
 - `HRDashboard.tsx`
 - `JobPostsScreen.tsx`
-- `CVRankingScreen.tsx`
+- `CVRankingScreen.tsx` with `Upload CV Batch` and `Job Applicants` tabs
 - `PipelineScreen.tsx`
 - `AutoEmailScreen.tsx`
 - `ReportsScreen.tsx`

@@ -276,7 +276,7 @@ CREATE TABLE match_result (
     strengths         LONGTEXT NULL,
     weaknesses        LONGTEXT NULL,
     recommendation    LONGTEXT NULL,
-    algorithm_version VARCHAR(50) NOT NULL DEFAULT 'fitcv-deterministic-v1',
+    algorithm_version VARCHAR(50) NOT NULL DEFAULT 'fitcv-evidence-v2',
     model_name        VARCHAR(100) NULL,
     error_message     VARCHAR(1000) NULL,
     generated_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,

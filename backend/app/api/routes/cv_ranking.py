@@ -1,5 +1,4 @@
-from fastapi import APIRouter, Depends, File, Form, UploadFile
-from fastapi.responses import FileResponse
+from fastapi import APIRouter, Depends, File, Form, Response, UploadFile
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
@@ -15,30 +14,40 @@ manager = require_role(AccountRole.hr, AccountRole.hiring_manager, AccountRole.a
 
 @router.post("/parse", response_model=BatchParseResponse)
 async def parse_cv_batch(
-    job_description: str = Form(..., min_length=1),
+    job_description: str = Form(..., min_length=50),
     files: list[UploadFile] = File(...),
-    account: Account = Depends(manager),
+    _account: Account = Depends(manager),
 ) -> BatchParseResponse:
     return await cv_ranking_service.parse_batch(files, job_description)
 
 
-@router.get("/jobs/{job_id}/applications", response_model=list[RankedApplicationResponse])
+@router.get(
+    "/jobs/{job_id}/applications",
+    response_model=list[RankedApplicationResponse],
+)
 def list_ranked_applications(
     job_id: int,
     db: Session = Depends(get_db),
     account: Account = Depends(manager),
-):
+) -> list[RankedApplicationResponse]:
     return application_service.ranked(db, job_id=job_id, account=account)
 
 
-@router.get("/applications/{application_id}/cv", response_class=FileResponse)
-def download_ranked_application_cv(
-    application_id: int,
+@router.get("/jobs/{job_id}/cvs/archive")
+def download_job_application_cvs(
+    job_id: int,
     db: Session = Depends(get_db),
     account: Account = Depends(manager),
-):
-    return application_service.download(
+) -> Response:
+    content, file_name = application_service.download_all_cvs(
         db,
-        application_id=application_id,
+        job_id=job_id,
         account=account,
+    )
+    return Response(
+        content=content,
+        media_type="application/zip",
+        headers={
+            "Content-Disposition": f'attachment; filename="{file_name}"',
+        },
     )

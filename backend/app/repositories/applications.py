@@ -214,6 +214,8 @@ def reset_analysis(
     match: MatchResult,
     parser_version: str,
     reparse_cv: bool,
+    algorithm_version: str,
+    model_name: str | None,
 ) -> None:
     if reparse_cv:
         parsed_cv.parse_status = "Pending"
@@ -223,6 +225,8 @@ def reset_analysis(
         parsed_cv.parsed_at = None
 
     match.status = "Pending"
+    match.algorithm_version = algorithm_version
+    match.model_name = model_name or algorithm_version
     match.overall_score = None
     match.skill_score = None
     match.experience_score = None
