@@ -97,6 +97,10 @@ async def apply(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Job not found."
         )
+    if job.archived_at is not None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Job not found."
+        )
     if job.status != "Published":
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -242,6 +246,12 @@ def run_analysis(application_id: int) -> None:
             algorithm_version=match.algorithm_version,
             model_name=match.model_name,
             source_scope="job-application",
+            weights={
+                "skills": float(job.skill_weight),
+                "experience": float(job.experience_weight),
+                "education": float(job.education_weight),
+                "soft_skills": float(job.soft_skill_weight),
+            },
         )
         analyzer.set_match_success(db, match, result)
     except Exception as exc:

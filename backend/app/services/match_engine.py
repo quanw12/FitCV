@@ -16,7 +16,6 @@ from app.services.gemini_analyzer import (
 )
 from app.services.matching_service import (
     ALGORITHM_VERSION,
-    CATEGORY_WEIGHTS,
     SCORING_FRAMEWORK_VERSION,
     match_documents,
     supplement_semantic_cv,
@@ -146,6 +145,7 @@ def score_match(
     algorithm_version: str | None = None,
     model_name: str | None = None,
     source_scope: str,
+    weights: dict[str, float] | None = None,
 ) -> dict[str, Any]:
     normalized_jd = normalize_scoring_jd_text(jd_text)
     local_cv = parsed_cv or parse_cv_text(cv_text)
@@ -168,14 +168,14 @@ def score_match(
     else:
         raise ValueError(f"Unsupported analyzer version: {selected_version}")
 
-    result = match_documents(score_cv, score_jd)
+    result = match_documents(score_cv, score_jd, weights=weights)
     result["algorithm_version"] = selected_version
     result["matching_inputs"] = {"cv": score_cv, "jd": score_jd}
     result["engine"] = {
         "framework_version": SCORING_FRAMEWORK_VERSION,
         "algorithm_version": selected_version,
         "extraction_provider": extraction_provider,
-        "weights": CATEGORY_WEIGHTS,
+        "weights": result["scoring_weights"],
         "source_scope": source_scope,
         "excluded_jd_sections": list(EXCLUDED_JD_SECTION_NAMES),
         "principles": [

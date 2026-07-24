@@ -121,6 +121,31 @@ Candidates meet the teamwork panel in three interviews.
             "not_evaluated",
         )
 
+    def test_custom_job_weights_flow_through_the_shared_engine(self) -> None:
+        result = score_match(
+            cv_text=CV_TEXT,
+            jd_text=SCORING_JD,
+            algorithm_version=ALGORITHM_VERSION,
+            source_scope="job-application",
+            weights={
+                "skills": 60,
+                "experience": 25,
+                "education": 10,
+                "soft_skills": 5,
+            },
+        )
+
+        self.assertEqual(
+            result["engine"]["weights"],
+            {
+                "skills": 60.0,
+                "experience": 25.0,
+                "education": 10.0,
+                "soft_skills": 5.0,
+            },
+        )
+        self.assertEqual(result["rubric"]["weights"], result["engine"]["weights"])
+
     def test_semantic_jd_keeps_locally_grounded_requirements(self) -> None:
         supplemented = supplement_semantic_jd(
             {

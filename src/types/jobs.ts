@@ -1,4 +1,4 @@
-export type JobStatus = 'Draft' | 'Published' | 'Closed'
+export type JobStatus = "Draft" | "Published" | "Closed"
 
 export interface JobCompany {
   name: string
@@ -20,6 +20,11 @@ export interface JobPost {
   employment_type: string | null
   status: JobStatus
   deadline: string | null
+  archived_at: string | null
+  skill_weight: number
+  experience_weight: number
+  education_weight: number
+  soft_skill_weight: number
   openings_count: number
   application_count: number
   created_at: string
@@ -40,6 +45,10 @@ export interface JobWrite {
   employment_type?: string | null
   deadline?: string | null
   openings_count?: number
+  skill_weight?: number
+  experience_weight?: number
+  education_weight?: number
+  soft_skill_weight?: number
 }
 
 export interface JobApplicationWrite {
@@ -54,4 +63,20 @@ export interface JobApplicationCreated {
   cv_id: number
   match_result_id: number
   analysis_status: string
+}
+
+export interface JobExtraction {
+  title: string
+  about_job: string
+  responsibilities: string
+  requirements: string
+  we_offer: string
+  life_at_company: string
+  hiring_process: string
+  location: string
+  employment_type: string
+  required_skills: string[]
+  preferred_skills: string[]
+  experience_summary: string
+  warnings: string[]
 }

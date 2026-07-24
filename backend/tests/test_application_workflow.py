@@ -52,6 +52,7 @@ def job(**overrides):
         "employment_type": "Full-time",
         "status": "Published",
         "deadline": datetime.now() + timedelta(days=2),
+        "archived_at": None,
     }
     values.update(overrides)
     return SimpleNamespace(**values)
@@ -111,6 +112,30 @@ class ApplicationValidationTests(unittest.IsolatedAsyncioTestCase):
                     phone="0900", file=upload, account=account,
                 )
         self.assertEqual(caught.exception.status_code, 409)
+        upload.read.assert_not_awaited()
+
+    async def test_rejects_archived_job_before_reading_file(self):
+        account = SimpleNamespace(account_id=4)
+        upload = SimpleNamespace(filename="resume.pdf", read=AsyncMock())
+        with (
+            patch.object(application_service.applications, "lock_account"),
+            patch.object(
+                application_service.applications,
+                "job_for_apply",
+                return_value=job(archived_at=datetime.now()),
+            ),
+        ):
+            with self.assertRaises(HTTPException) as caught:
+                await application_service.apply(
+                    MagicMock(),
+                    job_id=7,
+                    full_name="Student",
+                    email="s@example.com",
+                    phone="0900",
+                    file=upload,
+                    account=account,
+                )
+        self.assertEqual(caught.exception.status_code, 404)
         upload.read.assert_not_awaited()
 
 
@@ -261,6 +286,12 @@ class ApplicationPersistenceTests(unittest.IsolatedAsyncioTestCase):
         self.engine.dispose()
 
     async def test_apply_background_ranking_duplicate_and_download(self):
+        self.job.skill_weight = 60
+        self.job.experience_weight = 25
+        self.job.education_weight = 10
+        self.job.soft_skill_weight = 5
+        self.db.commit()
+
         upload = SimpleNamespace(
             filename="student-resume.pdf",
             read=AsyncMock(return_value=b"%PDF-1.4\nFitCV test"),
@@ -307,6 +338,15 @@ class ApplicationPersistenceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(completed.application_id, created.application_id)
         self.assertIsNotNone(completed.overall_score)
         self.assertEqual(completed.algorithm_version, "fitcv-evidence-v2")
+        self.assertEqual(
+            completed.evidence_json["engine"]["weights"],
+            {
+                "skills": 60.0,
+                "experience": 25.0,
+                "education": 10.0,
+                "soft_skills": 5.0,
+            },
+        )
 
         parsed_cv = self.db.scalar(
             select(CvParseResult).where(CvParseResult.cv_id == created.cv_id)
