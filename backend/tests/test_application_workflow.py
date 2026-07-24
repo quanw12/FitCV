@@ -140,16 +140,21 @@ class ApplicationValidationTests(unittest.IsolatedAsyncioTestCase):
 
 
 class JobDocumentTests(unittest.TestCase):
-    def test_job_text_contains_versioned_content_and_metadata(self):
+    def test_job_text_contains_only_candidate_scoring_content(self):
         text = application_service._job_text(job())
-        for expected in (
-            "Build reliable services", "Develop APIs", "Learning budget",
-            "Collaborative team", "Technical interview", "Openings Count: 2",
-            "Requires Python", "Ho Chi Minh City", "Full-time",
-        ):
+        for expected in ("Build reliable services", "Develop APIs", "Requires Python"):
             self.assertIn(expected, text)
+        for excluded in (
+            "Learning budget",
+            "Collaborative team",
+            "Technical interview",
+            "Openings Count",
+            "Ho Chi Minh City",
+            "Full-time",
+        ):
+            self.assertNotIn(excluded, text)
 
-    def test_legacy_ranking_delegates_to_matching_service(self):
+    def test_ranking_response_uses_shared_engine_result(self):
         result = {
             "overall_score": 73.0,
             "breakdown": {
@@ -158,23 +163,7 @@ class JobDocumentTests(unittest.TestCase):
                 "education": {"score": 100.0},
             },
         }
-        with patch.object(cv_ranking_service, "match_documents", return_value=result) as matcher:
-            score, breakdown, raw_result = cv_ranking_service._score_candidate(
-                {
-                    "skills": ["Python"],
-                    "experience_years": 2,
-                    "education": "Bachelor",
-                    "soft_skills": [],
-                },
-                {
-                    "required_skills": ["Python", "FastAPI"],
-                    "preferred_skills": [],
-                    "experience_years": 3,
-                    "education": "Bachelor",
-                    "soft_skills": [],
-                },
-            )
-        matcher.assert_called_once()
+        score, breakdown, raw_result = cv_ranking_service._score_candidate(result)
         self.assertEqual(score, 73)
         self.assertEqual(breakdown.skills, 73)
         self.assertEqual(breakdown.experience, 60)
@@ -297,6 +286,12 @@ class ApplicationPersistenceTests(unittest.IsolatedAsyncioTestCase):
         self.engine.dispose()
 
     async def test_apply_background_ranking_duplicate_and_download(self):
+        self.job.skill_weight = 60
+        self.job.experience_weight = 25
+        self.job.education_weight = 10
+        self.job.soft_skill_weight = 5
+        self.db.commit()
+
         upload = SimpleNamespace(
             filename="student-resume.pdf",
             read=AsyncMock(return_value=b"%PDF-1.4\nFitCV test"),
@@ -342,7 +337,16 @@ class ApplicationPersistenceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(completed.job_id, self.job.job_id)
         self.assertEqual(completed.application_id, created.application_id)
         self.assertIsNotNone(completed.overall_score)
-        self.assertEqual(completed.algorithm_version, "fitcv-deterministic-v1")
+        self.assertEqual(completed.algorithm_version, "fitcv-evidence-v2")
+        self.assertEqual(
+            completed.evidence_json["engine"]["weights"],
+            {
+                "skills": 60.0,
+                "experience": 25.0,
+                "education": 10.0,
+                "soft_skills": 5.0,
+            },
+        )
 
         parsed_cv = self.db.scalar(
             select(CvParseResult).where(CvParseResult.cv_id == created.cv_id)
@@ -442,6 +446,8 @@ class ApplicationPersistenceTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(tracked[0].analysis_error)
 
         parsed_text_before = parsed_cv.parsed_text
+        completed.algorithm_version = "fitcv-deterministic-v1"
+        self.db.commit()
         reanalyzed = application_service.retry_analysis(
             self.db,
             application_id=created.application_id,
@@ -451,6 +457,7 @@ class ApplicationPersistenceTests(unittest.IsolatedAsyncioTestCase):
         self.db.refresh(completed)
         self.db.refresh(parsed_cv)
         self.assertEqual(completed.status, "Pending")
+        self.assertEqual(completed.algorithm_version, "fitcv-evidence-v2")
         self.assertEqual(parsed_cv.parse_status, "Success")
         self.assertEqual(parsed_cv.parsed_text, parsed_text_before)
 

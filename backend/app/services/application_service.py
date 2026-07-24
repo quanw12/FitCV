@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+from io import BytesIO
 from datetime import datetime, timezone
 import hashlib
 import logging
 from pathlib import Path
+import re
 from uuid import uuid4
+from zipfile import ZIP_DEFLATED, ZipFile
 
 from fastapi import HTTPException, UploadFile, status
 from fastapi.responses import FileResponse
@@ -46,15 +49,11 @@ from app.services.document_parser import (
     parse_jd_text,
     validate_cv_content,
 )
-from app.services.gemini_analyzer import (
-    GeminiAnalyzerError,
-    extract_match_inputs,
-)
+from app.services.gemini_analyzer import GeminiAnalyzerError
 from app.services.jobs_service import _decode_description
-from app.services.matching_service import (
-    ALGORITHM_VERSION,
-    match_documents,
-    supplement_semantic_cv,
+from app.services.match_engine import (
+    build_structured_job_scoring_text,
+    score_match,
 )
 
 logger = logging.getLogger(__name__)
@@ -186,15 +185,13 @@ async def apply(
 
 def _job_text(job) -> str:
     virtual = _decode_description(job.description)
-    sections = [
-        ("Title", job.title),
-        *[(name.replace("_", " ").title(), virtual.get(name)) for name in virtual],
-        ("Requirements", job.requirements),
-        ("Location", job.location),
-        ("Employment Type", job.employment_type),
-        ("Deadline", job.deadline.isoformat() if job.deadline else None),
-    ]
-    return "\n".join(f"{label}: {value}" for label, value in sections if value not in (None, ""))
+    return build_structured_job_scoring_text(
+        title=job.title,
+        description=virtual.get("description"),
+        about_job=virtual.get("about_job"),
+        responsibilities=virtual.get("responsibilities"),
+        requirements=job.requirements,
+    )
 
 
 def run_analysis(application_id: int) -> None:
@@ -241,24 +238,14 @@ def run_analysis(application_id: int) -> None:
         )
         jd_payload = parse_jd_text(raw_jd)
         applications.set_job_parse_success(db, parsed_jd, jd_payload)
-        if match.algorithm_version == ALGORITHM_VERSION:
-            score_cv = cv_payload
-            score_jd = jd_payload
-        elif match.algorithm_version.startswith("fitcv-gemini-"):
-            gemini_cv, gemini_jd = extract_match_inputs(
-                cv_text=text,
-                job_description=raw_jd,
-                model_name=match.model_name,
-            )
-            score_cv = supplement_semantic_cv(gemini_cv, cv_payload)
-            score_jd = gemini_jd
-        else:
-            raise ValueError(
-                f"Unsupported analyzer version: {match.algorithm_version}"
-            )
-        result = match_documents(
-            score_cv,
-            score_jd,
+        result = score_match(
+            cv_text=text,
+            jd_text=raw_jd,
+            parsed_cv=cv_payload,
+            parsed_jd=jd_payload,
+            algorithm_version=match.algorithm_version,
+            model_name=match.model_name,
+            source_scope="job-application",
             weights={
                 "skills": float(job.skill_weight),
                 "experience": float(job.experience_weight),
@@ -266,12 +253,6 @@ def run_analysis(application_id: int) -> None:
                 "soft_skills": float(job.soft_skill_weight),
             },
         )
-        result["matching_inputs"] = {"cv": score_cv, "jd": score_jd}
-        if match.algorithm_version.startswith("fitcv-gemini-"):
-            result["match_summary"] = (
-                f"{result['match_label']} using Gemini semantic extraction, "
-                "locally verified CV terms, and FitCV's weighted evidence scorer."
-            )
         analyzer.set_match_success(db, match, result)
     except Exception as exc:
         logger.exception("Application analysis failed for application_id=%s", application_id)
@@ -288,12 +269,17 @@ def run_analysis(application_id: int) -> None:
         db.close()
 
 
-def ranked(db: Session, *, job_id: int, account: Account) -> list[RankedApplicationResponse]:
+def _managed_job(db: Session, *, job_id: int, account: Account):
     if account.company_id is None:
         raise HTTPException(status_code=400, detail="A company must be assigned.")
     job = applications.get_job(db, job_id)
     if job is None or job.company_id != account.company_id:
         raise HTTPException(status_code=404, detail="Job not found for this company.")
+    return job
+
+
+def ranked(db: Session, *, job_id: int, account: Account) -> list[RankedApplicationResponse]:
+    _managed_job(db, job_id=job_id, account=account)
     responses = []
     for application, candidate, cv, parsed, match in applications.ranked_rows(db, job_id):
         evidence = match.evidence_json if match and match.evidence_json else {}
@@ -338,6 +324,55 @@ def ranked(db: Session, *, job_id: int, account: Account) -> list[RankedApplicat
             breakdown=breakdown,
         ))
     return responses
+
+
+def download_all_cvs(
+    db: Session,
+    *,
+    job_id: int,
+    account: Account,
+) -> tuple[bytes, str]:
+    job = _managed_job(db, job_id=job_id, account=account)
+    rows = applications.ranked_rows(db, job_id)
+    if not rows:
+        raise HTTPException(
+            status_code=404,
+            detail="No application CVs were found for this job.",
+        )
+
+    archive = BytesIO()
+    included = 0
+    missing: list[str] = []
+    with ZipFile(archive, mode="w", compression=ZIP_DEFLATED) as zip_file:
+        for application, _candidate, cv, _parsed, _match in rows:
+            try:
+                path = _stored_path(cv.file_path)
+            except ValueError:
+                missing.append(f"{cv.file_name}: invalid stored path")
+                continue
+            if not path.is_file():
+                missing.append(f"{cv.file_name}: stored file not found")
+                continue
+
+            safe_name = Path(cv.file_name).name or f"cv-{cv.cv_id}.{cv.file_type.lower()}"
+            archive_name = f"{application.application_id}-{safe_name}"
+            zip_file.write(path, arcname=archive_name)
+            included += 1
+
+        if missing:
+            zip_file.writestr(
+                "MISSING_FILES.txt",
+                "\n".join(missing),
+            )
+
+    if included == 0:
+        raise HTTPException(
+            status_code=404,
+            detail="Application records exist, but no stored CV files are available.",
+        )
+
+    job_slug = re.sub(r"[^A-Za-z0-9._-]+", "-", job.title).strip("-")
+    return archive.getvalue(), f"{job_slug or f'job-{job_id}'}-cvs.zip"
 
 
 def mine(
@@ -428,12 +463,21 @@ def retry_analysis(
         or not parsed_cv.parsed_json
         or parsed_cv.parser_version != PARSER_VERSION
     )
+    try:
+        algorithm_version, model_name = _selected_analyzer_config()
+    except GeminiAnalyzerError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(exc),
+        ) from exc
     applications.reset_analysis(
         db,
         parsed_cv=parsed_cv,
         match=match,
         parser_version=PARSER_VERSION,
         reparse_cv=reparse_cv,
+        algorithm_version=algorithm_version,
+        model_name=model_name,
     )
     return ApplicationRetryResponse(
         application_id=application.application_id,

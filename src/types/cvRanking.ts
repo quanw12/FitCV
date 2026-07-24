@@ -2,10 +2,12 @@ export interface CvScoreBreakdown {
   skills: number
   experience: number
   education: number
+  softSkills: number
 }
 
 export interface ParsedCvCandidate {
   id: string
+  sourceIndex: number
   fileName: string
   fileType: 'PDF' | 'DOCX'
   fileSizeLabel: string
@@ -15,17 +17,22 @@ export interface ParsedCvCandidate {
   location: string
   position: string
   skills: string[]
+  matchedSkills: string[]
   missingSkills: string[]
   experienceYears: number
   education: string
   score: number
+  matchLabel: string
   scoreBreakdown: CvScoreBreakdown
   status: 'Ready' | 'Failed'
+  strengths: string[]
+  weaknesses: string[]
   parseNotes: string[]
 }
 
 export interface BatchParseCvResponse {
   requiredSkills: string[]
+  preferredSkills: string[]
   candidates: ParsedCvCandidate[]
   warnings: string[]
 }

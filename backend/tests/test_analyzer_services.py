@@ -181,6 +181,39 @@ class OcrServiceTests(unittest.TestCase):
                 {"candidates": [{"finishReason": "MAX_TOKENS", "content": {}}]}
             )
 
+    def test_retries_transient_ocr_connection_error(self) -> None:
+        response = MagicMock(status_code=200)
+        response.json.return_value = {
+            "candidates": [
+                {
+                    "finishReason": "STOP",
+                    "content": {"parts": [{"text": "Python Engineer"}]},
+                }
+            ]
+        }
+        with (
+            patch.object(settings, "gemini_max_retries", 1),
+            patch(
+                "app.services.ocr_service.requests.post",
+                side_effect=[
+                    ocr_service.requests.ConnectionError("temporary reset"),
+                    response,
+                ],
+            ) as post,
+            patch("app.services.ocr_service.time.sleep") as retry_sleep,
+        ):
+            payload = ocr_service._send_request(
+                "https://example.test",
+                {"contents": []},
+            )
+
+        self.assertEqual(post.call_count, 2)
+        retry_sleep.assert_called_once_with(0.5)
+        self.assertEqual(
+            payload["candidates"][0]["content"]["parts"][0]["text"],
+            "Python Engineer",
+        )
+
     def test_requires_api_key_for_scanned_pdf_ocr(self) -> None:
         settings.gemini_api_key = None
         with TemporaryDirectory() as directory:
@@ -625,7 +658,7 @@ Bachelor student using Splunk, Wireshark, and Python. Communication.""",
         algorithm_version, model_name = _selected_analyzer_config()
         self.assertTrue(algorithm_version.startswith("fitcv-gemini-"))
         self.assertLessEqual(len(algorithm_version), 50)
-        self.assertTrue(algorithm_version.endswith("-v2"))
+        self.assertTrue(algorithm_version.endswith("-v3-s2"))
         self.assertEqual(model_name, "gemini-3.1-flash-lite")
 
 
