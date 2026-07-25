@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type CSSProperties, type FormEvent, type ReactNode } from 'react'
-import { ArrowLeft, ArrowRight, Briefcase, Eye, EyeOff, Lock, Mail, RotateCcw, User, Users, Zap, Sparkles, Check } from 'lucide-react'
+import { Lightning, CaretLeft, CaretRight, Briefcase, Eye, EyeClosed, Lock, Envelope, ArrowClockwise, User, Users, Sparkle, Check } from '@phosphor-icons/react'
 import { authApi } from '@/api'
 import { hasAuthErrors, validateEmail, validateLogin, validateRegister, validateResetPassword, validateVerifyResetCode } from '@/services'
 import type { AccountRole, AuthFormErrors, AuthMode, AuthSession } from '@/types/auth'
@@ -282,110 +282,80 @@ export default function AuthScreen({ onAuth, startInRoleSelection = false }: Aut
   const isAuthMode = mode === 'login' || mode === 'register'
 
   return (
-    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
-      {/* Brand / editorial panel */}
-      <div style={{
-        flex: '0 0 44%',
-        background: 'linear-gradient(155deg, #0B1020 0%, #161D33 55%, #1E2742 100%)',
-        display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
-        padding: '40px 46px', position: 'relative', overflow: 'hidden', color: 'white',
-      }}>
-        <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none' }}>
-          <div
-            className="fc-mesh-orb"
-            style={{
-              width: 400,
-              height: 400,
-              top: '-10%',
-              right: '-10%',
-              background: 'radial-gradient(circle, rgba(37,99,235,0.3) 0%, transparent 70%)',
-            }}
-          />
-          <div
-            className="fc-mesh-orb"
-            style={{
-              width: 300,
-              height: 300,
-              bottom: '10%',
-              left: '-5%',
-              background: 'radial-gradient(circle, rgba(79,70,229,0.25) 0%, transparent 70%)',
-            }}
-          />
-        </div>
-
-        {/* Brand row */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, position: 'relative', zIndex: 1 }}>
-          <div className="fc-brandmark" style={{ width: 40, height: 40, borderRadius: 12, background: 'linear-gradient(135deg, var(--accent), var(--accent-2))', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 6px 18px var(--accent-glow)' }}>
-            <Zap size={20} color="white" fill="white" />
-          </div>
-          <span style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 22 }}>FitCV</span>
-        </div>
-
-        {/* Editorial hero */}
-        <div style={{ position: 'relative', zIndex: 1, maxWidth: 420 }}>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '6px 13px', borderRadius: 999, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', fontSize: 12, fontWeight: 600, letterSpacing: '0.04em', marginBottom: 22, color: '#c7cde0' }}>
-            <Sparkles size={13} color="#a5b4fc" /> AI-powered talent intelligence
-          </div>
-          <h1 style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 42, lineHeight: 1.08, marginBottom: 16, letterSpacing: '-0.02em' }}>
-            Know your fit<br />before you apply.
-          </h1>
-          <p style={{ color: 'rgba(255,255,255,0.66)', fontSize: 15.5, lineHeight: 1.65 }}>
-            Match your CV against any job description, surface skill gaps, and rank candidates with explainable AI — built for students and recruiters alike.
-          </p>
-
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginTop: 26 }}>
-            {[
-              { label: 'Skills', tone: '#a5b4fc' },
-              { label: 'Experience', tone: '#7dd3fc' },
-              { label: 'Role fit', tone: '#fcd34d' },
-              { label: 'Screening pass', tone: '#6ee7b7' },
-            ].map(t => (
-              <span key={t.label} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '8px 14px', borderRadius: 12, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', fontSize: 13, fontWeight: 500, color: '#e2e8f4' }}>
-                <span style={{ width: 7, height: 7, borderRadius: '50%', background: t.tone }} /> {t.label}
-              </span>
-            ))}
-          </div>
-        </div>
-
-        {/* Score signature */}
-        <div style={{ position: 'relative', zIndex: 1, display: 'flex', alignItems: 'center', gap: 18 }}>
-          <svg viewBox="0 0 120 120" width="92" height="92" style={{ filter: 'drop-shadow(0 8px 20px rgba(37,99,235,0.35))', transform: 'rotate(-8deg)' }}>
-            <circle cx="60" cy="60" r="46" fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth="11" />
-            <circle cx="60" cy="60" r="46" fill="none" stroke="url(#ag)" strokeWidth="11" strokeLinecap="round" strokeDasharray="289" strokeDashoffset="72" transform="rotate(-90 60 60)" />
-            <defs>
-              <linearGradient id="ag" x1="0" y1="0" x2="1" y2="1">
-                <stop offset="0%" stopColor="#60a5fa" />
-                <stop offset="100%" stopColor="#a78bfa" />
-              </linearGradient>
-            </defs>
-            <text x="60" y="58" textAnchor="middle" fill="white" fontSize="22" fontWeight="700" fontFamily="var(--font-display)">75</text>
-            <text x="60" y="76" textAnchor="middle" fill="rgba(255,255,255,0.6)" fontSize="9" fontFamily="Inter">avg match</text>
-          </svg>
-          <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', lineHeight: 1.6, maxWidth: 230 }}>
-            Live AI scoring across <strong style={{ color: '#fff' }}>12,480</strong> CV–JD pairs this month.
-          </div>
-        </div>
+    <div style={{
+      minHeight: '100vh',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      background: 'var(--bg)',
+      position: 'relative',
+      overflow: 'hidden',
+    }}>
+      <div className="fc-grain" />
+      <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none' }}>
+        <div
+          className="fc-mesh-orb"
+          style={{
+            width: 500,
+            height: 500,
+            top: '-20%',
+            right: '-10%',
+            background: 'radial-gradient(circle, rgba(37,99,235,0.12) 0%, transparent 70%)',
+          }}
+        />
+        <div
+          className="fc-mesh-orb"
+          style={{
+            width: 400,
+            height: 400,
+            bottom: '-15%',
+            left: '-8%',
+            background: 'radial-gradient(circle, rgba(79,70,229,0.10) 0%, transparent 70%)',
+          }}
+        />
       </div>
 
-      {/* Form panel */}
-      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)', padding: 32 }}>
-        <div className="fc-bezel" style={{ width: '100%', maxWidth: 420 }}>
-          <div className="fc-bezel__inner" style={{ padding: 32 }}>
+      <div style={{ width: '100%', maxWidth: 420, padding: '24px 20px', position: 'relative', zIndex: 1 }}>
+        <div style={{ textAlign: 'center', marginBottom: 28 }}>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+            <div style={{
+              width: 38, height: 38, borderRadius: 11,
+              background: 'linear-gradient(135deg, var(--accent), var(--accent-2))',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              boxShadow: '0 6px 18px var(--accent-glow)',
+            }}>
+              <Lightning size={18} color="white" weight="fill" />
+            </div>
+            <span style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 21, color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>FitCV</span>
+          </div>
+          <div style={{ fontSize: 13, color: 'var(--text-muted)', fontWeight: 500 }}>
+            AI-powered talent intelligence
+          </div>
+        </div>
+
+        <div className="fc-glass" style={{
+          borderRadius: 'var(--r-lg)',
+          padding: 32,
+        }}>
           {step === 'auth' ? (
             <>
-              {/* Segmented mode toggle */}
               {isAuthMode && (
-                <div style={{ display: 'flex', padding: 4, background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 13, marginBottom: 26 }}>
+                <div style={{
+                  display: 'flex', padding: 3,
+                  background: 'var(--surface-2)',
+                  border: '1px solid var(--border)',
+                  borderRadius: 12, marginBottom: 24,
+                }}>
                   {(['login', 'register'] as const).map(m => (
                     <button
                       key={m}
                       onClick={() => switchMode(m)}
                       style={{
-                        flex: 1, padding: '9px 0', borderRadius: 9, border: 'none', cursor: 'pointer',
-                        fontSize: 14, fontWeight: 600,
+                        flex: 1, padding: '8px 0', borderRadius: 9, border: 'none', cursor: 'pointer',
+                        fontSize: 13.5, fontWeight: 600,
                         background: mode === m ? 'var(--surface)' : 'transparent',
                         color: mode === m ? 'var(--text-primary)' : 'var(--text-secondary)',
-                        boxShadow: mode === m ? 'var(--shadow-sm)' : 'none',
+                        boxShadow: mode === m ? '0 1px 3px rgba(0,0,0,0.06)' : 'none',
                         transition: 'all 0.15s ease',
                       }}
                     >
@@ -395,13 +365,16 @@ export default function AuthScreen({ onAuth, startInRoleSelection = false }: Aut
                 </div>
               )}
 
-              <div style={{ marginBottom: 22 }}>
-                <h2 style={{ fontSize: 26, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 6, fontFamily: 'var(--font-display)', letterSpacing: '-0.01em' }}>{title}</h2>
-                <p style={{ color: 'var(--text-secondary)', fontSize: 14, minHeight: 20 }}>
-                  {mode === 'login' && <>New here? <button onClick={() => switchMode('register')} style={linkButtonStyle}>Create an account</button></>}
-                  {mode === 'register' && <>Already registered? <button onClick={() => switchMode('login')} style={linkButtonStyle}>Sign in</button></>}
-                  {mode === 'forgot' && <>We will email a 6-digit code to {email || 'your inbox'}.</>}
-                  {mode === 'verify' && <>Enter the 6-digit code sent to {email || 'your email'}.</>}
+              <div style={{ marginBottom: 20 }}>
+                <h2 style={{
+                  fontSize: 22, fontWeight: 700, color: 'var(--text-primary)',
+                  marginBottom: 4, fontFamily: 'var(--font-display)', letterSpacing: '-0.01em',
+                }}>{title}</h2>
+                <p style={{ color: 'var(--text-secondary)', fontSize: 13.5, minHeight: 18 }}>
+                  {mode === 'login' && <>New here? <button onClick={() => switchMode('register')} style={linkBtn}>Create an account</button></>}
+                  {mode === 'register' && <>Already registered? <button onClick={() => switchMode('login')} style={linkBtn}>Sign in</button></>}
+                  {mode === 'forgot' && <>We&apos;ll email a 6-digit code.</>}
+                  {mode === 'verify' && <>Enter the code sent to {email || 'your email'}.</>}
                   {mode === 'reset' && <>Code verified — choose a new password.</>}
                 </p>
               </div>
@@ -412,17 +385,17 @@ export default function AuthScreen({ onAuth, startInRoleSelection = false }: Aut
               {(mode === 'login' || mode === 'register') && (
                 <>
                   {GOOGLE_CLIENT_ID ? (
-                    <div ref={googleButtonRef} style={googleButtonContainerStyle} />
+                    <div ref={googleButtonRef} style={googleBoxStyle} />
                   ) : (
-                    <button type="button" disabled style={{ ...googleButtonStyle, opacity: 0.6, cursor: 'not-allowed' }}>
+                    <button type="button" disabled style={{ ...googleBtnStyle, opacity: 0.6, cursor: 'not-allowed', justifyContent: 'center' }}>
                       Google sign-in is not configured
                     </button>
                   )}
-                  {googleError && <div style={{ ...errorTextStyle, marginTop: -10, marginBottom: 12 }}>{googleError}</div>}
+                  {googleError && <div style={{ ...errTxt, marginTop: -12, marginBottom: 12, textAlign: 'center' }}>{googleError}</div>}
 
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '6px 0 20px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '0 0 18px' }}>
                     <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
-                    <span style={{ fontSize: 12.5, color: 'var(--text-muted)', fontWeight: 600, letterSpacing: '0.04em' }}>OR</span>
+                    <span style={{ fontSize: 11.5, color: 'var(--text-muted)', fontWeight: 600, letterSpacing: '0.05em' }}>OR</span>
                     <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
                   </div>
                 </>
@@ -432,7 +405,7 @@ export default function AuthScreen({ onAuth, startInRoleSelection = false }: Aut
                 {mode === 'register' && (
                   <Field
                     label="Full name"
-                    icon={<User size={16} color="var(--text-muted)" />}
+                    icon={<User size={15} weight="light" color="var(--text-muted)" />}
                     value={fullName}
                     placeholder="Nguyen Minh"
                     error={errors.fullName}
@@ -443,7 +416,7 @@ export default function AuthScreen({ onAuth, startInRoleSelection = false }: Aut
                 {(mode === 'login' || mode === 'register' || mode === 'forgot') && (
                   <Field
                     label="Email address"
-                    icon={<Mail size={16} color="var(--text-muted)" />}
+                    icon={<Envelope size={15} weight="light" color="var(--text-muted)" />}
                     value={email}
                     type="email"
                     placeholder="you@example.com"
@@ -455,7 +428,7 @@ export default function AuthScreen({ onAuth, startInRoleSelection = false }: Aut
                 {mode === 'verify' && (
                   <Field
                     label="Verification code"
-                    icon={<RotateCcw size={16} color="var(--text-muted)" />}
+                    icon={<ArrowClockwise size={15} weight="light" color="var(--text-muted)" />}
                     value={resetCode}
                     placeholder="6-digit code"
                     error={errors.code}
@@ -465,48 +438,52 @@ export default function AuthScreen({ onAuth, startInRoleSelection = false }: Aut
 
                 {mode !== 'forgot' && mode !== 'verify' && (
                   <div style={{ marginBottom: 8 }}>
-                    <label style={labelStyle}>Password</label>
+                    <label style={lbl}>Password</label>
                     <div style={{ position: 'relative' }}>
-                      <Lock size={16} color="var(--text-muted)" style={{ position: 'absolute', left: 13, top: '50%', transform: 'translateY(-50%)' }} />
+                      <Lock size={15} weight="light" color="var(--text-muted)" style={{ position: 'absolute', left: 13, top: '50%', transform: 'translateY(-50%)', zIndex: 1 }} />
                       <input
                         type={showPass ? 'text' : 'password'}
                         placeholder="Minimum 8 characters"
                         value={password}
                         onChange={e => setPassword(e.target.value)}
-                        style={{ ...inputStyle, paddingRight: 42, borderColor: errors.password ? '#DC2626' : 'var(--border-strong)' }}
+                        style={{ ...inp, borderColor: errors.password ? '#DC2626' : 'var(--border-strong)' }}
                       />
-                      <button type="button" onClick={() => setShowPass(!showPass)} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}>
-                        {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
+                      <button type="button" onClick={() => setShowPass(!showPass)} style={{ position: 'absolute', right: 11, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', lineHeight: 0 }}>
+                        {showPass ? <EyeClosed size={16} weight="light" /> : <Eye size={16} weight="light" />}
                       </button>
                     </div>
-                    {errors.password && <div style={errorTextStyle}>{errors.password}</div>}
+                    {errors.password && <div style={errTxt}>{errors.password}</div>}
                   </div>
                 )}
 
                 {mode === 'login' && (
-                  <div style={{ textAlign: 'right', marginBottom: 20 }}>
-                    <button type="button" onClick={() => switchMode('forgot')} style={{ ...linkButtonStyle, fontSize: 13 }}>
+                  <div style={{ textAlign: 'right', marginBottom: 18 }}>
+                    <button type="button" onClick={() => switchMode('forgot')} style={{ ...linkBtn, fontSize: 12.5 }}>
                       Forgot password?
                     </button>
                   </div>
                 )}
 
-                <button type="submit" className="fc-btn fc-btn--primary" disabled={loading} style={{ width: '100%', padding: '13px 20px', fontSize: 15 }}>
-                  {loading ? 'Please wait…' : submitLabel} <ArrowRight size={16} />
+                <button type="submit" className="fc-btn fc-btn--primary" disabled={loading} style={{ width: '100%', padding: '12px 20px', fontSize: 14.5, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                  {loading ? 'Please wait…' : <>{submitLabel} <CaretRight size={14} weight="bold" /></>}
                 </button>
               </form>
-
             </>
           ) : (
             <>
-              <div style={{ marginBottom: 26 }}>
-                <h2 style={{ fontSize: 25, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 6, fontFamily: 'var(--font-display)' }}>Choose your workspace</h2>
-                <p style={{ color: 'var(--text-secondary)', fontSize: 14 }}>FitCV saves your database role and routes you to the right portal.</p>
+              <div style={{ marginBottom: 24 }}>
+                <h2 style={{
+                  fontSize: 21, fontWeight: 700, color: 'var(--text-primary)',
+                  marginBottom: 4, fontFamily: 'var(--font-display)',
+                }}>Choose your workspace</h2>
+                <p style={{ color: 'var(--text-secondary)', fontSize: 13.5 }}>
+                  FitCV saves your role and routes you to the right portal.
+                </p>
               </div>
 
               {errors.general && <Feedback tone="error" message={errors.general} />}
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 11 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 {roleOptions.map(option => {
                   const active = selectedRole === option.role
                   return (
@@ -514,15 +491,15 @@ export default function AuthScreen({ onAuth, startInRoleSelection = false }: Aut
                       key={option.role}
                       onClick={() => setSelectedRole(option.role)}
                       style={{
-                        padding: '16px 18px', borderRadius: 15, cursor: 'pointer',
+                        padding: '14px 16px', borderRadius: 14, cursor: 'pointer',
                         border: `2px solid ${active ? 'var(--accent)' : 'var(--border)'}`,
                         background: active ? 'var(--accent-soft)' : 'var(--surface)',
-                        textAlign: 'left', display: 'flex', alignItems: 'center', gap: 16,
-                        transition: 'all 0.15s', boxShadow: active ? 'var(--shadow-sm)' : 'none',
+                        textAlign: 'left', display: 'flex', alignItems: 'center', gap: 14,
+                        transition: 'all 0.15s',
                       }}
                     >
                       <div style={{
-                        width: 48, height: 48, borderRadius: 14, flexShrink: 0,
+                        width: 44, height: 44, borderRadius: 12, flexShrink: 0,
                         background: active ? 'var(--accent)' : 'var(--surface-2)',
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                         color: active ? 'white' : 'var(--text-secondary)',
@@ -530,8 +507,8 @@ export default function AuthScreen({ onAuth, startInRoleSelection = false }: Aut
                         {option.icon}
                       </div>
                       <div>
-                        <div style={{ fontWeight: 700, fontSize: 15.5, color: 'var(--text-primary)', marginBottom: 3 }}>{option.title}</div>
-                        <div style={{ fontSize: 12.5, color: 'var(--text-secondary)' }}>{option.description}</div>
+                        <div style={{ fontWeight: 700, fontSize: 14.5, color: 'var(--text-primary)', marginBottom: 2 }}>{option.title}</div>
+                        <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{option.description}</div>
                       </div>
                     </button>
                   )
@@ -542,24 +519,23 @@ export default function AuthScreen({ onAuth, startInRoleSelection = false }: Aut
                 onClick={handleRoleContinue}
                 disabled={!selectedRole || loading}
                 className="fc-btn fc-btn--primary"
-                style={{ width: '100%', justifyContent: 'center', padding: '13px 20px', fontSize: 15, marginTop: 22, opacity: selectedRole && !loading ? 1 : 0.5 }}
+                style={{ width: '100%', justifyContent: 'center', padding: '12px 20px', fontSize: 14.5, marginTop: 20, display: 'flex', alignItems: 'center', gap: 8, opacity: selectedRole && !loading ? 1 : 0.5 }}
               >
-                Continue <ArrowRight size={16} />
+                Continue <CaretRight size={14} weight="bold" />
               </button>
 
               <button
                 onClick={() => setStep('auth')}
-                style={{ width: '100%', marginTop: 12, background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: 14, cursor: 'pointer', padding: 8, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 6 }}
+                style={{ width: '100%', marginTop: 10, background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: 13.5, cursor: 'pointer', padding: 8, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 6 }}
               >
-                <ArrowLeft size={14} /> Back
+                <CaretLeft size={13} weight="bold" /> Back
               </button>
             </>
           )}
 
-          <p style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: 12, marginTop: 26 }}>
+          <p style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: 11.5, marginTop: 24 }}>
             By continuing, you agree to FitCV&apos;s Terms of Service and Privacy Policy
           </p>
-          </div>
         </div>
       </div>
     </div>
@@ -585,18 +561,18 @@ function Field({
 }) {
   return (
     <div style={{ marginBottom: 14 }}>
-      <label style={labelStyle}>{label}</label>
+      <label style={lbl}>{label}</label>
       <div style={{ position: 'relative' }}>
-        <span style={{ position: 'absolute', left: 13, top: '50%', transform: 'translateY(-50%)' }}>{icon}</span>
+        <span style={{ position: 'absolute', left: 13, top: '50%', transform: 'translateY(-50%)', zIndex: 1 }}>{icon}</span>
         <input
           type={type}
           placeholder={placeholder}
           value={value}
           onChange={e => onChange(e.target.value)}
-          style={{ ...inputStyle, borderColor: error ? '#DC2626' : 'var(--border-strong)' }}
+          style={{ ...inp, borderColor: error ? '#DC2626' : 'var(--border-strong)' }}
         />
       </div>
-      {error && <div style={errorTextStyle}>{error}</div>}
+      {error && <div style={errTxt}>{error}</div>}
     </div>
   )
 }
@@ -604,69 +580,69 @@ function Field({
 function Feedback({ tone, message }: { tone: 'error' | 'success'; message: string }) {
   const color = tone === 'error' ? '#991B1B' : '#065F46'
   const bg = tone === 'error' ? '#FDEAEA' : '#DCFCE7'
-  const icon = tone === 'error' ? <Lock size={15} /> : <Check size={15} />
+  const icon = tone === 'error' ? <Lock size={14} weight="light" /> : <Check size={14} weight="bold" />
   return (
-    <div style={{ background: bg, color, borderRadius: 11, padding: '10px 13px', fontSize: 13, fontWeight: 600, marginBottom: 14, display: 'flex', alignItems: 'center', gap: 9 }}>
+    <div style={{ background: bg, color, borderRadius: 10, padding: '9px 12px', fontSize: 12.5, fontWeight: 600, marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
       {icon} {message}
     </div>
   )
 }
 
-const labelStyle: CSSProperties = {
-  fontSize: 13,
+const lbl: CSSProperties = {
+  fontSize: 12.5,
   fontWeight: 600,
   color: 'var(--text-primary)',
   display: 'block',
-  marginBottom: 6,
+  marginBottom: 5,
 }
 
-const inputStyle: CSSProperties = {
+const inp: CSSProperties = {
   width: '100%',
-  padding: '11px 14px 11px 40px',
-  borderRadius: 11,
+  padding: '10px 14px 10px 38px',
+  borderRadius: 10,
   border: '1px solid var(--border-strong)',
-  fontSize: 14,
+  fontSize: 13.5,
   outline: 'none',
   fontFamily: 'var(--font-body)',
   color: 'var(--text-primary)',
   background: 'var(--surface)',
 }
 
-const errorTextStyle: CSSProperties = {
+const errTxt: CSSProperties = {
   color: '#DC2626',
-  fontSize: 12,
+  fontSize: 11.5,
   fontWeight: 600,
-  marginTop: 5,
+  marginTop: 4,
 }
 
-const linkButtonStyle: CSSProperties = {
+const linkBtn: CSSProperties = {
   color: 'var(--accent)',
   fontWeight: 600,
   background: 'none',
   border: 'none',
   cursor: 'pointer',
-  fontSize: 14,
+  fontSize: 13.5,
 }
 
-const googleButtonStyle: CSSProperties = {
+const googleBtnStyle: CSSProperties = {
   width: '100%',
-  padding: '11px 20px',
-  borderRadius: 11,
+  padding: '10px 20px',
+  borderRadius: 10,
   border: '1px solid var(--border-strong)',
   background: 'white',
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
   gap: 10,
-  fontSize: 14,
+  fontSize: 13.5,
   fontWeight: 600,
   cursor: 'pointer',
   color: 'var(--text-primary)',
-  marginBottom: 20,
+  marginBottom: 18,
 }
 
-const googleButtonContainerStyle: CSSProperties = {
+const googleBoxStyle: CSSProperties = {
   width: '100%',
-  minHeight: 42,
-  marginBottom: 20,
+  minHeight: 40,
+  marginBottom: 18,
 }
