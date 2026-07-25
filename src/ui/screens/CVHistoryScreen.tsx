@@ -20,8 +20,11 @@ import {
   YAxis,
 } from "recharts"
 
+import { toast } from "sonner"
+
 import { analyzerApi } from "@/api/analyzerApi"
 import type { CvComparisonSeries, CvVersion } from "@/types/analyzer"
+import BezelCard from "@/ui/components/BezelCard"
 
 const MAX_CV_BYTES = 10 * 1024 * 1024
 
@@ -88,6 +91,8 @@ export default function CVHistoryScreen() {
 
     try {
       await analyzerApi.uploadCv(file)
+
+      toast.success("CV uploaded successfully")
 
       await loadCvs()
     } catch (caught) {
@@ -337,11 +342,38 @@ export default function CVHistoryScreen() {
           Loading CV history…
         </div>
       ) : cvs.length === 0 ? (
-        <div className="fitcv-card" style={emptyStyle}>
-          <FileText size={34} weight="light" color="#94A3B8" />
-          <strong>No CV versions yet</strong>
-          <span>Upload a PDF or DOCX (max 10 MB) to create version 1.</span>
-        </div>
+        <BezelCard>
+          <div style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: 12,
+            padding: "48px 24px",
+            textAlign: "center",
+          }}>
+            <div style={{
+              width: 56, height: 56, borderRadius: 16,
+              background: "var(--accent-soft)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+            }}>
+              <UploadSimple size={24} weight="light" color="var(--accent)" />
+            </div>
+            <strong style={{ fontSize: 16, color: "var(--text-primary)" }}>
+              No CVs uploaded yet
+            </strong>
+            <span style={{ fontSize: 13, color: "var(--text-secondary)", maxWidth: 280 }}>
+              Upload your first CV to get AI-powered match analysis and improvement suggestions.
+            </span>
+            <button
+              type="button"
+              className="fc-btn fc-btn--primary"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <UploadSimple size={16} weight="light" />
+              Upload CV
+            </button>
+          </div>
+        </BezelCard>
       ) : (
         <div
           style={{

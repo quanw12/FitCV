@@ -1,3 +1,5 @@
+import { useState } from "react"
+import { ChartBar } from "@phosphor-icons/react"
 import { Download, Calendar, TrendingUp, PieChart as PieIcon, BarChart3, Activity } from 'lucide-react'
 import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -38,6 +40,8 @@ const kpis = [
   { label: 'Active Job Posts', value: '4', icon: '📋', color: '#6B7280', bg: '#F3F4F6', delta: '+1 this week' },
 ]
 
+import BezelCard from "@/ui/components/BezelCard"
+
 const tooltipStyle = {
   background: 'var(--surface)',
   border: '1px solid var(--border)',
@@ -48,6 +52,46 @@ const tooltipStyle = {
 }
 
 export default function ReportsScreen() {
+  const [dataReady] = useState(true)
+
+  if (!dataReady) {
+    return (
+      <div className="fc-stagger">
+        <div className="fc-page-head">
+          <div>
+            <div className="fc-eyebrow" style={{ marginBottom: 6 }}>HR · Performance</div>
+            <h1>Reports &amp; Analytics</h1>
+            <p>Recruitment performance overview for TechViet Solutions.</p>
+          </div>
+        </div>
+        <BezelCard>
+          <div style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: 12,
+            padding: "48px 24px",
+            textAlign: "center",
+          }}>
+            <div style={{
+              width: 56, height: 56, borderRadius: 16,
+              background: "var(--accent-soft)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+            }}>
+              <ChartBar size={24} weight="light" color="var(--accent)" />
+            </div>
+            <strong style={{ fontSize: 16, color: "var(--text-primary)" }}>
+              No reports yet
+            </strong>
+            <span style={{ fontSize: 13, color: "var(--text-secondary)", maxWidth: 280 }}>
+              Reports are generated as candidates move through your hiring pipeline. Start by creating a job post and reviewing candidates.
+            </span>
+          </div>
+        </BezelCard>
+      </div>
+    )
+  }
+
   return (
     <div className="fc-stagger">
       <div className="fc-page-head">

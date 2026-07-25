@@ -32,9 +32,12 @@ import {
   XAxis,
   YAxis,
 } from "recharts"
+import { toast } from "sonner"
+
 import { applicationsApi } from "@/api/applicationsApi"
 import { jdLibraryApi } from "@/api/jdLibraryApi"
 import { jobsApi } from "@/api/jobsApi"
+import BezelCard from "@/ui/components/BezelCard"
 
 import { profileApi } from "@/api/profileApi"
 
@@ -448,10 +451,39 @@ export default function JDLibraryScreen({
               <h2>My analyzed JD library</h2>
             </div>
             {savedJds.length === 0 ? (
-              <p style={{ color: "var(--text-secondary)", fontSize: 13 }}>
-                JDs used in Match Analyzer are saved here automatically with
-                their parsed skill requirements.
-              </p>
+              <BezelCard innerClassName="fc-stagger">
+                <div style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  gap: 12,
+                  padding: "36px 24px",
+                  textAlign: "center",
+                }}>
+                  <div style={{
+                    width: 56, height: 56, borderRadius: 16,
+                    background: "var(--accent-soft)",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                  }}>
+                    <BookOpenText size={24} weight="light" color="var(--accent)" />
+                  </div>
+                  <strong style={{ fontSize: 16, color: "var(--text-primary)" }}>
+                    No analyzed JDs yet
+                  </strong>
+                  <span style={{ fontSize: 13, color: "var(--text-secondary)", maxWidth: 280 }}>
+                    JDs used in Match Analyzer are saved here automatically with
+                    their parsed skill requirements and recurring skill demand data.
+                  </span>
+                  <button
+                    type="button"
+                    className="fc-btn fc-btn--primary"
+                    onClick={() => toast.info("Use the Match Analyzer to analyze a job description")}
+                  >
+                    <BookOpenText size={16} weight="light" />
+                    Analyze a JD
+                  </button>
+                </div>
+              </BezelCard>
             ) : (
               <div style={{ display: "grid", gap: 10 }}>
                 {savedJds.map((item) => (
@@ -609,9 +641,38 @@ export default function JDLibraryScreen({
       {loading ? (
         <div className="fc-card fc-card--pad">Loading active jobs...</div>
       ) : filtered.length === 0 ? (
-        <div className="fc-card fc-card--pad">
-          No active jobs match your filters.
-        </div>
+        <BezelCard>
+          <div style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: 12,
+            padding: "48px 24px",
+            textAlign: "center",
+          }}>
+            <div style={{
+              width: 56, height: 56, borderRadius: 16,
+              background: "var(--accent-soft)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+            }}>
+              <MagnifyingGlass size={24} weight="light" color="var(--accent)" />
+            </div>
+            <strong style={{ fontSize: 16, color: "var(--text-primary)" }}>
+              No matching jobs found
+            </strong>
+            <span style={{ fontSize: 13, color: "var(--text-secondary)", maxWidth: 280 }}>
+              Try adjusting your search query or location filter to find more opportunities.
+            </span>
+            <button
+              type="button"
+              className="fc-btn fc-btn--secondary"
+              onClick={() => { setQuery(""); setLocation("") }}
+            >
+              <X size={16} weight="light" />
+              Clear filters
+            </button>
+          </div>
+        </BezelCard>
       ) : (
         <div
           style={{
