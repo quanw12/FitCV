@@ -290,8 +290,28 @@ export default function AuthScreen({ onAuth, startInRoleSelection = false }: Aut
         display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
         padding: '40px 46px', position: 'relative', overflow: 'hidden', color: 'white',
       }}>
-        <div className="fc-glow" style={{ width: 380, height: 380, top: -120, right: -120, opacity: 0.9 }} />
-        <div className="fc-glow" style={{ width: 260, height: 260, bottom: -90, left: -60, opacity: 0.7 }} />
+        <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none' }}>
+          <div
+            className="fc-mesh-orb"
+            style={{
+              width: 400,
+              height: 400,
+              top: '-10%',
+              right: '-10%',
+              background: 'radial-gradient(circle, rgba(37,99,235,0.3) 0%, transparent 70%)',
+            }}
+          />
+          <div
+            className="fc-mesh-orb"
+            style={{
+              width: 300,
+              height: 300,
+              bottom: '10%',
+              left: '-5%',
+              background: 'radial-gradient(circle, rgba(79,70,229,0.25) 0%, transparent 70%)',
+            }}
+          />
+        </div>
 
         {/* Brand row */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, position: 'relative', zIndex: 1 }}>
@@ -348,8 +368,9 @@ export default function AuthScreen({ onAuth, startInRoleSelection = false }: Aut
       </div>
 
       {/* Form panel */}
-      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)', padding: 48, overflowY: 'auto', position: 'relative' }}>
-        <div style={{ width: '100%', maxWidth: 440 }}>
+      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)', padding: 32 }}>
+        <div className="fc-bezel" style={{ width: '100%', maxWidth: 420 }}>
+          <div className="fc-bezel__inner" style={{ padding: 32 }}>
           {step === 'auth' ? (
             <>
               {/* Segmented mode toggle */}
@@ -538,6 +559,7 @@ export default function AuthScreen({ onAuth, startInRoleSelection = false }: Aut
           <p style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: 12, marginTop: 26 }}>
             By continuing, you agree to FitCV&apos;s Terms of Service and Privacy Policy
           </p>
+          </div>
         </div>
       </div>
     </div>
