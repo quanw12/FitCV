@@ -1,7 +1,5 @@
 import { useState } from 'react'
-import {
-  Zap, ChevronLeft, ChevronRight, Bell, Search, LogOut, ChevronDown, Command,
-} from 'lucide-react'
+import { Lightning, CaretLeft, CaretRight, CaretDown, Bell, MagnifyingGlass, SignOut, Command } from '@phosphor-icons/react'
 import { getPortalNavigation } from '@/data/navigation'
 import type { Portal, ScreenId } from '@/types/app'
 
@@ -29,7 +27,7 @@ export default function Layout({ portal, currentScreen, onNavigate, onLogout, ch
       <aside className="fc-sidebar" style={{ width: collapsed ? 'var(--sidebar-w-collapsed)' : 'var(--sidebar-w)', minWidth: collapsed ? 'var(--sidebar-w-collapsed)' : 'var(--sidebar-w)' }}>
         <div className="fc-sidebar__brand">
           <div className="fc-brandmark">
-            <Zap size={20} color="white" fill="white" />
+            <Lightning size={20} color="white" weight="light" />
           </div>
           {!collapsed && (
             <div>
@@ -63,7 +61,7 @@ export default function Layout({ portal, currentScreen, onNavigate, onLogout, ch
             className="fc-navitem"
             style={{ justifyContent: collapsed ? 'center' : 'flex-start', marginBottom: 0 }}
           >
-            {collapsed ? <ChevronRight size={16} /> : <><ChevronLeft size={16} /><span>Collapse</span></>}
+            {collapsed ? <CaretRight size={16} weight="light" /> : <><CaretLeft size={16} weight="light" /><span>Collapse</span></>}
           </button>
         </div>
       </aside>
@@ -72,18 +70,18 @@ export default function Layout({ portal, currentScreen, onNavigate, onLogout, ch
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <header className="fc-topbar">
           <div className="fc-search">
-            <Search size={15} color="var(--text-muted)" />
+            <MagnifyingGlass size={15} weight="light" color="var(--text-muted)" />
             <input
               placeholder="Search candidates, jobs, insights…"
               style={{ border: 'none', background: 'transparent', fontSize: 14, color: 'var(--text-primary)', outline: 'none', width: '100%' }}
             />
-            <kbd style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', border: '1px solid var(--border)', borderRadius: 6, padding: '2px 6px', display: 'flex', alignItems: 'center', gap: 3, background: 'var(--surface)' }}><Command size={10} />K</kbd>
+            <kbd style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', border: '1px solid var(--border)', borderRadius: 6, padding: '2px 6px', display: 'flex', alignItems: 'center', gap: 3, background: 'var(--surface)' }}><Command size={10} weight="light" />K</kbd>
           </div>
 
           <div style={{ flex: 1 }} />
 
           <button className="fc-icon-btn" aria-label="Notifications">
-            <Bell size={20} />
+            <Bell size={20} weight="light" />
             <span style={{ position: 'absolute', top: 7, right: 7, width: 8, height: 8, background: 'var(--danger)', borderRadius: '50%', border: '2px solid white', animation: 'fc-pulse-dot 2s ease-in-out infinite' }} />
           </button>
 
@@ -114,7 +112,7 @@ export default function Layout({ portal, currentScreen, onNavigate, onLogout, ch
                 )}
               </span>
               <span style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--text-primary)' }}>{userName}</span>
-              <ChevronDown size={14} color="var(--text-muted)" />
+              <CaretDown size={14} weight="light" color="var(--text-muted)" />
             </button>
             {showUserMenu && (
               <div style={{ position: 'absolute', top: '100%', right: 0, marginTop: 10, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, boxShadow: 'var(--shadow-lg)', padding: 8, minWidth: 180, zIndex: 100, animation: 'fc-pop 0.14s ease' }}>
@@ -126,7 +124,7 @@ export default function Layout({ portal, currentScreen, onNavigate, onLogout, ch
                   onClick={onLogout}
                   style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 9, padding: '9px 12px', borderRadius: 9, border: 'none', background: 'transparent', color: 'var(--danger)', fontSize: 13.5, fontWeight: 600, cursor: 'pointer' }}
                 >
-                  <LogOut size={15} /> Sign out
+                  <SignOut size={15} weight="light" /> Sign out
                 </button>
               </div>
             )}
