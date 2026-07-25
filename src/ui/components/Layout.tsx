@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Lightning, CaretLeft, CaretRight, SignOut } from '@phosphor-icons/react'
 import FloatingTopbar from "./FloatingTopbar"
+import CommandPalette from "./CommandPalette"
 import { getPortalNavigation } from '@/data/navigation'
 import type { Portal, ScreenId } from '@/types/app'
 
@@ -17,6 +18,18 @@ interface LayoutProps {
 export default function Layout({ portal, currentScreen, onNavigate, onLogout, children, userName = 'Nguyen Minh', userAvatarUrl }: LayoutProps) {
   const [collapsed, setCollapsed] = useState(false)
   const [showUserMenu, setShowUserMenu] = useState(false)
+  const [paletteOpen, setPaletteOpen] = useState(false)
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault()
+        setPaletteOpen((p) => !p)
+      }
+    }
+    window.addEventListener("keydown", handler)
+    return () => window.removeEventListener("keydown", handler)
+  }, [])
 
   const navItems = getPortalNavigation(portal)
   const portalLabel = portal === 'seeker' ? 'Job Seeker' : 'HR Recruiter'
@@ -72,7 +85,7 @@ export default function Layout({ portal, currentScreen, onNavigate, onLogout, ch
           <FloatingTopbar
             userName={userName}
             userAvatarUrl={userAvatarUrl}
-            onSearchFocus={() => {}}
+            onSearchFocus={() => setPaletteOpen(true)}
             onUserMenuClick={() => setShowUserMenu(!showUserMenu)}
           />
           {showUserMenu && (
@@ -96,6 +109,13 @@ export default function Layout({ portal, currentScreen, onNavigate, onLogout, ch
         </main>
         <div className="fc-grain" />
       </div>
+
+      <CommandPalette
+        portal={portal}
+        isOpen={paletteOpen}
+        onClose={() => setPaletteOpen(false)}
+        onNavigate={onNavigate}
+      />
     </div>
   )
 }
