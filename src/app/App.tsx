@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react"
+import { toast } from "sonner"
 
 import { authApi, profileApi } from "@/api"
 
 import AuthScreen from "@/ui/screens/AuthScreen"
 
 import Layout from "@/ui/components/Layout"
+import ToastProvider from "@/ui/components/ToastProvider"
 
 import SeekerDashboard from "@/ui/screens/SeekerDashboard"
 
@@ -125,6 +127,8 @@ export default function App() {
     setImprovementMatchResultId(null)
     setTrackerFocusApplicationId(null)
 
+    toast.success(`Welcome, ${nextSession.user.fullName}`)
+
     if (nextSession.user.role) {
       const nextPortal = portalFromAccountRole(nextSession.user.role)
 
@@ -137,6 +141,8 @@ export default function App() {
       clearStoredImprovementMatchResultId(session.user.accountId)
     }
     authApi.logout()
+
+    toast("Signed out successfully")
 
     setSession(null)
     setCompanyProfileGate("complete")
@@ -315,15 +321,18 @@ export default function App() {
   }
 
   return (
-    <Layout
-      portal={portal}
-      currentScreen={screen}
-      onNavigate={handleNavigate}
-      onLogout={handleLogout}
-      userName={session.user.fullName}
-      userAvatarUrl={session.user.avatarUrl}
-    >
-      {renderScreen()}
-    </Layout>
+    <>
+      <ToastProvider />
+      <Layout
+        portal={portal}
+        currentScreen={screen}
+        onNavigate={handleNavigate}
+        onLogout={handleLogout}
+        userName={session.user.fullName}
+        userAvatarUrl={session.user.avatarUrl}
+      >
+        {renderScreen()}
+      </Layout>
+    </>
   )
 }
