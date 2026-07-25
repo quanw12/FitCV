@@ -1,3 +1,4 @@
+import { motion, useReducedMotion } from "motion/react"
 import { getScoreTone } from '@/services/matchScore'
 
 interface ScoreRingProps {
@@ -13,9 +14,21 @@ export default function ScoreRing({ score, size = 100, strokeWidth = 10, label, 
   const circumference = 2 * Math.PI * radius
   const dashOffset = circumference - (score / 100) * circumference
   const { color, trackColor } = getScoreTone(score)
+  const reduce = useReducedMotion()
 
   return (
-    <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+    <motion.div
+      initial={reduce ? false : { opacity: 0, scale: 0.8 }}
+      whileInView={{ opacity: 1, scale: 1 }}
+      viewport={{ once: true }}
+      transition={{
+        type: "spring",
+        stiffness: 80,
+        damping: 15,
+        delay: 0.1,
+      }}
+      style={{ position: "relative", display: "inline-flex", alignItems: "center", justifyContent: "center" }}
+    >
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ filter: `drop-shadow(0 4px 10px ${color}22)` }}>
         <circle
           cx={size / 2} cy={size / 2} r={radius}
@@ -37,6 +50,6 @@ export default function ScoreRing({ score, size = 100, strokeWidth = 10, label, 
           {label && <div style={{ fontSize: size * 0.11, color: 'var(--text-secondary)', fontWeight: 500, marginTop: 2 }}>{label}</div>}
         </div>
       )}
-    </div>
+    </motion.div>
   )
 }
