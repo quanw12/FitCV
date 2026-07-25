@@ -1,37 +1,27 @@
-import { useEffect, useState } from "react"
+import { lazy, Suspense, useEffect, useState } from "react"
 import { toast } from "sonner"
+import { AnimatePresence } from "framer-motion"
 
 import { authApi, profileApi } from "@/api"
 
-import AuthScreen from "@/ui/screens/AuthScreen"
-
 import Layout from "@/ui/components/Layout"
 import ToastProvider from "@/ui/components/ToastProvider"
+import FullPageSkeleton from "@/ui/components/FullPageSkeleton"
 
-import SeekerDashboard from "@/ui/screens/SeekerDashboard"
-
-import AnalyzerScreen from "@/ui/screens/AnalyzerScreen"
-
-import ImprovementScreen from "@/ui/screens/ImprovementScreen"
-
-import CVHistoryScreen from "@/ui/screens/CVHistoryScreen"
-
-import AppTrackerScreen from "@/ui/screens/AppTrackerScreen"
-
-import JDLibraryScreen from "@/ui/screens/JDLibraryScreen"
-
-import HRDashboard from "@/ui/screens/HRDashboard"
-
-import JobPostsScreen from "@/ui/screens/JobPostsScreen"
-
-import CVRankingScreen from "@/ui/screens/CVRankingScreen"
-
-import PipelineScreen from "@/ui/screens/PipelineScreen"
-
-import AutoEmailScreen from "@/ui/screens/AutoEmailScreen"
-
-import ReportsScreen from "@/ui/screens/ReportsScreen"
-import ProfileScreen from "@/ui/screens/ProfileScreen"
+const AuthScreen = lazy(() => import("@/ui/screens/AuthScreen"))
+const SeekerDashboard = lazy(() => import("@/ui/screens/SeekerDashboard"))
+const AnalyzerScreen = lazy(() => import("@/ui/screens/AnalyzerScreen"))
+const ImprovementScreen = lazy(() => import("@/ui/screens/ImprovementScreen"))
+const CVHistoryScreen = lazy(() => import("@/ui/screens/CVHistoryScreen"))
+const AppTrackerScreen = lazy(() => import("@/ui/screens/AppTrackerScreen"))
+const JDLibraryScreen = lazy(() => import("@/ui/screens/JDLibraryScreen"))
+const HRDashboard = lazy(() => import("@/ui/screens/HRDashboard"))
+const JobPostsScreen = lazy(() => import("@/ui/screens/JobPostsScreen"))
+const CVRankingScreen = lazy(() => import("@/ui/screens/CVRankingScreen"))
+const PipelineScreen = lazy(() => import("@/ui/screens/PipelineScreen"))
+const AutoEmailScreen = lazy(() => import("@/ui/screens/AutoEmailScreen"))
+const ReportsScreen = lazy(() => import("@/ui/screens/ReportsScreen"))
+const ProfileScreen = lazy(() => import("@/ui/screens/ProfileScreen"))
 
 import type { Portal, ScreenId } from "@/types/app"
 import type { AnalyzerDraftState } from "@/types/analyzer"
@@ -178,10 +168,12 @@ export default function App() {
 
   if (!session || session.requiresRoleSelection || !portal) {
     return (
-      <AuthScreen
-        onAuth={handleAuth}
-        startInRoleSelection={Boolean(session?.requiresRoleSelection)}
-      />
+      <Suspense fallback={<FullPageSkeleton />}>
+        <AuthScreen
+          onAuth={handleAuth}
+          startInRoleSelection={Boolean(session?.requiresRoleSelection)}
+        />
+      </Suspense>
     )
   }
 
@@ -239,15 +231,17 @@ export default function App() {
             </button>
           </header>
           <main style={{ padding: "28px 20px 48px" }}>
-            <ProfileScreen
-              session={session}
-              onSessionChange={setSession}
-              companyOnboarding
-              onProfileSaved={(profile) => {
-                if (isCompanyProfileComplete(profile))
-                  setCompanyProfileGate("complete")
-              }}
-            />
+            <Suspense fallback={<FullPageSkeleton />}>
+              <ProfileScreen
+                session={session}
+                onSessionChange={setSession}
+                companyOnboarding
+                onProfileSaved={(profile) => {
+                  if (isCompanyProfileComplete(profile))
+                    setCompanyProfileGate("complete")
+                }}
+              />
+            </Suspense>
           </main>
         </div>
       )
@@ -331,7 +325,11 @@ export default function App() {
         userName={session.user.fullName}
         userAvatarUrl={session.user.avatarUrl}
       >
-        {renderScreen()}
+        <AnimatePresence mode="wait">
+          <Suspense fallback={<FullPageSkeleton />}>
+            <div key={screen}>{renderScreen()}</div>
+          </Suspense>
+        </AnimatePresence>
       </Layout>
     </>
   )
