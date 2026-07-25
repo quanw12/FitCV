@@ -1,15 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 
 import {
-  AlertCircle,
-  BarChart3,
+  WarningCircle,
+  ChartBar,
   Check,
   FileText,
-  GitCompare,
-  RefreshCw,
-  Trash2,
-  Upload,
-} from "lucide-react"
+  GitBranch,
+  ArrowsClockwise,
+  TrashSimple,
+  UploadSimple,
+} from "@phosphor-icons/react"
 import {
   CartesianGrid,
   Line,
@@ -180,7 +180,7 @@ export default function CVHistoryScreen() {
             onClick={() => void loadCvs()}
             disabled={loading}
           >
-            <RefreshCw size={15} /> Refresh
+            <ArrowsClockwise size={15} weight="light" /> Refresh
           </button>
           <button
             type="button"
@@ -188,7 +188,7 @@ export default function CVHistoryScreen() {
             onClick={() => fileInputRef.current?.click()}
             disabled={uploading}
           >
-            <Upload size={15} />
+            <UploadSimple size={15} weight="light" />
             {uploading ? "Uploading…" : "Upload new version"}
           </button>
           <input
@@ -206,7 +206,7 @@ export default function CVHistoryScreen() {
 
       {error && (
         <div role="alert" style={alertStyle}>
-          <AlertCircle size={18} /> {error}
+          <WarningCircle size={18} weight="light" /> {error}
         </div>
       )}
 
@@ -326,7 +326,7 @@ export default function CVHistoryScreen() {
 
       {!loading && cvs.length > 0 && comparisons.length === 0 && (
         <div style={selectionHintStyle}>
-          <BarChart3 size={16} /> Analyze at least one CV against a JD to start
+          <ChartBar size={16} weight="light" /> Analyze at least one CV against a JD to start
           the score history. Analyze two versions against the same JD to see
           improvement.
         </div>
@@ -338,7 +338,7 @@ export default function CVHistoryScreen() {
         </div>
       ) : cvs.length === 0 ? (
         <div className="fitcv-card" style={emptyStyle}>
-          <FileText size={34} color="#94A3B8" />
+          <FileText size={34} weight="light" color="#94A3B8" />
           <strong>No CV versions yet</strong>
           <span>Upload a PDF or DOCX (max 10 MB) to create version 1.</span>
         </div>
@@ -382,7 +382,7 @@ export default function CVHistoryScreen() {
                   </span>
                 )}
                 <div style={fileIconStyle}>
-                  <FileText size={22} />
+                  <FileText size={22} weight="light" />
                 </div>
                 <div
                   title={cv.fileName}
@@ -418,9 +418,9 @@ export default function CVHistoryScreen() {
                     style={{ flex: 1, justifyContent: "center" }}
                   >
                     {isSelected ? (
-                      <Check size={14} />
+                      <Check size={14} weight="light" />
                     ) : (
-                      <GitCompare size={14} />
+                      <GitBranch size={14} weight="light" />
                     )}
                     {isSelected ? "Selected" : "Compare"}
                   </button>
@@ -431,7 +431,7 @@ export default function CVHistoryScreen() {
                     disabled={deletingId === cv.cvId}
                     style={deleteButtonStyle}
                   >
-                    <Trash2 size={15} />
+                    <TrashSimple size={15} weight="light" />
                   </button>
                 </div>
               </article>

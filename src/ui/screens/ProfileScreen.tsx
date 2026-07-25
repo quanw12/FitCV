@@ -1,15 +1,15 @@
 import { useEffect, useMemo, useRef, useState, type DragEvent, type FormEvent } from "react"
 import {
-  AlertCircle,
-  Building2,
-  CheckCircle2,
-  Loader2,
-  Image as ImageIcon,
-  Save,
-  Trash2,
-  Upload,
-  UserRound,
-} from "lucide-react"
+  WarningCircle,
+  Buildings,
+  CheckCircle,
+  Spinner,
+  Image,
+  FloppyDisk,
+  TrashSimple,
+  UploadSimple,
+  UserCircle,
+} from "@phosphor-icons/react"
 import { authApi, profileApi } from "@/api"
 import type { AuthSession } from "@/types/auth"
 import type { ProfileUpdate, UserProfile } from "@/types/profile"
@@ -290,7 +290,7 @@ export default function ProfileScreen({
         }}
       >
         <span style={{ display: "flex", alignItems: "center", gap: 9 }}>
-          <Loader2 className="fitcv-spin" size={20} /> Loading profile...
+          <Spinner className="fitcv-spin" size={20} weight="light" /> Loading profile...
         </span>
       </div>
     )
@@ -329,7 +329,7 @@ export default function ProfileScreen({
             color: "#B91C1C",
           }}
         >
-          <AlertCircle size={18} />
+          <WarningCircle size={18} weight="light" />
           {error}
         </div>
       )}
@@ -346,7 +346,7 @@ export default function ProfileScreen({
             color: "#15803D",
           }}
         >
-          <CheckCircle2 size={18} />
+          <CheckCircle size={18} weight="light" />
           {success}
         </div>
       )}
@@ -419,7 +419,7 @@ export default function ProfileScreen({
                 marginBottom: 12,
               }}
             >
-              <UserRound size={17} />
+              <UserCircle size={17} weight="light" />
               <strong>Account</strong>
             </div>
             {[
@@ -484,7 +484,7 @@ export default function ProfileScreen({
           {hasCompanyRole && (
             <section style={{ padding: "4px 2px" }}>
               <h2 style={{ fontSize: 17, margin: "0 0 18px", display: "flex", alignItems: "center", gap: 8 }}>
-                <Building2 size={18} /> Company details
+                <Buildings size={18} weight="light" /> Company details
               </h2>
               <div className="fitcv-form-grid">
                 <Field label="Company name" value={form.companyName} onChange={set("companyName")} maxLength={200} required placeholder="FitCV Technologies" />
@@ -511,7 +511,7 @@ export default function ProfileScreen({
                 alignItems: "center",
               }}
             >
-              <ImageIcon size={18} /> Profile photo
+              <Image size={18} weight="light" /> Profile photo
             </h2>
             <div
               onDragOver={(event) => { event.preventDefault(); setDragging(true) }}
@@ -526,9 +526,9 @@ export default function ProfileScreen({
               </div>
               <input ref={fileInput} hidden type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => void chooseAvatar(event.target.files?.[0])} />
               <button type="button" disabled={avatarBusy} onClick={() => fileInput.current?.click()} style={{ border: "1px solid var(--border)", borderRadius: 9, background: "white", padding: "9px 12px", display: "flex", gap: 7, alignItems: "center", cursor: avatarBusy ? "wait" : "pointer", fontWeight: 650 }}>
-                {avatarBusy ? <Loader2 className="fitcv-spin" size={16} /> : <Upload size={16} />} {avatarBusy ? "Uploading..." : "Choose photo"}
+                {avatarBusy ? <Spinner className="fitcv-spin" size={16} weight="light" /> : <UploadSimple size={16} weight="light" />} {avatarBusy ? "Uploading..." : "Choose photo"}
               </button>
-              {(profile?.avatarUrl || avatarPreview) && <button type="button" disabled={avatarBusy} onClick={() => void removeAvatar()} aria-label="Remove profile photo" style={{ border: 0, background: "transparent", color: "#DC2626", padding: 8, display: "flex", gap: 6, alignItems: "center", cursor: avatarBusy ? "wait" : "pointer", fontWeight: 650 }}><Trash2 size={16} /> Remove</button>}
+              {(profile?.avatarUrl || avatarPreview) && <button type="button" disabled={avatarBusy} onClick={() => void removeAvatar()} aria-label="Remove profile photo" style={{ border: 0, background: "transparent", color: "#DC2626", padding: 8, display: "flex", gap: 6, alignItems: "center", cursor: avatarBusy ? "wait" : "pointer", fontWeight: 650 }}><TrashSimple size={16} weight="light" /> Remove</button>}
             </div>
           </section>
           <div style={{ display: "flex", justifyContent: "flex-end" }}>
@@ -555,9 +555,9 @@ export default function ProfileScreen({
               }}
             >
               {saving ? (
-                <Loader2 className="fitcv-spin" size={17} />
+                <Spinner className="fitcv-spin" size={17} weight="light" />
               ) : (
-                <Save size={17} />
+                <FloppyDisk size={17} weight="light" />
               )}
               {saving
                 ? "Saving..."

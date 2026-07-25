@@ -1,18 +1,18 @@
 import { type FormEvent, useEffect, useMemo, useState } from "react"
 import {
-  AlertCircle,
+  WarningCircle,
   Bell,
   Clock,
-  ExternalLink,
-  LoaderCircle,
-  MessageSquare,
-  Pencil,
+  ArrowSquareOut,
+  Spinner,
+  ChatText,
+  PencilSimpleLine,
   Plus,
-  Search,
-  Send,
-  Trash2,
+  MagnifyingGlass,
+  PaperPlaneRight,
+  TrashSimple,
   X,
-} from "lucide-react"
+} from "@phosphor-icons/react"
 import {
   Bar,
   BarChart,
@@ -159,7 +159,7 @@ function ModalShell({
             onClick={onClose}
             aria-label="Close dialog"
           >
-            <X size={18} />
+            <X size={18} weight="light" />
           </button>
         </div>
         {children}
@@ -214,7 +214,7 @@ function ApplicationFormModal({
       <form onSubmit={submit} style={{ display: "grid", gap: 15 }}>
         {error && (
           <div className="tracker-alert tracker-alert--error">
-            <AlertCircle size={15} /> {error}
+            <WarningCircle size={15} weight="light" /> {error}
           </div>
         )}
         <div className="tracker-form-grid">
@@ -313,7 +313,7 @@ function ApplicationFormModal({
             Cancel
           </button>
           <button type="submit" className="fitcv-btn-primary" disabled={saving}>
-            {saving && <LoaderCircle className="tracker-spin" size={15} />}
+            {saving && <Spinner className="tracker-spin" size={15} weight="light" />}
             {saving ? "Saving..." : "Save application"}
           </button>
         </div>
@@ -377,7 +377,7 @@ function ApplicationDetailModal({
               disabled={busy || !note.trim()}
               aria-label="Add note"
             >
-              <Send size={15} />
+              <PaperPlaneRight size={15} weight="light" />
             </button>
           </form>
           {error && (
@@ -406,7 +406,7 @@ function ApplicationDetailModal({
                     }}
                     aria-label="Delete note"
                   >
-                    <Trash2 size={13} />
+                    <TrashSimple size={13} weight="light" />
                   </button>
                 </div>
               </article>
@@ -596,13 +596,13 @@ export default function AppTrackerScreen() {
           className="fitcv-btn-primary"
           onClick={() => setFormState({ id: null, initial: emptyForm() })}
         >
-          <Plus size={15} /> Add application
+          <Plus size={15} weight="light" /> Add application
         </button>
       </div>
 
       {error && (
         <div className="tracker-alert tracker-alert--error" role="alert">
-          <AlertCircle size={16} /> <span>{error}</span>
+          <WarningCircle size={16} weight="light" /> <span>{error}</span>
           <button onClick={() => void load()}>Retry</button>
         </div>
       )}
@@ -621,7 +621,7 @@ export default function AppTrackerScreen() {
               <h2>{stats.total} applications</h2>
             </div>
             <span className="fc-badge fc-badge--amber">
-              <Bell size={12} /> {stats.remindersDue} due
+              <Bell size={12} weight="light" /> {stats.remindersDue} due
             </span>
           </div>
           <ResponsiveContainer width="100%" height={130}>
@@ -662,7 +662,7 @@ export default function AppTrackerScreen() {
 
       <div className="tracker-filters">
         <label className="fc-search tracker-search">
-          <Search size={15} />
+          <MagnifyingGlass size={15} weight="light" />
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -684,7 +684,7 @@ export default function AppTrackerScreen() {
           className={`fc-chip ${remindersOnly ? "fc-chip--active" : ""}`}
           onClick={() => setRemindersOnly((value) => !value)}
         >
-          <Bell size={13} /> Follow-ups
+          <Bell size={13} weight="light" /> Follow-ups
         </button>
       </div>
       <div className="tracker-status-filters" aria-label="Filter by status">
@@ -704,12 +704,12 @@ export default function AppTrackerScreen() {
       <div className="fitcv-card tracker-table-wrap">
         {loading ? (
           <div className="tracker-empty">
-            <LoaderCircle className="tracker-spin" size={24} />
+            <Spinner className="tracker-spin" size={24} weight="light" />
             <strong>Loading applications...</strong>
           </div>
         ) : filtered.length === 0 ? (
           <div className="tracker-empty">
-            <MessageSquare size={28} />
+            <ChatText size={28} weight="light" />
             <strong>
               {applications.length
                 ? "No applications match these filters."
@@ -751,7 +751,7 @@ export default function AppTrackerScreen() {
                           <strong>{application.companyName}</strong>
                           {application.reminderDue && (
                             <small>
-                              <Clock size={11} /> {application.reminderReason}
+                              <Clock size={11} weight="light" /> {application.reminderReason}
                             </small>
                           )}
                         </div>
@@ -804,7 +804,7 @@ export default function AppTrackerScreen() {
                           }
                           aria-label="Open notes"
                         >
-                          <MessageSquare size={14} />
+                          <ChatText size={14} weight="light" />
                           <span>{application.noteCount}</span>
                         </button>
                         {application.jobUrl && (
@@ -814,7 +814,7 @@ export default function AppTrackerScreen() {
                             rel="noreferrer"
                             aria-label="Open job posting"
                           >
-                            <ExternalLink size={14} />
+                            <ArrowSquareOut size={14} weight="light" />
                           </a>
                         )}
                         <button
@@ -826,13 +826,13 @@ export default function AppTrackerScreen() {
                           }
                           aria-label="Edit application"
                         >
-                          <Pencil size={14} />
+                          <PencilSimpleLine size={14} weight="light" />
                         </button>
                         <button
                           onClick={() => void removeApplication(application)}
                           aria-label="Delete application"
                         >
-                          <Trash2 size={14} />
+                          <TrashSimple size={14} weight="light" />
                         </button>
                       </div>
                     </td>

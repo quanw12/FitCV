@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
-  AlertCircle,
-  BriefcaseBusiness,
-  CalendarDays,
+  WarningCircle,
+  Briefcase,
+  CalendarBlank,
   FileText,
-  Inbox,
+  Tray,
   MapPin,
-  RefreshCw,
-  Search,
-} from "lucide-react"
+  ArrowsClockwise,
+  MagnifyingGlass,
+} from "@phosphor-icons/react"
 
 import { applicationsApi } from "@/api/applicationsApi"
 import type {
@@ -419,7 +419,7 @@ export default function AppTrackerScreen({
           onClick={() => void loadApplications()}
           disabled={loading}
         >
-          <RefreshCw size={15} />
+          <ArrowsClockwise size={15} weight="light" />
           Refresh
         </button>
       </header>
@@ -457,7 +457,7 @@ export default function AppTrackerScreen({
 
       {error && (
         <div role="alert" style={alertStyle}>
-          <AlertCircle size={18} />
+          <WarningCircle size={18} weight="light" />
           <span style={{ flex: 1 }}>{error}</span>
           <button
             type="button"
@@ -472,7 +472,7 @@ export default function AppTrackerScreen({
       {!loading && !error && applications.length > 0 && (
         <div className="tracker-toolbar">
           <label className="tracker-search">
-            <Search size={16} color="var(--text-muted)" />
+            <MagnifyingGlass size={16} weight="light" color="var(--text-muted)" />
             <span className="sr-only">Search applications</span>
             <input
               value={search}
@@ -522,18 +522,18 @@ export default function AppTrackerScreen({
 
       {loading ? (
         <StatePanel>
-          <RefreshCw className="state-spinner" size={30} />
+          <ArrowsClockwise className="state-spinner" size={30} weight="light" />
           <strong>Loading your applications</strong>
         </StatePanel>
       ) : error ? null : applications.length === 0 ? (
         <StatePanel>
-          <Inbox size={36} color="#94A3B8" />
+          <Tray size={36} weight="light" color="#94A3B8" />
           <strong>No applications yet</strong>
           <span>Your submitted jobs will appear here.</span>
         </StatePanel>
       ) : filteredApplications.length === 0 ? (
         <StatePanel>
-          <Search size={34} color="#94A3B8" />
+          <MagnifyingGlass size={34} weight="light" color="#94A3B8" />
           <strong>No matching applications</strong>
           <span>Try another search term or stage.</span>
         </StatePanel>
@@ -610,20 +610,20 @@ export default function AppTrackerScreen({
 
                 <div className="tracker-card__meta">
                   <span className="tracker-meta-item">
-                    <CalendarDays size={14} />
+                    <CalendarBlank size={14} weight="light" />
                     Applied {formatDate(application.applied_at)}
                   </span>
                   <span className="tracker-meta-item">
-                    <MapPin size={14} />
+                    <MapPin size={14} weight="light" />
                     {application.job.location || "Location not specified"}
                   </span>
                   <span className="tracker-meta-item">
-                    <BriefcaseBusiness size={14} />
+                    <Briefcase size={14} weight="light" />
                     {application.job.employment_type ||
                       "Employment type not specified"}
                   </span>
                   <span className="tracker-meta-item">
-                    <FileText size={14} />
+                    <FileText size={14} weight="light" />
                     {application.cv.file_name}
                   </span>
                 </div>
@@ -656,9 +656,9 @@ export default function AppTrackerScreen({
                   <div className="tracker-retry">
                     <div role="status" className="tracker-retry__message">
                       {analysisFailed ? (
-                        <AlertCircle size={15} />
+                        <WarningCircle size={15} weight="light" />
                       ) : (
-                        <RefreshCw size={15} />
+                        <ArrowsClockwise size={15} weight="light" />
                       )}
                       <span>
                         {analysisFailed
@@ -676,9 +676,9 @@ export default function AppTrackerScreen({
                       disabled={retrying}
                     >
                       {retrying ? (
-                        <RefreshCw className="state-spinner" size={15} />
+                        <ArrowsClockwise className="state-spinner" size={15} weight="light" />
                       ) : (
-                        <RefreshCw size={15} />
+                        <ArrowsClockwise size={15} weight="light" />
                       )}
                       {retrying
                         ? "Analyzing..."

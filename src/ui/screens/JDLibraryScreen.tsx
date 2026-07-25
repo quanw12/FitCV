@@ -8,21 +8,21 @@ import {
 
 import {
   Briefcase,
-  BookOpen,
-  Building2,
-  Calendar,
-  CheckCircle2,
-  ExternalLink,
+  BookOpenText,
+  Buildings,
+  CalendarBlank,
+  CheckCircle,
+  ArrowSquareOut,
   FileText,
-  LoaderCircle,
+  Spinner,
   MapPin,
-  Search,
-  Send,
-  Trash2,
-  TrendingUp,
-  Upload,
+  MagnifyingGlass,
+  PaperPlaneRight,
+  TrashSimple,
+  TrendUp,
+  UploadSimple,
   X,
-} from "lucide-react"
+} from "@phosphor-icons/react"
 import {
   Bar,
   BarChart,
@@ -395,17 +395,17 @@ export default function JDLibraryScreen({
             }}
           >
             <InsightMetric
-              icon={<BookOpen size={18} />}
+              icon={<BookOpenText size={18} weight="light" />}
               label="Analyzed JDs"
               value={insights?.totalJobDescriptions ?? 0}
             />
             <InsightMetric
-              icon={<Briefcase size={18} />}
+              icon={<Briefcase size={18} weight="light" />}
               label="Completed matches"
               value={insights?.totalMatches ?? 0}
             />
             <InsightMetric
-              icon={<TrendingUp size={18} />}
+              icon={<TrendUp size={18} weight="light" />}
               label="Average match"
               value={
                 insights?.averageMatchScore == null
@@ -444,7 +444,7 @@ export default function JDLibraryScreen({
             style={{ marginBottom: 24 }}
           >
             <div className="fc-section-title" style={{ marginBottom: 14 }}>
-              <BookOpen size={16} />
+              <BookOpenText size={16} weight="light" />
               <h2>My analyzed JD library</h2>
             </div>
             {savedJds.length === 0 ? (
@@ -503,7 +503,7 @@ export default function JDLibraryScreen({
                             void deleteSavedJd(item)
                           }}
                         >
-                          <Trash2 size={15} />
+                          <TrashSimple size={15} weight="light" />
                         </button>
                       </span>
                     </summary>
@@ -548,7 +548,7 @@ export default function JDLibraryScreen({
       )}
 
       <div className="fc-section-title" style={{ marginBottom: 12 }}>
-        <Building2 size={16} />
+        <Buildings size={16} weight="light" />
         <h2>Active opportunities</h2>
       </div>
 
@@ -567,8 +567,9 @@ export default function JDLibraryScreen({
         <label>
           <span className="fc-field-label">Search jobs</span>
           <div style={{ position: "relative" }}>
-            <Search
+            <MagnifyingGlass
               size={16}
+              weight="light"
               style={{ position: "absolute", left: 12, top: 12 }}
             />
             <input
@@ -642,7 +643,7 @@ export default function JDLibraryScreen({
                     style={{ width: 44, height: 44, objectFit: "contain" }}
                   />
                 ) : (
-                  <Building2 size={32} />
+                  <Buildings size={32} weight="light" />
                 )}
                 <div>
                   <div style={{ fontSize: 12, color: "var(--text-muted)" }}>
@@ -652,7 +653,7 @@ export default function JDLibraryScreen({
                 </div>
               </div>
               <p>
-                <MapPin size={13} style={{ display: "inline" }} />{" "}
+                <MapPin size={13} weight="light" style={{ display: "inline" }} />{" "}
                 {job.location} - {job.employment_type}
               </p>
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -663,7 +664,7 @@ export default function JDLibraryScreen({
                   <span className="fc-badge fc-badge--blue">Applied</span>
                 )}
                 <span>
-                  <Calendar size={12} style={{ display: "inline" }} /> Apply by{" "}
+                  <CalendarBlank size={12} weight="light" style={{ display: "inline" }} /> Apply by{" "}
                   {job.deadline
                     ? new Date(job.deadline).toLocaleDateString()
                     : "open"}
@@ -720,7 +721,7 @@ export default function JDLibraryScreen({
                 <div className="fc-eyebrow">{selected.company.name}</div>
                 <h2 id="job-detail-title">{selected.title}</h2>
                 <p>
-                  <MapPin size={13} style={{ display: "inline" }} />{" "}
+                  <MapPin size={13} weight="light" style={{ display: "inline" }} />{" "}
                   {selected.location} - {selected.employment_type} -{" "}
                   {selected.openings_count} openings
                 </p>
@@ -730,7 +731,7 @@ export default function JDLibraryScreen({
                 aria-label="Close details"
                 onClick={() => setSelected(null)}
               >
-                <X size={16} />
+                <X size={16} weight="light" />
               </button>
             </div>
 
@@ -749,14 +750,14 @@ export default function JDLibraryScreen({
                     viewTracking(applicationByJob.get(selected.job_id)!)
                   }
                 >
-                  <ExternalLink size={15} /> View tracking
+                  <ArrowSquareOut size={15} weight="light" /> View tracking
                 </button>
               ) : (
                 <button
                   className="fc-btn fc-btn--primary"
                   onClick={() => setApplyJob(selected)}
                 >
-                  <Send size={15} /> Apply now
+                  <PaperPlaneRight size={15} weight="light" /> Apply now
                 </button>
               )}
               {selected.company.website_url && (
@@ -766,7 +767,7 @@ export default function JDLibraryScreen({
                   rel="noreferrer"
                   className="fc-btn fc-btn--secondary"
                 >
-                  <ExternalLink size={14} /> Company website
+                  <ArrowSquareOut size={14} weight="light" /> Company website
                 </a>
               )}
             </div>
@@ -774,7 +775,7 @@ export default function JDLibraryScreen({
             {sections.map(([key, label]) => (
               <section key={key} style={{ marginTop: 22 }}>
                 <div className="fc-section-title">
-                  <Briefcase size={15} />
+                  <Briefcase size={15} weight="light" />
                   <h3>{label}</h3>
                 </div>
                 <p style={{ whiteSpace: "pre-wrap", lineHeight: 1.65 }}>
@@ -837,14 +838,15 @@ export default function JDLibraryScreen({
                 onClick={closeApply}
                 disabled={submitting}
               >
-                <X size={17} />
+                <X size={17} weight="light" />
               </button>
             </div>
 
             {submittedApplicationId ? (
               <div style={{ textAlign: "center", padding: "28px 10px 10px" }}>
-                <CheckCircle2
+                <CheckCircle
                   size={48}
+                  weight="light"
                   color="var(--success)"
                   style={{ margin: "0 auto 14px" }}
                 />
@@ -863,7 +865,7 @@ export default function JDLibraryScreen({
                   className="fc-btn fc-btn--primary"
                   onClick={() => viewTracking(submittedApplicationId)}
                 >
-                  <ExternalLink size={15} /> View application tracking
+                  <ArrowSquareOut size={15} weight="light" /> View application tracking
                 </button>
               </div>
             ) : (
@@ -873,8 +875,9 @@ export default function JDLibraryScreen({
                     className="fc-panel"
                     style={{ padding: 12, marginBottom: 14 }}
                   >
-                    <LoaderCircle
+                    <Spinner
                       size={15}
+                      weight="light"
                       style={{
                         display: "inline",
 
@@ -1010,7 +1013,7 @@ export default function JDLibraryScreen({
                         flexShrink: 0,
                       }}
                     >
-                      {cvFile ? <FileText size={21} /> : <Upload size={21} />}
+                      {cvFile ? <FileText size={21} weight="light" /> : <UploadSimple size={21} weight="light" />}
                     </div>
                     <div style={{ minWidth: 0 }}>
                       <div
@@ -1058,12 +1061,13 @@ export default function JDLibraryScreen({
                     disabled={submitting || profileLoading}
                   >
                     {submitting ? (
-                      <LoaderCircle
+                      <Spinner
                         size={15}
+                        weight="light"
                         style={{ animation: "fc-spin .8s linear infinite" }}
                       />
                     ) : (
-                      <Send size={15} />
+                      <PaperPlaneRight size={15} weight="light" />
                     )}
                     {submitting ? "Submitting..." : "Submit application"}
                   </button>

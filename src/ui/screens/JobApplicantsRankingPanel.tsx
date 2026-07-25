@@ -1,25 +1,25 @@
 import { useEffect, useMemo, useState } from "react"
 import {
-  AlertCircle,
+  WarningCircle,
   Briefcase,
   Check,
-  CheckCircle2,
-  ChevronRight,
-  Clock3,
-  Download,
-  ExternalLink,
+  CheckCircle,
+  CaretRight,
+  Clock,
+  DownloadSimple,
+  ArrowSquareOut,
   FileText,
   GraduationCap,
-  LoaderCircle,
-  Mail,
+  Spinner,
+  Envelope,
   Phone,
-  RefreshCw,
-  ScanText,
+  ArrowsClockwise,
+  Scan,
   SlidersHorizontal,
-  Sparkles,
-  UserRound,
+  Sparkle,
+  UserCircle,
   X,
-} from "lucide-react"
+} from "@phosphor-icons/react"
 
 import { applicationsApi } from "@/api/applicationsApi"
 import { cvRankingApi } from "@/api/cvRankingApi"
@@ -61,17 +61,18 @@ function badgeClass(status: AnalysisState): string {
 }
 
 function statusIcon(status: AnalysisState) {
-  if (status === "Success") return <CheckCircle2 size={13} />
-  if (status === "Failed") return <AlertCircle size={13} />
+  if (status === "Success") return <CheckCircle size={13} weight="light" />
+  if (status === "Failed") return <WarningCircle size={13} weight="light" />
   if (status === "Processing") {
     return (
-      <LoaderCircle
+      <Spinner
         size={13}
+        weight="light"
         style={{ animation: "fc-spin .8s linear infinite" }}
       />
     )
   }
-  return <Clock3 size={13} />
+  return <Clock size={13} weight="light" />
 }
 
 function fileSizeLabel(sizeKb: number): string {
@@ -469,7 +470,7 @@ export default function JobApplicantsRankingPanel() {
                 style={{ animation: "fc-spin .8s linear infinite" }}
               />
             ) : (
-              <Download size={15} />
+              <DownloadSimple size={15} weight="light" />
             )}
             {archiveLoading ? "Preparing ZIP..." : "Download all CVs"}
           </button>
@@ -479,8 +480,9 @@ export default function JobApplicantsRankingPanel() {
             onClick={() => setReloadKey((current) => current + 1)}
             disabled={selectedJobId == null || applicationsLoading}
           >
-            <RefreshCw
+            <ArrowsClockwise
               size={15}
+              weight="light"
               style={
                 applicationsLoading
                   ? { animation: "fc-spin .8s linear infinite" }
@@ -561,6 +563,7 @@ export default function JobApplicantsRankingPanel() {
         <div className="fc-panel" style={{ padding: 32, textAlign: "center" }}>
           <Briefcase
             size={32}
+            weight="light"
             color="var(--text-muted)"
             style={{ margin: "0 auto 10px" }}
           />
@@ -571,8 +574,9 @@ export default function JobApplicantsRankingPanel() {
         </div>
       ) : applicationsLoading ? (
         <div className="fc-panel" style={{ padding: 32, textAlign: "center" }}>
-          <LoaderCircle
+          <Spinner
             size={28}
+            weight="light"
             color="var(--accent)"
             style={{
               margin: "0 auto 10px",
@@ -583,8 +587,9 @@ export default function JobApplicantsRankingPanel() {
         </div>
       ) : rankedApplications.length === 0 ? (
         <div className="fc-panel" style={{ padding: 32, textAlign: "center" }}>
-          <UserRound
+          <UserCircle
             size={32}
+            weight="light"
             color="var(--text-muted)"
             style={{ margin: "0 auto 10px" }}
           />
@@ -606,7 +611,7 @@ export default function JobApplicantsRankingPanel() {
               marginBottom: 14,
             }}
           >
-            <SlidersHorizontal size={16} color="var(--accent)" />
+            <SlidersHorizontal size={16} weight="light" color="var(--accent)" />
             <label
               style={{
                 display: "flex",
@@ -637,7 +642,7 @@ export default function JobApplicantsRankingPanel() {
               className="fc-btn fc-btn--secondary"
               onClick={selectByThreshold}
             >
-              <Check size={15} />
+              <Check size={15} weight="light" />
               Select score &gt;= {threshold}
             </button>
             <button
@@ -658,7 +663,7 @@ export default function JobApplicantsRankingPanel() {
               onClick={() => setConfirmedIds(new Set(selectedIds))}
               style={{ marginLeft: "auto" }}
             >
-              <CheckCircle2 size={16} />
+              <CheckCircle size={16} weight="light" />
               Confirm {selectedIds.size} selected
             </button>
           </section>
@@ -675,7 +680,7 @@ export default function JobApplicantsRankingPanel() {
                 marginBottom: 12,
               }}
             >
-              <CheckCircle2 size={16} />
+              <CheckCircle size={16} weight="light" />
               {confirmedIds.size} applicant
               {confirmedIds.size === 1 ? "" : "s"} confirmed for HR review.
             </div>
@@ -821,7 +826,7 @@ export default function JobApplicantsRankingPanel() {
                           ).toLocaleDateString()}
                         </td>
                         <td>
-                          <ChevronRight size={16} color="var(--text-muted)" />
+                          <CaretRight size={16} weight="light" color="var(--text-muted)" />
                         </td>
                       </tr>
                     )
@@ -858,7 +863,7 @@ export default function JobApplicantsRankingPanel() {
                     }}
                   >
                     <div className="fc-section-title">
-                      <FileText size={16} />
+                      <FileText size={16} weight="light" />
                       <h3>Raw CV</h3>
                     </div>
                     <button
@@ -870,7 +875,7 @@ export default function JobApplicantsRankingPanel() {
                       }
                       disabled={!previewUrl}
                     >
-                      <ExternalLink size={14} />
+                      <ArrowSquareOut size={14} weight="light" />
                       Open
                     </button>
                   </div>
@@ -882,8 +887,9 @@ export default function JobApplicantsRankingPanel() {
                         placeItems: "center",
                       }}
                     >
-                      <LoaderCircle
+                      <Spinner
                         size={28}
+                        weight="light"
                         color="var(--accent)"
                         style={{ animation: "fc-spin .8s linear infinite" }}
                       />
@@ -928,6 +934,7 @@ export default function JobApplicantsRankingPanel() {
                       <div>
                         <FileText
                           size={34}
+                          weight="light"
                           color="var(--accent)"
                           style={{ margin: "0 auto 10px" }}
                         />
@@ -950,7 +957,7 @@ export default function JobApplicantsRankingPanel() {
                       borderBottom: "1px solid var(--border)",
                     }}
                   >
-                    <Sparkles size={16} />
+                    <Sparkle size={16} weight="light" />
                     <h3>Parsed data and score</h3>
                   </div>
                   <div
@@ -970,7 +977,7 @@ export default function JobApplicantsRankingPanel() {
                       aria-label="Close applicant detail"
                       onClick={() => setSelectedApplication(null)}
                     >
-                      <X size={16} />
+                      <X size={16} weight="light" />
                     </button>
                   </div>
 
@@ -1005,7 +1012,7 @@ export default function JobApplicantsRankingPanel() {
                           fontSize: 13,
                         }}
                       >
-                        <Mail size={13} />
+                        <Envelope size={13} weight="light" />
                         <span style={{ overflowWrap: "anywhere" }}>
                           {selectedApplication.candidate.email}
                         </span>
@@ -1019,7 +1026,7 @@ export default function JobApplicantsRankingPanel() {
                           marginTop: 6,
                         }}
                       >
-                        <Phone size={13} />
+                        <Phone size={13} weight="light" />
                         {selectedApplication.candidate.phone}
                       </div>
                     </div>
@@ -1053,12 +1060,13 @@ export default function JobApplicantsRankingPanel() {
                       style={{ width: "100%", marginTop: 12 }}
                     >
                       {retryingId === selectedApplication.application_id ? (
-                        <LoaderCircle
+                        <Spinner
                           size={15}
+                          weight="light"
                           style={{ animation: "fc-spin .8s linear infinite" }}
                         />
                       ) : (
-                        <ScanText size={15} />
+                        <Scan size={15} weight="light" />
                       )}
                       {retryingId === selectedApplication.application_id
                         ? "Analyzing..."
@@ -1113,7 +1121,7 @@ export default function JobApplicantsRankingPanel() {
                     selectedEducation) && (
                     <div style={{ marginTop: 16 }}>
                       <div className="fc-section-title">
-                        <Sparkles size={15} />
+                        <Sparkle size={15} weight="light" />
                         <h3>Parsed CV</h3>
                       </div>
                       {selectedSkills.length > 0 && (
@@ -1141,7 +1149,7 @@ export default function JobApplicantsRankingPanel() {
                             marginTop: 8,
                           }}
                         >
-                          <Briefcase size={14} />
+                          <Briefcase size={14} weight="light" />
                           {selectedExperience}
                         </div>
                       )}
@@ -1154,7 +1162,7 @@ export default function JobApplicantsRankingPanel() {
                             marginTop: 8,
                           }}
                         >
-                          <GraduationCap size={14} />
+                          <GraduationCap size={14} weight="light" />
                           {selectedEducation}
                         </div>
                       )}
@@ -1168,7 +1176,7 @@ export default function JobApplicantsRankingPanel() {
                     <div
                       style={{ display: "flex", gap: 8, alignItems: "center" }}
                     >
-                      <FileText size={18} color="var(--accent)" />
+                      <FileText size={18} weight="light" color="var(--accent)" />
                       <div style={{ minWidth: 0 }}>
                         <strong style={{ overflowWrap: "anywhere" }}>
                           {selectedApplication.cv.file_name}
@@ -1200,7 +1208,7 @@ export default function JobApplicantsRankingPanel() {
                       }
                       style={{ flex: 1 }}
                     >
-                      <ExternalLink size={15} />
+                      <ArrowSquareOut size={15} weight="light" />
                       Open CV
                     </button>
                     <button
@@ -1213,7 +1221,7 @@ export default function JobApplicantsRankingPanel() {
                         cvAction?.id === selectedApplication.application_id
                       }
                     >
-                      <Download size={15} />
+<DownloadSimple size={15} weight="light" />
                       Download
                     </button>
                   </div>

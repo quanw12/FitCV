@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react"
-import { AlertCircle, FileText, Trash2, Upload, Zap } from "lucide-react"
+import { WarningCircle, FileText, TrashSimple, UploadSimple, Lightning } from "@phosphor-icons/react"
 
 import { analyzerApi } from "@/api/analyzerApi"
 import { getScoreTone } from "@/services/matchScore"
@@ -290,9 +290,9 @@ export default function AnalyzerScreen({
               }}
             >
               {cvFile ? (
-                <FileText size={26} color="var(--success)" />
+                <FileText size={26} weight="light" color="var(--success)" />
               ) : (
-                <Upload size={24} color="var(--accent)" />
+                <UploadSimple size={24} weight="light" color="var(--accent)" />
               )}
             </div>
             <strong style={{ fontSize: 15, marginBottom: 6 }}>
@@ -322,7 +322,7 @@ export default function AnalyzerScreen({
               onClick={() => void clearUpload()}
               style={{ padding: "7px 12px", fontSize: 12 }}
             >
-              <Trash2 size={14} aria-hidden="true" />
+              <TrashSimple size={14} weight="light" aria-hidden="true" />
               {clearing ? "Clearing…" : "Clear upload"}
             </button>
           )}
@@ -359,7 +359,7 @@ export default function AnalyzerScreen({
               onClick={() => jdInputRef.current?.click()}
               style={{ padding: "6px 12px", fontSize: 12 }}
             >
-              <Upload size={12} /> Upload text
+              <UploadSimple size={12} weight="light" /> Upload text
             </button>
             <input
               ref={jdInputRef}
@@ -424,7 +424,7 @@ export default function AnalyzerScreen({
             fontWeight: 600,
           }}
         >
-          <AlertCircle size={18} aria-hidden="true" /> {error}
+          <WarningCircle size={18} weight="light" aria-hidden="true" /> {error}
         </div>
       )}
 
@@ -444,7 +444,7 @@ export default function AnalyzerScreen({
             </>
           ) : (
             <>
-              <Zap size={18} fill="white" /> Analyze match
+              <Lightning size={18} weight="light" /> Analyze match
             </>
           )}
         </button>
@@ -595,7 +595,7 @@ export default function AnalyzerScreen({
                     flexShrink: 0,
                   }}
                 >
-                  <AlertCircle size={24} color="var(--warning)" />
+                  <WarningCircle size={24} weight="light" color="var(--warning)" />
                 </div>
                 <div style={{ flex: 1, minWidth: 240 }}>
                   <div
