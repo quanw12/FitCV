@@ -1,5 +1,24 @@
 import { useState } from 'react'
 import { MessageSquare, Clock, X, ArrowRight, Send } from 'lucide-react'
+import {
+  DndContext,
+  DragOverlay,
+  closestCorners,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  useDroppable,
+  type DragEndEvent,
+  type DragStartEvent,
+} from "@dnd-kit/core"
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+  useSortable,
+} from "@dnd-kit/sortable"
+import { CSS } from "@dnd-kit/utilities"
+import BezelCard from '../components/BezelCard'
 
 const columns = ['New', 'In Review', 'Shortlisted', 'Interview', 'Offer', 'Rejected']
 
@@ -35,10 +54,35 @@ const initialCards: Record<string, Array<{ id: number; name: string; score: numb
   ],
 }
 
+function SortableCard({ id, children }: { id: string; children: React.ReactNode }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id })
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  }
+  return (
+    <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
+      {children}
+    </div>
+  )
+}
+
+function ColumnArea({ col, children }: { col: string; children: React.ReactNode }) {
+  const { setNodeRef } = useDroppable({ id: col })
+  return <div ref={setNodeRef} style={{ minHeight: 120 }}>{children}</div>
+}
+
 export default function PipelineScreen() {
   const [cards, setCards] = useState(initialCards)
   const [modal, setModal] = useState<typeof initialCards['New'][0] | null>(null)
   const [note, setNote] = useState('')
+  const [activeCard, setActiveCard] = useState<typeof initialCards['New'][0] | null>(null)
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor)
+  )
 
   const getScoreColor = (score: number) =>
     score >= 80
@@ -56,8 +100,70 @@ export default function PipelineScreen() {
     setModal(null)
   }
 
+  const handleDragStart = (event: DragStartEvent) => {
+    const id = event.active.id.toString()
+    const col = columns.find(c => cards[c]?.some(card => card.id.toString() === id))
+    if (!col) { setActiveCard(null); return }
+    const card = cards[col].find(c => c.id.toString() === id)
+    setActiveCard(card ?? null)
+  }
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    setActiveCard(null)
+    const { active, over } = event
+    if (!over) return
+
+    const activeId = active.id.toString()
+    const overId = over.id.toString()
+
+    const sourceCol = columns.find(col => cards[col]?.some(c => c.id.toString() === activeId))
+    if (!sourceCol) return
+
+    let destCol: string | undefined
+    if ((columns as readonly string[]).includes(overId)) {
+      destCol = overId
+    } else {
+      destCol = columns.find(col => cards[col]?.some(c => c.id.toString() === overId))
+    }
+    if (!destCol || sourceCol === destCol) return
+
+    const card = cards[sourceCol].find(c => c.id.toString() === activeId)
+    if (!card) return
+
+    setCards(prev => {
+      const source = prev[sourceCol].filter(c => c.id.toString() !== activeId)
+      const dest = [...prev[destCol!], card]
+      return { ...prev, [sourceCol]: source, [destCol!]: dest }
+    })
+  }
+
   const currentCol = modal ? Object.keys(cards).find(col => cards[col].some(c => c.id === modal.id)) ?? '' : ''
   const nextCol = currentCol ? columns[columns.indexOf(currentCol) + 1] : ''
+
+  const renderCardContent = (card: typeof initialCards['New'][0], clickable: boolean) => {
+    const scoreColor = getScoreColor(card.score)
+    return (
+      <div onClick={clickable ? () => setModal(card) : undefined} style={{ cursor: clickable ? 'pointer' : undefined }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+          <div style={{ width: 30, height: 30, borderRadius: 8, background: scoreColor.soft, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800, color: scoreColor.color, flexShrink: 0 }}>
+            {card.initials}
+          </div>
+          <div style={{ flex: 1, overflow: 'hidden' }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{card.name}</div>
+          </div>
+        </div>
+        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 8 }}>{card.position}</div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span style={{ fontSize: 13, fontWeight: 800, color: scoreColor.color, fontFamily: 'var(--font-display)' }}>{card.score}%</span>
+          {card.comments > 0 && (
+            <span style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 11, color: 'var(--text-muted)' }}>
+              <MessageSquare size={11} /> {card.comments}
+            </span>
+          )}
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="fc-stagger">
@@ -70,61 +176,52 @@ export default function PipelineScreen() {
       </div>
 
       {/* Kanban board */}
-      <div style={{ display: 'flex', gap: 14, overflowX: 'auto', paddingBottom: 12 }}>
-        {columns.map(col => {
-          const cc = colColors[col]
-          const colCards = cards[col] || []
-          return (
-            <div key={col} style={{ minWidth: 210, flex: '0 0 210px' }}>
-              {/* Column header */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, padding: '0 2px' }}>
-                <span style={{ width: 8, height: 8, borderRadius: '50%', background: cc.dot, flexShrink: 0 }} />
-                <span className="fc-eyebrow">{col}</span>
-                <span className="fc-badge fc-badge--gray" style={{ marginLeft: 'auto' }}>{colCards.length}</span>
-              </div>
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCorners}
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
+      >
+        <div style={{ display: 'flex', gap: 14, overflowX: 'auto', paddingBottom: 12 }}>
+          {columns.map(col => {
+            const cc = colColors[col]
+            const colCards = cards[col] || []
+            return (
+              <div key={col} style={{ minWidth: 210, flex: '0 0 210px' }}>
+                {/* Column header */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, padding: '0 2px' }}>
+                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: cc.dot, flexShrink: 0 }} />
+                  <span className="fc-eyebrow">{col}</span>
+                  <span className="fc-badge fc-badge--gray" style={{ marginLeft: 'auto' }}>{colCards.length}</span>
+                </div>
 
-              {/* Cards */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, minHeight: 120 }}>
-                {colCards.map(card => {
-                  const scoreColor = getScoreColor(card.score)
-                  return (
-                    <div
-                      key={card.id}
-                      onClick={() => setModal(card)}
-                      className="fc-card fc-card--lift"
-                      style={{
-                        borderRadius: 'var(--r-md)',
-                        padding: '14px',
-                        cursor: 'pointer',
-                        position: 'relative',
-                        overflow: 'hidden',
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                        <div style={{ width: 30, height: 30, borderRadius: 8, background: scoreColor.soft, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800, color: scoreColor.color, flexShrink: 0 }}>
-                          {card.initials}
-                        </div>
-                        <div style={{ flex: 1, overflow: 'hidden' }}>
-                          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{card.name}</div>
-                        </div>
-                      </div>
-                      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 8 }}>{card.position}</div>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <span style={{ fontSize: 13, fontWeight: 800, color: scoreColor.color, fontFamily: 'var(--font-display)' }}>{card.score}%</span>
-                        {card.comments > 0 && (
-                          <span style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 11, color: 'var(--text-muted)' }}>
-                            <MessageSquare size={11} /> {card.comments}
-                          </span>
-                        )}
-                      </div>
+                {/* Cards area */}
+                <ColumnArea col={col}>
+                  <SortableContext items={colCards.map(c => c.id.toString())} strategy={verticalListSortingStrategy}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                      {colCards.map(card => (
+                        <SortableCard key={card.id} id={card.id.toString()}>
+                          <BezelCard className="fc-card fc-card--lift">
+                            {renderCardContent(card, true)}
+                          </BezelCard>
+                        </SortableCard>
+                      ))}
                     </div>
-                  )
-                })}
+                  </SortableContext>
+                </ColumnArea>
               </div>
-            </div>
-          )
-        })}
-      </div>
+            )
+          })}
+        </div>
+
+        <DragOverlay>
+          {activeCard ? (
+            <BezelCard className="fc-card fc-card--lift" style={{ width: 210 }}>
+              {renderCardContent(activeCard, false)}
+            </BezelCard>
+          ) : null}
+        </DragOverlay>
+      </DndContext>
 
       {/* Detail modal */}
       {modal && (
