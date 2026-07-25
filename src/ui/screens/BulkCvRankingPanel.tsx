@@ -6,23 +6,23 @@ import {
   type DragEvent,
 } from 'react'
 import {
-  AlertCircle,
-  BriefcaseBusiness,
+  WarningCircle,
+  Briefcase,
   Check,
-  CheckCircle2,
-  ExternalLink,
+  CheckCircle,
+  ArrowSquareOut,
   FileText,
   Files,
   GraduationCap,
-  LoaderCircle,
-  Mail,
+  SpinnerGap,
+  Envelope,
   Phone,
   SlidersHorizontal,
-  Sparkles,
-  UploadCloud,
+  Sparkle,
+  CloudArrowUp,
   UserCheck,
   X,
-} from 'lucide-react'
+} from '@phosphor-icons/react'
 
 import { cvRankingApi } from '@/api/cvRankingApi'
 import type {
@@ -30,6 +30,7 @@ import type {
   ParsedCvCandidate,
 } from '@/types/cvRanking'
 import ScoreRing from '../components/ScoreRing'
+import BezelCard from '../components/BezelCard'
 
 const MAX_FILE_BYTES = 10 * 1024 * 1024
 const MAX_BATCH_FILES = 20
@@ -208,21 +209,21 @@ export default function BulkCvRankingPanel() {
         </div>
       </div>
 
-      <section
-        className="fc-card"
-        aria-labelledby="screening-input-title"
-        style={{ marginBottom: 18 }}
-      >
-        <div
-          style={{
-            padding: '16px 20px',
-            borderBottom: '1px solid var(--border)',
-          }}
+      <div style={{ marginBottom: 18 }}>
+      <BezelCard innerClassName="fc-stagger">
+        <section
+          aria-labelledby="screening-input-title"
         >
-          <h2 id="screening-input-title" style={{ fontSize: 16 }}>
-            Screening input
-          </h2>
-        </div>
+          <div
+            style={{
+              padding: '16px 20px',
+              borderBottom: '1px solid var(--border)',
+            }}
+          >
+            <h2 id="screening-input-title" style={{ fontSize: 16 }}>
+              Screening input
+            </h2>
+          </div>
         <div
           style={{
             display: 'grid',
@@ -306,7 +307,7 @@ export default function BulkCvRankingPanel() {
               }}
             >
               <div>
-                <UploadCloud
+                <CloudArrowUp
                   size={30}
                   color="var(--accent)"
                   style={{ margin: '0 auto 9px' }}
@@ -391,7 +392,7 @@ export default function BulkCvRankingPanel() {
               fontSize: 13,
             }}
           >
-            <AlertCircle size={16} style={{ flexShrink: 0 }} />
+            <WarningCircle size={16} style={{ flexShrink: 0 }} />
             <span>{fileError || error}</span>
           </div>
         )}
@@ -421,17 +422,19 @@ export default function BulkCvRankingPanel() {
             }
           >
             {busy ? (
-              <LoaderCircle
+              <SpinnerGap
                 size={16}
                 style={{ animation: 'fc-spin .8s linear infinite' }}
               />
             ) : (
-              <Sparkles size={16} />
+              <Sparkle size={16} />
             )}
             {busy ? 'Parsing and ranking...' : 'Analyze and rank'}
           </button>
         </div>
-      </section>
+        </section>
+      </BezelCard>
+      </div>
 
       {result && (
         <>
@@ -485,7 +488,9 @@ export default function BulkCvRankingPanel() {
             ))}
           </section>
 
-          <section className="fc-card" style={{ marginBottom: 16 }}>
+          <div style={{ marginBottom: 16 }}>
+          <BezelCard>
+          <section>
             <div
               style={{
                 display: 'flex',
@@ -567,7 +572,7 @@ export default function BulkCvRankingPanel() {
                   fontWeight: 700,
                 }}
               >
-                <CheckCircle2 size={16} />
+                <CheckCircle size={16} />
                 {confirmedCandidates.length} candidate
                 {confirmedCandidates.length === 1 ? '' : 's'} confirmed for HR
                 review.
@@ -668,16 +673,19 @@ export default function BulkCvRankingPanel() {
               </table>
             </div>
           </section>
+          </BezelCard>
+          </div>
 
           {selectedCandidate && (
+          <div style={{ overflow: 'auto' }}>
+            <BezelCard innerClassName="fc-stagger">
             <section
               aria-label="Candidate comparison"
               style={{
                 display: 'grid',
                 gridTemplateColumns:
                   'repeat(auto-fit,minmax(min(100%,420px),1fr))',
-                border: '1px solid var(--border)',
-                background: 'var(--surface)',
+                gap: 0,
               }}
             >
               <div
@@ -706,7 +714,7 @@ export default function BulkCvRankingPanel() {
                     onClick={openRawFile}
                     disabled={!previewUrl}
                   >
-                    <ExternalLink size={14} />
+                    <ArrowSquareOut size={14} />
                     Open
                   </button>
                 </div>
@@ -756,7 +764,7 @@ export default function BulkCvRankingPanel() {
                   }}
                   className="fc-section-title"
                 >
-                  <Sparkles size={16} />
+                  <Sparkle size={16} />
                   <h3>Parsed data and score</h3>
                 </div>
                 <div style={{ padding: 18 }}>
@@ -786,7 +794,7 @@ export default function BulkCvRankingPanel() {
                           fontSize: 13,
                         }}
                       >
-                        <Mail size={13} />
+                        <Envelope size={13} />
                         <span style={{ overflowWrap: 'anywhere' }}>
                           {selectedCandidate.email}
                         </span>
@@ -904,7 +912,7 @@ export default function BulkCvRankingPanel() {
                     <div
                       style={{ display: 'flex', gap: 7, alignItems: 'center' }}
                     >
-                      <BriefcaseBusiness size={15} />
+                      <Briefcase size={15} />
                       <span style={{ fontSize: 13 }}>
                         {selectedCandidate.experienceYears > 0
                           ? `${selectedCandidate.experienceYears} years`
@@ -950,7 +958,9 @@ export default function BulkCvRankingPanel() {
                   )}
                 </div>
               </div>
-            </section>
+          </section>
+          </BezelCard>
+          </div>
           )}
         </>
       )}

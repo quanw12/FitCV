@@ -5,6 +5,7 @@ import { analyzerApi } from "@/api/analyzerApi"
 import { getScoreTone } from "@/services/matchScore"
 import type { AnalyzerDraftState, MatchAnalysis } from "@/types/analyzer"
 import ScoreRing from "../components/ScoreRing"
+import BezelCard from "../components/BezelCard"
 
 const MAX_CV_BYTES = 10 * 1024 * 1024
 const breakdownLabels = {
@@ -215,117 +216,124 @@ export default function AnalyzerScreen({
           marginBottom: 20,
         }}
       >
-        <div
-          className="fc-card fc-card--pad fc-card--lift"
-          onDragOver={(event) => {
-            event.preventDefault()
-            setCvDrag(true)
-          }}
-          onDragLeave={() => setCvDrag(false)}
-          onDrop={(event) => {
-            event.preventDefault()
-            setCvDrag(false)
-            selectCv(event.dataTransfer.files[0])
-          }}
-          style={{
-            border: `2px dashed ${
-              cvDrag
-                ? "var(--accent)"
-                : cvFile
-                  ? "var(--success)"
-                  : "var(--border-strong)"
-            }`,
-            background: cvDrag
-              ? "var(--accent-soft)"
-              : cvFile
-                ? "var(--success-soft)"
-                : "var(--surface)",
-            minHeight: 220,
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            justifyContent: "center",
-            transition: "all 0.2s",
-          }}
-        >
-          <input
-            ref={cvInputRef}
-            type="file"
-            accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-            hidden
-            onClick={(event) => {
-              event.currentTarget.value = ""
-            }}
-            onChange={(event) => selectCv(event.target.files?.[0])}
-          />
-          <button
-            type="button"
-            disabled={loading || clearing}
-            onClick={() => cvInputRef.current?.click()}
-            style={{
-              width: "100%",
-              minHeight: 150,
-              border: 0,
-              background: "transparent",
-              cursor: loading || clearing ? "not-allowed" : "pointer",
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              justifyContent: "center",
-              color: "var(--text-primary)",
-            }}
-          >
+        <div className="fc-bezel">
+          <div className="fc-bezel__inner" style={{ padding: 0 }}>
             <div
+              className="fc-card fc-card--pad fc-card--lift"
+              onDragOver={(event) => {
+                event.preventDefault()
+                setCvDrag(true)
+              }}
+              onDragLeave={() => setCvDrag(false)}
+              onDrop={(event) => {
+                event.preventDefault()
+                setCvDrag(false)
+                selectCv(event.dataTransfer.files[0])
+              }}
               style={{
-                width: 56,
-                height: 56,
-                borderRadius: 16,
-                background: cvFile
-                  ? "var(--success-soft)"
-                  : "var(--accent-soft)",
+                border: `2px dashed ${
+                  cvDrag
+                    ? "var(--accent)"
+                    : cvFile
+                      ? "var(--success)"
+                      : "var(--border-strong)"
+                }`,
+                background: cvDrag
+                  ? "var(--accent-soft)"
+                  : cvFile
+                    ? "var(--success-soft)"
+                    : "var(--surface)",
+                minHeight: 220,
                 display: "flex",
+                flexDirection: "column",
                 alignItems: "center",
                 justifyContent: "center",
-                marginBottom: 12,
+                transition: "all 0.2s",
+                borderRadius: "var(--card-inner-radius)",
+                margin: 0,
+                boxShadow: "none",
               }}
             >
-              {cvFile ? (
-                <FileText size={26} weight="light" color="var(--success)" />
-              ) : (
-                <UploadSimple size={24} weight="light" color="var(--accent)" />
+              <input
+                ref={cvInputRef}
+                type="file"
+                accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                hidden
+                onClick={(event) => {
+                  event.currentTarget.value = ""
+                }}
+                onChange={(event) => selectCv(event.target.files?.[0])}
+              />
+              <button
+                type="button"
+                disabled={loading || clearing}
+                onClick={() => cvInputRef.current?.click()}
+                style={{
+                  width: "100%",
+                  minHeight: 150,
+                  border: 0,
+                  background: "transparent",
+                  cursor: loading || clearing ? "not-allowed" : "pointer",
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  color: "var(--text-primary)",
+                }}
+              >
+                <div
+                  style={{
+                    width: 56,
+                    height: 56,
+                    borderRadius: 16,
+                    background: cvFile
+                      ? "var(--success-soft)"
+                      : "var(--accent-soft)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    marginBottom: 12,
+                  }}
+                >
+                  {cvFile ? (
+                    <FileText size={26} weight="light" color="var(--success)" />
+                  ) : (
+                    <UploadSimple size={24} weight="light" color="var(--accent)" />
+                  )}
+                </div>
+                <strong style={{ fontSize: 15, marginBottom: 6 }}>
+                  {cvFile ? cvFile.name : "Upload your CV"}
+                </strong>
+                <span
+                  style={{
+                    fontSize: 13,
+                    color: cvFile ? "var(--success)" : "var(--text-secondary)",
+                    fontWeight: cvFile ? 600 : 400,
+                    textAlign: "center",
+                  }}
+                >
+                  {cvFile
+                    ? `Ready · ${formatFileSize(cvFile.size)}`
+                    : "Drag and drop or browse files"}
+                </span>
+                <small style={{ marginTop: 5, color: "var(--text-muted)" }}>
+                  {cvFile ? "Choose a different file" : "PDF or DOCX · max 10 MB"}
+                </small>
+              </button>
+              {cvFile && (
+                <button
+                  type="button"
+                  className="fc-btn fc-btn--ghost"
+                  disabled={loading || clearing}
+                  onClick={() => void clearUpload()}
+                  style={{ padding: "7px 12px", fontSize: 12 }}
+                >
+                  <TrashSimple size={14} weight="light" aria-hidden="true" />
+                  {clearing ? "Clearing…" : "Clear upload"}
+                </button>
               )}
             </div>
-            <strong style={{ fontSize: 15, marginBottom: 6 }}>
-              {cvFile ? cvFile.name : "Upload your CV"}
-            </strong>
-            <span
-              style={{
-                fontSize: 13,
-                color: cvFile ? "var(--success)" : "var(--text-secondary)",
-                fontWeight: cvFile ? 600 : 400,
-                textAlign: "center",
-              }}
-            >
-              {cvFile
-                ? `Ready · ${formatFileSize(cvFile.size)}`
-                : "Drag and drop or browse files"}
-            </span>
-            <small style={{ marginTop: 5, color: "var(--text-muted)" }}>
-              {cvFile ? "Choose a different file" : "PDF or DOCX · max 10 MB"}
-            </small>
-          </button>
-          {cvFile && (
-            <button
-              type="button"
-              className="fc-btn fc-btn--ghost"
-              disabled={loading || clearing}
-              onClick={() => void clearUpload()}
-              style={{ padding: "7px 12px", fontSize: 12 }}
-            >
-              <TrashSimple size={14} weight="light" aria-hidden="true" />
-              {clearing ? "Clearing…" : "Clear upload"}
-            </button>
-          )}
+          </div>
         </div>
 
         <div
@@ -452,14 +460,7 @@ export default function AnalyzerScreen({
 
       {result?.status === "Success" && result.overallScore != null && (
         <div aria-live="polite">
-          <div
-            className="fc-card fc-card--pad"
-            style={{
-              marginBottom: 16,
-              position: "relative",
-              overflow: "hidden",
-            }}
-          >
+          <BezelCard>
             <div
               className="fc-glow"
               style={{ width: 240, height: 240, top: -80, right: -60 }}
@@ -563,7 +564,7 @@ export default function AnalyzerScreen({
                 })}
               </div>
             </div>
-          </div>
+          </BezelCard>
 
           {result.passProbability != null && (
             <div
@@ -645,7 +646,7 @@ export default function AnalyzerScreen({
             </div>
           )}
 
-          <div className="fc-card fc-card--pad">
+          <BezelCard>
             <div className="fc-section-title" style={{ marginBottom: 14 }}>
               <h3>Skills Assessment</h3>
             </div>
@@ -699,7 +700,7 @@ export default function AnalyzerScreen({
                 View improvement suggestions
               </button>
             )}
-          </div>
+          </BezelCard>
         </div>
       )}
 
