@@ -1,5 +1,7 @@
 import { Trophy, TrendingUp, FileText, CheckSquare, Plus, ArrowRight, Clock, Zap, Sparkles } from 'lucide-react'
 import ScoreRing from '../components/ScoreRing'
+import BezelCard from '@/ui/components/BezelCard'
+import RevealStagger from '@/ui/components/RevealStagger'
 import type { ScreenId } from '@/types/app'
 
 interface SeekerDashboardProps {
@@ -41,53 +43,66 @@ export default function SeekerDashboard({ onNavigate }: SeekerDashboardProps) {
   return (
     <div className="fc-stagger">
       {/* Page head */}
-      <div className="fc-page-head">
-        <div>
-          <h1>Welcome back, Minh 👋</h1>
-          <p>Here&apos;s your job readiness overview for today.</p>
+      <RevealStagger>
+        <div className="fc-page-head">
+          <div>
+            <h1>Welcome back, Minh 👋</h1>
+            <p>Here&apos;s your job readiness overview for today.</p>
+          </div>
+          <button className="fc-btn fc-btn--primary" onClick={() => onNavigate('analyzer')}>
+            <Plus size={16} /> New Analysis
+          </button>
         </div>
-        <button className="fc-btn fc-btn--primary" onClick={() => onNavigate('analyzer')}>
-          <Plus size={16} /> New Analysis
-        </button>
-      </div>
+      </RevealStagger>
 
       {/* Bento grid */}
       <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr 1fr', gap: 16, marginBottom: 16 }}>
         {/* Avg match — feature card */}
-        <div className="fc-card fc-card--pad" style={{ display: 'flex', alignItems: 'center', gap: 20, gridRow: 'span 1' }}>
-          <ScoreRing score={73} size={104} strokeWidth={11} label="Avg. Score" />
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div className="fc-eyebrow" style={{ marginBottom: 6 }}>Average Match Score</div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-              <span style={{ fontSize: 13, color: 'var(--text-secondary)', fontWeight: 500 }}>+8pts from last month</span>
-              <span className="fc-badge fc-badge--green"><TrendingUp size={12} /> Trending</span>
-            </div>
-            <Sparkline points={[55, 58, 61, 60, 66, 69, 73]} color="#2563EB" />
+        <RevealStagger delay={0}>
+          <div style={{ gridRow: 'span 1' }}>
+            <BezelCard as="article">
+              <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
+                <ScoreRing score={73} size={104} strokeWidth={11} label="Avg. Score" />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div className="fc-eyebrow" style={{ marginBottom: 6 }}>Average Match Score</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                    <span style={{ fontSize: 13, color: 'var(--text-secondary)', fontWeight: 500 }}>+8pts from last month</span>
+                    <span className="fc-badge fc-badge--green"><TrendingUp size={12} /> Trending</span>
+                  </div>
+                  <Sparkline points={[55, 58, 61, 60, 66, 69, 73]} color="#2563EB" />
+                </div>
+              </div>
+            </BezelCard>
           </div>
-        </div>
+        </RevealStagger>
 
         {/* CVs analyzed */}
-        <div className="fc-stat">
-          <div className="fc-stat__icon" style={{ background: 'var(--accent-soft)', color: 'var(--accent-ink)' }}><FileText size={18} color="var(--accent)" /></div>
-          <div style={{ marginTop: 14 }}>
-            <div className="fc-stat__value">14</div>
-            <div className="fc-stat__label">CVs Analyzed</div>
-            <div className="fc-stat__delta" style={{ color: 'var(--success)', marginTop: 8, display: 'flex', alignItems: 'center', gap: 5 }}><TrendingUp size={13} /> +3 this week</div>
-          </div>
-        </div>
+        <RevealStagger delay={0.08}>
+          <BezelCard>
+            <div className="fc-stat__icon" style={{ background: 'var(--accent-soft)', color: 'var(--accent-ink)' }}><FileText size={18} color="var(--accent)" /></div>
+            <div style={{ marginTop: 14 }}>
+              <div className="fc-stat__value">14</div>
+              <div className="fc-stat__label">CVs Analyzed</div>
+              <div className="fc-stat__delta" style={{ color: 'var(--success)', marginTop: 8, display: 'flex', alignItems: 'center', gap: 5 }}><TrendingUp size={13} /> +3 this week</div>
+            </div>
+          </BezelCard>
+        </RevealStagger>
 
         {/* Applications tracked */}
-        <div className="fc-stat">
-          <div className="fc-stat__icon" style={{ background: 'var(--success-soft)', color: 'var(--success)' }}><CheckSquare size={18} color="var(--success)" /></div>
-          <div style={{ marginTop: 14 }}>
-            <div className="fc-stat__value">7</div>
-            <div className="fc-stat__label">Applications Tracked</div>
-            <div className="fc-stat__delta" style={{ color: 'var(--warning)', marginTop: 8, display: 'flex', alignItems: 'center', gap: 5 }}><Clock size={13} /> 2 pending review</div>
-          </div>
-        </div>
+        <RevealStagger delay={0.16}>
+          <BezelCard>
+            <div className="fc-stat__icon" style={{ background: 'var(--success-soft)', color: 'var(--success)' }}><CheckSquare size={18} color="var(--success)" /></div>
+            <div style={{ marginTop: 14 }}>
+              <div className="fc-stat__value">7</div>
+              <div className="fc-stat__label">Applications Tracked</div>
+              <div className="fc-stat__delta" style={{ color: 'var(--warning)', marginTop: 8, display: 'flex', alignItems: 'center', gap: 5 }}><Clock size={13} /> 2 pending review</div>
+            </div>
+          </BezelCard>
+        </RevealStagger>
       </div>
 
       {/* Banner */}
+      <RevealStagger>
       <div className="fc-card" style={{
         background: 'linear-gradient(120deg, #0B1020 0%, #161D33 60%, #1E2742 100%)',
         color: 'white', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 18, padding: '20px 24px', position: 'relative', overflow: 'hidden',
@@ -115,9 +130,11 @@ export default function SeekerDashboard({ onNavigate }: SeekerDashboardProps) {
           Continue <ArrowRight size={14} />
         </button>
       </div>
+      </RevealStagger>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 322px', gap: 16 }}>
         {/* Recent activity */}
+        <RevealStagger>
         <div className="fc-card fc-card--pad">
           <div className="fc-section-title" style={{ marginBottom: 18 }}>
             <Clock size={17} color="var(--accent)" />
@@ -152,8 +169,10 @@ export default function SeekerDashboard({ onNavigate }: SeekerDashboardProps) {
             <Zap size={15} /> Continue Last Analysis
           </button>
         </div>
+        </RevealStagger>
 
         {/* Quick links + skill nudge */}
+        <RevealStagger>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div className="fc-card fc-card--pad">
             <h3 style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 14 }}>Quick Actions</h3>
@@ -191,6 +210,7 @@ export default function SeekerDashboard({ onNavigate }: SeekerDashboardProps) {
             </button>
           </div>
         </div>
+        </RevealStagger>
       </div>
     </div>
   )

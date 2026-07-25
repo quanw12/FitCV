@@ -1,4 +1,6 @@
 import { Briefcase, FileText, TrendingUp, Upload, Plus, ArrowRight, Star, BarChart3 } from 'lucide-react'
+import BezelCard from '@/ui/components/BezelCard'
+import RevealStagger from '@/ui/components/RevealStagger'
 import type { ScreenId } from '@/types/app'
 
 interface HRDashboardProps {
@@ -28,6 +30,7 @@ const scoreColor = (s: number) => (s >= 70 ? '#16A34A' : s >= 60 ? '#2563EB' : '
 export default function HRDashboard({ onNavigate }: HRDashboardProps) {
   return (
     <div className="fc-stagger">
+      <RevealStagger>
       <div className="fc-page-head">
         <div>
           <h1>HR Dashboard</h1>
@@ -38,6 +41,7 @@ export default function HRDashboard({ onNavigate }: HRDashboardProps) {
           <button className="fc-btn fc-btn--primary" onClick={() => onNavigate('job-posts')}><Plus size={15} /> Create Job Post</button>
         </div>
       </div>
+      </RevealStagger>
 
       {/* Stat cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 16 }}>
@@ -46,22 +50,27 @@ export default function HRDashboard({ onNavigate }: HRDashboardProps) {
           { label: 'Total CVs Reviewed', value: '119', icon: <FileText size={18} />, color: '#16A34A', soft: 'var(--success-soft)', delta: '+23 today', spark: [60, 78, 91, 119] },
           { label: 'Avg. Candidate Score', value: '68%', icon: <Star size={18} />, color: '#D97706', soft: 'var(--warning-soft)', delta: '+4pts vs last mo.', spark: [60, 62, 65, 68] },
           { label: 'Review Progress', value: '58%', icon: <TrendingUp size={18} />, color: '#64748B', soft: 'var(--gray-soft)', delta: '3 posts active', spark: [30, 42, 51, 58] },
-        ].map(s => (
-          <div key={s.label} className="fc-stat" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div className="fc-stat__icon" style={{ background: s.soft, color: s.color }}>{s.icon}</div>
-              <MiniBars values={s.spark} color={s.color} />
-            </div>
-            <div style={{ marginTop: 12 }}>
-              <div className="fc-stat__value" style={{ fontSize: 28 }}>{s.value}</div>
-              <div className="fc-stat__label">{s.label}</div>
-              <div className="fc-stat__delta" style={{ color: s.color, marginTop: 6 }}>{s.delta}</div>
-            </div>
-          </div>
+        ].map((s, i) => (
+          <RevealStagger key={s.label} delay={i * 0.08}>
+            <BezelCard>
+              <div className="fc-stat" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div className="fc-stat__icon" style={{ background: s.soft, color: s.color }}>{s.icon}</div>
+                  <MiniBars values={s.spark} color={s.color} />
+                </div>
+                <div style={{ marginTop: 12 }}>
+                  <div className="fc-stat__value" style={{ fontSize: 28 }}>{s.value}</div>
+                  <div className="fc-stat__label">{s.label}</div>
+                  <div className="fc-stat__delta" style={{ color: s.color, marginTop: 6 }}>{s.delta}</div>
+                </div>
+              </div>
+            </BezelCard>
+          </RevealStagger>
         ))}
       </div>
 
       {/* Active job posts table */}
+      <RevealStagger>
       <div className="fc-card" style={{ overflow: 'hidden' }}>
         <div style={{ padding: '18px 22px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div className="fc-section-title">
@@ -114,6 +123,7 @@ export default function HRDashboard({ onNavigate }: HRDashboardProps) {
           </tbody>
         </table>
       </div>
+      </RevealStagger>
     </div>
   )
 }
