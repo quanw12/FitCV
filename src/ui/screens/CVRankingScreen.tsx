@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { BriefcaseBusiness, Files } from 'lucide-react'
+import { Briefcase, Files } from '@phosphor-icons/react'
 
 import BulkCvRankingPanel from './BulkCvRankingPanel'
 import JobApplicantsRankingPanel from './JobApplicantsRankingPanel'
@@ -49,7 +49,7 @@ export default function CVRankingScreen() {
           }
           onClick={() => setSource('applications')}
         >
-          <BriefcaseBusiness size={16} />
+          <Briefcase size={16} />
           Job Applicants
         </button>
       </div>

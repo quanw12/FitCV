@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Mail, CheckCircle, Send, Users, Sparkles, Check } from 'lucide-react'
+import { Envelope, CheckCircle, PaperPlaneRight, Users, Sparkle, Check } from '@phosphor-icons/react'
 
 const templates = [
   { id: 'confirmation', icon: '✅', label: 'Application Confirmation', color: '#10B981', bg: '#D1FAE5' },
@@ -61,9 +61,9 @@ const highlights: Record<string, string> = {
 }
 
 const steps = [
-  { label: 'AI Drafts', icon: <Sparkles size={16} />, done: true },
-  { label: 'HR Reviews', icon: <Mail size={16} />, done: true },
-  { label: 'HR Approves & Sends', icon: <Send size={16} />, done: false },
+  { label: 'AI Drafts', icon: <Sparkle size={16} />, done: true },
+  { label: 'HR Reviews', icon: <Envelope size={16} />, done: true },
+  { label: 'HR Approves & Sends', icon: <PaperPlaneRight size={16} />, done: false },
 ]
 
 const badgeFor = (color: string) => {
@@ -96,7 +96,7 @@ export default function AutoEmailScreen() {
           <h1>Auto Email &amp; Smart Reply</h1>
           <p>AI-drafted emails, personalized per candidate.</p>
         </div>
-        <span className="fc-badge fc-badge--amber"><Sparkles size={12} /> AI-Powered</span>
+        <span className="fc-badge fc-badge--amber"><Sparkle size={12} /> AI-Powered</span>
       </div>
 
       <div className="fc-stagger" style={{ display: 'grid', gridTemplateColumns: '260px 1fr', gap: 20, alignItems: 'start' }}>
@@ -105,7 +105,7 @@ export default function AutoEmailScreen() {
           {/* Template library */}
           <div className="fc-card fc-card--pad">
             <div className="fc-section-title" style={{ marginBottom: 14 }}>
-              <Mail size={16} color="var(--accent)" />
+              <Envelope size={16} color="var(--accent)" />
               <h3>Template Library</h3>
             </div>
             {templates.map(t => {
@@ -205,7 +205,7 @@ export default function AutoEmailScreen() {
           {/* Email preview */}
           <div className="fc-card fc-card--pad">
             <div className="fc-section-title" style={{ marginBottom: 16 }}>
-              <Send size={16} color="var(--accent)" />
+              <PaperPlaneRight size={16} color="var(--accent)" />
               <h3>Email Preview</h3>
               <span>Draft · {templates.find(t => t.id === selectedTemplate)?.label}</span>
             </div>
@@ -243,7 +243,7 @@ export default function AutoEmailScreen() {
               ) : (
                 <>
                   <button onClick={() => setSent(true)} className="fc-btn fc-btn--primary">
-                    <Send size={15} /> Approve &amp; Send
+                    <PaperPlaneRight size={15} /> Approve &amp; Send
                   </button>
                   <button className="fc-btn fc-btn--secondary">
                     <Users size={15} /> Bulk Send to Filtered Group

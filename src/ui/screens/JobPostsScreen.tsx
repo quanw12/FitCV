@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { Briefcase, Edit3, Plus, RotateCcw, Save, XCircle } from 'lucide-react'
+import { Briefcase, PencilSimple, Plus, ArrowCounterClockwise, FloppyDisk, XCircle } from '@phosphor-icons/react'
 import { jobsApi } from '@/api/jobsApi'
 import type { JobPost, JobWrite } from '@/types/jobs'
 
@@ -95,8 +95,8 @@ export default function JobPostsScreen() {
         {sections.map(([key, label]) => <label key={key}><span className="fc-field-label">{label}</span><textarea className="fc-input" style={{ minHeight: 110 }} value={form[key] ?? ''} onChange={e => set(key, e.target.value)} /></label>)}
       </div>
       <div style={{ display: 'flex', gap: 10, marginTop: 18 }}>
-        <button className="fc-btn fc-btn--primary" disabled={saving}><Save size={15}/>{saving ? 'Saving...' : 'Save draft'}</button>
-        <button className="fc-btn fc-btn--secondary" type="button" onClick={reset}><RotateCcw size={15}/>Reset</button>
+        <button className="fc-btn fc-btn--primary" disabled={saving}>        <FloppyDisk size={15}/>{saving ? 'Saving...' : 'Save draft'}</button>
+        <button className="fc-btn fc-btn--secondary" type="button" onClick={reset}><ArrowCounterClockwise size={15}/>Reset</button>
       </div>
     </form>
     <div className="fc-section-title" style={{ marginBottom: 14 }}><Briefcase size={17}/><h2>All company jobs</h2><span>{jobs.length} total</span></div>
@@ -108,7 +108,7 @@ export default function JobPostsScreen() {
             <p>Created {new Date(job.created_at).toLocaleDateString()} - Deadline {job.deadline ? new Date(job.deadline).toLocaleDateString() : 'not set'}</p>
           </div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', flexWrap: 'wrap' }}>
-            {job.status !== 'Published' && <button className="fc-btn fc-btn--secondary" onClick={() => edit(job)}><Edit3 size={14}/>Edit</button>}
+            {job.status !== 'Published' && <button className="fc-btn fc-btn--secondary" onClick={() => edit(job)}><PencilSimple size={14}/>Edit</button>}
             {job.status !== 'Published' && <button className="fc-btn fc-btn--primary" disabled={saving} onClick={() => void changeStatus(job, 'publish')}><Plus size={14}/>{job.status === 'Closed' ? 'Reopen' : 'Publish'}</button>}
             {job.status === 'Published' && <button className="fc-btn fc-btn--secondary" disabled={saving} onClick={() => void changeStatus(job, 'close')}><XCircle size={14}/>Close</button>}
           </div>

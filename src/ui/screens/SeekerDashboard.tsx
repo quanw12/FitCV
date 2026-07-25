@@ -1,4 +1,4 @@
-import { Trophy, TrendingUp, FileText, CheckSquare, Plus, ArrowRight, Clock, Zap, Sparkles } from 'lucide-react'
+import { Trophy, TrendUp, FileText, CheckSquare, Plus, ArrowRight, Clock, Lightning, Sparkle } from '@phosphor-icons/react'
 import ScoreRing from '../components/ScoreRing'
 import BezelCard from '@/ui/components/BezelCard'
 import RevealStagger from '@/ui/components/RevealStagger'
@@ -33,8 +33,8 @@ function Sparkline({ points, color }: { points: number[]; color: string }) {
 }
 
 const recentActivity = [
-  { icon: <Zap size={14} />, color: '#2563EB', text: 'Analyzed "Senior Backend Developer" at VNG Corp', time: '2 hours ago', score: 78 },
-  { icon: <TrendingUp size={14} />, color: '#16A34A', text: 'Received 12 AI improvement suggestions for your CV', time: '2 hours ago' },
+  { icon: <Lightning size={14} />, color: '#2563EB', text: 'Analyzed "Senior Backend Developer" at VNG Corp', time: '2 hours ago', score: 78 },
+  { icon: <TrendUp size={14} />, color: '#16A34A', text: 'Received 12 AI improvement suggestions for your CV', time: '2 hours ago' },
   { icon: <CheckSquare size={14} />, color: '#D97706', text: 'Added application to Shopee — Fullstack Engineer', time: '1 day ago' },
   { icon: <FileText size={14} />, color: '#64748B', text: 'Uploaded new CV version: CV_v3_Backend.pdf', time: '3 days ago' },
 ]
@@ -67,7 +67,7 @@ export default function SeekerDashboard({ onNavigate }: SeekerDashboardProps) {
                   <div className="fc-eyebrow" style={{ marginBottom: 6 }}>Average Match Score</div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
                     <span style={{ fontSize: 13, color: 'var(--text-secondary)', fontWeight: 500 }}>+8pts from last month</span>
-                    <span className="fc-badge fc-badge--green"><TrendingUp size={12} /> Trending</span>
+                    <span className="fc-badge fc-badge--green"><TrendUp size={12} /> Trending</span>
                   </div>
                   <Sparkline points={[55, 58, 61, 60, 66, 69, 73]} color="#2563EB" />
                 </div>
@@ -83,7 +83,7 @@ export default function SeekerDashboard({ onNavigate }: SeekerDashboardProps) {
             <div style={{ marginTop: 14 }}>
               <div className="fc-stat__value">14</div>
               <div className="fc-stat__label">CVs Analyzed</div>
-              <div className="fc-stat__delta" style={{ color: 'var(--success)', marginTop: 8, display: 'flex', alignItems: 'center', gap: 5 }}><TrendingUp size={13} /> +3 this week</div>
+              <div className="fc-stat__delta" style={{ color: 'var(--success)', marginTop: 8, display: 'flex', alignItems: 'center', gap: 5 }}><TrendUp size={13} /> +3 this week</div>
             </div>
           </BezelCard>
         </RevealStagger>
@@ -166,7 +166,7 @@ export default function SeekerDashboard({ onNavigate }: SeekerDashboardProps) {
             ))}
           </div>
           <button className="fc-btn fc-btn--primary" onClick={() => onNavigate('analyzer')} style={{ width: '100%', justifyContent: 'center' }}>
-            <Zap size={15} /> Continue Last Analysis
+            <Lightning size={15} /> Continue Last Analysis
           </button>
         </div>
         </RevealStagger>
@@ -177,8 +177,8 @@ export default function SeekerDashboard({ onNavigate }: SeekerDashboardProps) {
           <div className="fc-card fc-card--pad">
             <h3 style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 14 }}>Quick Actions</h3>
             {([
-              { label: 'Analyze new JD', screen: 'analyzer', icon: <Zap size={15} />, color: '#2563EB' },
-              { label: 'View improvement tips', screen: 'improvement', icon: <TrendingUp size={15} />, color: '#16A34A' },
+              { label: 'Analyze new JD', screen: 'analyzer', icon: <Lightning size={15} />, color: '#2563EB' },
+              { label: 'View improvement tips', screen: 'improvement', icon: <TrendUp size={15} />, color: '#16A34A' },
               { label: 'Track application', screen: 'app-tracker', icon: <CheckSquare size={15} />, color: '#D97706' },
               { label: 'Browse JD library', screen: 'jd-library', icon: <FileText size={15} />, color: '#64748B' },
             ] as const).map(a => (
@@ -197,7 +197,7 @@ export default function SeekerDashboard({ onNavigate }: SeekerDashboardProps) {
 
           <div className="fc-card fc-card--pad" style={{ background: 'linear-gradient(135deg, var(--accent-soft), var(--surface))' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-              <span style={{ fontSize: 20 }}><Sparkles /></span>
+              <span style={{ fontSize: 20 }}><Sparkle /></span>
               <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--accent-ink)' }}>Top skill gap this week</span>
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>

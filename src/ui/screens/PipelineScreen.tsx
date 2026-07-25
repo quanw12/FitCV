@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { MessageSquare, Clock, X, ArrowRight, Send } from 'lucide-react'
+import { ChatCircle, Clock, X, ArrowRight, PaperPlaneRight } from '@phosphor-icons/react'
 import {
   DndContext,
   DragOverlay,
@@ -157,7 +157,7 @@ export default function PipelineScreen() {
           <span style={{ fontSize: 13, fontWeight: 800, color: scoreColor.color, fontFamily: 'var(--font-display)' }}>{card.score}%</span>
           {card.comments > 0 && (
             <span style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 11, color: 'var(--text-muted)' }}>
-              <MessageSquare size={11} /> {card.comments}
+              <ChatCircle size={11} /> {card.comments}
             </span>
           )}
         </div>
@@ -264,8 +264,8 @@ export default function PipelineScreen() {
                   className="fc-input"
                   style={{ fontStyle: 'normal' }}
                 />
-                <button className="fc-btn fc-btn--primary" aria-label="Send note">
-                  <Send size={15} />
+                <button className="fc-btn fc-btn--primary" aria-label="PaperPlaneRight note">
+                  <PaperPlaneRight size={15} />
                 </button>
               </div>
             </div>

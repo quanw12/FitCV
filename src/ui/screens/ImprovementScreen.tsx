@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { AlertCircle, CheckSquare, ChevronDown, ChevronUp, Clipboard, Lightbulb, RefreshCw, Square } from 'lucide-react'
+import { WarningCircle, CheckSquare, CaretDown, CaretUp, Clipboard, Lightbulb, ArrowsClockwise, Square } from '@phosphor-icons/react'
 import { improvementApi } from '@/api/improvementApi'
 import { priorityBadge, priorityRank, scoreLabel, sectionLabel } from '@/services/improvementReport'
 import type { ImprovementReportResponse } from '@/types/improvement'
@@ -154,11 +154,11 @@ export default function ImprovementScreen({ matchResultId = null }: ImprovementS
             <h1>AI Improvement Suggestions</h1>
             <p>Prioritized recommendations for the selected CV and job description.</p>
           </div>
-          {matchResultId && <button className="fc-btn fc-btn--secondary" onClick={() => void loadReport(true)} disabled={isProcessing}><RefreshCw size={15} /> Regenerate</button>}
+          {matchResultId && <button className="fc-btn fc-btn--secondary" onClick={() => void loadReport(true)} disabled={isProcessing}><ArrowsClockwise size={15} /> Regenerate</button>}
         </header>
 
         <div className="improvement-disclaimer" role="note">
-          <AlertCircle size={18} aria-hidden="true" />
+          <WarningCircle size={18} aria-hidden="true" />
           <span>AI suggestions support your review and do not guarantee a hiring outcome. Verify every fact and replace placeholders only with accurate information.</span>
         </div>
 
@@ -190,7 +190,7 @@ export default function ImprovementScreen({ matchResultId = null }: ImprovementS
                   <button onClick={() => toggleExpanded(item.id)} aria-expanded={expanded.has(item.id)} aria-controls={`feedback-${item.id}`}>
                     <span>{sectionLabel[item.section]} — {item.issue}</span>
                     <span className={priorityBadge(item.priority)}>{item.priority}</span>
-                    {expanded.has(item.id) ? <ChevronUp size={17} /> : <ChevronDown size={17} />}
+                    {expanded.has(item.id) ? <CaretUp size={17} /> : <CaretDown size={17} />}
                   </button>
                   {expanded.has(item.id) && <div id={`feedback-${item.id}`} className="feedback-detail"><p>{item.explanation}</p><strong>Recommended action</strong><p>{item.suggestedAction}</p></div>}
                 </article>

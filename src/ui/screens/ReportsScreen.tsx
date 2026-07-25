@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { ChartBar } from "@phosphor-icons/react"
-import { Download, Calendar, TrendingUp, PieChart as PieIcon, BarChart3, Activity } from 'lucide-react'
+import { Download, Calendar, TrendUp, ChartPie as PieIcon, ActivityIcon } from '@phosphor-icons/react'
 import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell,
@@ -129,7 +129,7 @@ export default function ReportsScreen() {
         {/* Line — applications over time */}
         <div className="fc-card fc-card--pad">
           <div className="fc-section-title" style={{ marginBottom: 16 }}>
-            <TrendingUp size={17} color="var(--accent)" />
+            <TrendUp size={17} color="var(--accent)" />
             <h3>Applications Over Time</h3>
             <span>Last 7 months</span>
           </div>
@@ -185,7 +185,7 @@ export default function ReportsScreen() {
         {/* Bar — score distribution */}
         <div className="fc-card fc-card--pad">
           <div className="fc-section-title" style={{ marginBottom: 16 }}>
-            <BarChart3 size={17} color="var(--accent)" />
+            <ChartBar size={17} color="var(--accent)" />
             <h3>Score Distribution</h3>
           </div>
           <ResponsiveContainer width="100%" height={200}>
@@ -211,7 +211,7 @@ export default function ReportsScreen() {
         {/* Horizontal bar — source breakdown */}
         <div className="fc-card fc-card--pad">
           <div className="fc-section-title" style={{ marginBottom: 16 }}>
-            <Activity size={17} color="var(--accent)" />
+            <ActivityIcon size={17} color="var(--accent)" />
             <h3>Source Breakdown</h3>
           </div>
           <ResponsiveContainer width="100%" height={200}>

@@ -1,4 +1,4 @@
-import { Briefcase, FileText, TrendingUp, Upload, Plus, ArrowRight, Star, BarChart3 } from 'lucide-react'
+import { Briefcase, FileText, TrendUp, Upload, Plus, ArrowRight, Star, ChartBar } from '@phosphor-icons/react'
 import BezelCard from '@/ui/components/BezelCard'
 import RevealStagger from '@/ui/components/RevealStagger'
 import type { ScreenId } from '@/types/app'
@@ -49,7 +49,7 @@ export default function HRDashboard({ onNavigate }: HRDashboardProps) {
           { label: 'Active Job Posts', value: '4', icon: <Briefcase size={18} />, color: '#2563EB', soft: 'var(--accent-soft)', delta: '+1 this week', spark: [2, 3, 3, 4] },
           { label: 'Total CVs Reviewed', value: '119', icon: <FileText size={18} />, color: '#16A34A', soft: 'var(--success-soft)', delta: '+23 today', spark: [60, 78, 91, 119] },
           { label: 'Avg. Candidate Score', value: '68%', icon: <Star size={18} />, color: '#D97706', soft: 'var(--warning-soft)', delta: '+4pts vs last mo.', spark: [60, 62, 65, 68] },
-          { label: 'Review Progress', value: '58%', icon: <TrendingUp size={18} />, color: '#64748B', soft: 'var(--gray-soft)', delta: '3 posts active', spark: [30, 42, 51, 58] },
+          { label: 'Review Progress', value: '58%', icon: <TrendUp size={18} />, color: '#64748B', soft: 'var(--gray-soft)', delta: '3 posts active', spark: [30, 42, 51, 58] },
         ].map((s, i) => (
           <RevealStagger key={s.label} delay={i * 0.08}>
             <BezelCard>
@@ -74,7 +74,7 @@ export default function HRDashboard({ onNavigate }: HRDashboardProps) {
       <div className="fc-card" style={{ overflow: 'hidden' }}>
         <div style={{ padding: '18px 22px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div className="fc-section-title">
-            <BarChart3 size={17} color="var(--accent)" />
+            <ChartBar size={17} color="var(--accent)" />
             <h3>Active Job Posts</h3>
           </div>
           <button onClick={() => onNavigate('job-posts')} className="fc-chip" style={{ cursor: 'pointer', border: 'none' }}>
