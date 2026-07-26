@@ -1,16 +1,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+
 import {
-  AlertCircle,
-  BriefcaseBusiness,
-  CalendarDays,
+  WarningCircle,
+  Briefcase,
+  CalendarBlank,
   FileText,
-  Inbox,
+  Tray,
   MapPin,
-  RefreshCw,
-  Search,
-} from "lucide-react"
+  ArrowsClockwise,
+  MagnifyingGlass,
+} from "@phosphor-icons/react"
 
 import { applicationsApi } from "@/api/applicationsApi"
+
 import type {
   ApplicationProcessingStatus,
   ApplicationStage,
@@ -19,24 +21,35 @@ import type {
 
 const STAGES: ApplicationStage[] = [
   "Applied",
+
   "Screening",
+
   "Interview",
+
   "Offer",
+
   "Hired",
+
   "Rejected",
 ]
 
-const stageConfig: Record<
-  ApplicationStage,
-  { background: string; color: string }
-> = {
+const stageConfig: Record<ApplicationStage, {
+  background: string
+  color: string
+}> = {
   Applied: { background: "#F1F5F9", color: "#475569" },
+
   Screening: { background: "#DBEAFE", color: "#1D4ED8" },
+
   Interview: { background: "#FEF3C7", color: "#A16207" },
+
   Offer: { background: "#DCFCE7", color: "#15803D" },
+
   Hired: { background: "#CCFBF1", color: "#0F766E" },
+
   Rejected: { background: "#FEE2E2", color: "#B91C1C" },
 }
+
 interface AppTrackerScreenProps {
   focusApplicationId?: number | null
 }
@@ -45,17 +58,28 @@ export default function AppTrackerScreen({
   focusApplicationId = null,
 }: AppTrackerScreenProps) {
   const focusedCardRef = useRef<HTMLElement | null>(null)
+
   const [applications, setApplications] = useState<StudentApplication[]>([])
+
   const [loading, setLoading] = useState(true)
+
   const [error, setError] = useState<string | null>(null)
+
   const [search, setSearch] = useState("")
-  const [stageFilter, setStageFilter] = useState<"All" | ApplicationStage>("All")
+
+  const [stageFilter, setStageFilter] = useState<"All" | ApplicationStage>(
+    "All",
+  )
+
   const [retryingIds, setRetryingIds] = useState<Set<number>>(() => new Set())
+
   const [retryErrors, setRetryErrors] = useState<Record<number, string>>({})
 
   const loadApplications = useCallback(async () => {
     setLoading(true)
+
     setError(null)
+
     try {
       setApplications(await applicationsApi.listMine())
     } catch (caught) {
@@ -81,17 +105,21 @@ export default function AppTrackerScreen({
         application.analysis_status === "Pending" ||
         application.analysis_status === "Processing",
     )
+
     if (!hasInProgressApplication) return
 
     let cancelled = false
+
     let timerId: number | undefined
 
     const pollApplications = async () => {
       try {
         const nextApplications = await applicationsApi.listMine()
+
         if (cancelled) return
 
         setApplications(nextApplications)
+
         const shouldContinue = nextApplications.some(
           (application) =>
             application.parse_status === "Pending" ||
@@ -99,6 +127,7 @@ export default function AppTrackerScreen({
             application.analysis_status === "Pending" ||
             application.analysis_status === "Processing",
         )
+
         if (shouldContinue) {
           timerId = window.setTimeout(pollApplications, 3000)
         }
@@ -110,8 +139,10 @@ export default function AppTrackerScreen({
     }
 
     timerId = window.setTimeout(pollApplications, 3000)
+
     return () => {
       cancelled = true
+
       if (timerId !== undefined) {
         window.clearTimeout(timerId)
       }
@@ -120,19 +151,25 @@ export default function AppTrackerScreen({
 
   useEffect(() => {
     if (focusApplicationId == null) return
+
     setSearch("")
+
     setStageFilter("All")
   }, [focusApplicationId])
 
   useEffect(() => {
     if (loading || focusApplicationId == null) return
+
     const frame = window.requestAnimationFrame(() => {
       focusedCardRef.current?.scrollIntoView({
         behavior: "smooth",
+
         block: "center",
       })
+
       focusedCardRef.current?.focus({ preventScroll: true })
     })
+
     return () => window.cancelAnimationFrame(frame)
   }, [applications, focusApplicationId, loading])
 
@@ -140,45 +177,59 @@ export default function AppTrackerScreen({
     () =>
       STAGES.map((stage) => ({
         stage,
+
         count: applications.filter(
           (application) => application.current_stage === stage,
         ).length,
       })),
+
     [applications],
   )
 
   const filteredApplications = useMemo(() => {
     const query = search.trim().toLocaleLowerCase()
+
     return applications.filter((application) => {
       const matchesStage =
         stageFilter === "All" || application.current_stage === stageFilter
+
       const matchesSearch =
         query.length === 0 ||
         application.job.title.toLocaleLowerCase().includes(query) ||
         application.job.company.name.toLocaleLowerCase().includes(query) ||
         (application.job.location ?? "").toLocaleLowerCase().includes(query)
+
       return matchesStage && matchesSearch
     })
   }, [applications, search, stageFilter])
 
   const retryAnalysis = useCallback(async (applicationId: number) => {
     setRetryingIds((current) => new Set(current).add(applicationId))
+
     setRetryErrors((current) => {
       const next = { ...current }
+
       delete next[applicationId]
+
       return next
     })
 
     try {
       await applicationsApi.retryAnalysis(applicationId)
+
       setApplications((current) =>
         current.map((application) =>
           application.application_id === applicationId
             ? {
                 ...application,
+
                 parse_status:
-                  application.parse_status === "Success" ? "Success" : "Pending",
+                  application.parse_status === "Success"
+                    ? "Success"
+                    : "Pending",
+
                 analysis_status: "Pending",
+
                 analysis_error: null,
               }
             : application,
@@ -187,6 +238,7 @@ export default function AppTrackerScreen({
     } catch (caught) {
       setRetryErrors((current) => ({
         ...current,
+
         [applicationId]:
           caught instanceof Error
             ? caught.message
@@ -195,7 +247,9 @@ export default function AppTrackerScreen({
     } finally {
       setRetryingIds((current) => {
         const next = new Set(current)
+
         next.delete(applicationId)
+
         return next
       })
     }
@@ -396,8 +450,11 @@ export default function AppTrackerScreen({
           <h1
             style={{
               margin: "0 0 4px",
+
               color: "var(--text-primary)",
+
               fontSize: 22,
+
               fontWeight: 800,
             }}
           >
@@ -406,7 +463,9 @@ export default function AppTrackerScreen({
           <p
             style={{
               margin: 0,
+
               color: "var(--text-secondary)",
+
               fontSize: 14,
             }}
           >
@@ -419,7 +478,7 @@ export default function AppTrackerScreen({
           onClick={() => void loadApplications()}
           disabled={loading}
         >
-          <RefreshCw size={15} />
+          <ArrowsClockwise size={15} weight="light" />
           Refresh
         </button>
       </header>
@@ -433,8 +492,11 @@ export default function AppTrackerScreen({
                 <div
                   style={{
                     marginBottom: 7,
+
                     color: stageConfig[stage].color,
+
                     fontSize: 12,
+
                     fontWeight: 700,
                   }}
                 >
@@ -443,7 +505,9 @@ export default function AppTrackerScreen({
                 <div
                   style={{
                     color: "var(--text-primary)",
+
                     fontSize: 22,
+
                     fontWeight: 800,
                   }}
                 >
@@ -457,7 +521,7 @@ export default function AppTrackerScreen({
 
       {error && (
         <div role="alert" style={alertStyle}>
-          <AlertCircle size={18} />
+          <WarningCircle size={18} weight="light" />
           <span style={{ flex: 1 }}>{error}</span>
           <button
             type="button"
@@ -472,7 +536,11 @@ export default function AppTrackerScreen({
       {!loading && !error && applications.length > 0 && (
         <div className="tracker-toolbar">
           <label className="tracker-search">
-            <Search size={16} color="var(--text-muted)" />
+            <MagnifyingGlass
+              size={16}
+              weight="light"
+              color="var(--text-muted)"
+            />
             <span className="sr-only">Search applications</span>
             <input
               value={search}
@@ -480,11 +548,17 @@ export default function AppTrackerScreen({
               placeholder="Search job, company, or location"
               style={{
                 width: "100%",
+
                 minWidth: 0,
+
                 border: 0,
+
                 outline: 0,
+
                 background: "transparent",
+
                 color: "var(--text-primary)",
+
                 fontSize: 13,
               }}
             />
@@ -492,6 +566,7 @@ export default function AppTrackerScreen({
           <div className="tracker-filters" aria-label="Filter by stage">
             {(["All", ...STAGES] as const).map((stage) => {
               const active = stageFilter === stage
+
               return (
                 <button
                   type="button"
@@ -500,15 +575,23 @@ export default function AppTrackerScreen({
                   onClick={() => setStageFilter(stage)}
                   style={{
                     flexShrink: 0,
+
                     padding: "8px 12px",
+
                     border: `1px solid ${
                       active ? "var(--accent)" : "var(--border)"
                     }`,
+
                     borderRadius: 8,
+
                     background: active ? "var(--accent)" : "var(--surface)",
+
                     color: active ? "#FFFFFF" : "var(--text-secondary)",
+
                     cursor: "pointer",
+
                     fontSize: 12,
+
                     fontWeight: 700,
                   }}
                 >
@@ -522,35 +605,40 @@ export default function AppTrackerScreen({
 
       {loading ? (
         <StatePanel>
-          <RefreshCw className="state-spinner" size={30} />
+          <ArrowsClockwise className="state-spinner" size={30} weight="light" />
           <strong>Loading your applications</strong>
         </StatePanel>
       ) : error ? null : applications.length === 0 ? (
         <StatePanel>
-          <Inbox size={36} color="#94A3B8" />
+          <Tray size={36} weight="light" color="#94A3B8" />
           <strong>No applications yet</strong>
           <span>Your submitted jobs will appear here.</span>
         </StatePanel>
       ) : filteredApplications.length === 0 ? (
         <StatePanel>
-          <Search size={34} color="#94A3B8" />
+          <MagnifyingGlass size={34} weight="light" color="#94A3B8" />
           <strong>No matching applications</strong>
           <span>Try another search term or stage.</span>
         </StatePanel>
       ) : (
         <section className="tracker-list" aria-label="Your applications">
           {filteredApplications.map((application) => {
-            const focused =
-              application.application_id === focusApplicationId
+            const focused = application.application_id === focusApplicationId
+
             const retrying = retryingIds.has(application.application_id)
+
             const retryError = retryErrors[application.application_id]
+
             const analysisFailed =
               application.parse_status === "Failed" ||
               application.analysis_status === "Failed"
+
             const canReanalyze =
               analysisFailed || application.analysis_status === "Success"
+
             const companyInitial =
               application.job.company.name.trim().charAt(0).toUpperCase() || "C"
+
             return (
               <article
                 key={application.application_id}
@@ -565,10 +653,7 @@ export default function AppTrackerScreen({
                   <div className="tracker-card__identity">
                     <div className="tracker-card__logo" aria-hidden="true">
                       {application.job.company.logo_url ? (
-                        <img
-                          src={application.job.company.logo_url}
-                          alt=""
-                        />
+                        <img src={application.job.company.logo_url} alt="" />
                       ) : (
                         companyInitial
                       )}
@@ -585,8 +670,11 @@ export default function AppTrackerScreen({
                   <div
                     style={{
                       display: "flex",
+
                       alignItems: "center",
+
                       flexWrap: "wrap",
+
                       gap: 8,
                     }}
                   >
@@ -594,10 +682,15 @@ export default function AppTrackerScreen({
                       <span
                         style={{
                           padding: "4px 9px",
+
                           borderRadius: 999,
+
                           background: "var(--accent-soft)",
+
                           color: "var(--accent-ink)",
+
                           fontSize: 11,
+
                           fontWeight: 700,
                         }}
                       >
@@ -610,20 +703,20 @@ export default function AppTrackerScreen({
 
                 <div className="tracker-card__meta">
                   <span className="tracker-meta-item">
-                    <CalendarDays size={14} />
+                    <CalendarBlank size={14} weight="light" />
                     Applied {formatDate(application.applied_at)}
                   </span>
                   <span className="tracker-meta-item">
-                    <MapPin size={14} />
+                    <MapPin size={14} weight="light" />
                     {application.job.location || "Location not specified"}
                   </span>
                   <span className="tracker-meta-item">
-                    <BriefcaseBusiness size={14} />
+                    <Briefcase size={14} weight="light" />
                     {application.job.employment_type ||
                       "Employment type not specified"}
                   </span>
                   <span className="tracker-meta-item">
-                    <FileText size={14} />
+                    <FileText size={14} weight="light" />
                     {application.cv.file_name}
                   </span>
                 </div>
@@ -642,7 +735,9 @@ export default function AppTrackerScreen({
                   <div
                     style={{
                       color: "var(--text-muted)",
+
                       fontSize: 12,
+
                       textAlign: "right",
                     }}
                   >
@@ -656,9 +751,9 @@ export default function AppTrackerScreen({
                   <div className="tracker-retry">
                     <div role="status" className="tracker-retry__message">
                       {analysisFailed ? (
-                        <AlertCircle size={15} />
+                        <WarningCircle size={15} weight="light" />
                       ) : (
-                        <RefreshCw size={15} />
+                        <ArrowsClockwise size={15} weight="light" />
                       )}
                       <span>
                         {analysisFailed
@@ -676,9 +771,13 @@ export default function AppTrackerScreen({
                       disabled={retrying}
                     >
                       {retrying ? (
-                        <RefreshCw className="state-spinner" size={15} />
+                        <ArrowsClockwise
+                          className="state-spinner"
+                          size={15}
+                          weight="light"
+                        />
                       ) : (
-                        <RefreshCw size={15} />
+                        <ArrowsClockwise size={15} weight="light" />
                       )}
                       {retrying
                         ? "Analyzing..."
@@ -704,15 +803,22 @@ export default function AppTrackerScreen({
 
 function StageBadge({ stage }: { stage: ApplicationStage }) {
   const config = stageConfig[stage]
+
   return (
     <span
       style={{
         display: "inline-flex",
+
         padding: "5px 10px",
+
         borderRadius: 999,
+
         background: config.background,
+
         color: config.color,
+
         fontSize: 12,
+
         fontWeight: 750,
       }}
     >
@@ -723,32 +829,47 @@ function StageBadge({ stage }: { stage: ApplicationStage }) {
 
 function ProcessingBadge({
   label,
+
   status,
 }: {
   label: string
+
   status: ApplicationProcessingStatus
 }) {
-  const config: Record<
-    ApplicationProcessingStatus,
-    { background: string; color: string }
-  > = {
+  const config: Record<ApplicationProcessingStatus, {
+    background: string
+    color: string
+  }> = {
     Pending: { background: "#FEF3C7", color: "#92400E" },
+
     Processing: { background: "#DBEAFE", color: "#1D4ED8" },
+
     Success: { background: "#DCFCE7", color: "#166534" },
+
     Failed: { background: "#FEE2E2", color: "#B91C1C" },
   }
+
   const tone = config[status]
+
   return (
     <span
       style={{
         display: "inline-flex",
+
         alignItems: "center",
+
         gap: 5,
+
         padding: "4px 8px",
+
         borderRadius: 6,
+
         background: tone.background,
+
         color: tone.color,
+
         fontSize: 11,
+
         fontWeight: 700,
       }}
     >
@@ -767,42 +888,66 @@ function StatePanel({ children }: { children: React.ReactNode }) {
 
 function formatDate(value: string) {
   const date = new Date(value)
+
   if (Number.isNaN(date.getTime())) return "Unknown date"
+
   return new Intl.DateTimeFormat(undefined, {
     dateStyle: "medium",
+
     timeStyle: "short",
   }).format(date)
 }
 
 const sectionHeadingStyle: React.CSSProperties = {
   margin: "0 0 10px",
+
   color: "var(--text-primary)",
+
   fontSize: 14,
+
   fontWeight: 750,
 }
 
 const alertStyle: React.CSSProperties = {
   display: "flex",
+
   alignItems: "center",
+
   flexWrap: "wrap",
+
   gap: 10,
+
   marginBottom: 18,
+
   padding: "12px 14px",
+
   border: "1px solid #FECACA",
+
   borderRadius: 8,
+
   background: "#FEF2F2",
+
   color: "#B91C1C",
+
   fontSize: 13,
 }
 
 const statePanelStyle: React.CSSProperties = {
   minHeight: 230,
+
   display: "flex",
+
   flexDirection: "column",
+
   alignItems: "center",
+
   justifyContent: "center",
+
   gap: 8,
+
   padding: 24,
+
   color: "var(--text-secondary)",
+
   textAlign: "center",
 }
