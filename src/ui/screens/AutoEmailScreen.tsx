@@ -43,7 +43,7 @@ const templates = [
   },
 ]
 
-const emailContent: Record<string, { subject: string body: string[] }> = {
+const emailContent: Record<string, { subject: string; body: string[] }> = {
   confirmation: {
     subject:
       "Application Received — Senior Backend Developer at TechViet Solutions",

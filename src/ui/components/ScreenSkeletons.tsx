@@ -30,20 +30,6 @@ function SkeletonCard({
   )
 }
 
-function Pulse({
-  children,
-  delay = 0,
-}: {
-  children: React.ReactNode
-  delay?: number
-}) {
-  return (
-    <div style={{ animation: `fc-fade-in 0.5s ease ${delay}s both` }}>
-      {children}
-    </div>
-  )
-}
-
 export function AnalyzerSkeleton() {
   return (
     <div className="fc-stagger">

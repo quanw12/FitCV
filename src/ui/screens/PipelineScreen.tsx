@@ -35,7 +35,7 @@ const columns = [
   "Rejected",
 ]
 
-const colColors: Record<string, { bg: string text: string dot: string }> = {
+const colColors: Record<string, { bg: string; text: string; dot: string }> = {
   New: {
     bg: "var(--gray-soft)",
     text: "var(--text-secondary)",

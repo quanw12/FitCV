@@ -12,7 +12,6 @@ import {
   Sparkle,
   Handshake,
   CloudArrowUp,
-  Gear,
   CaretDown,
   CheckCircle,
 } from "@phosphor-icons/react"
@@ -84,26 +83,7 @@ const hrBenefits = [
   },
 ]
 
-const steps = [
-  {
-    icon: <CloudArrowUp size={32} weight="duotone" />,
-    title: "Upload",
-    description:
-      "Upload a CV or paste a job description. We support PDF, DOCX, and plain text.",
-  },
-  {
-    icon: <Gear size={32} weight="duotone" />,
-    title: "AI Analysis",
-    description:
-      "Our engine parses, extracts, and scores every skill, qualification, and experience against the target role.",
-  },
-  {
-    icon: <Sparkle size={32} weight="duotone" />,
-    title: "Act on Insights",
-    description:
-      "View match scores, skill gaps, improvement suggestions, and rank candidates — all driven by source-grounded evidence.",
-  },
-]
+
 
 const faqs = [
   {

@@ -19,7 +19,7 @@ interface HRDashboardProps {
   onNavigate: (screen: ScreenId) => void
 }
 
-function MiniBars({ values, color }: { values: number[] color: string }) {
+function MiniBars({ values, color }: { values: number[]; color: string }) {
   const max = Math.max(...values) || 1
 
   return (

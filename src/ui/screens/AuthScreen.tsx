@@ -18,7 +18,6 @@ import {
   ArrowClockwise,
   User,
   Users,
-  Sparkle,
   Check,
 } from "@phosphor-icons/react"
 import { authApi } from "@/api"

@@ -22,7 +22,7 @@ interface SeekerDashboardProps {
   onNavigate: (screen: ScreenId) => void
 }
 
-function Sparkline({ points, color }: { points: number[] color: string }) {
+function Sparkline({ points, color }: { points: number[]; color: string }) {
   const w = 120
 
   const h = 36

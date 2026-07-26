@@ -611,7 +611,7 @@ export default function JobApplicantsRankingPanel() {
             }
           >
             {archiveLoading ? (
-              <LoaderCircle
+              <Spinner
                 size={15}
                 style={{ animation: "fc-spin .8s linear infinite" }}
               />

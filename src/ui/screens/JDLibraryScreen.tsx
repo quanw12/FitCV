@@ -1410,7 +1410,7 @@ function SkillInsightChart({
   )
 }
 
-function SkillChips({ label, skills }: { label: string skills: string[] }) {
+function SkillChips({ label, skills }: { label: string; skills: string[] }) {
   if (skills.length === 0) return null
 
   return (
