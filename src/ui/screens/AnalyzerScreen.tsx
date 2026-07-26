@@ -1,47 +1,79 @@
 import { useCallback, useEffect, useRef, useState } from "react"
-import { WarningCircle, FileText, TrashSimple, UploadSimple, Lightning } from "@phosphor-icons/react"
+
+import {
+  WarningCircle,
+  FileText,
+  TrashSimple,
+  UploadSimple,
+  Lightning,
+} from "@phosphor-icons/react"
 
 import { analyzerApi } from "@/api/analyzerApi"
+
 import { getScoreTone } from "@/services/matchScore"
+
 import type { AnalyzerDraftState, MatchAnalysis } from "@/types/analyzer"
+
 import ScoreRing from "../components/ScoreRing"
+
 import BezelCard from "../components/BezelCard"
 
 const MAX_CV_BYTES = 10 * 1024 * 1024
+
 const breakdownLabels = {
   skills: "Skills Match",
+
   experience: "Experience",
+
   education: "Education",
+
   soft_skills: "Soft Skills",
 } as const
 
 interface AnalyzerScreenProps {
   draft: AnalyzerDraftState
+
   setDraft: React.Dispatch<React.SetStateAction<AnalyzerDraftState>>
+
   onAnalysisComplete?: (matchResultId: string) => void
+
   onAnalysisInvalidated?: () => void
+
   onViewSuggestions?: () => void
 }
 
 export default function AnalyzerScreen({
   draft,
+
   setDraft,
+
   onAnalysisComplete,
+
   onAnalysisInvalidated,
+
   onViewSuggestions,
 }: AnalyzerScreenProps) {
   const cvInputRef = useRef<HTMLInputElement>(null)
+
   const jdInputRef = useRef<HTMLInputElement>(null)
+
   const { cvFile, uploadedCvId, jdText, result } = draft
+
   const [cvDrag, setCvDrag] = useState(false)
+
   const [loading, setLoading] = useState(false)
+
   const [clearing, setClearing] = useState(false)
+
   const [progress, setProgress] = useState("")
+
   const [error, setError] = useState<string | null>(null)
+
   const activeAnalysisRef = useRef<AbortController | null>(null)
 
   const cancelActiveAnalysis = useCallback(() => {
     activeAnalysisRef.current?.abort()
+
     activeAnalysisRef.current = null
   }, [])
 
@@ -49,46 +81,68 @@ export default function AnalyzerScreen({
     () => () => {
       cancelActiveAnalysis()
     },
+
     [cancelActiveAnalysis],
   )
 
   const invalidateAnalysis = () => {
     cancelActiveAnalysis()
+
     setLoading(false)
+
     setProgress("")
+
     onAnalysisInvalidated?.()
   }
 
   const selectCv = (file?: File) => {
     if (!file) return
+
     const validationError = validateCv(file)
+
     if (validationError) {
       setError(validationError)
+
       return
     }
+
     invalidateAnalysis()
+
     setDraft((current) => ({
       ...current,
+
       cvFile: file,
+
       uploadedCvId: null,
+
       result: null,
     }))
+
     setError(null)
   }
 
   const clearUpload = async () => {
     if (loading || clearing) return
+
     setClearing(true)
+
     setError(null)
+
     try {
       if (uploadedCvId != null) await analyzerApi.deleteCv(uploadedCvId)
+
       if (cvInputRef.current) cvInputRef.current.value = ""
+
       setDraft((current) => ({
         ...current,
+
         cvFile: null,
+
         uploadedCvId: null,
+
         result: null,
       }))
+
       invalidateAnalysis()
     } catch (caught) {
       setError(
@@ -104,51 +158,80 @@ export default function AnalyzerScreen({
   const handleAnalyze = async () => {
     if (!cvFile) {
       setError("Choose a PDF or DOCX CV before analyzing.")
+
       return
     }
+
     if (jdText.trim().length < 50) {
       setError("Paste a job description with at least 50 characters.")
+
       return
     }
 
     cancelActiveAnalysis()
+
     onAnalysisInvalidated?.()
+
     const controller = new AbortController()
+
     activeAnalysisRef.current = controller
 
     setLoading(true)
+
     setError(null)
+
     setDraft((current) => ({ ...current, result: null }))
+
     try {
       let cvId = uploadedCvId
+
       if (cvId == null) {
         setProgress("Uploading CV…")
+
         const uploaded = await analyzerApi.uploadCv(cvFile, controller.signal)
+
         if (!isCurrentAnalysis(activeAnalysisRef, controller)) return
+
         cvId = uploaded.cvId
+
         setDraft((current) => ({ ...current, uploadedCvId: cvId }))
+
         if (uploaded.parseStatus !== "Success") {
           setProgress("Parsing CV…")
+
           await waitForCv(cvId, controller.signal)
+
           if (!isCurrentAnalysis(activeAnalysisRef, controller)) return
         }
       }
 
       setProgress("Extracting JD requirements…")
-      let analysis = await analyzerApi.analyzeCv({
-        cvId,
-        jobDescription: jdText.trim(),
-      }, controller.signal)
+
+      let analysis = await analyzerApi.analyzeCv(
+        {
+          cvId,
+
+          jobDescription: jdText.trim(),
+        },
+        controller.signal,
+      )
+
       if (!isCurrentAnalysis(activeAnalysisRef, controller)) return
+
       if (analysis.status !== "Success") {
         setProgress("Matching evidence…")
+
         analysis = await waitForMatch(
           analysis.matchResultId,
+
           controller.signal,
         )
+
         if (!isCurrentAnalysis(activeAnalysisRef, controller)) return
       }
+
       setDraft((current) => ({ ...current, result: analysis }))
+
       onAnalysisComplete?.(analysis.matchResultId)
     } catch (caught) {
       if (
@@ -157,6 +240,7 @@ export default function AnalyzerScreen({
       ) {
         return
       }
+
       setError(
         caught instanceof Error
           ? caught.message
@@ -165,7 +249,9 @@ export default function AnalyzerScreen({
     } finally {
       if (isCurrentAnalysis(activeAnalysisRef, controller)) {
         activeAnalysisRef.current = null
+
         setLoading(false)
+
         setProgress("")
       }
     }
@@ -173,14 +259,20 @@ export default function AnalyzerScreen({
 
   const uploadJdText = async (file?: File) => {
     if (!file) return
+
     if (file.size > 1024 * 1024) {
       setError("JD text files must be 1 MB or smaller.")
+
       return
     }
+
     try {
       const text = await file.text()
+
       invalidateAnalysis()
+
       setDraft((current) => ({ ...current, jdText: text, result: null }))
+
       setError(null)
     } catch {
       setError("Unable to read this job-description text file.")
@@ -190,10 +282,12 @@ export default function AnalyzerScreen({
   const breakdowns = result
     ? Object.entries(breakdownLabels).flatMap(([key, label]) => {
         const evidence =
-          result.breakdown[key as keyof MatchAnalysis["breakdown"]]
+          result.breakdown[(key as keyof MatchAnalysis["breakdown"])]
+
         return evidence ? [{ label, score: evidence.score }] : []
       })
     : []
+
   const skills = result?.breakdown.skills
 
   return (
@@ -211,8 +305,11 @@ export default function AnalyzerScreen({
       <div
         style={{
           display: "grid",
+
           gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
+
           gap: 16,
+
           marginBottom: 20,
         }}
       >
@@ -222,12 +319,15 @@ export default function AnalyzerScreen({
               className="fc-card fc-card--pad fc-card--lift"
               onDragOver={(event) => {
                 event.preventDefault()
+
                 setCvDrag(true)
               }}
               onDragLeave={() => setCvDrag(false)}
               onDrop={(event) => {
                 event.preventDefault()
+
                 setCvDrag(false)
+
                 selectCv(event.dataTransfer.files[0])
               }}
               style={{
@@ -238,19 +338,29 @@ export default function AnalyzerScreen({
                       ? "var(--success)"
                       : "var(--border-strong)"
                 }`,
+
                 background: cvDrag
                   ? "var(--accent-soft)"
                   : cvFile
                     ? "var(--success-soft)"
                     : "var(--surface)",
+
                 minHeight: 220,
+
                 display: "flex",
+
                 flexDirection: "column",
+
                 alignItems: "center",
+
                 justifyContent: "center",
+
                 transition: "all 0.2s",
+
                 borderRadius: "var(--card-inner-radius)",
+
                 margin: 0,
+
                 boxShadow: "none",
               }}
             >
@@ -270,35 +380,55 @@ export default function AnalyzerScreen({
                 onClick={() => cvInputRef.current?.click()}
                 style={{
                   width: "100%",
+
                   minHeight: 150,
+
                   border: 0,
+
                   background: "transparent",
+
                   cursor: loading || clearing ? "not-allowed" : "pointer",
+
                   display: "flex",
+
                   flexDirection: "column",
+
                   alignItems: "center",
+
                   justifyContent: "center",
+
                   color: "var(--text-primary)",
                 }}
               >
                 <div
                   style={{
                     width: 56,
+
                     height: 56,
+
                     borderRadius: 16,
+
                     background: cvFile
                       ? "var(--success-soft)"
                       : "var(--accent-soft)",
+
                     display: "flex",
+
                     alignItems: "center",
+
                     justifyContent: "center",
+
                     marginBottom: 12,
                   }}
                 >
                   {cvFile ? (
                     <FileText size={26} weight="light" color="var(--success)" />
                   ) : (
-                    <UploadSimple size={24} weight="light" color="var(--accent)" />
+                    <UploadSimple
+                      size={24}
+                      weight="light"
+                      color="var(--accent)"
+                    />
                   )}
                 </div>
                 <strong style={{ fontSize: 15, marginBottom: 6 }}>
@@ -307,8 +437,11 @@ export default function AnalyzerScreen({
                 <span
                   style={{
                     fontSize: 13,
+
                     color: cvFile ? "var(--success)" : "var(--text-secondary)",
+
                     fontWeight: cvFile ? 600 : 400,
+
                     textAlign: "center",
                   }}
                 >
@@ -317,7 +450,9 @@ export default function AnalyzerScreen({
                     : "Drag and drop or browse files"}
                 </span>
                 <small style={{ marginTop: 5, color: "var(--text-muted)" }}>
-                  {cvFile ? "Choose a different file" : "PDF or DOCX · max 10 MB"}
+                  {cvFile
+                    ? "Choose a different file"
+                    : "PDF or DOCX · max 10 MB"}
                 </small>
               </button>
               {cvFile && (
@@ -343,9 +478,13 @@ export default function AnalyzerScreen({
           <div
             style={{
               display: "flex",
+
               alignItems: "center",
+
               justifyContent: "space-between",
+
               gap: 12,
+
               marginBottom: 12,
             }}
           >
@@ -353,8 +492,11 @@ export default function AnalyzerScreen({
               htmlFor="analyzer-jd-text"
               style={{
                 fontWeight: 700,
+
                 fontSize: 15,
+
                 color: "var(--text-primary)",
+
                 fontFamily: "var(--font-display)",
               }}
             >
@@ -377,9 +519,7 @@ export default function AnalyzerScreen({
               onClick={(event) => {
                 event.currentTarget.value = ""
               }}
-              onChange={(event) =>
-                void uploadJdText(event.target.files?.[0])
-              }
+              onChange={(event) => void uploadJdText(event.target.files?.[0])}
             />
           </div>
           <textarea
@@ -388,21 +528,31 @@ export default function AnalyzerScreen({
             value={jdText}
             onChange={(event) => {
               const value = event.target.value
+
               invalidateAnalysis()
+
               setDraft((current) => ({
                 ...current,
+
                 jdText: value,
+
                 result: null,
               }))
             }}
             placeholder="Paste the complete job description here…"
             style={{
               flex: 1,
+
               minHeight: 160,
+
               resize: "vertical",
+
               padding: 14,
+
               fontSize: 13,
+
               background: "var(--surface-2)",
+
               lineHeight: 1.6,
             }}
           />
@@ -421,14 +571,23 @@ export default function AnalyzerScreen({
           role="alert"
           style={{
             display: "flex",
+
             alignItems: "center",
+
             gap: 9,
+
             padding: "12px 14px",
+
             marginBottom: 16,
+
             borderRadius: 10,
+
             background: "var(--danger-soft)",
+
             color: "var(--danger)",
+
             fontSize: 13,
+
             fontWeight: 600,
           }}
         >
@@ -468,8 +627,11 @@ export default function AnalyzerScreen({
             <div
               style={{
                 textAlign: "center",
+
                 marginBottom: 24,
+
                 position: "relative",
+
                 zIndex: 1,
               }}
             >
@@ -479,8 +641,11 @@ export default function AnalyzerScreen({
               <h2
                 style={{
                   fontSize: 18,
+
                   fontWeight: 700,
+
                   color: "var(--text-primary)",
+
                   fontFamily: "var(--font-display)",
                 }}
               >
@@ -490,11 +655,17 @@ export default function AnalyzerScreen({
             <div
               style={{
                 display: "flex",
+
                 alignItems: "center",
+
                 justifyContent: "center",
+
                 gap: 40,
+
                 flexWrap: "wrap",
+
                 position: "relative",
+
                 zIndex: 1,
               }}
             >
@@ -507,35 +678,47 @@ export default function AnalyzerScreen({
               <div
                 style={{
                   display: "grid",
+
                   gridTemplateColumns: "repeat(2, minmax(140px, 1fr))",
+
                   gap: 12,
                 }}
               >
                 {breakdowns.map((item) => {
                   const tone = getScoreTone(item.score)
+
                   return (
                     <div
                       key={item.label}
                       style={{
                         background: "var(--surface-2)",
+
                         border: "1px solid var(--border)",
+
                         borderRadius: 12,
+
                         padding: "14px 16px",
                       }}
                     >
                       <div
                         style={{
                           display: "flex",
+
                           justifyContent: "space-between",
+
                           alignItems: "center",
+
                           gap: 12,
+
                           marginBottom: 8,
                         }}
                       >
                         <span
                           style={{
                             fontSize: 13,
+
                             fontWeight: 600,
+
                             color: "var(--text-secondary)",
                           }}
                         >
@@ -544,7 +727,9 @@ export default function AnalyzerScreen({
                         <span
                           style={{
                             fontSize: 14,
+
                             fontWeight: 800,
+
                             color: tone.color,
                           }}
                         >
@@ -555,6 +740,7 @@ export default function AnalyzerScreen({
                         <div
                           style={{
                             width: `${Math.min(100, Math.max(0, item.score))}%`,
+
                             background: tone.color,
                           }}
                         />
@@ -571,48 +757,71 @@ export default function AnalyzerScreen({
               className="fc-card fc-card--pad"
               style={{
                 marginBottom: 16,
+
                 background: "var(--warning-soft)",
+
                 border: "1px solid #fde9cf",
               }}
             >
               <div
                 style={{
                   display: "flex",
+
                   alignItems: "center",
+
                   gap: 16,
+
                   flexWrap: "wrap",
                 }}
               >
                 <div
                   style={{
                     width: 52,
+
                     height: 52,
+
                     borderRadius: 14,
+
                     background: "#fff",
+
                     border: "1px solid #fde9cf",
+
                     display: "flex",
+
                     alignItems: "center",
+
                     justifyContent: "center",
+
                     flexShrink: 0,
                   }}
                 >
-                  <WarningCircle size={24} weight="light" color="var(--warning)" />
+                  <WarningCircle
+                    size={24}
+                    weight="light"
+                    color="var(--warning)"
+                  />
                 </div>
                 <div style={{ flex: 1, minWidth: 240 }}>
                   <div
                     style={{
                       fontWeight: 700,
+
                       fontSize: 16,
+
                       color: "var(--text-primary)",
+
                       marginBottom: 4,
                     }}
                   >
-                    Estimated screening alignment: {Math.round(result.passProbability)}%
+                    Estimated screening alignment:{" "}
+                    {Math.round(result.passProbability)}%
                   </div>
                   <div
                     style={{
                       fontSize: 13,
+
                       color: "var(--text-secondary)",
+
                       marginBottom: 10,
                     }}
                   >
@@ -622,21 +831,31 @@ export default function AnalyzerScreen({
                     aria-hidden="true"
                     style={{
                       height: 10,
+
                       borderRadius: 5,
+
                       background:
                         "linear-gradient(to right, #EF4444, #F59E0B, #10B981)",
+
                       position: "relative",
                     }}
                   >
                     <div
                       style={{
                         position: "absolute",
+
                         left: `calc(${Math.min(100, Math.max(0, result.passProbability))}% - 2px)`,
+
                         top: -3,
+
                         width: 4,
+
                         height: 16,
+
                         background: "#1F2937",
+
                         borderRadius: 2,
+
                         boxShadow: "0 0 0 2px white",
                       }}
                     />
@@ -668,9 +887,13 @@ export default function AnalyzerScreen({
               <div
                 style={{
                   marginTop: 18,
+
                   padding: 16,
+
                   borderRadius: 12,
+
                   background: "var(--surface-2)",
+
                   border: "1px solid var(--border)",
                 }}
               >
@@ -680,8 +903,11 @@ export default function AnalyzerScreen({
                 <ul
                   style={{
                     paddingLeft: 20,
+
                     color: "var(--text-secondary)",
+
                     fontSize: 13,
+
                     lineHeight: 1.7,
                   }}
                 >
@@ -712,12 +938,17 @@ export default function AnalyzerScreen({
 async function waitForCv(cvId: number, signal: AbortSignal) {
   for (let attempt = 0; attempt < 60; attempt += 1) {
     throwIfAborted(signal)
+
     const cv = await analyzerApi.getCv(cvId, signal)
+
     if (cv.parseStatus === "Success") return cv
+
     if (cv.parseStatus === "Failed")
       throw new Error(cv.errorMessage ?? "CV parsing failed.")
+
     await delay(500, signal)
   }
+
   throw new Error(
     "CV parsing is taking longer than expected. Please retry shortly.",
   )
@@ -726,12 +957,17 @@ async function waitForCv(cvId: number, signal: AbortSignal) {
 async function waitForMatch(matchResultId: string, signal: AbortSignal) {
   for (let attempt = 0; attempt < 60; attempt += 1) {
     throwIfAborted(signal)
+
     const match = await analyzerApi.getMatchResult(matchResultId, signal)
+
     if (match.status === "Success") return match
+
     if (match.status === "Failed")
       throw new Error(match.errorMessage ?? "CV/JD matching failed.")
+
     await delay(500, signal)
   }
+
   throw new Error(
     "Matching is taking longer than expected. Please retry shortly.",
   )
@@ -740,14 +976,19 @@ async function waitForMatch(matchResultId: string, signal: AbortSignal) {
 function delay(milliseconds: number, signal: AbortSignal) {
   return new Promise<void>((resolve, reject) => {
     throwIfAborted(signal)
+
     const timeoutId = window.setTimeout(() => {
       signal.removeEventListener("abort", handleAbort)
+
       resolve()
     }, milliseconds)
+
     const handleAbort = () => {
       window.clearTimeout(timeoutId)
+
       reject(createAbortError())
     }
+
     signal.addEventListener("abort", handleAbort, { once: true })
   })
 }
@@ -766,19 +1007,22 @@ function isAbortError(error: unknown): boolean {
 
 function isCurrentAnalysis(
   activeAnalysisRef: React.RefObject<AbortController | null>,
+
   controller: AbortController,
 ): boolean {
-  return (
-    activeAnalysisRef.current === controller && !controller.signal.aborted
-  )
+  return activeAnalysisRef.current === controller && !controller.signal.aborted
 }
 
 function validateCv(file: File): string | null {
   const lowerName = file.name.toLowerCase()
+
   if (!lowerName.endsWith(".pdf") && !lowerName.endsWith(".docx"))
     return "Only PDF and DOCX CV files are supported."
+
   if (file.size === 0) return "The selected CV is empty."
+
   if (file.size > MAX_CV_BYTES) return "CV files must be 10 MB or smaller."
+
   return null
 }
 
@@ -807,15 +1051,23 @@ function Spinner() {
 
 function SkillTags({
   title,
+
   values,
+
   className,
+
   prefix,
+
   empty,
 }: {
   title: string
+
   values: string[]
+
   className: string
+
   prefix: string
+
   empty: string
 }) {
   return (

@@ -42,6 +42,9 @@ export default function AnimatedNumber({
   }, [value, duration, delay])
 
   return (
-    <span className="fc-stat__value">{display}{suffix}</span>
+    <span className="fc-stat__value">
+      {display}
+      {suffix}
+    </span>
   )
 }

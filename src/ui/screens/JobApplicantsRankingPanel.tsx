@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react"
+
 import {
   WarningCircle,
   Briefcase,
@@ -22,47 +23,66 @@ import {
 } from "@phosphor-icons/react"
 
 import { applicationsApi } from "@/api/applicationsApi"
+
 import { cvRankingApi } from "@/api/cvRankingApi"
+
 import { jobsApi } from "@/api/jobsApi"
+
 import type { RankedApplication, RankingBreakdown } from "@/types/cvRanking"
+
 import type { JobPost } from "@/types/jobs"
+
 import ScoreRing from "../components/ScoreRing"
 
 type AnalysisState = "Pending" | "Processing" | "Failed" | "Success"
+
 type CvAction = "open" | "download"
 
 const breakdownCriteria: Array<[keyof RankingBreakdown, string]> = [
   ["skills", "Skills"],
+
   ["experience", "Experience"],
+
   ["education", "Education"],
+
   ["soft_skills", "Soft skills"],
 ]
 
 function analysisState(value: string): AnalysisState {
   const normalized = value.trim().toLowerCase()
+
   if (["success", "completed", "ready"].includes(normalized)) return "Success"
+
   if (["failed", "error"].includes(normalized)) return "Failed"
+
   if (["processing", "running", "in_progress"].includes(normalized)) {
     return "Processing"
   }
+
   return "Pending"
 }
 
 function percentValue(value: number | null | undefined): number | null {
   if (value == null || !Number.isFinite(value)) return null
+
   const percentage = value > 0 && value <= 1 ? value * 100 : value
+
   return Math.round(Math.max(0, Math.min(100, percentage)))
 }
 
 function badgeClass(status: AnalysisState): string {
   if (status === "Success") return "fc-badge--green"
+
   if (status === "Failed") return "fc-badge--red"
+
   return "fc-badge--amber"
 }
 
 function statusIcon(status: AnalysisState) {
   if (status === "Success") return <CheckCircle size={13} weight="light" />
+
   if (status === "Failed") return <WarningCircle size={13} weight="light" />
+
   if (status === "Processing") {
     return (
       <Spinner
@@ -72,92 +92,135 @@ function statusIcon(status: AnalysisState) {
       />
     )
   }
+
   return <Clock size={13} weight="light" />
 }
 
 function fileSizeLabel(sizeKb: number): string {
   if (sizeKb >= 1024) return `${(sizeKb / 1024).toFixed(1)} MB`
+
   return `${Math.max(0, Math.round(sizeKb))} KB`
 }
 
 function parsedList(
   parsed: Record<string, unknown> | null,
+
   keys: string[],
 ): string[] {
   if (!parsed) return []
+
   for (const key of keys) {
     const value = parsed[key]
+
     if (Array.isArray(value)) {
       return value
+
         .map((item) => {
           if (typeof item === "string") return item
+
           if (item && typeof item === "object" && "name" in item) {
             return String(item.name)
           }
+
           return null
         })
+
         .filter((item): item is string => Boolean(item))
     }
   }
+
   return []
 }
 
 function parsedText(
   parsed: Record<string, unknown> | null,
+
   keys: string[],
 ): string | null {
   if (!parsed) return null
+
   for (const key of keys) {
     const value = parsed[key]
+
     if (typeof value === "string" && value.trim()) return value
+
     if (typeof value === "number") return String(value)
   }
+
   return null
 }
 
 export default function JobApplicantsRankingPanel() {
   const [jobs, setJobs] = useState<JobPost[]>([])
+
   const [selectedJobId, setSelectedJobId] = useState<number | null>(null)
+
   const [applications, setApplications] = useState<RankedApplication[]>([])
+
   const [selectedApplication, setSelectedApplication] =
     useState<RankedApplication | null>(null)
+
   const [selectedIds, setSelectedIds] = useState<Set<number>>(() => new Set())
+
   const [confirmedIds, setConfirmedIds] = useState<Set<number>>(() => new Set())
+
   const [threshold, setThreshold] = useState(70)
+
   const [jobsLoading, setJobsLoading] = useState(true)
+
   const [applicationsLoading, setApplicationsLoading] = useState(false)
+
   const [jobsError, setJobsError] = useState("")
+
   const [applicationsError, setApplicationsError] = useState("")
+
   const [cvError, setCvError] = useState("")
+
   const [archiveError, setArchiveError] = useState("")
+
   const [previewError, setPreviewError] = useState("")
+
   const [previewUrl, setPreviewUrl] = useState("")
+
   const [previewLoading, setPreviewLoading] = useState(false)
+
   const [archiveLoading, setArchiveLoading] = useState(false)
+
   const [retryError, setRetryError] = useState("")
+
   const [retryingId, setRetryingId] = useState<number | null>(null)
+
   const [cvAction, setCvAction] = useState<{
     id: number
+
     action: CvAction
   } | null>(null)
+
   const [reloadKey, setReloadKey] = useState(0)
 
   useEffect(() => {
     let active = true
+
     setJobsLoading(true)
+
     setJobsError("")
 
     jobsApi
+
       .listManaged()
+
       .then((result) => {
         if (!active) return
+
         setJobs(result)
+
         setSelectedJobId((current) =>
           current != null && result.some((job) => job.job_id === current)
             ? current
             : (result[0]?.job_id ?? null),
         )
       })
+
       .catch((cause) => {
         if (active) {
           setJobsError(
@@ -167,6 +230,7 @@ export default function JobApplicantsRankingPanel() {
           )
         }
       })
+
       .finally(() => {
         if (active) setJobsLoading(false)
       })
@@ -178,25 +242,34 @@ export default function JobApplicantsRankingPanel() {
 
   useEffect(() => {
     setSelectedIds(new Set())
+
     setConfirmedIds(new Set())
+
     setSelectedApplication(null)
   }, [selectedJobId])
 
   useEffect(() => {
     if (selectedJobId == null) {
       setApplications([])
+
       return
     }
 
     let active = true
+
     setApplicationsLoading(true)
+
     setApplicationsError("")
 
     cvRankingApi
+
       .listApplications(selectedJobId)
+
       .then((result) => {
         if (!active) return
+
         setApplications(result)
+
         setSelectedApplication((current) =>
           current
             ? (result.find(
@@ -205,15 +278,19 @@ export default function JobApplicantsRankingPanel() {
             : null,
         )
       })
+
       .catch((cause) => {
         if (!active) return
+
         setApplications([])
+
         setApplicationsError(
           cause instanceof Error
             ? cause.message
             : "Could not load job applicants.",
         )
       })
+
       .finally(() => {
         if (active) setApplicationsLoading(false)
       })
@@ -226,36 +303,50 @@ export default function JobApplicantsRankingPanel() {
   useEffect(() => {
     const processing = applications.some((application) => {
       const state = analysisState(application.analysis_status)
+
       return state === "Pending" || state === "Processing"
     })
+
     if (!processing || selectedJobId == null) return
 
     const timer = window.setTimeout(
       () => setReloadKey((current) => current + 1),
+
       3000,
     )
+
     return () => window.clearTimeout(timer)
   }, [applications, selectedJobId])
 
   useEffect(() => {
     let active = true
+
     let objectUrl = ""
+
     setPreviewUrl("")
+
     setPreviewError("")
 
     if (!selectedApplication) {
       setPreviewLoading(false)
+
       return
     }
 
     setPreviewLoading(true)
+
     cvRankingApi
+
       .getApplicationCv(selectedApplication.application_id)
+
       .then((blob) => {
         if (!active) return
+
         objectUrl = URL.createObjectURL(blob)
+
         setPreviewUrl(objectUrl)
       })
+
       .catch((cause) => {
         if (active) {
           setPreviewError(
@@ -265,12 +356,14 @@ export default function JobApplicantsRankingPanel() {
           )
         }
       })
+
       .finally(() => {
         if (active) setPreviewLoading(false)
       })
 
     return () => {
       active = false
+
       if (objectUrl) URL.revokeObjectURL(objectUrl)
     }
   }, [selectedApplication?.application_id])
@@ -284,16 +377,20 @@ export default function JobApplicantsRankingPanel() {
           analysisState(left.analysis_status) === "Success"
             ? (left.overall_score ?? -1)
             : -1
+
         const rightScore =
           analysisState(right.analysis_status) === "Success"
             ? (right.overall_score ?? -1)
             : -1
+
         if (rightScore !== leftScore) return rightScore - leftScore
+
         return (
           new Date(right.applied_at).getTime() -
           new Date(left.applied_at).getTime()
         )
       }),
+
     [applications],
   )
 
@@ -302,20 +399,26 @@ export default function JobApplicantsRankingPanel() {
       applications.reduce<Record<AnalysisState, number>>(
         (counts, application) => {
           counts[analysisState(application.analysis_status)] += 1
+
           return counts
         },
+
         { Pending: 0, Processing: 0, Failed: 0, Success: 0 },
       ),
+
     [applications],
   )
 
   const toggleApplication = (applicationId: number) => {
     setSelectedIds((current) => {
       const next = new Set(current)
+
       if (next.has(applicationId)) next.delete(applicationId)
       else next.add(applicationId)
+
       return next
     })
+
     setConfirmedIds(new Set())
   }
 
@@ -323,43 +426,57 @@ export default function JobApplicantsRankingPanel() {
     setSelectedIds(
       new Set(
         applications
+
           .filter(
             (application) =>
               analysisState(application.analysis_status) === "Success" &&
               (percentValue(application.overall_score) ?? -1) >= threshold,
           )
+
           .map((application) => application.application_id),
       ),
     )
+
     setConfirmedIds(new Set())
   }
 
   const handleCv = async (application: RankedApplication, action: CvAction) => {
     const previewWindow = action === "open" ? window.open("", "_blank") : null
+
     setCvAction({ id: application.application_id, action })
+
     setCvError("")
 
     try {
       const blob = await cvRankingApi.getApplicationCv(
         application.application_id,
       )
+
       const objectUrl = URL.createObjectURL(blob)
+
       if (action === "open") {
         if (previewWindow) previewWindow.location.href = objectUrl
         else window.open(objectUrl, "_blank", "noopener,noreferrer")
       } else {
         const anchor = document.createElement("a")
+
         anchor.href = objectUrl
+
         anchor.download =
           application.cv.file_name ||
           `application-${application.application_id}.pdf`
+
         document.body.appendChild(anchor)
+
         anchor.click()
+
         anchor.remove()
       }
+
       window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000)
     } catch (cause) {
       previewWindow?.close()
+
       setCvError(
         cause instanceof Error ? cause.message : "Could not load this CV.",
       )
@@ -370,17 +487,28 @@ export default function JobApplicantsRankingPanel() {
 
   const downloadAllCvs = async () => {
     if (selectedJobId == null || !selectedJob) return
+
     setArchiveLoading(true)
+
     setArchiveError("")
+
     try {
       const blob = await cvRankingApi.downloadJobCvs(selectedJobId)
+
       const objectUrl = URL.createObjectURL(blob)
+
       const anchor = document.createElement("a")
+
       anchor.href = objectUrl
+
       anchor.download = `${selectedJob.title.replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "") || `job-${selectedJobId}`}-cvs.zip`
+
       document.body.appendChild(anchor)
+
       anchor.click()
+
       anchor.remove()
+
       window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000)
     } catch (cause) {
       setArchiveError(
@@ -395,23 +523,34 @@ export default function JobApplicantsRankingPanel() {
 
   const retryAnalysis = async (application: RankedApplication) => {
     setRetryingId(application.application_id)
+
     setRetryError("")
+
     try {
       await applicationsApi.retryAnalysis(application.application_id)
+
       const pending: RankedApplication = {
         ...application,
+
         analysis_status: "Pending",
+
         analysis_error: null,
+
         overall_score: null,
+
         match_label: null,
+
         pass_probability: null,
+
         breakdown: null,
       }
+
       setApplications((current) =>
         current.map((item) =>
           item.application_id === application.application_id ? pending : item,
         ),
       )
+
       setSelectedApplication(pending)
     } catch (cause) {
       setRetryError(
@@ -425,20 +564,27 @@ export default function JobApplicantsRankingPanel() {
   const selectedState = selectedApplication
     ? analysisState(selectedApplication.analysis_status)
     : null
+
   const selectedSkills = selectedApplication
     ? parsedList(selectedApplication.parsed_cv, ["skills", "technical_skills"])
     : []
+
   const selectedExperience = selectedApplication
     ? parsedText(selectedApplication.parsed_cv, [
         "experience_summary",
+
         "experience",
+
         "total_experience_years",
       ])
     : null
+
   const selectedEducation = selectedApplication
     ? parsedText(selectedApplication.parsed_cv, [
         "education_summary",
+
         "education",
+
         "highest_education",
       ])
     : null
@@ -497,12 +643,19 @@ export default function JobApplicantsRankingPanel() {
       <section
         style={{
           display: "grid",
+
           gridTemplateColumns: "minmax(240px,1fr) repeat(4,minmax(90px,.35fr))",
+
           gap: 12,
+
           alignItems: "end",
+
           overflowX: "auto",
+
           padding: "14px 0 18px",
+
           borderBottom: "1px solid var(--border)",
+
           marginBottom: 16,
         }}
       >
@@ -529,8 +682,11 @@ export default function JobApplicantsRankingPanel() {
         </label>
         {([
           "Success",
+
           "Processing",
+
           "Pending",
+
           "Failed",
         ] as AnalysisState[]).map((status) => (
           <div key={status} style={{ minWidth: 90 }}>
@@ -543,7 +699,9 @@ export default function JobApplicantsRankingPanel() {
       </section>
 
       {[jobsError, applicationsError, cvError, archiveError]
+
         .filter(Boolean)
+
         .map((message) => (
           <div
             key={message}
@@ -580,6 +738,7 @@ export default function JobApplicantsRankingPanel() {
             color="var(--accent)"
             style={{
               margin: "0 auto 10px",
+
               animation: "fc-spin .8s linear infinite",
             }}
           />
@@ -603,11 +762,17 @@ export default function JobApplicantsRankingPanel() {
           <section
             style={{
               display: "flex",
+
               alignItems: "center",
+
               gap: 12,
+
               flexWrap: "wrap",
+
               padding: "12px 0",
+
               borderBottom: "1px solid var(--border)",
+
               marginBottom: 14,
             }}
           >
@@ -615,8 +780,11 @@ export default function JobApplicantsRankingPanel() {
             <label
               style={{
                 display: "flex",
+
                 alignItems: "center",
+
                 gap: 8,
+
                 minWidth: 250,
               }}
             >
@@ -651,6 +819,7 @@ export default function JobApplicantsRankingPanel() {
               disabled={selectedIds.size === 0}
               onClick={() => {
                 setSelectedIds(new Set())
+
                 setConfirmedIds(new Set())
               }}
             >
@@ -673,10 +842,15 @@ export default function JobApplicantsRankingPanel() {
               role="status"
               style={{
                 display: "flex",
+
                 gap: 8,
+
                 alignItems: "center",
+
                 color: "var(--success)",
+
                 fontWeight: 700,
+
                 marginBottom: 12,
               }}
             >
@@ -689,8 +863,11 @@ export default function JobApplicantsRankingPanel() {
           <div
             style={{
               display: "grid",
+
               gridTemplateColumns: "minmax(0,1fr)",
+
               gap: 16,
+
               alignItems: "start",
             }}
           >
@@ -699,6 +876,7 @@ export default function JobApplicantsRankingPanel() {
                 className="fc-section-title"
                 style={{
                   padding: "14px 18px",
+
                   borderBottom: "1px solid var(--border)",
                 }}
               >
@@ -706,7 +884,9 @@ export default function JobApplicantsRankingPanel() {
                 <span
                   style={{
                     marginLeft: "auto",
+
                     color: "var(--text-secondary)",
+
                     fontSize: 13,
                   }}
                 >
@@ -729,19 +909,23 @@ export default function JobApplicantsRankingPanel() {
                 <tbody>
                   {rankedApplications.map((application, index) => {
                     const state = analysisState(application.analysis_status)
+
                     const active =
                       selectedApplication?.application_id ===
                       application.application_id
+
                     const score =
                       state === "Success"
                         ? percentValue(application.overall_score)
                         : null
+
                     return (
                       <tr
                         key={application.application_id}
                         onClick={() => setSelectedApplication(application)}
                         style={{
                           cursor: "pointer",
+
                           background: active
                             ? "var(--accent-soft)"
                             : "transparent",
@@ -771,7 +955,9 @@ export default function JobApplicantsRankingPanel() {
                           <div
                             style={{
                               color: "var(--text-muted)",
+
                               fontSize: 11,
+
                               marginTop: 2,
                             }}
                           >
@@ -783,7 +969,9 @@ export default function JobApplicantsRankingPanel() {
                             className={`fc-badge ${badgeClass(state)}`}
                             style={{
                               display: "inline-flex",
+
                               alignItems: "center",
+
                               gap: 5,
                             }}
                           >
@@ -801,6 +989,7 @@ export default function JobApplicantsRankingPanel() {
                               <div
                                 style={{
                                   color: "var(--text-muted)",
+
                                   fontSize: 11,
                                 }}
                               >
@@ -814,6 +1003,7 @@ export default function JobApplicantsRankingPanel() {
                           <div
                             style={{
                               color: "var(--text-muted)",
+
                               fontSize: 11,
                             }}
                           >
@@ -826,7 +1016,11 @@ export default function JobApplicantsRankingPanel() {
                           ).toLocaleDateString()}
                         </td>
                         <td>
-                          <CaretRight size={16} weight="light" color="var(--text-muted)" />
+                          <CaretRight
+                            size={16}
+                            weight="light"
+                            color="var(--text-muted)"
+                          />
                         </td>
                       </tr>
                     )
@@ -840,25 +1034,34 @@ export default function JobApplicantsRankingPanel() {
                 aria-label="Applicant CV comparison"
                 style={{
                   display: "grid",
+
                   gridTemplateColumns:
                     "repeat(auto-fit,minmax(min(100%,420px),1fr))",
+
                   border: "1px solid var(--border)",
+
                   background: "var(--surface)",
                 }}
               >
                 <div
                   style={{
                     minWidth: 0,
+
                     borderRight: "1px solid var(--border)",
                   }}
                 >
                   <div
                     style={{
                       display: "flex",
+
                       alignItems: "center",
+
                       justifyContent: "space-between",
+
                       minHeight: 50,
+
                       padding: "10px 14px",
+
                       borderBottom: "1px solid var(--border)",
                     }}
                   >
@@ -883,7 +1086,9 @@ export default function JobApplicantsRankingPanel() {
                     <div
                       style={{
                         minHeight: 360,
+
                         display: "grid",
+
                         placeItems: "center",
                       }}
                     >
@@ -899,10 +1104,15 @@ export default function JobApplicantsRankingPanel() {
                       role="alert"
                       style={{
                         minHeight: 240,
+
                         display: "grid",
+
                         placeItems: "center",
+
                         padding: 24,
+
                         color: "var(--danger)",
+
                         textAlign: "center",
                       }}
                     >
@@ -915,8 +1125,11 @@ export default function JobApplicantsRankingPanel() {
                       src={previewUrl}
                       style={{
                         display: "block",
+
                         width: "100%",
+
                         height: 680,
+
                         border: 0,
                       }}
                     />
@@ -924,10 +1137,15 @@ export default function JobApplicantsRankingPanel() {
                     <div
                       style={{
                         minHeight: 300,
+
                         display: "grid",
+
                         placeItems: "center",
+
                         padding: 24,
+
                         color: "var(--text-secondary)",
+
                         textAlign: "center",
                       }}
                     >
@@ -952,8 +1170,11 @@ export default function JobApplicantsRankingPanel() {
                     className="fc-section-title"
                     style={{
                       margin: "-18px -18px 0",
+
                       minHeight: 50,
+
                       padding: "10px 14px",
+
                       borderBottom: "1px solid var(--border)",
                     }}
                   >
@@ -963,7 +1184,9 @@ export default function JobApplicantsRankingPanel() {
                   <div
                     style={{
                       display: "flex",
+
                       justifyContent: "space-between",
+
                       gap: 10,
                     }}
                   >
@@ -984,9 +1207,13 @@ export default function JobApplicantsRankingPanel() {
                   <div
                     style={{
                       display: "flex",
+
                       gap: 14,
+
                       alignItems: "center",
+
                       padding: "16px 0",
+
                       borderBottom: "1px solid var(--border)",
                     }}
                   >
@@ -1007,8 +1234,11 @@ export default function JobApplicantsRankingPanel() {
                       <div
                         style={{
                           display: "flex",
+
                           gap: 6,
+
                           alignItems: "center",
+
                           fontSize: 13,
                         }}
                       >
@@ -1020,9 +1250,13 @@ export default function JobApplicantsRankingPanel() {
                       <div
                         style={{
                           display: "flex",
+
                           gap: 6,
+
                           alignItems: "center",
+
                           fontSize: 13,
+
                           marginTop: 6,
                         }}
                       >
@@ -1038,7 +1272,9 @@ export default function JobApplicantsRankingPanel() {
                       className="fc-panel"
                       style={{
                         padding: 12,
+
                         color: "var(--danger)",
+
                         marginTop: 14,
                       }}
                     >
@@ -1092,13 +1328,17 @@ export default function JobApplicantsRankingPanel() {
                         const score = percentValue(
                           selectedApplication.breakdown?.[key],
                         )
+
                         return (
                           <div key={key} style={{ marginBottom: 10 }}>
                             <div
                               style={{
                                 display: "flex",
+
                                 justifyContent: "space-between",
+
                                 fontSize: 12,
+
                                 marginBottom: 5,
                               }}
                             >
@@ -1128,8 +1368,11 @@ export default function JobApplicantsRankingPanel() {
                         <div
                           style={{
                             display: "flex",
+
                             gap: 5,
+
                             flexWrap: "wrap",
+
                             margin: "10px 0",
                           }}
                         >
@@ -1144,8 +1387,11 @@ export default function JobApplicantsRankingPanel() {
                         <div
                           style={{
                             display: "flex",
+
                             gap: 7,
+
                             fontSize: 13,
+
                             marginTop: 8,
                           }}
                         >
@@ -1157,8 +1403,11 @@ export default function JobApplicantsRankingPanel() {
                         <div
                           style={{
                             display: "flex",
+
                             gap: 7,
+
                             fontSize: 13,
+
                             marginTop: 8,
                           }}
                         >
@@ -1176,7 +1425,11 @@ export default function JobApplicantsRankingPanel() {
                     <div
                       style={{ display: "flex", gap: 8, alignItems: "center" }}
                     >
-                      <FileText size={18} weight="light" color="var(--accent)" />
+                      <FileText
+                        size={18}
+                        weight="light"
+                        color="var(--accent)"
+                      />
                       <div style={{ minWidth: 0 }}>
                         <strong style={{ overflowWrap: "anywhere" }}>
                           {selectedApplication.cv.file_name}
@@ -1194,8 +1447,11 @@ export default function JobApplicantsRankingPanel() {
                   <div
                     style={{
                       display: "flex",
+
                       gap: 8,
+
                       flexWrap: "wrap",
+
                       marginTop: 12,
                     }}
                   >
@@ -1221,7 +1477,7 @@ export default function JobApplicantsRankingPanel() {
                         cvAction?.id === selectedApplication.application_id
                       }
                     >
-<DownloadSimple size={15} weight="light" />
+                      <DownloadSimple size={15} weight="light" />
                       Download
                     </button>
                   </div>

@@ -1,4 +1,5 @@
 import type { AccountRole } from "@/types/auth"
+
 import type { UserProfile } from "@/types/profile"
 
 export function requiresCompanyProfile(role: AccountRole | null): boolean {
@@ -7,7 +8,6 @@ export function requiresCompanyProfile(role: AccountRole | null): boolean {
 
 export function isCompanyProfileComplete(profile: UserProfile): boolean {
   return Boolean(
-    profile.company?.companyName.trim() &&
-      profile.company.industryName?.trim(),
+    profile.company?.companyName.trim() && profile.company.industryName?.trim(),
   )
 }

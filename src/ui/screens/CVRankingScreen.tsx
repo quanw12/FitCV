@@ -1,13 +1,15 @@
-import { useState } from 'react'
-import { Briefcase, Files } from '@phosphor-icons/react'
+import { useState } from "react"
 
-import BulkCvRankingPanel from './BulkCvRankingPanel'
-import JobApplicantsRankingPanel from './JobApplicantsRankingPanel'
+import { Briefcase, Files } from "@phosphor-icons/react"
 
-type RankingSource = 'upload' | 'applications'
+import BulkCvRankingPanel from "./BulkCvRankingPanel"
+
+import JobApplicantsRankingPanel from "./JobApplicantsRankingPanel"
+
+type RankingSource = "upload" | "applications"
 
 export default function CVRankingScreen() {
-  const [source, setSource] = useState<RankingSource>('upload')
+  const [source, setSource] = useState<RankingSource>("upload")
 
   return (
     <div>
@@ -15,25 +17,31 @@ export default function CVRankingScreen() {
         role="tablist"
         aria-label="CV ranking source"
         style={{
-          display: 'inline-flex',
+          display: "inline-flex",
+
           gap: 4,
+
           padding: 4,
+
           marginBottom: 18,
-          border: '1px solid var(--border)',
-          background: 'var(--surface-2)',
+
+          border: "1px solid var(--border)",
+
+          background: "var(--surface-2)",
+
           borderRadius: 8,
         }}
       >
         <button
           type="button"
           role="tab"
-          aria-selected={source === 'upload'}
+          aria-selected={source === "upload"}
           className={
-            source === 'upload'
-              ? 'fc-btn fc-btn--primary'
-              : 'fc-btn fc-btn--secondary'
+            source === "upload"
+              ? "fc-btn fc-btn--primary"
+              : "fc-btn fc-btn--secondary"
           }
-          onClick={() => setSource('upload')}
+          onClick={() => setSource("upload")}
         >
           <Files size={16} />
           Upload CV Batch
@@ -41,20 +49,20 @@ export default function CVRankingScreen() {
         <button
           type="button"
           role="tab"
-          aria-selected={source === 'applications'}
+          aria-selected={source === "applications"}
           className={
-            source === 'applications'
-              ? 'fc-btn fc-btn--primary'
-              : 'fc-btn fc-btn--secondary'
+            source === "applications"
+              ? "fc-btn fc-btn--primary"
+              : "fc-btn fc-btn--secondary"
           }
-          onClick={() => setSource('applications')}
+          onClick={() => setSource("applications")}
         >
           <Briefcase size={16} />
           Job Applicants
         </button>
       </div>
 
-      {source === 'upload' ? (
+      {source === "upload" ? (
         <BulkCvRankingPanel />
       ) : (
         <JobApplicantsRankingPanel />

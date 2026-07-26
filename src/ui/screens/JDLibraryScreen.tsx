@@ -23,6 +23,7 @@ import {
   UploadSimple,
   X,
 } from "@phosphor-icons/react"
+
 import {
   Bar,
   BarChart,
@@ -32,11 +33,15 @@ import {
   XAxis,
   YAxis,
 } from "recharts"
+
 import { toast } from "sonner"
 
 import { applicationsApi } from "@/api/applicationsApi"
+
 import { jdLibraryApi } from "@/api/jdLibraryApi"
+
 import { jobsApi } from "@/api/jobsApi"
+
 import BezelCard from "@/ui/components/BezelCard"
 
 import { profileApi } from "@/api/profileApi"
@@ -44,6 +49,7 @@ import { profileApi } from "@/api/profileApi"
 import type { JobPost } from "@/types/jobs"
 
 import type { StudentApplication } from "@/types/applications"
+
 import type { JdLibraryInsights, JdLibraryItem } from "@/types/jdLibrary"
 
 const MAX_CV_BYTES = 10 * 1024 * 1024
@@ -80,6 +86,7 @@ const emptyApplyForm: ApplyForm = {
 
 function validateApplication(
   form: ApplyForm,
+
   file: File | null,
 ): string | null {
   if (form.fullName.trim().length < 2) return "Enter your full name."
@@ -112,8 +119,11 @@ export default function JDLibraryScreen({
   onViewTracking,
 }: JDLibraryScreenProps) {
   const [jobs, setJobs] = useState<JobPost[]>([])
+
   const [savedJds, setSavedJds] = useState<JdLibraryItem[]>([])
+
   const [insights, setInsights] = useState<JdLibraryInsights | null>(null)
+
   const [applications, setApplications] = useState<StudentApplication[]>([])
 
   const [recentApplications, setRecentApplications] =
@@ -132,8 +142,11 @@ export default function JDLibraryScreen({
   const [location, setLocation] = useState("")
 
   const [loading, setLoading] = useState(true)
+
   const [libraryLoading, setLibraryLoading] = useState(true)
+
   const [deletingJdId, setDeletingJdId] = useState<number | null>(null)
+
   const [profileLoading, setProfileLoading] = useState(false)
 
   const [submitting, setSubmitting] = useState(false)
@@ -142,7 +155,9 @@ export default function JDLibraryScreen({
     useState<number | null>(null)
 
   const [error, setError] = useState("")
+
   const [libraryError, setLibraryError] = useState("")
+
   const [applyError, setApplyError] = useState("")
 
   useEffect(() => {
@@ -167,13 +182,18 @@ export default function JDLibraryScreen({
 
   const loadLibrary = async () => {
     setLibraryLoading(true)
+
     setLibraryError("")
+
     try {
       const [items, summary] = await Promise.all([
         jdLibraryApi.list(),
+
         jdLibraryApi.getInsights(),
       ])
+
       setSavedJds(items)
+
       setInsights(summary)
     } catch (cause) {
       setLibraryError(
@@ -193,10 +213,14 @@ export default function JDLibraryScreen({
   const deleteSavedJd = async (item: JdLibraryItem) => {
     if (!window.confirm(`Delete “${item.title}” and its saved match results?`))
       return
+
     setDeletingJdId(item.jobDescriptionId)
+
     setLibraryError("")
+
     try {
       await jdLibraryApi.delete(item.jobDescriptionId)
+
       await loadLibrary()
     } catch (cause) {
       setLibraryError(
@@ -260,7 +284,9 @@ export default function JDLibraryScreen({
     () => [
       ...new Set(
         jobs
+
           .map((job) => job.location)
+
           .filter((item): item is string => Boolean(item)),
       ),
     ],
@@ -392,8 +418,11 @@ export default function JDLibraryScreen({
           <div
             style={{
               display: "grid",
+
               gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))",
+
               gap: 14,
+
               marginBottom: 18,
             }}
           >
@@ -421,8 +450,11 @@ export default function JDLibraryScreen({
           <div
             style={{
               display: "grid",
+
               gridTemplateColumns: "repeat(auto-fit,minmax(300px,1fr))",
+
               gap: 16,
+
               marginBottom: 20,
             }}
           >
@@ -452,32 +484,64 @@ export default function JDLibraryScreen({
             </div>
             {savedJds.length === 0 ? (
               <BezelCard innerClassName="fc-stagger">
-                <div style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  gap: 12,
-                  padding: "36px 24px",
-                  textAlign: "center",
-                }}>
-                  <div style={{
-                    width: 56, height: 56, borderRadius: 16,
-                    background: "var(--accent-soft)",
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                  }}>
-                    <BookOpenText size={24} weight="light" color="var(--accent)" />
+                <div
+                  style={{
+                    display: "flex",
+
+                    flexDirection: "column",
+
+                    alignItems: "center",
+
+                    gap: 12,
+
+                    padding: "36px 24px",
+
+                    textAlign: "center",
+                  }}
+                >
+                  <div
+                    style={{
+                      width: 56,
+                      height: 56,
+                      borderRadius: 16,
+
+                      background: "var(--accent-soft)",
+
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <BookOpenText
+                      size={24}
+                      weight="light"
+                      color="var(--accent)"
+                    />
                   </div>
-                  <strong style={{ fontSize: 16, color: "var(--text-primary)" }}>
+                  <strong
+                    style={{ fontSize: 16, color: "var(--text-primary)" }}
+                  >
                     No analyzed JDs yet
                   </strong>
-                  <span style={{ fontSize: 13, color: "var(--text-secondary)", maxWidth: 280 }}>
+                  <span
+                    style={{
+                      fontSize: 13,
+                      color: "var(--text-secondary)",
+                      maxWidth: 280,
+                    }}
+                  >
                     JDs used in Match Analyzer are saved here automatically with
-                    their parsed skill requirements and recurring skill demand data.
+                    their parsed skill requirements and recurring skill demand
+                    data.
                   </span>
                   <button
                     type="button"
                     className="fc-btn fc-btn--primary"
-                    onClick={() => toast.info("Use the Match Analyzer to analyze a job description")}
+                    onClick={() =>
+                      toast.info(
+                        "Use the Match Analyzer to analyze a job description",
+                      )
+                    }
                   >
                     <BookOpenText size={16} weight="light" />
                     Analyze a JD
@@ -495,10 +559,15 @@ export default function JDLibraryScreen({
                     <summary
                       style={{
                         cursor: "pointer",
+
                         listStyle: "none",
+
                         display: "flex",
+
                         justifyContent: "space-between",
+
                         gap: 14,
+
                         alignItems: "center",
                       }}
                     >
@@ -515,7 +584,9 @@ export default function JDLibraryScreen({
                       <span
                         style={{
                           display: "flex",
+
                           alignItems: "center",
+
                           gap: 8,
                         }}
                       >
@@ -532,6 +603,7 @@ export default function JDLibraryScreen({
                           disabled={deletingJdId === item.jobDescriptionId}
                           onClick={(event) => {
                             event.preventDefault()
+
                             void deleteSavedJd(item)
                           }}
                         >
@@ -542,7 +614,9 @@ export default function JDLibraryScreen({
                     <div
                       style={{
                         marginTop: 14,
+
                         borderTop: "1px solid var(--border)",
+
                         paddingTop: 14,
                       }}
                     >
@@ -561,10 +635,15 @@ export default function JDLibraryScreen({
                       <p
                         style={{
                           whiteSpace: "pre-wrap",
+
                           maxHeight: 180,
+
                           overflowY: "auto",
+
                           color: "var(--text-secondary)",
+
                           fontSize: 13,
+
                           marginTop: 12,
                         }}
                       >
@@ -642,31 +721,56 @@ export default function JDLibraryScreen({
         <div className="fc-card fc-card--pad">Loading active jobs...</div>
       ) : filtered.length === 0 ? (
         <BezelCard>
-          <div style={{
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            gap: 12,
-            padding: "48px 24px",
-            textAlign: "center",
-          }}>
-            <div style={{
-              width: 56, height: 56, borderRadius: 16,
-              background: "var(--accent-soft)",
-              display: "flex", alignItems: "center", justifyContent: "center",
-            }}>
+          <div
+            style={{
+              display: "flex",
+
+              flexDirection: "column",
+
+              alignItems: "center",
+
+              gap: 12,
+
+              padding: "48px 24px",
+
+              textAlign: "center",
+            }}
+          >
+            <div
+              style={{
+                width: 56,
+                height: 56,
+                borderRadius: 16,
+
+                background: "var(--accent-soft)",
+
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
               <MagnifyingGlass size={24} weight="light" color="var(--accent)" />
             </div>
             <strong style={{ fontSize: 16, color: "var(--text-primary)" }}>
               No matching jobs found
             </strong>
-            <span style={{ fontSize: 13, color: "var(--text-secondary)", maxWidth: 280 }}>
-              Try adjusting your search query or location filter to find more opportunities.
+            <span
+              style={{
+                fontSize: 13,
+                color: "var(--text-secondary)",
+                maxWidth: 280,
+              }}
+            >
+              Try adjusting your search query or location filter to find more
+              opportunities.
             </span>
             <button
               type="button"
               className="fc-btn fc-btn--secondary"
-              onClick={() => { setQuery(""); setLocation("") }}
+              onClick={() => {
+                setQuery("")
+                setLocation("")
+              }}
             >
               <X size={16} weight="light" />
               Clear filters
@@ -677,7 +781,9 @@ export default function JDLibraryScreen({
         <div
           style={{
             display: "grid",
+
             gridTemplateColumns: "repeat(auto-fit,minmax(280px,1fr))",
+
             gap: 16,
           }}
         >
@@ -714,7 +820,11 @@ export default function JDLibraryScreen({
                 </div>
               </div>
               <p>
-                <MapPin size={13} weight="light" style={{ display: "inline" }} />{" "}
+                <MapPin
+                  size={13}
+                  weight="light"
+                  style={{ display: "inline" }}
+                />{" "}
                 {job.location} - {job.employment_type}
               </p>
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -725,7 +835,12 @@ export default function JDLibraryScreen({
                   <span className="fc-badge fc-badge--blue">Applied</span>
                 )}
                 <span>
-                  <CalendarBlank size={12} weight="light" style={{ display: "inline" }} /> Apply by{" "}
+                  <CalendarBlank
+                    size={12}
+                    weight="light"
+                    style={{ display: "inline" }}
+                  />{" "}
+                  Apply by{" "}
                   {job.deadline
                     ? new Date(job.deadline).toLocaleDateString()
                     : "open"}
@@ -767,14 +882,18 @@ export default function JDLibraryScreen({
             onClick={(event) => event.stopPropagation()}
             style={{
               width: "min(820px,100%)",
+
               maxHeight: "90vh",
+
               overflowY: "auto",
             }}
           >
             <div
               style={{
                 display: "flex",
+
                 justifyContent: "space-between",
+
                 gap: 14,
               }}
             >
@@ -782,7 +901,11 @@ export default function JDLibraryScreen({
                 <div className="fc-eyebrow">{selected.company.name}</div>
                 <h2 id="job-detail-title">{selected.title}</h2>
                 <p>
-                  <MapPin size={13} weight="light" style={{ display: "inline" }} />{" "}
+                  <MapPin
+                    size={13}
+                    weight="light"
+                    style={{ display: "inline" }}
+                  />{" "}
                   {selected.location} - {selected.employment_type} -{" "}
                   {selected.openings_count} openings
                 </p>
@@ -799,8 +922,11 @@ export default function JDLibraryScreen({
             <div
               style={{
                 display: "flex",
+
                 gap: 10,
+
                 flexWrap: "wrap",
+
                 marginTop: 14,
               }}
             >
@@ -875,15 +1001,20 @@ export default function JDLibraryScreen({
             onClick={(event) => event.stopPropagation()}
             style={{
               width: "min(620px,100%)",
+
               maxHeight: "92vh",
+
               overflowY: "auto",
             }}
           >
             <div
               style={{
                 display: "flex",
+
                 justifyContent: "space-between",
+
                 gap: 16,
+
                 marginBottom: 18,
               }}
             >
@@ -915,7 +1046,9 @@ export default function JDLibraryScreen({
                 <p
                   style={{
                     color: "var(--text-secondary)",
+
                     margin: "8px auto 22px",
+
                     maxWidth: 420,
                   }}
                 >
@@ -926,7 +1059,8 @@ export default function JDLibraryScreen({
                   className="fc-btn fc-btn--primary"
                   onClick={() => viewTracking(submittedApplicationId)}
                 >
-                  <ArrowSquareOut size={15} weight="light" /> View application tracking
+                  <ArrowSquareOut size={15} weight="light" /> View application
+                  tracking
                 </button>
               </div>
             ) : (
@@ -957,7 +1091,9 @@ export default function JDLibraryScreen({
                     className="fc-panel"
                     style={{
                       padding: 12,
+
                       marginBottom: 14,
+
                       color: "var(--danger)",
                     }}
                   >
@@ -982,6 +1118,7 @@ export default function JDLibraryScreen({
                       onChange={(event) =>
                         setApplyForm((current) => ({
                           ...current,
+
                           fullName: event.target.value,
                         }))
                       }
@@ -998,6 +1135,7 @@ export default function JDLibraryScreen({
                       onChange={(event) =>
                         setApplyForm((current) => ({
                           ...current,
+
                           email: event.target.value,
                         }))
                       }
@@ -1014,6 +1152,7 @@ export default function JDLibraryScreen({
                       onChange={(event) =>
                         setApplyForm((current) => ({
                           ...current,
+
                           phone: event.target.value,
                         }))
                       }
@@ -1047,8 +1186,11 @@ export default function JDLibraryScreen({
                     disabled={submitting}
                     style={{
                       position: "absolute",
+
                       width: 1,
+
                       height: 1,
+
                       opacity: 0,
                     }}
                   />
@@ -1074,7 +1216,11 @@ export default function JDLibraryScreen({
                         flexShrink: 0,
                       }}
                     >
-                      {cvFile ? <FileText size={21} weight="light" /> : <UploadSimple size={21} weight="light" />}
+                      {cvFile ? (
+                        <FileText size={21} weight="light" />
+                      ) : (
+                        <UploadSimple size={21} weight="light" />
+                      )}
                     </div>
                     <div style={{ minWidth: 0 }}>
                       <div
@@ -1085,7 +1231,9 @@ export default function JDLibraryScreen({
                       <div
                         style={{
                           fontSize: 12,
+
                           color: "var(--text-muted)",
+
                           marginTop: 3,
                         }}
                       >
@@ -1102,9 +1250,13 @@ export default function JDLibraryScreen({
                 <div
                   style={{
                     display: "flex",
+
                     justifyContent: "flex-end",
+
                     gap: 10,
+
                     marginTop: 20,
+
                     flexWrap: "wrap",
                   }}
                 >
@@ -1144,11 +1296,15 @@ export default function JDLibraryScreen({
 
 function InsightMetric({
   icon,
+
   label,
+
   value,
 }: {
   icon: React.ReactNode
+
   label: string
+
   value: string | number
 }) {
   return (
@@ -1159,11 +1315,17 @@ function InsightMetric({
       <span
         style={{
           width: 40,
+
           height: 40,
+
           borderRadius: 10,
+
           display: "grid",
+
           placeItems: "center",
+
           color: "var(--accent)",
+
           background: "var(--accent-soft)",
         }}
       >
@@ -1179,15 +1341,23 @@ function InsightMetric({
 
 function SkillInsightChart({
   title,
+
   description,
+
   data,
+
   color,
+
   emptyMessage,
 }: {
   title: string
+
   description: string
+
   data: JdLibraryInsights["requiredSkills"]
+
   color: string
+
   emptyMessage: string
 }) {
   return (
@@ -1200,7 +1370,9 @@ function SkillInsightChart({
         <p
           style={{
             color: "var(--text-muted)",
+
             fontSize: 13,
+
             padding: "30px 0 12px",
           }}
         >
@@ -1225,6 +1397,7 @@ function SkillInsightChart({
               <Tooltip
                 formatter={(value) => [
                   `${Number(value ?? 0).toFixed(1)}%`,
+
                   "Frequency",
                 ]}
               />
@@ -1237,8 +1410,9 @@ function SkillInsightChart({
   )
 }
 
-function SkillChips({ label, skills }: { label: string; skills: string[] }) {
+function SkillChips({ label, skills }: { label: string skills: string[] }) {
   if (skills.length === 0) return null
+
   return (
     <div style={{ marginBottom: 10 }}>
       <strong style={{ display: "block", fontSize: 12, marginBottom: 6 }}>

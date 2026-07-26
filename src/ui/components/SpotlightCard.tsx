@@ -5,7 +5,10 @@ interface SpotlightCardProps extends HTMLMotionProps<"div"> {
   children: ReactNode
 }
 
-export default function SpotlightCard({ children, ...props }: SpotlightCardProps) {
+export default function SpotlightCard({
+  children,
+  ...props
+}: SpotlightCardProps) {
   const ref = useRef<HTMLDivElement>(null)
   const [pos, setPos] = useState({ x: "50%", y: "50%" })
   const [hovered, setHovered] = useState(false)

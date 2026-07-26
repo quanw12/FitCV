@@ -1,3 +1,5 @@
-export * from './matchScore'
-export * from './authValidation'
-export * from './profileCompletion'
+export * from "./matchScore"
+
+export * from "./authValidation"
+
+export * from "./profileCompletion"

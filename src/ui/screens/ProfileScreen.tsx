@@ -1,4 +1,12 @@
-import { useEffect, useMemo, useRef, useState, type DragEvent, type FormEvent } from "react"
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type DragEvent,
+  type FormEvent,
+} from "react"
+
 import {
   WarningCircle,
   Buildings,
@@ -10,82 +18,131 @@ import {
   UploadSimple,
   UserCircle,
 } from "@phosphor-icons/react"
+
 import { authApi, profileApi } from "@/api"
+
 import type { AuthSession } from "@/types/auth"
+
 import type { ProfileUpdate, UserProfile } from "@/types/profile"
 
 interface ProfileScreenProps {
   session: AuthSession
+
   onSessionChange: (session: AuthSession) => void
+
   companyOnboarding?: boolean
+
   onProfileSaved?: (profile: UserProfile) => void
 }
+
 interface FormState {
   fullName: string
+
   phone: string
+
   companyName: string
+
   industryName: string
+
   companyWebsiteUrl: string
+
   companyLogoUrl: string
 }
 
 const blank: FormState = {
   fullName: "",
+
   phone: "",
+
   companyName: "",
+
   industryName: "",
+
   companyWebsiteUrl: "",
+
   companyLogoUrl: "",
 }
+
 const inputStyle = {
   width: "100%",
+
   boxSizing: "border-box" as const,
+
   border: "1px solid var(--border)",
+
   borderRadius: 10,
+
   padding: "10px 12px",
+
   font: "inherit",
+
   color: "var(--text-primary)",
+
   background: "white",
+
   outlineColor: "var(--accent)",
 }
 
 function formFrom(profile: UserProfile): FormState {
   return {
     fullName: profile.fullName,
+
     phone: profile.phone ?? "",
+
     companyName: profile.company?.companyName ?? "",
+
     industryName: profile.company?.industryName ?? "",
+
     companyWebsiteUrl: profile.company?.websiteUrl ?? "",
+
     companyLogoUrl: profile.company?.logoUrl ?? "",
   }
 }
 
 function Field({
   label,
+
   value,
+
   onChange,
+
   placeholder,
+
   type = "text",
+
   maxLength,
+
   minLength,
+
   required,
 }: {
   label: string
+
   value: string
+
   onChange: (value: string) => void
+
   placeholder?: string
+
   type?: string
+
   maxLength?: number
+
   minLength?: number
+
   required?: boolean
 }) {
   return (
     <label
       style={{
         display: "grid",
+
         gap: 7,
+
         fontSize: 13,
+
         fontWeight: 600,
+
         color: "var(--text-secondary)",
       }}
     >
@@ -107,46 +164,81 @@ function Field({
 
 export default function ProfileScreen({
   session,
+
   onSessionChange,
+
   companyOnboarding = false,
+
   onProfileSaved,
 }: ProfileScreenProps) {
   const [profile, setProfile] = useState<UserProfile | null>(null)
+
   const [form, setForm] = useState<FormState>(blank)
+
   const [loading, setLoading] = useState(true)
+
   const [saving, setSaving] = useState(false)
+
   const [error, setError] = useState("")
+
   const [success, setSuccess] = useState("")
+
   const [avatarBusy, setAvatarBusy] = useState(false)
+
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
-  const [avatarFile, setAvatarFile] = useState<{ name: string; size: number } | null>(null)
+
+  const [avatarFile, setAvatarFile] = useState<{
+    name: string
+    size: number
+  } | null>(null)
+
   const [avatarBroken, setAvatarBroken] = useState(false)
+
   const [dragging, setDragging] = useState(false)
+
   const fileInput = useRef<HTMLInputElement>(null)
+
   const isStudent = session.user.role === "Student"
-  const hasCompanyRole = session.user.role === "HR" || session.user.role === "HiringManager" || session.user.role === "Admin"
+
+  const hasCompanyRole =
+    session.user.role === "HR" ||
+    session.user.role === "HiringManager" ||
+    session.user.role === "Admin"
+
   const initials = useMemo(
     () =>
       (form.fullName || session.user.email)
+
         .split(/\s+/)
+
         .map((part) => part[0])
+
         .join("")
+
         .slice(0, 2)
+
         .toUpperCase(),
+
     [form.fullName, session.user.email],
   )
 
   useEffect(() => {
     let active = true
+
     profileApi
+
       .get()
+
       .then((value) => {
         if (active) {
           setProfile(value)
+
           setForm(formFrom(value))
+
           setError("")
         }
       })
+
       .catch((reason) => {
         if (active)
           setError(
@@ -155,58 +247,86 @@ export default function ProfileScreen({
               : "Unable to load profile.",
           )
       })
+
       .finally(() => {
         if (active) setLoading(false)
       })
+
     return () => {
       active = false
     }
   }, [])
 
-  useEffect(() => () => {
-    if (avatarPreview) URL.revokeObjectURL(avatarPreview)
-  }, [avatarPreview])
+  useEffect(
+    () => () => {
+      if (avatarPreview) URL.revokeObjectURL(avatarPreview)
+    },
+    [avatarPreview],
+  )
 
   const set = (key: keyof FormState) => (value: string) => {
     setSuccess("")
+
     setForm((current) => ({ ...current, [key]: value }))
   }
+
   const optional = (value: string) => value.trim() || null
 
   async function submit(event: FormEvent) {
     event.preventDefault()
+
     setError("")
+
     setSuccess("")
+
     if (form.fullName.trim().length < 2) {
       setError("Full name must be at least 2 characters.")
+
       return
     }
+
     if (
       hasCompanyRole &&
       (!form.companyName.trim() || !form.industryName.trim())
     ) {
       setError("Company name and industry are required.")
+
       return
     }
 
     setSaving(true)
+
     const update: ProfileUpdate = {
       fullName: form.fullName.trim(),
+
       ...(isStudent ? { phone: optional(form.phone) } : {}),
-      ...(hasCompanyRole ? {
-        companyName: optional(form.companyName),
-        industryName: optional(form.industryName),
-        companyWebsiteUrl: optional(form.companyWebsiteUrl),
-        companyLogoUrl: optional(form.companyLogoUrl),
-      } : {}),
+
+      ...(hasCompanyRole
+        ? {
+            companyName: optional(form.companyName),
+
+            industryName: optional(form.industryName),
+
+            companyWebsiteUrl: optional(form.companyWebsiteUrl),
+
+            companyLogoUrl: optional(form.companyLogoUrl),
+          }
+        : {}),
     }
+
     try {
       const saved = await profileApi.update(update)
+
       setProfile(saved)
+
       setForm(formFrom(saved))
+
       const nextSession = authApi.getSession()
+
       if (nextSession) onSessionChange(nextSession)
+
       onProfileSaved?.(saved)
+
       setSuccess("Profile saved successfully.")
     } catch (reason) {
       setError(
@@ -219,59 +339,99 @@ export default function ProfileScreen({
 
   async function chooseAvatar(file?: File) {
     if (!file) return
+
     setError("")
+
     setSuccess("")
+
     if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
       setAvatarPreview(null)
+
       setAvatarFile(null)
+
       setError("Choose a JPG, PNG, or WebP image.")
+
       return
     }
+
     if (file.size > 5 * 1024 * 1024) {
       setAvatarPreview(null)
+
       setAvatarFile(null)
+
       setError("Avatar must be 5MB or smaller.")
+
       return
     }
+
     const preview = URL.createObjectURL(file)
+
     setAvatarPreview(preview)
+
     setAvatarFile({ name: file.name, size: file.size })
+
     setAvatarBroken(false)
+
     setAvatarBusy(true)
+
     try {
       const saved = await profileApi.uploadAvatar(file)
+
       setProfile(saved)
+
       setAvatarPreview(null)
+
       setAvatarFile(null)
+
       setAvatarBroken(false)
+
       const nextSession = authApi.getSession()
+
       if (nextSession) onSessionChange(nextSession)
+
       setSuccess("Profile photo updated.")
     } catch (reason) {
       setAvatarPreview(null)
+
       setAvatarFile(null)
-      setError(reason instanceof Error ? reason.message : "Unable to upload photo.")
+
+      setError(
+        reason instanceof Error ? reason.message : "Unable to upload photo.",
+      )
     } finally {
       setAvatarBusy(false)
+
       if (fileInput.current) fileInput.current.value = ""
     }
   }
 
   async function removeAvatar() {
     setError("")
+
     setSuccess("")
+
     setAvatarBusy(true)
+
     try {
       const saved = await profileApi.deleteAvatar()
+
       setProfile(saved)
+
       setAvatarPreview(null)
+
       setAvatarFile(null)
+
       setAvatarBroken(false)
+
       const nextSession = authApi.getSession()
+
       if (nextSession) onSessionChange(nextSession)
+
       setSuccess("Profile photo removed.")
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Unable to remove photo.")
+      setError(
+        reason instanceof Error ? reason.message : "Unable to remove photo.",
+      )
     } finally {
       setAvatarBusy(false)
     }
@@ -284,13 +444,17 @@ export default function ProfileScreen({
       <div
         style={{
           minHeight: 300,
+
           display: "grid",
+
           placeItems: "center",
+
           color: "var(--text-muted)",
         }}
       >
         <span style={{ display: "flex", alignItems: "center", gap: 9 }}>
-          <Spinner className="fitcv-spin" size={20} weight="light" /> Loading profile...
+          <Spinner className="fitcv-spin" size={20} weight="light" /> Loading
+          profile...
         </span>
       </div>
     )
@@ -307,7 +471,9 @@ export default function ProfileScreen({
         <p
           style={{
             margin: "7px 0 0",
+
             color: "var(--text-muted)",
+
             fontSize: 14,
           }}
         >
@@ -321,11 +487,17 @@ export default function ProfileScreen({
           role="alert"
           style={{
             display: "flex",
+
             gap: 9,
+
             padding: 12,
+
             marginBottom: 16,
+
             borderRadius: 10,
+
             background: "#FEF2F2",
+
             color: "#B91C1C",
           }}
         >
@@ -338,11 +510,17 @@ export default function ProfileScreen({
           role="status"
           style={{
             display: "flex",
+
             gap: 9,
+
             padding: 12,
+
             marginBottom: 16,
+
             borderRadius: 10,
+
             background: "#F0FDF4",
+
             color: "#15803D",
           }}
         >
@@ -355,25 +533,40 @@ export default function ProfileScreen({
           <section
             style={{
               background: "white",
+
               border: "1px solid var(--border)",
+
               borderRadius: 14,
+
               padding: 20,
+
               textAlign: "center",
             }}
           >
             <div
               style={{
                 width: 88,
+
                 height: 88,
+
                 borderRadius: 20,
+
                 margin: "0 auto 14px",
+
                 overflow: "hidden",
+
                 display: "grid",
+
                 placeItems: "center",
+
                 position: "relative",
+
                 background: "linear-gradient(135deg,#4F46E5,#7C3AED)",
+
                 color: "white",
+
                 fontSize: 24,
+
                 fontWeight: 800,
               }}
             >
@@ -388,9 +581,13 @@ export default function ProfileScreen({
                   }}
                   style={{
                     position: "absolute",
+
                     inset: 0,
+
                     width: "100%",
+
                     height: "100%",
+
                     objectFit: "cover",
                   }}
                 />
@@ -406,16 +603,22 @@ export default function ProfileScreen({
           <section
             style={{
               background: "white",
+
               border: "1px solid var(--border)",
+
               borderRadius: 14,
+
               padding: 18,
             }}
           >
             <div
               style={{
                 display: "flex",
+
                 gap: 8,
+
                 alignItems: "center",
+
                 marginBottom: 12,
               }}
             >
@@ -424,10 +627,14 @@ export default function ProfileScreen({
             </div>
             {[
               ["Email", profile?.email],
+
               ["Account ID", profile?.accountId],
+
               ["Sign-in method", profile?.authProvider],
+
               [
                 "Created",
+
                 profile?.createdAt
                   ? new Date(profile.createdAt).toLocaleDateString()
                   : null,
@@ -437,7 +644,9 @@ export default function ProfileScreen({
                 <div
                   style={{
                     fontSize: 11,
+
                     color: "var(--text-muted)",
+
                     textTransform: "uppercase",
                   }}
                 >
@@ -446,7 +655,9 @@ export default function ProfileScreen({
                 <div
                   style={{
                     fontSize: 13,
+
                     color: "var(--text-primary)",
+
                     wordBreak: "break-word",
                   }}
                 >
@@ -483,52 +694,181 @@ export default function ProfileScreen({
           </section>
           {hasCompanyRole && (
             <section style={{ padding: "4px 2px" }}>
-              <h2 style={{ fontSize: 17, margin: "0 0 18px", display: "flex", alignItems: "center", gap: 8 }}>
+              <h2
+                style={{
+                  fontSize: 17,
+                  margin: "0 0 18px",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                }}
+              >
                 <Buildings size={18} weight="light" /> Company details
               </h2>
               <div className="fitcv-form-grid">
-                <Field label="Company name" value={form.companyName} onChange={set("companyName")} maxLength={200} required placeholder="FitCV Technologies" />
-                <Field label="Industry" value={form.industryName} onChange={set("industryName")} maxLength={100} required placeholder="Information Technology" />
-                <Field label="Company website" value={form.companyWebsiteUrl} onChange={set("companyWebsiteUrl")} type="url" maxLength={300} placeholder="https://example.com" />
-                <Field label="Company logo URL" value={form.companyLogoUrl} onChange={set("companyLogoUrl")} type="url" maxLength={400} placeholder="https://example.com/logo.png" />
+                <Field
+                  label="Company name"
+                  value={form.companyName}
+                  onChange={set("companyName")}
+                  maxLength={200}
+                  required
+                  placeholder="FitCV Technologies"
+                />
+                <Field
+                  label="Industry"
+                  value={form.industryName}
+                  onChange={set("industryName")}
+                  maxLength={100}
+                  required
+                  placeholder="Information Technology"
+                />
+                <Field
+                  label="Company website"
+                  value={form.companyWebsiteUrl}
+                  onChange={set("companyWebsiteUrl")}
+                  type="url"
+                  maxLength={300}
+                  placeholder="https://example.com"
+                />
+                <Field
+                  label="Company logo URL"
+                  value={form.companyLogoUrl}
+                  onChange={set("companyLogoUrl")}
+                  type="url"
+                  maxLength={400}
+                  placeholder="https://example.com/logo.png"
+                />
               </div>
             </section>
           )}
           <section
             style={{
               background: "white",
+
               border: "1px solid var(--border)",
+
               borderRadius: 14,
+
               padding: 22,
             }}
           >
             <h2
               style={{
                 fontSize: 17,
+
                 margin: "0 0 18px",
+
                 display: "flex",
+
                 gap: 8,
+
                 alignItems: "center",
               }}
             >
               <Image size={18} weight="light" /> Profile photo
             </h2>
             <div
-              onDragOver={(event) => { event.preventDefault(); setDragging(true) }}
+              onDragOver={(event) => {
+                event.preventDefault()
+                setDragging(true)
+              }}
               onDragLeave={() => setDragging(false)}
-              onDrop={(event: DragEvent<HTMLDivElement>) => { event.preventDefault(); setDragging(false); void chooseAvatar(event.dataTransfer.files[0]) }}
-              style={{ border: `1px dashed ${dragging ? "var(--accent)" : "var(--border)"}`, borderRadius: 12, padding: 16, background: dragging ? "var(--accent-soft)" : "transparent", display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}
+              onDrop={(event: DragEvent<HTMLDivElement>) => {
+                event.preventDefault()
+                setDragging(false)
+                void chooseAvatar(event.dataTransfer.files[0])
+              }}
+              style={{
+                border: `1px dashed ${
+                  dragging ? "var(--accent)" : "var(--border)"
+                }`,
+                borderRadius: 12,
+                padding: 16,
+                background: dragging ? "var(--accent-soft)" : "transparent",
+                display: "flex",
+                alignItems: "center",
+                gap: 14,
+                flexWrap: "wrap",
+              }}
             >
               <div style={{ flex: "1 1 240px" }}>
-                <div style={{ fontSize: 13, color: "var(--text-secondary)", marginBottom: 7 }}>Drag and drop an image here, or choose one from your device.</div>
-                <div style={{ fontSize: 12, color: "var(--text-muted)" }}>JPG, PNG or WebP - maximum 5MB</div>
-                {avatarFile && <div style={{ fontSize: 12, color: "var(--text-primary)", marginTop: 7, wordBreak: "break-word" }}>{avatarFile.name} - {(avatarFile.size / 1024 / 1024).toFixed(2)}MB</div>}
+                <div
+                  style={{
+                    fontSize: 13,
+                    color: "var(--text-secondary)",
+                    marginBottom: 7,
+                  }}
+                >
+                  Drag and drop an image here, or choose one from your device.
+                </div>
+                <div style={{ fontSize: 12, color: "var(--text-muted)" }}>
+                  JPG, PNG or WebP - maximum 5MB
+                </div>
+                {avatarFile && (
+                  <div
+                    style={{
+                      fontSize: 12,
+                      color: "var(--text-primary)",
+                      marginTop: 7,
+                      wordBreak: "break-word",
+                    }}
+                  >
+                    {avatarFile.name} -{" "}
+                    {(avatarFile.size / 1024 / 1024).toFixed(2)}MB
+                  </div>
+                )}
               </div>
-              <input ref={fileInput} hidden type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => void chooseAvatar(event.target.files?.[0])} />
-              <button type="button" disabled={avatarBusy} onClick={() => fileInput.current?.click()} style={{ border: "1px solid var(--border)", borderRadius: 9, background: "white", padding: "9px 12px", display: "flex", gap: 7, alignItems: "center", cursor: avatarBusy ? "wait" : "pointer", fontWeight: 650 }}>
-                {avatarBusy ? <Spinner className="fitcv-spin" size={16} weight="light" /> : <UploadSimple size={16} weight="light" />} {avatarBusy ? "Uploading..." : "Choose photo"}
+              <input
+                ref={fileInput}
+                hidden
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                onChange={(event) => void chooseAvatar(event.target.files?.[0])}
+              />
+              <button
+                type="button"
+                disabled={avatarBusy}
+                onClick={() => fileInput.current?.click()}
+                style={{
+                  border: "1px solid var(--border)",
+                  borderRadius: 9,
+                  background: "white",
+                  padding: "9px 12px",
+                  display: "flex",
+                  gap: 7,
+                  alignItems: "center",
+                  cursor: avatarBusy ? "wait" : "pointer",
+                  fontWeight: 650,
+                }}
+              >
+                {avatarBusy ? (
+                  <Spinner className="fitcv-spin" size={16} weight="light" />
+                ) : (
+                  <UploadSimple size={16} weight="light" />
+                )}{" "}
+                {avatarBusy ? "Uploading..." : "Choose photo"}
               </button>
-              {(profile?.avatarUrl || avatarPreview) && <button type="button" disabled={avatarBusy} onClick={() => void removeAvatar()} aria-label="Remove profile photo" style={{ border: 0, background: "transparent", color: "#DC2626", padding: 8, display: "flex", gap: 6, alignItems: "center", cursor: avatarBusy ? "wait" : "pointer", fontWeight: 650 }}><TrashSimple size={16} weight="light" /> Remove</button>}
+              {(profile?.avatarUrl || avatarPreview) && (
+                <button
+                  type="button"
+                  disabled={avatarBusy}
+                  onClick={() => void removeAvatar()}
+                  aria-label="Remove profile photo"
+                  style={{
+                    border: 0,
+                    background: "transparent",
+                    color: "#DC2626",
+                    padding: 8,
+                    display: "flex",
+                    gap: 6,
+                    alignItems: "center",
+                    cursor: avatarBusy ? "wait" : "pointer",
+                    fontWeight: 650,
+                  }}
+                >
+                  <TrashSimple size={16} weight="light" /> Remove
+                </button>
+              )}
             </div>
           </section>
           <div style={{ display: "flex", justifyContent: "flex-end" }}>
@@ -542,15 +882,25 @@ export default function ProfileScreen({
               type="submit"
               style={{
                 border: 0,
+
                 borderRadius: 10,
+
                 padding: "11px 18px",
+
                 background: "var(--accent)",
+
                 color: "white",
+
                 display: "flex",
+
                 gap: 8,
+
                 alignItems: "center",
+
                 fontWeight: 700,
+
                 cursor: saving ? "wait" : "pointer",
+
                 opacity: saving ? 0.7 : 1,
               }}
             >

@@ -15,9 +15,7 @@ export default function BezelCard({
 }: Props) {
   return (
     <Tag className={`fc-bezel ${className}`}>
-      <div className={`fc-bezel__inner ${innerClassName}`}>
-        {children}
-      </div>
+      <div className={`fc-bezel__inner ${innerClassName}`}>{children}</div>
     </Tag>
   )
 }

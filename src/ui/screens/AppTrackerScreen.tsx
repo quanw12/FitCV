@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react"
 
 import FitCVApplicationTracker from "./FitCVApplicationTracker"
+
 import PersonalApplicationTracker from "./PersonalApplicationTracker"
 
 interface AppTrackerScreenProps {
   focusApplicationId?: number | null
 }
+
 type TrackerView = "personal" | "fitcv"
 
 export default function AppTrackerScreen({
@@ -26,11 +28,17 @@ export default function AppTrackerScreen({
         aria-label="Application tracker views"
         style={{
           display: "inline-flex",
+
           gap: 4,
+
           marginBottom: 20,
+
           padding: 4,
+
           border: "1px solid var(--border)",
+
           borderRadius: 10,
+
           background: "var(--surface)",
         }}
       >

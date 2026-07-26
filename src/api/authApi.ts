@@ -9,43 +9,67 @@ import type {
   SelectRoleRequest,
   VerifyResetCodeRequest,
   VerifyResetCodeResponse,
-} from '@/types/auth'
-import { clearStoredSession, getStoredSession, storeSession } from './authSession'
-import { requestJson } from './httpClient'
+} from "@/types/auth"
+
+import {
+  clearStoredSession,
+  getStoredSession,
+  storeSession,
+} from "./authSession"
+
+import { requestJson } from "./httpClient"
 
 interface BackendAuthSession {
   access_token: string
-  token_type?: 'bearer'
+
+  token_type?: "bearer"
+
   requires_role_selection: boolean
+
   user: {
     account_id: number
+
     email: string
+
     full_name: string
-    role: AuthSession['user']['role']
+
+    role: AuthSession["user"]["role"]
+
     avatar_url?: string | null
-    auth_provider?: AuthSession['user']['authProvider']
+
+    auth_provider?: AuthSession["user"]["authProvider"]
   }
 }
 
 function normalizeBackendSession(payload: BackendAuthSession): AuthSession {
   return {
     accessToken: payload.access_token,
-    tokenType: payload.token_type ?? 'bearer',
+
+    tokenType: payload.token_type ?? "bearer",
+
     requiresRoleSelection: payload.requires_role_selection,
+
     user: {
       accountId: String(payload.user.account_id),
+
       email: payload.user.email,
+
       fullName: payload.user.full_name,
+
       role: payload.user.role,
+
       avatarUrl: payload.user.avatar_url,
-      authProvider: payload.user.auth_provider ?? 'Password',
+
+      authProvider: payload.user.auth_provider ?? "Password",
     },
   }
 }
 
 function persistBackendSession(payload: BackendAuthSession): AuthSession {
   const session = normalizeBackendSession(payload)
+
   storeSession(session)
+
   return session
 }
 
@@ -55,72 +79,104 @@ export const authApi = {
   logout: clearStoredSession,
 
   updateCurrentUser(
-    patch: Partial<Pick<AuthSession['user'], 'fullName' | 'avatarUrl'>>,
+    patch: Partial<Pick<AuthSession["user"], "fullName" | "avatarUrl">>,
   ): AuthSession | null {
     const current = getStoredSession()
+
     if (!current) return null
+
     const updated = {
       ...current,
+
       user: { ...current.user, ...patch },
     }
+
     storeSession(updated)
+
     return updated
   },
 
   async register(payload: RegisterRequest): Promise<AuthSession> {
-    const response = await requestJson<BackendAuthSession>('/api/auth/register', {
-      method: 'POST',
-      body: JSON.stringify({
-        email: payload.email,
-        password: payload.password,
-        full_name: payload.fullName,
-      }),
-    })
+    const response = await requestJson<BackendAuthSession>(
+      "/api/auth/register",
+      {
+        method: "POST",
+
+        body: JSON.stringify({
+          email: payload.email,
+
+          password: payload.password,
+
+          full_name: payload.fullName,
+        }),
+      },
+    )
+
     return persistBackendSession(response)
   },
 
   async login(payload: LoginRequest): Promise<AuthSession> {
-    const response = await requestJson<BackendAuthSession>('/api/auth/login', {
-      method: 'POST',
+    const response = await requestJson<BackendAuthSession>("/api/auth/login", {
+      method: "POST",
+
       body: JSON.stringify(payload),
     })
+
     return persistBackendSession(response)
   },
 
   async oauthLogin(payload: OAuthLoginRequest): Promise<AuthSession> {
-    const response = await requestJson<BackendAuthSession>('/api/auth/oauth/google', {
-      method: 'POST',
-      body: JSON.stringify(payload),
-    })
+    const response = await requestJson<BackendAuthSession>(
+      "/api/auth/oauth/google",
+      {
+        method: "POST",
+
+        body: JSON.stringify(payload),
+      },
+    )
+
     return persistBackendSession(response)
   },
 
   async selectRole(payload: SelectRoleRequest): Promise<AuthSession> {
-    const response = await requestJson<BackendAuthSession>('/api/auth/select-role', {
-      method: 'POST',
-      authenticated: true,
-      body: JSON.stringify(payload),
-    })
+    const response = await requestJson<BackendAuthSession>(
+      "/api/auth/select-role",
+      {
+        method: "POST",
+
+        authenticated: true,
+
+        body: JSON.stringify(payload),
+      },
+    )
+
     return persistBackendSession(response)
   },
 
-  forgotPassword(payload: ForgotPasswordRequest): Promise<ForgotPasswordResponse> {
-    return requestJson('/api/auth/forgot-password', {
-      method: 'POST',
+  forgotPassword(
+    payload: ForgotPasswordRequest,
+  ): Promise<ForgotPasswordResponse> {
+    return requestJson("/api/auth/forgot-password", {
+      method: "POST",
+
       body: JSON.stringify(payload),
     })
   },
 
-  verifyResetCode(payload: VerifyResetCodeRequest): Promise<VerifyResetCodeResponse> {
-    return requestJson('/api/auth/verify-reset-code', {
-      method: 'POST',
+  verifyResetCode(
+    payload: VerifyResetCodeRequest,
+  ): Promise<VerifyResetCodeResponse> {
+    return requestJson("/api/auth/verify-reset-code", {
+      method: "POST",
+
       body: JSON.stringify(payload),
     })
   },
 
   resetPassword(payload: ResetPasswordRequest): Promise<void> {
-    return requestJson('/api/auth/reset-password', {
-      method: 'POST',
+    return requestJson("/api/auth/reset-password", {
+      method: "POST",
+
       body: JSON.stringify(payload),
     })
   },

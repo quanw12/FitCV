@@ -22,37 +22,111 @@ function screenItems(
 ): Item[] {
   if (portal === "seeker") {
     return [
-      { id: "seeker-dashboard", label: "Dashboard", icon: null, action: () => onNavigate("seeker-dashboard") },
-      { id: "analyzer", label: "Match Analyzer", icon: null, action: () => onNavigate("analyzer") },
-      { id: "improvement", label: "Improvement Tips", icon: null, action: () => onNavigate("improvement") },
-      { id: "cv-history", label: "CV History", icon: null, action: () => onNavigate("cv-history") },
-      { id: "app-tracker", label: "Application Tracker", icon: null, action: () => onNavigate("app-tracker") },
-      { id: "jd-library", label: "JD Library", icon: null, action: () => onNavigate("jd-library") },
-      { id: "profile", label: "Profile", icon: null, action: () => onNavigate("profile") },
+      {
+        id: "seeker-dashboard",
+        label: "Dashboard",
+        icon: null,
+        action: () => onNavigate("seeker-dashboard"),
+      },
+      {
+        id: "analyzer",
+        label: "Match Analyzer",
+        icon: null,
+        action: () => onNavigate("analyzer"),
+      },
+      {
+        id: "improvement",
+        label: "Improvement Tips",
+        icon: null,
+        action: () => onNavigate("improvement"),
+      },
+      {
+        id: "cv-history",
+        label: "CV History",
+        icon: null,
+        action: () => onNavigate("cv-history"),
+      },
+      {
+        id: "app-tracker",
+        label: "Application Tracker",
+        icon: null,
+        action: () => onNavigate("app-tracker"),
+      },
+      {
+        id: "jd-library",
+        label: "JD Library",
+        icon: null,
+        action: () => onNavigate("jd-library"),
+      },
+      {
+        id: "profile",
+        label: "Profile",
+        icon: null,
+        action: () => onNavigate("profile"),
+      },
     ]
   }
   if (portal === "hr") {
     return [
-      { id: "hr-dashboard", label: "Dashboard", icon: null, action: () => onNavigate("hr-dashboard") },
-      { id: "job-posts", label: "Job Posts", icon: null, action: () => onNavigate("job-posts") },
-      { id: "cv-ranking", label: "CV Ranking", icon: null, action: () => onNavigate("cv-ranking") },
-      { id: "pipeline", label: "Pipeline", icon: null, action: () => onNavigate("pipeline") },
-      { id: "auto-email", label: "Auto Email", icon: null, action: () => onNavigate("auto-email") },
-      { id: "reports", label: "Reports", icon: null, action: () => onNavigate("reports") },
-      { id: "hr-settings", label: "Settings", icon: null, action: () => onNavigate("hr-settings") },
+      {
+        id: "hr-dashboard",
+        label: "Dashboard",
+        icon: null,
+        action: () => onNavigate("hr-dashboard"),
+      },
+      {
+        id: "job-posts",
+        label: "Job Posts",
+        icon: null,
+        action: () => onNavigate("job-posts"),
+      },
+      {
+        id: "cv-ranking",
+        label: "CV Ranking",
+        icon: null,
+        action: () => onNavigate("cv-ranking"),
+      },
+      {
+        id: "pipeline",
+        label: "Pipeline",
+        icon: null,
+        action: () => onNavigate("pipeline"),
+      },
+      {
+        id: "auto-email",
+        label: "Auto Email",
+        icon: null,
+        action: () => onNavigate("auto-email"),
+      },
+      {
+        id: "reports",
+        label: "Reports",
+        icon: null,
+        action: () => onNavigate("reports"),
+      },
+      {
+        id: "hr-settings",
+        label: "Settings",
+        icon: null,
+        action: () => onNavigate("hr-settings"),
+      },
     ]
   }
   return []
 }
 
-export default function CommandPalette({ portal, isOpen, onClose, onNavigate }: Props) {
+export default function CommandPalette({
+  portal,
+  isOpen,
+  onClose,
+  onNavigate,
+}: Props) {
   const [query, setQuery] = useState("")
   const [selectedIndex, setSelectedIndex] = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)
 
   const items = screenItems(portal, onNavigate).filter(
-    (item) =>
-      !query || item.label.toLowerCase().includes(query.toLowerCase()),
+    (item) => !query || item.label.toLowerCase().includes(query.toLowerCase()),
   )
 
   const handleKeyDown = useCallback(
@@ -170,7 +244,14 @@ export default function CommandPalette({ portal, isOpen, onClose, onNavigate }: 
 
         <div style={{ maxHeight: 300, overflowY: "auto", padding: 6 }}>
           {items.length === 0 && (
-            <div style={{ padding: "24px 16px", textAlign: "center", color: "var(--text-muted)", fontSize: 13 }}>
+            <div
+              style={{
+                padding: "24px 16px",
+                textAlign: "center",
+                color: "var(--text-muted)",
+                fontSize: 13,
+              }}
+            >
               No results for &quot;{query}&quot;
             </div>
           )}
@@ -190,8 +271,12 @@ export default function CommandPalette({ portal, isOpen, onClose, onNavigate }: 
                 padding: "10px 14px",
                 borderRadius: 10,
                 border: "none",
-                background: idx === selectedIndex ? "var(--accent-soft)" : "transparent",
-                color: idx === selectedIndex ? "var(--accent-ink)" : "var(--text-primary)",
+                background:
+                  idx === selectedIndex ? "var(--accent-soft)" : "transparent",
+                color:
+                  idx === selectedIndex
+                    ? "var(--accent-ink)"
+                    : "var(--text-primary)",
                 fontFamily: "inherit",
                 fontSize: 14,
                 fontWeight: 500,

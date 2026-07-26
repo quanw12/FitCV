@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "FitCV Matching Cycle",
+    "subtitle": "AI-powered CV screening and improvement loop",
+    "output": "fitcv-workflow.html",
+    "animation": "trace",
+    "quality_profile": "standard",
+    "views": [
+      { "id": "student-loop", "label": "Student cycle", "focus": ["cv-upload", "ai-parse", "score-match", "review", "improve-iterate"], "note": "Upload CV, get scored by AI, review gaps & AI suggestions, improve, re-analyze" },
+      { "id": "hr-screening", "label": "HR screening", "focus": ["jd-upload", "ai-parse", "score-match", "rank-candidates", "shortlist"], "note": "Post JD or upload CV batch, rank candidates, manage pipeline" }
+    ]
+  },
+  "lanes": [
+    { "id": "student", "label": "Student / Job Seeker" },
+    { "id": "engine", "label": "FitCV AI Engine" },
+    { "id": "hr", "label": "HR / Recruiter" }
+  ],
+  "phases": [
+    { "id": "input", "label": "Input", "fromCol": 0, "toCol": 0 },
+    { "id": "process", "label": "AI Processing", "fromCol": 1, "toCol": 3 },
+    { "id": "output", "label": "Insights & Action", "fromCol": 5, "toCol": 5 }
+  ],
+  "mainPath": ["cv-upload", "ai-parse", "score-match", "review", "improve-iterate"],
+  "nodes": [
+    { "id": "cv-upload", "lane": "student", "col": 0, "type": "frontend", "label": "Upload CV", "sublabel": "PDF / DOCX", "width": 92 },
+    { "id": "ai-parse", "lane": "engine", "col": 1, "type": "backend", "label": "Parse & Extract", "sublabel": "CV + JD parsing", "tag": "Gemini AI", "width": 112 },
+    { "id": "score-match", "lane": "engine", "col": 3, "type": "backend", "label": "Score & Match", "sublabel": "weighted evidence", "tag": "v2 engine", "width": 112 },
+    { "id": "review", "lane": "student", "col": 3, "type": "frontend", "label": "View Results", "sublabel": "match %, gaps, AI tips", "width": 112 },
+    { "id": "improve-iterate", "lane": "student", "col": 5, "type": "frontend", "label": "Improve CV", "sublabel": "revise, re-analyze", "tag": "loop", "width": 92 },
+    { "id": "jd-upload", "lane": "hr", "col": 0, "type": "frontend", "label": "Post JD", "sublabel": "paste criteria or CVs", "width": 92 },
+    { "id": "rank-candidates", "lane": "engine", "col": 5, "type": "backend", "label": "Rank CVs", "sublabel": "AI score + evidence", "width": 92 },
+    { "id": "shortlist", "lane": "hr", "col": 5, "type": "frontend", "label": "Pipeline", "sublabel": "shortlist, email, track", "width": 92 }
+  ],
+  "edges": [
+    { "from": "cv-upload", "to": "ai-parse", "variant": "emphasis", "fromSide": "bottom", "route": "drop" },
+    { "from": "ai-parse", "to": "score-match", "variant": "emphasis", "route": "straight" },
+    { "from": "score-match", "to": "review", "variant": "emphasis", "fromSide": "bottom", "route": "drop", "label": "match result" },
+    { "from": "review", "to": "improve-iterate", "variant": "emphasis", "route": "straight" },
+    { "from": "improve-iterate", "to": "cv-upload", "variant": "dashed", "role": "return", "route": "up-channel", "fromSide": "top", "toSide": "top", "label": "revise & re-upload" },
+    { "from": "jd-upload", "to": "ai-parse", "variant": "emphasis", "fromSide": "bottom", "route": "drop" },
+    { "from": "score-match", "to": "rank-candidates", "variant": "emphasis", "route": "straight" },
+    { "from": "rank-candidates", "to": "shortlist", "variant": "emphasis", "fromSide": "bottom", "route": "drop", "label": "ranked list", "labelDy": 28 }
+  ],
+  "cards": [
+    { "dot": "violet", "title": "How it works", "items": ["Student: upload CV + select JD → AI parses & scores → view match %, gaps & AI suggestions → improve & re-analyze", "HR: post JD or upload CV batch → AI parses & scores → rank candidates → manage pipeline", "Both flows share Gemini AI parsing and the same weighted scoring engine"] }
+  ]
+}

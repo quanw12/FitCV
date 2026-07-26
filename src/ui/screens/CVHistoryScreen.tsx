@@ -10,6 +10,7 @@ import {
   TrashSimple,
   UploadSimple,
 } from "@phosphor-icons/react"
+
 import {
   CartesianGrid,
   Line,
@@ -23,7 +24,9 @@ import {
 import { toast } from "sonner"
 
 import { analyzerApi } from "@/api/analyzerApi"
+
 import type { CvComparisonSeries, CvVersion } from "@/types/analyzer"
+
 import BezelCard from "@/ui/components/BezelCard"
 
 const MAX_CV_BYTES = 10 * 1024 * 1024
@@ -32,8 +35,11 @@ export default function CVHistoryScreen() {
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const [cvs, setCvs] = useState<CvVersion[]>([])
+
   const [comparisons, setComparisons] = useState<CvComparisonSeries[]>([])
+
   const [selectedJdId, setSelectedJdId] = useState<number | null>(null)
+
   const [selected, setSelected] = useState<number[]>([])
 
   const [loading, setLoading] = useState(true)
@@ -48,13 +54,18 @@ export default function CVHistoryScreen() {
     setLoading(true)
 
     setError(null)
+
     try {
       const [versions, scoreComparisons] = await Promise.all([
         analyzerApi.listCvs(),
+
         analyzerApi.listCvComparisons(),
       ])
+
       setCvs(versions)
+
       setComparisons(scoreComparisons)
+
       setSelectedJdId((current) =>
         current != null &&
         scoreComparisons.some((item) => item.jobDescriptionId === current)
@@ -136,8 +147,10 @@ export default function CVHistoryScreen() {
   }
 
   const compareItems = cvs.filter((cv) => selected.includes(cv.cvId))
+
   const activeComparison =
     comparisons.find((item) => item.jobDescriptionId === selectedJdId) ?? null
+
   const scoreByCv = new Map(
     activeComparison?.versions.map((point) => [point.cvId, point]) ?? [],
   )
@@ -226,8 +239,11 @@ export default function CVHistoryScreen() {
           <div
             style={{
               display: "flex",
+
               justifyContent: "space-between",
+
               gap: 16,
+
               flexWrap: "wrap",
             }}
           >
@@ -239,7 +255,9 @@ export default function CVHistoryScreen() {
               <p
                 style={{
                   color: "var(--text-secondary)",
+
                   fontSize: 13,
+
                   marginTop: 4,
                 }}
               >
@@ -272,8 +290,11 @@ export default function CVHistoryScreen() {
               <div
                 style={{
                   display: "flex",
+
                   gap: 8,
+
                   flexWrap: "wrap",
+
                   marginTop: 16,
                 }}
               >
@@ -309,6 +330,7 @@ export default function CVHistoryScreen() {
                     <Tooltip
                       formatter={(value) => [
                         `${Number(value ?? 0).toFixed(1)}%`,
+
                         "Match score",
                       ]}
                       labelFormatter={(value) => `CV version ${value}`}
@@ -331,9 +353,9 @@ export default function CVHistoryScreen() {
 
       {!loading && cvs.length > 0 && comparisons.length === 0 && (
         <div style={selectionHintStyle}>
-          <ChartBar size={16} weight="light" /> Analyze at least one CV against a JD to start
-          the score history. Analyze two versions against the same JD to see
-          improvement.
+          <ChartBar size={16} weight="light" /> Analyze at least one CV against
+          a JD to start the score history. Analyze two versions against the same
+          JD to see improvement.
         </div>
       )}
 
@@ -343,26 +365,48 @@ export default function CVHistoryScreen() {
         </div>
       ) : cvs.length === 0 ? (
         <BezelCard>
-          <div style={{
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            gap: 12,
-            padding: "48px 24px",
-            textAlign: "center",
-          }}>
-            <div style={{
-              width: 56, height: 56, borderRadius: 16,
-              background: "var(--accent-soft)",
-              display: "flex", alignItems: "center", justifyContent: "center",
-            }}>
+          <div
+            style={{
+              display: "flex",
+
+              flexDirection: "column",
+
+              alignItems: "center",
+
+              gap: 12,
+
+              padding: "48px 24px",
+
+              textAlign: "center",
+            }}
+          >
+            <div
+              style={{
+                width: 56,
+                height: 56,
+                borderRadius: 16,
+
+                background: "var(--accent-soft)",
+
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
               <UploadSimple size={24} weight="light" color="var(--accent)" />
             </div>
             <strong style={{ fontSize: 16, color: "var(--text-primary)" }}>
               No CVs uploaded yet
             </strong>
-            <span style={{ fontSize: 13, color: "var(--text-secondary)", maxWidth: 280 }}>
-              Upload your first CV to get AI-powered match analysis and improvement suggestions.
+            <span
+              style={{
+                fontSize: 13,
+                color: "var(--text-secondary)",
+                maxWidth: 280,
+              }}
+            >
+              Upload your first CV to get AI-powered match analysis and
+              improvement suggestions.
             </span>
             <button
               type="button"
