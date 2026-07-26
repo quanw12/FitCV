@@ -1,17 +1,36 @@
-import {
-  AlertCircle,
-  CalendarDays,
-  CheckCircle2,
-  Clock3,
-  Mail,
-  MessageSquare,
-  Phone,
-  RefreshCw,
-  Send,
-  UserRound,
-  X,
-} from "lucide-react"
 import { useCallback, useEffect, useMemo, useState } from "react"
+
+import {
+  DndContext,
+  DragOverlay,
+  KeyboardSensor,
+  PointerSensor,
+  closestCorners,
+  useDroppable,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+  type DragStartEvent,
+} from "@dnd-kit/core"
+import {
+  SortableContext,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable"
+import { CSS } from "@dnd-kit/utilities"
+import {
+  ArrowClockwise,
+  CalendarBlank,
+  ChatCircle,
+  CheckCircle,
+  Clock,
+  Envelope,
+  PaperPlaneRight,
+  Phone,
+  UserCircle,
+  WarningCircle,
+  X,
+} from "@phosphor-icons/react"
 
 import { jobsApi } from "@/api/jobsApi"
 import { pipelineApi } from "@/api/pipelineApi"
@@ -22,6 +41,7 @@ import type {
   PipelineStage,
   PipelineStageHistory,
 } from "@/types/pipeline"
+import BezelCard from "@/ui/components/BezelCard"
 
 const stages: PipelineStage[] = [
   "Applied",
@@ -31,6 +51,43 @@ const stages: PipelineStage[] = [
   "Hired",
   "Rejected",
 ]
+
+const stageColors: Record<PipelineStage, {
+  dot: string
+  text: string
+  soft: string
+}> = {
+  Applied: {
+    dot: "var(--text-muted)",
+    text: "var(--text-secondary)",
+    soft: "var(--gray-soft)",
+  },
+  Screening: {
+    dot: "var(--accent)",
+    text: "var(--accent-ink)",
+    soft: "var(--accent-soft)",
+  },
+  Interview: {
+    dot: "var(--warning)",
+    text: "#92400e",
+    soft: "var(--warning-soft)",
+  },
+  Offer: {
+    dot: "var(--accent)",
+    text: "var(--accent-ink)",
+    soft: "var(--accent-soft)",
+  },
+  Hired: {
+    dot: "var(--success)",
+    text: "var(--success)",
+    soft: "var(--success-soft)",
+  },
+  Rejected: {
+    dot: "var(--danger)",
+    text: "var(--danger)",
+    soft: "var(--danger-soft)",
+  },
+}
 
 const errorMessage = (cause: unknown, fallback: string) =>
   cause instanceof Error ? cause.message : fallback
@@ -50,11 +107,79 @@ const formatDate = (value: string) =>
     year: "numeric",
   })
 
-const scoreClass = (score: number | null) => {
-  if (score == null) return "pipeline-score--pending"
-  if (score >= 80) return "pipeline-score--strong"
-  if (score >= 50) return "pipeline-score--moderate"
-  return "pipeline-score--weak"
+const scoreColor = (score: number | null) => {
+  if (score == null) {
+    return { color: "var(--text-muted)", soft: "var(--gray-soft)" }
+  }
+  if (score >= 80) {
+    return { color: "var(--success)", soft: "var(--success-soft)" }
+  }
+  if (score >= 50) {
+    return { color: "var(--warning)", soft: "var(--warning-soft)" }
+  }
+  return { color: "var(--danger)", soft: "var(--danger-soft)" }
+}
+
+function SortableCard({
+  application,
+  children,
+  onOpen,
+}: {
+  application: PipelineApplication
+  children: React.ReactNode
+  onOpen: () => void
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: String(application.application_id) })
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={{
+        transform: CSS.Transform.toString(transform),
+        transition,
+        opacity: isDragging ? 0.45 : 1,
+      }}
+      {...attributes}
+      {...listeners}
+      aria-label={`${application.candidate_name}, ${application.job_title}`}
+      onClick={onOpen}
+    >
+      {children}
+    </div>
+  )
+}
+
+function ColumnArea({
+  stage,
+  children,
+}: {
+  stage: PipelineStage
+  children: React.ReactNode
+}) {
+  const { setNodeRef, isOver } = useDroppable({ id: stage })
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={{
+        minHeight: 132,
+        padding: 4,
+        margin: -4,
+        borderRadius: "var(--r-md)",
+        background: isOver ? stageColors[stage].soft : "transparent",
+        transition: "background 140ms ease",
+      }}
+    >
+      {children}
+    </div>
+  )
 }
 
 export default function PipelineScreen() {
@@ -62,6 +187,7 @@ export default function PipelineScreen() {
   const [jobs, setJobs] = useState<JobPost[]>([])
   const [selectedJobId, setSelectedJobId] = useState<number | undefined>()
   const [selected, setSelected] = useState<PipelineApplication | null>(null)
+  const [activeCard, setActiveCard] = useState<PipelineApplication | null>(null)
   const [notes, setNotes] = useState<PipelineNote[]>([])
   const [history, setHistory] = useState<PipelineStageHistory[]>([])
   const [note, setNote] = useState("")
@@ -72,6 +198,11 @@ export default function PipelineScreen() {
   const [error, setError] = useState("")
   const [detailError, setDetailError] = useState("")
   const [success, setSuccess] = useState("")
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor),
+  )
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -117,7 +248,13 @@ export default function PipelineScreen() {
         pipelineApi.listNotes(application.application_id),
         pipelineApi.listHistory(application.application_id),
       ])
-      setNotes(nextNotes)
+      setNotes((current) => [
+        ...current,
+        ...nextNotes.filter(
+          (item) =>
+            !current.some((existing) => existing.note_id === item.note_id),
+        ),
+      ])
       setHistory(nextHistory)
     } catch (cause) {
       setDetailError(errorMessage(cause, "Could not load candidate activity."))
@@ -135,6 +272,7 @@ export default function PipelineScreen() {
     setError("")
     setDetailError("")
     setSuccess("")
+
     try {
       const updated = await pipelineApi.moveStage(
         application.application_id,
@@ -149,6 +287,7 @@ export default function PipelineScreen() {
         current?.application_id === updated.application_id ? updated : current,
       )
       setSuccess(`Moved ${updated.candidate_name} to ${updated.current_stage}.`)
+
       if (selected?.application_id === updated.application_id) {
         setHistory(await pipelineApi.listHistory(updated.application_id))
       }
@@ -168,6 +307,7 @@ export default function PipelineScreen() {
     if (!selected || !note.trim() || savingNote) return
     setSavingNote(true)
     setDetailError("")
+
     try {
       const created = await pipelineApi.addNote(
         selected.application_id,
@@ -192,40 +332,174 @@ export default function PipelineScreen() {
     }
   }
 
+  const handleDragStart = (event: DragStartEvent) => {
+    const applicationId = Number(event.active.id)
+    setActiveCard(
+      applications.find((item) => item.application_id === applicationId) ??
+        null,
+    )
+  }
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    setActiveCard(null)
+    const { active, over } = event
+    if (!over) return
+
+    const application = applications.find(
+      (item) => item.application_id === Number(active.id),
+    )
+    if (!application) return
+
+    const overId = String(over.id)
+    const destination = stages.includes(overId as PipelineStage)
+      ? overId as PipelineStage
+      : applications.find((item) => item.application_id === Number(overId))
+          ?.current_stage
+
+    if (destination) void move(application, destination)
+  }
+
+  const renderCard = (application: PipelineApplication, clickable: boolean) => {
+    const score = scoreColor(application.overall_score)
+
+    return (
+      <div
+        style={{
+          width: "100%",
+          padding: 0,
+          textAlign: "left",
+          color: "inherit",
+          cursor: clickable ? "pointer" : undefined,
+          opacity: movingId === application.application_id ? 0.65 : 1,
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            marginBottom: 8,
+          }}
+        >
+          <div
+            style={{
+              width: 30,
+              height: 30,
+              borderRadius: 8,
+              background: score.soft,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: 11,
+              fontWeight: 800,
+              color: score.color,
+              flexShrink: 0,
+            }}
+          >
+            {initials(application.candidate_name)}
+          </div>
+          <div
+            style={{
+              flex: 1,
+              minWidth: 0,
+              fontSize: 13,
+              fontWeight: 700,
+              color: "var(--text-primary)",
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+            }}
+          >
+            {application.candidate_name}
+          </div>
+        </div>
+
+        <div
+          style={{
+            fontSize: 11,
+            color: "var(--text-muted)",
+            marginBottom: 8,
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+          }}
+        >
+          {application.job_title}
+        </div>
+
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+          }}
+        >
+          <span
+            style={{
+              fontSize: 13,
+              fontWeight: 800,
+              color: score.color,
+              fontFamily: "var(--font-display)",
+            }}
+          >
+            {application.overall_score == null
+              ? "Pending"
+              : `${Math.round(application.overall_score)}%`}
+          </span>
+          {application.note_count > 0 && (
+            <span
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 3,
+                fontSize: 11,
+                color: "var(--text-muted)",
+              }}
+            >
+              <ChatCircle size={11} /> {application.note_count}
+            </span>
+          )}
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="fc-stagger">
-      <div className="fc-page-head pipeline-page-head">
+      <div className="fc-page-head">
         <div>
-          <div className="fc-eyebrow">Hiring pipeline</div>
+          <div className="fc-eyebrow" style={{ marginBottom: 6 }}>
+            Hiring Pipeline
+          </div>
           <h1>Candidate Pipeline</h1>
-          <p>Move applicants through the six recruitment stages.</p>
+          <p>Drag candidates through your hiring stages.</p>
         </div>
-        <div className="pipeline-toolbar">
-          <label>
-            <span className="sr-only">Filter by job</span>
-            <select
-              className="fc-input"
-              value={selectedJobId ?? ""}
-              onChange={(event) =>
-                setSelectedJobId(
-                  event.target.value ? Number(event.target.value) : undefined,
-                )
-              }
-            >
-              <option value="">All jobs</option>
-              {jobs.map((job) => (
-                <option value={job.job_id} key={job.job_id}>
-                  {job.title}
-                </option>
-              ))}
-            </select>
-          </label>
+
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          <select
+            className="fc-input"
+            aria-label="Filter pipeline by job"
+            value={selectedJobId ?? ""}
+            onChange={(event) =>
+              setSelectedJobId(
+                event.target.value ? Number(event.target.value) : undefined,
+              )
+            }
+          >
+            <option value="">All jobs</option>
+            {jobs.map((job) => (
+              <option value={job.job_id} key={job.job_id}>
+                {job.title}
+              </option>
+            ))}
+          </select>
           <button
+            type="button"
             className="fc-btn fc-btn--secondary"
             disabled={loading}
             onClick={() => void load()}
           >
-            <RefreshCw size={15} aria-hidden="true" />
+            <ArrowClockwise size={15} />
             Refresh
           </button>
         </div>
@@ -233,163 +507,260 @@ export default function PipelineScreen() {
 
       {success && (
         <div className="job-alert job-alert--success" role="status">
-          <CheckCircle2 size={17} aria-hidden="true" />
+          <CheckCircle size={17} />
           <span>{success}</span>
-          <button onClick={() => setSuccess("")} aria-label="Dismiss success">
-            <X size={16} aria-hidden="true" />
+          <button
+            type="button"
+            onClick={() => setSuccess("")}
+            aria-label="Dismiss success"
+          >
+            <X size={16} />
+          </button>
+        </div>
+      )}
+
+      {error && applications.length > 0 && (
+        <div className="job-alert job-alert--error" role="alert">
+          <WarningCircle size={17} />
+          <span>{error}</span>
+          <button
+            type="button"
+            onClick={() => setError("")}
+            aria-label="Dismiss error"
+          >
+            <X size={16} />
           </button>
         </div>
       )}
 
       {loading ? (
-        <div className="fc-card pipeline-page-state" aria-live="polite">
-          <span className="state-spinner" />
-          <strong>Loading candidate pipeline</strong>
-          <p>Fetching applications and their current stages...</p>
+        <div className="fc-card fc-card--pad" aria-live="polite">
+          Loading candidate pipeline...
         </div>
       ) : error ? (
-        <div className="fc-card pipeline-page-state" role="alert">
-          <AlertCircle size={30} aria-hidden="true" />
-          <strong>Pipeline could not be loaded</strong>
+        <div
+          className="fc-card fc-card--pad"
+          role="alert"
+          style={{ textAlign: "center" }}
+        >
+          <WarningCircle size={30} color="var(--danger)" />
+          <strong style={{ display: "block", margin: "8px 0" }}>
+            Pipeline could not be loaded
+          </strong>
           <p>{error}</p>
           <button
+            type="button"
             className="fc-btn fc-btn--secondary"
             onClick={() => void load()}
+            style={{ marginTop: 12 }}
           >
-            <RefreshCw size={15} aria-hidden="true" />
+            <ArrowClockwise size={15} />
             Retry
           </button>
         </div>
       ) : applications.length === 0 ? (
-        <div className="fc-card pipeline-page-state">
-          <UserRound size={32} aria-hidden="true" />
-          <strong>No candidates in this pipeline</strong>
+        <div
+          className="fc-card fc-card--pad"
+          style={{ textAlign: "center", color: "var(--text-secondary)" }}
+        >
+          <UserCircle size={34} style={{ marginBottom: 8 }} />
+          <strong style={{ display: "block", color: "var(--text-primary)" }}>
+            No candidates in this pipeline
+          </strong>
           <p>
             Applications submitted to a published FitCV job will appear here.
           </p>
         </div>
       ) : (
-        <div className="pipeline-board" aria-label="Candidate pipeline board">
-          {stages.map((stage) => (
-            <section
-              className={`pipeline-column pipeline-column--${stage.toLowerCase()}`}
-              key={stage}
-              onDragOver={(event) => event.preventDefault()}
-              onDrop={(event) => {
-                event.preventDefault()
-                const applicationId = Number(
-                  event.dataTransfer.getData("text/plain"),
-                )
-                const application = applications.find(
-                  (item) => item.application_id === applicationId,
-                )
-                if (application) void move(application, stage)
-              }}
-            >
-              <div className="pipeline-column-head">
-                <span />
-                <h2>{stage}</h2>
-                <strong>{grouped[stage].length}</strong>
-              </div>
-              <div className="pipeline-column-cards">
-                {grouped[stage].length === 0 ? (
-                  <div className="pipeline-column-empty">
-                    Drop a candidate here
-                  </div>
-                ) : (
-                  grouped[stage].map((application) => (
-                    <button
-                      className="fc-card pipeline-candidate-card"
-                      type="button"
-                      key={application.application_id}
-                      draggable
-                      disabled={movingId === application.application_id}
-                      onDragStart={(event) =>
-                        event.dataTransfer.setData(
-                          "text/plain",
-                          String(application.application_id),
-                        )
-                      }
-                      onClick={() => void openDetails(application)}
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCorners}
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
+        >
+          <div
+            aria-label="Candidate pipeline board"
+            style={{
+              display: "flex",
+              gap: 14,
+              overflowX: "auto",
+              padding: "4px 2px 12px",
+            }}
+          >
+            {stages.map((stage) => (
+              <section key={stage} style={{ minWidth: 210, flex: "0 0 210px" }}>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    marginBottom: 12,
+                    padding: "0 2px",
+                  }}
+                >
+                  <span
+                    style={{
+                      width: 8,
+                      height: 8,
+                      borderRadius: "50%",
+                      background: stageColors[stage].dot,
+                    }}
+                  />
+                  <span className="fc-eyebrow">{stage}</span>
+                  <span
+                    className="fc-badge fc-badge--gray"
+                    style={{ marginLeft: "auto" }}
+                  >
+                    {grouped[stage].length}
+                  </span>
+                </div>
+
+                <ColumnArea stage={stage}>
+                  <SortableContext
+                    items={grouped[stage].map((item) =>
+                      String(item.application_id),
+                    )}
+                    strategy={verticalListSortingStrategy}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 10,
+                      }}
                     >
-                      <div className="pipeline-candidate-head">
-                        <span>{initials(application.candidate_name)}</span>
-                        <div>
-                          <strong>{application.candidate_name}</strong>
-                          <small>{application.job_title}</small>
-                        </div>
-                      </div>
-                      <div className="pipeline-candidate-foot">
-                        <span
-                          className={`pipeline-score ${scoreClass(
-                            application.overall_score,
-                          )}`}
+                      {grouped[stage].map((application) => (
+                        <SortableCard
+                          key={application.application_id}
+                          application={application}
+                          onOpen={() => {
+                            if (movingId !== application.application_id) {
+                              void openDetails(application)
+                            }
+                          }}
                         >
-                          {application.overall_score == null
-                            ? "Pending"
-                            : `${Math.round(application.overall_score)}%`}
-                        </span>
-                        {application.note_count > 0 && (
-                          <span>
-                            <MessageSquare size={12} aria-hidden="true" />
-                            {application.note_count}
-                          </span>
-                        )}
-                      </div>
-                    </button>
-                  ))
-                )}
-              </div>
-            </section>
-          ))}
-        </div>
+                          <BezelCard className="fc-card fc-card--lift">
+                            {renderCard(application, true)}
+                          </BezelCard>
+                        </SortableCard>
+                      ))}
+                    </div>
+                  </SortableContext>
+                </ColumnArea>
+              </section>
+            ))}
+          </div>
+
+          <DragOverlay>
+            {activeCard ? (
+              <BezelCard
+                className="fc-card fc-card--lift"
+                style={{ width: 210 }}
+              >
+                {renderCard(activeCard, false)}
+              </BezelCard>
+            ) : null}
+          </DragOverlay>
+        </DndContext>
       )}
 
       {selected && (
-        <div className="pipeline-modal-backdrop" role="presentation">
+        <div
+          role="presentation"
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(11, 16, 32, 0.45)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 200,
+            padding: 24,
+            backdropFilter: "blur(4px)",
+          }}
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setSelected(null)
+          }}
+        >
           <div
-            className="fc-card pipeline-modal"
+            className="fc-card fc-card--pad"
             role="dialog"
             aria-modal="true"
             aria-labelledby="pipeline-candidate-title"
+            style={{
+              width: "100%",
+              maxWidth: 560,
+              maxHeight: "86vh",
+              overflowY: "auto",
+              animation: "fc-pop 0.16s ease",
+            }}
           >
-            <div className="pipeline-modal-head">
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                marginBottom: 20,
+              }}
+            >
               <div>
-                <div className="fc-eyebrow">Candidate details</div>
+                <div className="fc-eyebrow">Candidate detail</div>
                 <h2 id="pipeline-candidate-title">{selected.candidate_name}</h2>
               </div>
               <button
-                className="fc-icon-btn"
+                type="button"
                 onClick={() => setSelected(null)}
-                aria-label="Close candidate details"
+                className="fc-icon-btn"
+                aria-label="Close candidate detail"
               >
-                <X size={18} aria-hidden="true" />
+                <X size={18} />
               </button>
             </div>
 
             {detailError && (
-              <div className="job-alert job-alert--error" role="alert">
-                <AlertCircle size={16} aria-hidden="true" />
+              <div
+                className="job-alert job-alert--error"
+                role="alert"
+                style={{ marginBottom: 16 }}
+              >
+                <WarningCircle size={16} />
                 <span>{detailError}</span>
               </div>
             )}
 
-            <div className="pipeline-contact-grid">
-              <span>
-                <Mail size={14} aria-hidden="true" />
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))",
+                gap: 10,
+                marginBottom: 18,
+              }}
+            >
+              <span className="fc-panel" style={{ padding: "10px 12px" }}>
+                <Envelope size={14} />{" "}
                 {selected.candidate_email || "Email unavailable"}
               </span>
-              <span>
-                <Phone size={14} aria-hidden="true" />
+              <span className="fc-panel" style={{ padding: "10px 12px" }}>
+                <Phone size={14} />{" "}
                 {selected.candidate_phone || "Phone unavailable"}
               </span>
-              <span>
-                <CalendarDays size={14} aria-hidden="true" />
-                Applied {formatDate(selected.applied_at)}
+              <span className="fc-panel" style={{ padding: "10px 12px" }}>
+                <CalendarBlank size={14} /> Applied{" "}
+                {formatDate(selected.applied_at)}
               </span>
             </div>
 
-            <div className="pipeline-stage-editor">
+            <div
+              className="fc-panel"
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr auto",
+                gap: 16,
+                alignItems: "end",
+                padding: 14,
+                marginBottom: 20,
+              }}
+            >
               <label>
                 <span className="fc-field-label">Recruitment stage</span>
                 <select
@@ -407,77 +778,103 @@ export default function PipelineScreen() {
                   ))}
                 </select>
               </label>
-              <div>
-                <span className="fc-field-label">Match score</span>
-                <strong
-                  className={`pipeline-modal-score ${scoreClass(
-                    selected.overall_score,
-                  )}`}
-                >
-                  {selected.overall_score == null
-                    ? "Analysis pending"
-                    : `${Math.round(selected.overall_score)}% · ${
-                        selected.match_label ?? "Scored"
-                      }`}
-                </strong>
-              </div>
+              <strong
+                style={{
+                  fontSize: 22,
+                  color: scoreColor(selected.overall_score).color,
+                  paddingBottom: 8,
+                }}
+              >
+                {selected.overall_score == null
+                  ? "Pending"
+                  : `${Math.round(selected.overall_score)}%`}
+              </strong>
             </div>
 
-            <section className="pipeline-detail-section">
-              <h3>Notes</h3>
-              <div className="pipeline-note-compose">
-                <textarea
-                  className="fc-input"
+            <section style={{ marginBottom: 20 }}>
+              <h3 style={{ fontSize: 14, marginBottom: 10 }}>
+                Notes &amp; Comments
+              </h3>
+              <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+                <input
                   value={note}
-                  rows={3}
-                  maxLength={5000}
                   onChange={(event) => setNote(event.target.value)}
                   placeholder="Add a factual recruiter note..."
+                  maxLength={5000}
+                  className="fc-input"
                 />
                 <button
+                  type="button"
                   className="fc-btn fc-btn--primary"
                   disabled={savingNote || !note.trim()}
                   onClick={() => void addNote()}
+                  aria-label="Add note"
                 >
-                  <Send size={14} aria-hidden="true" />
-                  {savingNote ? "Saving..." : "Add note"}
+                  <PaperPlaneRight size={15} />
                 </button>
               </div>
+
               {detailLoading ? (
-                <p className="pipeline-detail-empty">Loading activity...</p>
+                <p>Loading activity...</p>
               ) : notes.length === 0 ? (
-                <p className="pipeline-detail-empty">
+                <p style={{ color: "var(--text-muted)" }}>
                   No recruiter notes for this candidate.
                 </p>
               ) : (
-                <div className="pipeline-note-list">
+                <div style={{ display: "grid", gap: 8 }}>
                   {notes.map((item) => (
-                    <article key={item.note_id}>
-                      <div>
+                    <article
+                      className="fc-panel"
+                      style={{ padding: "11px 13px" }}
+                      key={item.note_id}
+                    >
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          gap: 10,
+                        }}
+                      >
                         <strong>{item.author_name}</strong>
-                        <time>{formatDate(item.created_at)}</time>
+                        <time style={{ color: "var(--text-muted)" }}>
+                          {formatDate(item.created_at)}
+                        </time>
                       </div>
-                      <p>{item.content}</p>
+                      <p style={{ marginTop: 5 }}>{item.content}</p>
                     </article>
                   ))}
                 </div>
               )}
             </section>
 
-            <section className="pipeline-detail-section">
-              <h3>Stage history</h3>
-              {detailLoading ? null : history.length === 0 ? (
-                <p className="pipeline-detail-empty">
+            <section>
+              <h3 style={{ fontSize: 14, marginBottom: 10 }}>Stage history</h3>
+              {!detailLoading && history.length === 0 ? (
+                <p style={{ color: "var(--text-muted)" }}>
                   Stage changes will be recorded here.
                 </p>
               ) : (
-                <div className="pipeline-history-list">
+                <div style={{ display: "grid", gap: 8 }}>
                   {history.map((item) => (
-                    <div key={item.stage_history_id}>
-                      <Clock3 size={14} aria-hidden="true" />
+                    <div
+                      className="fc-panel"
+                      key={item.stage_history_id}
+                      style={{
+                        display: "flex",
+                        gap: 9,
+                        alignItems: "flex-start",
+                        padding: "10px 12px",
+                      }}
+                    >
+                      <Clock size={14} style={{ marginTop: 2 }} />
                       <p>
                         <strong>{item.new_stage}</strong>
-                        <span>
+                        <span
+                          style={{
+                            display: "block",
+                            color: "var(--text-muted)",
+                          }}
+                        >
                           {item.changed_by_name} · {formatDate(item.changed_at)}
                         </span>
                       </p>

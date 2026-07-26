@@ -1,29 +1,30 @@
 import {
-  AlertCircle,
-  Archive,
-  ArchiveRestore,
-  Briefcase,
-  CalendarDays,
-  CheckCircle2,
-  Edit3,
-  Link2,
-  MapPin,
-  Plus,
-  RefreshCw,
-  RotateCcw,
-  Save,
-  Sparkles,
-  SlidersHorizontal,
-  Users,
-  XCircle,
-} from "lucide-react"
-import {
   useCallback,
   useEffect,
   useMemo,
   useState,
   type FormEvent,
 } from "react"
+
+import {
+  Archive,
+  ArrowClockwise,
+  ArrowCounterClockwise,
+  Briefcase,
+  CalendarBlank,
+  CheckCircle,
+  FloppyDisk,
+  Link,
+  MagicWand,
+  MapPin,
+  PencilSimple,
+  Plus,
+  SlidersHorizontal,
+  Users,
+  WarningCircle,
+  X,
+  XCircle,
+} from "@phosphor-icons/react"
 
 import { jobsApi } from "@/api/jobsApi"
 import type { JobPost, JobStatus, JobWrite } from "@/types/jobs"
@@ -248,6 +249,7 @@ export default function JobPostsScreen() {
       )
       return
     }
+
     setExtracting(true)
     setFormError("")
     setSuccess("")
@@ -284,10 +286,7 @@ export default function JobPostsScreen() {
       setFormError("A title is required, even for a draft.")
       return
     }
-    if (
-      !Number.isFinite(form.openings_count) ||
-      Number(form.openings_count) < 1
-    ) {
+    if (Number(form.openings_count) < 1) {
       setFormError("Openings must be at least 1.")
       return
     }
@@ -297,6 +296,7 @@ export default function JobPostsScreen() {
       )
       return
     }
+
     const deadline = toUtcIso(form.deadline)
     if (deadline === undefined) {
       setFormError("Enter a valid deadline.")
@@ -313,6 +313,7 @@ export default function JobPostsScreen() {
         title: form.title.trim(),
         deadline,
       }
+
       if (editingId) {
         const updated = await jobsApi.update(editingId, payload)
         setManagedJobs((current) => ({
@@ -345,6 +346,7 @@ export default function JobPostsScreen() {
     setSuccess("")
     try {
       const updated = await jobsApi[action](job.job_id)
+
       if (action === "archive") {
         setManagedJobs((current) => ({
           active: current.active.filter(
@@ -353,9 +355,7 @@ export default function JobPostsScreen() {
           archived: [updated, ...current.archived],
         }))
         if (editingId === updated.job_id) closeEditor()
-        setSuccess(
-          `Archived “${updated.title}”. Its ${updated.status.toLowerCase()} status was preserved.`,
-        )
+        setSuccess(`Archived “${updated.title}”.`)
       } else if (action === "unarchive") {
         setManagedJobs((current) => ({
           active: [updated, ...current.active],
@@ -391,6 +391,7 @@ export default function JobPostsScreen() {
     shareUrl.search = ""
     shareUrl.hash = ""
     shareUrl.searchParams.set("job", String(job.job_id))
+
     try {
       if (!navigator.clipboard?.writeText) {
         throw new Error("Clipboard access is unavailable in this browser.")
@@ -406,143 +407,205 @@ export default function JobPostsScreen() {
     <div className="fc-stagger">
       <div className="fc-page-head">
         <div>
-          <div className="fc-eyebrow">Recruitment</div>
+          <div className="fc-eyebrow" style={{ marginBottom: 6 }}>
+            Recruitment
+          </div>
           <h1>Job Post Management</h1>
           <p>Create, publish, and maintain your company jobs.</p>
         </div>
-        <button className="fc-btn fc-btn--primary" onClick={startCreate}>
-          <Plus size={16} aria-hidden="true" />
+        <button
+          type="button"
+          className="fc-btn fc-btn--primary"
+          onClick={startCreate}
+        >
+          <Plus size={16} />
           New job
         </button>
       </div>
 
-      <div className="job-summary-grid" aria-label="Job post summary">
-        <div className="fc-stat job-summary-card">
-          <span className="job-summary-icon job-summary-icon--blue">
-            <Briefcase size={18} aria-hidden="true" />
-          </span>
-          <div>
-            <strong>{managedJobs.active.length}</strong>
-            <span>Active records</span>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))",
+          gap: 14,
+          marginBottom: 20,
+        }}
+        aria-label="Job post summary"
+      >
+        {[
+          {
+            label: "Active records",
+            value: managedJobs.active.length,
+            icon: <Briefcase size={19} />,
+            color: "var(--accent)",
+            soft: "var(--accent-soft)",
+          },
+          {
+            label: "Published",
+            value: publishedCount,
+            icon: <CheckCircle size={19} />,
+            color: "var(--success)",
+            soft: "var(--success-soft)",
+          },
+          {
+            label: "Applications",
+            value: activeApplications,
+            icon: <Users size={19} />,
+            color: "var(--warning)",
+            soft: "var(--warning-soft)",
+          },
+        ].map((stat) => (
+          <div className="fc-card fc-card--pad" key={stat.label}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <span
+                className="fc-stat__icon"
+                style={{ color: stat.color, background: stat.soft }}
+              >
+                {stat.icon}
+              </span>
+              <div>
+                <strong className="fc-stat__value">{stat.value}</strong>
+                <span
+                  style={{
+                    display: "block",
+                    color: "var(--text-secondary)",
+                    fontSize: 13,
+                  }}
+                >
+                  {stat.label}
+                </span>
+              </div>
+            </div>
           </div>
-        </div>
-        <div className="fc-stat job-summary-card">
-          <span className="job-summary-icon job-summary-icon--green">
-            <CheckCircle2 size={18} aria-hidden="true" />
-          </span>
-          <div>
-            <strong>{publishedCount}</strong>
-            <span>Published</span>
-          </div>
-        </div>
-        <div className="fc-stat job-summary-card">
-          <span className="job-summary-icon job-summary-icon--amber">
-            <Users size={18} aria-hidden="true" />
-          </span>
-          <div>
-            <strong>{activeApplications}</strong>
-            <span>Applications</span>
-          </div>
-        </div>
+        ))}
       </div>
 
       {success && (
         <div className="job-alert job-alert--success" role="status">
-          <CheckCircle2 size={17} aria-hidden="true" />
+          <CheckCircle size={17} />
           <span>{success}</span>
           <button
+            type="button"
             onClick={() => setSuccess("")}
-            aria-label="Dismiss success message"
+            aria-label="Dismiss success"
           >
-            <XCircle size={16} aria-hidden="true" />
+            <X size={16} />
           </button>
         </div>
       )}
+
       {actionError && (
         <div className="job-alert job-alert--error" role="alert">
-          <AlertCircle size={17} aria-hidden="true" />
+          <WarningCircle size={17} />
           <span>{actionError}</span>
           <button
+            type="button"
             onClick={() => setActionError("")}
-            aria-label="Dismiss error message"
+            aria-label="Dismiss error"
           >
-            <XCircle size={16} aria-hidden="true" />
+            <X size={16} />
           </button>
         </div>
       )}
 
       {editorOpen && (
-        <form id="job-editor" className="fc-card job-editor" onSubmit={save}>
-          <div className="job-editor-head">
-            <div className="fc-section-title">
-              <Briefcase size={17} aria-hidden="true" />
-              <div>
-                <h2>{editingId ? "Edit job post" : "Create job draft"}</h2>
-                <p>
-                  Save incomplete work as a draft. All marked publishing fields
-                  are required before the job can go live.
-                </p>
-              </div>
+        <form
+          id="job-editor"
+          className="fc-card fc-card--pad"
+          onSubmit={save}
+          style={{ marginBottom: 28 }}
+        >
+          <div
+            className="fc-section-title"
+            style={{ marginBottom: 18, alignItems: "flex-start" }}
+          >
+            <Briefcase size={18} color="var(--accent)" />
+            <div style={{ flex: 1 }}>
+              <h2>{editingId ? "Edit job post" : "Create job draft"}</h2>
+              <p>
+                Save incomplete work as a draft. Review AI suggestions before
+                publishing.
+              </p>
             </div>
             <button
-              className="fc-icon-btn"
               type="button"
+              className="fc-icon-btn"
               onClick={closeEditor}
               aria-label="Close job editor"
             >
-              <XCircle size={19} aria-hidden="true" />
+              <X size={18} />
             </button>
           </div>
 
           {formError && (
-            <div className="job-alert job-alert--error" role="alert">
-              <AlertCircle size={17} aria-hidden="true" />
+            <div
+              className="job-alert job-alert--error"
+              role="alert"
+              style={{ marginBottom: 16 }}
+            >
+              <WarningCircle size={17} />
               <span>{formError}</span>
             </div>
           )}
 
           <section
-            className="job-editor-section job-ai-extractor"
+            className="fc-panel"
+            style={{ padding: 16, marginBottom: 18 }}
             aria-labelledby="job-ai-extractor-title"
           >
-            <div className="job-editor-section-title">
+            <div className="fc-section-title" style={{ marginBottom: 12 }}>
+              <MagicWand size={17} color="var(--accent)" />
               <div>
                 <h3 id="job-ai-extractor-title">
-                  <Sparkles size={16} aria-hidden="true" />
                   AI job description extractor
                 </h3>
-                <p>
-                  Paste an existing JD. FitCV will suggest fields without saving
-                  or publishing anything automatically.
-                </p>
+                <p>Paste a full JD; FitCV suggests editable fields only.</p>
               </div>
             </div>
             <label>
               <span className="fc-field-label">Full job description</span>
               <textarea
                 className="fc-input"
-                rows={7}
+                rows={6}
                 value={rawJobDescription}
                 onChange={(event) => setRawJobDescription(event.target.value)}
                 placeholder="Paste the full job description here..."
               />
             </label>
-            <div className="job-ai-actions">
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 12,
+                marginTop: 10,
+                flexWrap: "wrap",
+              }}
+            >
               <button
-                className="fc-btn fc-btn--secondary"
                 type="button"
+                className="fc-btn fc-btn--secondary"
                 disabled={extracting || saving}
                 onClick={() => void extractJobDescription()}
               >
-                <Sparkles size={15} aria-hidden="true" />
+                <MagicWand size={15} />
                 {extracting ? "Extracting..." : "Extract fields with AI"}
               </button>
-              <span>AI output is a draft and requires recruiter review.</span>
+              <span style={{ color: "var(--text-muted)", fontSize: 12 }}>
+                AI output requires recruiter review.
+              </span>
             </div>
+
             {extractionWarnings.length > 0 && (
-              <div className="job-extraction-warnings" role="status">
+              <div
+                style={{
+                  marginTop: 12,
+                  color: "var(--warning)",
+                  fontSize: 13,
+                }}
+                role="status"
+              >
                 <strong>Review notes</strong>
-                <ul>
+                <ul style={{ margin: "6px 0 0 18px" }}>
                   {extractionWarnings.map((warning) => (
                     <li key={warning}>{warning}</li>
                   ))}
@@ -551,23 +614,25 @@ export default function JobPostsScreen() {
             )}
           </section>
 
-          <section
-            className="job-editor-section"
-            aria-labelledby="job-basics-title"
-          >
-            <div className="job-editor-section-title">
-              <h3 id="job-basics-title">Job basics</h3>
-              <span>Title is required for a draft</span>
+          <section style={{ marginBottom: 18 }}>
+            <div className="fc-eyebrow" style={{ marginBottom: 12 }}>
+              Job basics
             </div>
-            <div className="job-form-grid">
-              <label className="job-field--wide">
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns:
+                  "repeat(auto-fit,minmax(min(100%,210px),1fr))",
+                gap: 14,
+              }}
+            >
+              <label style={{ gridColumn: "span 2" }}>
                 <span className="fc-field-label">Title *</span>
                 <input
                   className="fc-input"
                   value={form.title}
                   onChange={(event) => setField("title", event.target.value)}
                   placeholder="e.g. Senior Backend Engineer"
-                  autoFocus
                   required
                 />
               </label>
@@ -622,23 +687,26 @@ export default function JobPostsScreen() {
             </div>
           </section>
 
-          <section
-            className="job-editor-section"
-            aria-labelledby="job-content-title"
-          >
-            <div className="job-editor-section-title">
-              <h3 id="job-content-title">Job description</h3>
-              <span>Required before publishing</span>
+          <section style={{ marginBottom: 18 }}>
+            <div className="fc-eyebrow" style={{ marginBottom: 12 }}>
+              Job description
             </div>
-            <div className="job-description-grid">
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns:
+                  "repeat(auto-fit,minmax(min(100%,300px),1fr))",
+                gap: 14,
+              }}
+            >
               {sections.map(([key, label]) => (
                 <label key={key}>
                   <span className="fc-field-label">{label}</span>
                   <textarea
                     className="fc-input"
+                    style={{ minHeight: 120 }}
                     value={form[key] ?? ""}
                     onChange={(event) => setField(key, event.target.value)}
-                    rows={5}
                   />
                 </label>
               ))}
@@ -646,33 +714,40 @@ export default function JobPostsScreen() {
           </section>
 
           <section
-            className="job-editor-section"
+            className="fc-panel"
+            style={{ padding: 16, marginBottom: 18 }}
             aria-labelledby="job-scoring-title"
           >
-            <div className="job-editor-section-title">
-              <div>
-                <h3 id="job-scoring-title">
-                  <SlidersHorizontal size={16} aria-hidden="true" />
-                  Candidate scoring weights
-                </h3>
-                <p>Adjust how FitCV will prioritize candidates for this job.</p>
+            <div
+              className="fc-section-title"
+              style={{ marginBottom: 12, alignItems: "flex-start" }}
+            >
+              <SlidersHorizontal size={17} color="var(--accent)" />
+              <div style={{ flex: 1 }}>
+                <h3 id="job-scoring-title">Candidate scoring weights</h3>
+                <p>These four values must total exactly 100%.</p>
               </div>
               <strong
-                className={
-                  weightsValid
-                    ? "job-weight-total--valid"
-                    : "job-weight-total--invalid"
-                }
+                className={`fc-badge ${
+                  weightsValid ? "fc-badge--green" : "fc-badge--red"
+                }`}
                 aria-live="polite"
               >
                 Total {weightTotal}%
               </strong>
             </div>
-            <div className="job-weight-grid">
+
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))",
+                gap: 12,
+              }}
+            >
               {weightFields.map(([key, label, description]) => (
                 <label key={key}>
                   <span className="fc-field-label">{label}</span>
-                  <span className="job-weight-input">
+                  <div style={{ position: "relative" }}>
                     <input
                       className="fc-input"
                       type="number"
@@ -686,21 +761,33 @@ export default function JobPostsScreen() {
                         setField(key, Number(event.target.value))
                       }
                     />
-                    <span>%</span>
-                  </span>
-                  <small>{description}</small>
+                    <span
+                      style={{
+                        position: "absolute",
+                        right: 12,
+                        top: "50%",
+                        transform: "translateY(-50%)",
+                        color: "var(--text-muted)",
+                      }}
+                    >
+                      %
+                    </span>
+                  </div>
+                  <small style={{ color: "var(--text-muted)" }}>
+                    {description}
+                  </small>
                 </label>
               ))}
             </div>
           </section>
 
-          <div className="job-editor-actions">
+          <div style={{ display: "flex", gap: 10 }}>
             <button
               className="fc-btn fc-btn--primary"
               disabled={saving}
               type="submit"
             >
-              <Save size={15} aria-hidden="true" />
+              <FloppyDisk size={15} />
               {saving
                 ? "Saving..."
                 : editingId
@@ -713,135 +800,178 @@ export default function JobPostsScreen() {
               onClick={closeEditor}
               disabled={saving}
             >
-              <RotateCcw size={15} aria-hidden="true" />
+              <ArrowCounterClockwise size={15} />
               Cancel
             </button>
           </div>
         </form>
       )}
 
-      <section
-        className="job-list-section"
-        aria-labelledby="company-jobs-title"
-      >
-        <div className="job-list-head">
-          <div>
-            <div className="fc-eyebrow">Company jobs</div>
-            <h2 id="company-jobs-title">Recruitment records</h2>
+      <section aria-labelledby="company-jobs-title">
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 12,
+            marginBottom: 14,
+          }}
+        >
+          <div className="fc-section-title">
+            <Briefcase size={17} color="var(--accent)" />
+            <div>
+              <h2 id="company-jobs-title">Company jobs</h2>
+              <p>Manage active and archived recruitment records.</p>
+            </div>
           </div>
           <button
+            type="button"
             className="fc-btn fc-btn--secondary"
             onClick={() => void load()}
             disabled={loading}
           >
-            <RefreshCw
-              size={15}
-              className={loading ? "job-spin" : undefined}
-              aria-hidden="true"
-            />
+            <ArrowClockwise size={15} />
             Refresh
           </button>
         </div>
 
         <div
-          className="job-tabs"
           role="tablist"
           aria-label="Job record filters"
+          style={{
+            display: "inline-flex",
+            gap: 6,
+            padding: 5,
+            background: "var(--surface-2)",
+            border: "1px solid var(--border)",
+            borderRadius: "var(--r-md)",
+            marginBottom: 14,
+          }}
         >
-          <button
-            id="active-jobs-tab"
-            role="tab"
-            aria-selected={listView === "active"}
-            aria-controls="job-list-panel"
-            className={listView === "active" ? "is-active" : undefined}
-            onClick={() => setListView("active")}
-          >
-            Active
-            <span>{managedJobs.active.length}</span>
-          </button>
-          <button
-            id="archived-jobs-tab"
-            role="tab"
-            aria-selected={listView === "archived"}
-            aria-controls="job-list-panel"
-            className={listView === "archived" ? "is-active" : undefined}
-            onClick={() => setListView("archived")}
-          >
-            Archived
-            <span>{managedJobs.archived.length}</span>
-          </button>
+          {(["active", "archived"] as const).map((view) => (
+            <button
+              type="button"
+              key={view}
+              role="tab"
+              aria-selected={listView === view}
+              className={
+                listView === view
+                  ? "fc-btn fc-btn--primary"
+                  : "fc-btn fc-btn--ghost"
+              }
+              onClick={() => setListView(view)}
+            >
+              {view === "active" ? "Active" : "Archived"}
+              <span className="fc-badge fc-badge--gray">
+                {managedJobs[view].length}
+              </span>
+            </button>
+          ))}
         </div>
 
-        <div
-          id="job-list-panel"
-          role="tabpanel"
-          aria-labelledby={`${listView}-jobs-tab`}
-        >
-          {loading ? (
-            <div className="fc-card job-list-state" aria-live="polite">
-              <span className="state-spinner" />
-              <strong>Loading company jobs</strong>
-              <p>Fetching the latest recruitment records...</p>
-            </div>
-          ) : loadError ? (
-            <div className="fc-card job-list-state" role="alert">
-              <AlertCircle size={28} aria-hidden="true" />
-              <strong>Jobs could not be loaded</strong>
-              <p>{loadError}</p>
-              <button
-                className="fc-btn fc-btn--secondary"
-                onClick={() => void load()}
-              >
-                <RefreshCw size={15} aria-hidden="true" />
-                Retry
-              </button>
-            </div>
-          ) : visibleJobs.length === 0 ? (
-            <div className="fc-card job-list-state">
-              {listView === "active" ? (
-                <>
-                  <Briefcase size={30} aria-hidden="true" />
-                  <strong>No active job records yet</strong>
-                  <p>Create a draft, complete its details, then publish it.</p>
-                  <button
-                    className="fc-btn fc-btn--primary"
-                    onClick={startCreate}
+        {loading ? (
+          <div className="fc-card fc-card--pad" aria-live="polite">
+            Loading company jobs...
+          </div>
+        ) : loadError ? (
+          <div
+            className="fc-card fc-card--pad"
+            role="alert"
+            style={{ textAlign: "center" }}
+          >
+            <WarningCircle size={28} color="var(--danger)" />
+            <strong style={{ display: "block", margin: "8px 0" }}>
+              Jobs could not be loaded
+            </strong>
+            <p>{loadError}</p>
+            <button
+              type="button"
+              className="fc-btn fc-btn--secondary"
+              onClick={() => void load()}
+              style={{ marginTop: 12 }}
+            >
+              <ArrowClockwise size={15} />
+              Retry
+            </button>
+          </div>
+        ) : visibleJobs.length === 0 ? (
+          <div className="fc-card fc-card--pad" style={{ textAlign: "center" }}>
+            {listView === "active" ? (
+              <>
+                <Briefcase size={30} />
+                <strong style={{ display: "block", margin: "8px 0" }}>
+                  No active job records yet
+                </strong>
+                <p>Create a draft, complete its details, then publish it.</p>
+                <button
+                  type="button"
+                  className="fc-btn fc-btn--primary"
+                  onClick={startCreate}
+                  style={{ marginTop: 12 }}
+                >
+                  <Plus size={15} />
+                  Create first job
+                </button>
+              </>
+            ) : (
+              <>
+                <Archive size={30} />
+                <strong style={{ display: "block", margin: "8px 0" }}>
+                  No archived jobs
+                </strong>
+                <p>Archived jobs remain available here for restoration.</p>
+              </>
+            )}
+          </div>
+        ) : (
+          <div style={{ display: "grid", gap: 12 }}>
+            {visibleJobs.map((job) => {
+              const busyAction =
+                pendingAction?.jobId === job.job_id
+                  ? pendingAction.action
+                  : null
+
+              return (
+                <article
+                  className="fc-card fc-card--pad fc-card--lift"
+                  key={job.job_id}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      gap: 18,
+                      flexWrap: "wrap",
+                    }}
                   >
-                    <Plus size={15} aria-hidden="true" />
-                    Create first job
-                  </button>
-                </>
-              ) : (
-                <>
-                  <Archive size={30} aria-hidden="true" />
-                  <strong>No archived jobs</strong>
-                  <p>
-                    Jobs you archive will remain available here for restoration.
-                  </p>
-                </>
-              )}
-            </div>
-          ) : (
-            <div className="job-card-list">
-              {visibleJobs.map((job) => {
-                const busyAction =
-                  pendingAction?.jobId === job.job_id
-                    ? pendingAction.action
-                    : null
-                return (
-                  <article className="fc-card job-post-card" key={job.job_id}>
-                    <div className="job-post-main">
-                      <div className="job-post-title-row">
+                    <div style={{ flex: "1 1 440px", minWidth: 0 }}>
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "flex-start",
+                          justifyContent: "space-between",
+                          gap: 12,
+                        }}
+                      >
                         <div>
                           <h3>{job.title}</h3>
-                          <div className="job-post-meta">
+                          <div
+                            style={{
+                              display: "flex",
+                              gap: 12,
+                              flexWrap: "wrap",
+                              color: "var(--text-muted)",
+                              fontSize: 12,
+                              marginTop: 5,
+                            }}
+                          >
                             <span>
-                              <MapPin size={13} aria-hidden="true" />
+                              <MapPin size={13} />{" "}
                               {job.location || "Location pending"}
                             </span>
                             <span>
-                              <CalendarDays size={13} aria-hidden="true" />
-                              Deadline {formatDate(job.deadline)}
+                              <CalendarBlank size={13} /> Deadline{" "}
+                              {formatDate(job.deadline)}
                             </span>
                           </div>
                         </div>
@@ -851,38 +981,82 @@ export default function JobPostsScreen() {
                       </div>
 
                       {job.about_job && (
-                        <p className="job-post-summary">{job.about_job}</p>
+                        <p
+                          style={{
+                            color: "var(--text-secondary)",
+                            marginTop: 12,
+                          }}
+                        >
+                          {job.about_job}
+                        </p>
                       )}
 
-                      <div className="job-post-facts">
-                        <span>{job.employment_type || "Type pending"}</span>
-                        <span>{job.openings_count} openings</span>
-                        <span>{job.application_count} applications</span>
+                      <div
+                        style={{
+                          display: "flex",
+                          gap: 8,
+                          flexWrap: "wrap",
+                          marginTop: 12,
+                        }}
+                      >
+                        <span className="fc-badge fc-badge--gray">
+                          {job.employment_type || "Type pending"}
+                        </span>
+                        <span className="fc-badge fc-badge--gray">
+                          {job.openings_count} openings
+                        </span>
+                        <span className="fc-badge fc-badge--blue">
+                          {job.application_count} applications
+                        </span>
                         {job.archived_at && (
-                          <span>Archived {formatDate(job.archived_at)}</span>
+                          <span className="fc-badge fc-badge--gray">
+                            Archived {formatDate(job.archived_at)}
+                          </span>
                         )}
                       </div>
 
                       <div
-                        className="job-score-summary"
+                        style={{
+                          display: "grid",
+                          gridTemplateColumns:
+                            "repeat(auto-fit,minmax(110px,1fr))",
+                          gap: 8,
+                          marginTop: 12,
+                        }}
                         aria-label="Candidate scoring weights"
                       >
                         {weightFields.map(([key, label]) => (
-                          <span key={key}>
+                          <span
+                            className="fc-panel"
+                            style={{
+                              padding: "8px 10px",
+                              fontSize: 12,
+                              color: "var(--text-secondary)",
+                            }}
+                            key={key}
+                          >
                             {label} <strong>{job[key]}%</strong>
                           </span>
                         ))}
                       </div>
                     </div>
 
-                    <div className="job-post-actions">
+                    <div
+                      style={{
+                        display: "flex",
+                        gap: 8,
+                        alignItems: "flex-start",
+                        flexWrap: "wrap",
+                      }}
+                    >
                       {listView === "archived" ? (
                         <button
+                          type="button"
                           className="fc-btn fc-btn--secondary"
                           disabled={Boolean(busyAction)}
                           onClick={() => void runAction(job, "unarchive")}
                         >
-                          <ArchiveRestore size={14} aria-hidden="true" />
+                          <ArrowCounterClockwise size={14} />
                           {busyAction === "unarchive"
                             ? actionLabels.unarchive
                             : "Restore"}
@@ -891,21 +1065,24 @@ export default function JobPostsScreen() {
                         <>
                           {job.status !== "Published" && (
                             <button
+                              type="button"
                               className="fc-btn fc-btn--secondary"
                               disabled={Boolean(busyAction)}
                               onClick={() => startEdit(job)}
                             >
-                              <Edit3 size={14} aria-hidden="true" />
+                              <PencilSimple size={14} />
                               Edit
                             </button>
                           )}
+
                           {job.status !== "Published" && (
                             <button
+                              type="button"
                               className="fc-btn fc-btn--primary"
                               disabled={Boolean(busyAction)}
                               onClick={() => void runAction(job, "publish")}
                             >
-                              <Plus size={14} aria-hidden="true" />
+                              <Plus size={14} />
                               {busyAction === "publish"
                                 ? actionLabels.publish
                                 : job.status === "Closed"
@@ -913,34 +1090,39 @@ export default function JobPostsScreen() {
                                   : "Publish"}
                             </button>
                           )}
+
                           {job.status === "Published" && (
                             <>
                               <button
+                                type="button"
                                 className="fc-btn fc-btn--secondary"
                                 disabled={Boolean(busyAction)}
                                 onClick={() => void copyShareLink(job)}
                               >
-                                <Link2 size={14} aria-hidden="true" />
+                                <Link size={14} />
                                 Copy public link
                               </button>
                               <button
+                                type="button"
                                 className="fc-btn fc-btn--secondary"
                                 disabled={Boolean(busyAction)}
                                 onClick={() => void runAction(job, "close")}
                               >
-                                <XCircle size={14} aria-hidden="true" />
+                                <XCircle size={14} />
                                 {busyAction === "close"
                                   ? actionLabels.close
                                   : "Close"}
                               </button>
                             </>
                           )}
+
                           <button
-                            className="fc-btn fc-btn--ghost job-archive-action"
+                            type="button"
+                            className="fc-btn fc-btn--ghost"
                             disabled={Boolean(busyAction)}
                             onClick={() => void runAction(job, "archive")}
                           >
-                            <Archive size={14} aria-hidden="true" />
+                            <Archive size={14} />
                             {busyAction === "archive"
                               ? actionLabels.archive
                               : "Archive"}
@@ -948,12 +1130,12 @@ export default function JobPostsScreen() {
                         </>
                       )}
                     </div>
-                  </article>
-                )
-              })}
-            </div>
-          )}
-        </div>
+                  </div>
+                </article>
+              )
+            })}
+          </div>
+        )}
       </section>
     </div>
   )

@@ -88,26 +88,44 @@ export interface AnalyzerDraftState {
 
 export interface CvScorePoint {
   cvId: number
+
   versionNumber: number
+
   fileName: string
+
   uploadedAt: string
+
   matchResultId: number
+
   overallScore: number
+
   skillScore: number | null
+
   experienceScore: number | null
+
   educationScore: number | null
+
   softSkillScore: number | null
+
   matchLabel: string | null
+
   completedAt: string | null
+
   deltaFromPrevious: number | null
 }
 
 export interface CvComparisonSeries {
   jobDescriptionId: number
+
   title: string
+
   createdAt: string
+
   bestScore: number
+
   latestScore: number
+
   latestDelta: number | null
+
   versions: CvScorePoint[]
 }

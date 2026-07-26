@@ -1,18 +1,20 @@
 import { type FormEvent, useEffect, useMemo, useState } from "react"
+
 import {
-  AlertCircle,
+  WarningCircle,
   Bell,
   Clock,
-  ExternalLink,
-  LoaderCircle,
-  MessageSquare,
-  Pencil,
+  ArrowSquareOut,
+  Spinner,
+  ChatText,
+  PencilSimpleLine,
   Plus,
-  Search,
-  Send,
-  Trash2,
+  MagnifyingGlass,
+  PaperPlaneRight,
+  TrashSimple,
   X,
-} from "lucide-react"
+} from "@phosphor-icons/react"
+
 import {
   Bar,
   BarChart,
@@ -24,6 +26,7 @@ import {
 } from "recharts"
 
 import { applicationApi } from "@/api/applicationApi"
+
 import {
   APPLICATION_STATUSES,
   type ApplicationDetail,
@@ -34,42 +37,61 @@ import {
 } from "@/types/application"
 
 const SOURCES = ["LinkedIn", "TopCV", "Referral", "Company Website", "Other"]
+
 const STATUS_COLORS: Record<ApplicationStatus, {
   color: string
+
   background: string
 }> = {
   Applied: { color: "#475569", background: "#F1F5F9" },
+
   Screening: { color: "#1D4ED8", background: "#DBEAFE" },
+
   Interview: { color: "#B45309", background: "#FEF3C7" },
+
   Offer: { color: "#15803D", background: "#DCFCE7" },
+
   Rejected: { color: "#B91C1C", background: "#FEE2E2" },
 }
+
 const STAGE_COLORS = ["#64748B", "#2563EB", "#F59E0B", "#16A34A", "#DC2626"]
 
 const EMPTY_STATS: ApplicationStats = {
   total: 0,
+
   remindersDue: 0,
+
   byStatus: { Applied: 0, Screening: 0, Interview: 0, Offer: 0, Rejected: 0 },
 }
+
 function todayInputValue() {
   const now = new Date()
+
   return new Date(now.getTime() - now.getTimezoneOffset() * 60_000)
+
     .toISOString()
+
     .slice(0, 10)
 }
 
 function toDateTimeLocal(value: string | null) {
   if (!value) return ""
+
   const date = new Date(value)
+
   return new Date(date.getTime() - date.getTimezoneOffset() * 60_000)
+
     .toISOString()
+
     .slice(0, 16)
 }
 
 function formatDate(value: string) {
   return new Date(`${value}T00:00:00`).toLocaleDateString(undefined, {
     day: "2-digit",
+
     month: "short",
+
     year: "numeric",
   })
 }
@@ -77,9 +99,13 @@ function formatDate(value: string) {
 function formatDateTime(value: string) {
   return new Date(value).toLocaleString(undefined, {
     day: "2-digit",
+
     month: "short",
+
     year: "numeric",
+
     hour: "2-digit",
+
     minute: "2-digit",
   })
 }
@@ -87,11 +113,17 @@ function formatDateTime(value: string) {
 function emptyForm(): ApplicationInput {
   return {
     companyName: "",
+
     positionTitle: "",
+
     appliedOn: todayInputValue(),
+
     source: "LinkedIn",
+
     status: "Applied",
+
     jobUrl: "",
+
     reminderAt: null,
   }
 }
@@ -99,22 +131,32 @@ function emptyForm(): ApplicationInput {
 function applicationToForm(application: TrackedApplication): ApplicationInput {
   return {
     companyName: application.companyName,
+
     positionTitle: application.positionTitle,
+
     appliedOn: application.appliedOn,
+
     source: application.source,
+
     status: application.status,
+
     jobUrl: application.jobUrl ?? "",
+
     reminderAt: toDateTimeLocal(application.reminderAt),
   }
 }
 
 function ModalShell({
   title,
+
   onClose,
+
   children,
 }: {
   title: string
+
   onClose: () => void
+
   children: React.ReactNode
 }) {
   return (
@@ -123,12 +165,19 @@ function ModalShell({
       onMouseDown={(event) => event.target === event.currentTarget && onClose()}
       style={{
         position: "fixed",
+
         inset: 0,
+
         zIndex: 100,
+
         display: "grid",
+
         placeItems: "center",
+
         padding: 20,
+
         background: "rgba(15, 23, 42, 0.48)",
+
         backdropFilter: "blur(3px)",
       }}
     >
@@ -139,16 +188,22 @@ function ModalShell({
         className="fitcv-card"
         style={{
           width: "min(680px, 100%)",
+
           maxHeight: "90vh",
+
           overflow: "auto",
+
           padding: 24,
         }}
       >
         <div
           style={{
             display: "flex",
+
             alignItems: "center",
+
             justifyContent: "space-between",
+
             marginBottom: 20,
           }}
         >
@@ -159,7 +214,7 @@ function ModalShell({
             onClick={onClose}
             aria-label="Close dialog"
           >
-            <X size={18} />
+            <X size={18} weight="light" />
           </button>
         </div>
         {children}
@@ -170,29 +225,43 @@ function ModalShell({
 
 function ApplicationFormModal({
   initial,
+
   saving,
+
   onClose,
+
   onSave,
 }: {
   initial: ApplicationInput
+
   saving: boolean
+
   onClose: () => void
+
   onSave: (payload: ApplicationInput) => Promise<void>
 }) {
   const [form, setForm] = useState(initial)
+
   const [error, setError] = useState<string | null>(null)
+
   const field = (name: keyof ApplicationInput, value: string) =>
     setForm((current) => ({ ...current, [name]: value }))
 
   const submit = async (event: FormEvent) => {
     event.preventDefault()
+
     setError(null)
+
     try {
       await onSave({
         ...form,
+
         companyName: form.companyName.trim(),
+
         positionTitle: form.positionTitle.trim(),
+
         jobUrl: form.jobUrl?.trim() || null,
+
         reminderAt: form.reminderAt
           ? new Date(form.reminderAt).toISOString()
           : null,
@@ -214,7 +283,7 @@ function ApplicationFormModal({
       <form onSubmit={submit} style={{ display: "grid", gap: 15 }}>
         {error && (
           <div className="tracker-alert tracker-alert--error">
-            <AlertCircle size={15} /> {error}
+            <WarningCircle size={15} weight="light" /> {error}
           </div>
         )}
         <div className="tracker-form-grid">
@@ -259,9 +328,11 @@ function ApplicationFormModal({
               {(SOURCES.includes(form.source)
                 ? SOURCES
                 : [form.source, ...SOURCES]
-              ).map((source) => (
-                <option key={source}>{source}</option>
-              ))}
+              )
+
+                .map((source) => (
+                  <option key={source}>{source}</option>
+                ))}
             </select>
           </label>
           <label>
@@ -300,8 +371,11 @@ function ApplicationFormModal({
         <div
           style={{
             display: "flex",
+
             justifyContent: "flex-end",
+
             gap: 10,
+
             marginTop: 4,
           }}
         >
@@ -313,7 +387,9 @@ function ApplicationFormModal({
             Cancel
           </button>
           <button type="submit" className="fitcv-btn-primary" disabled={saving}>
-            {saving && <LoaderCircle className="tracker-spin" size={15} />}
+            {saving && (
+              <Spinner className="tracker-spin" size={15} weight="light" />
+            )}
             {saving ? "Saving..." : "Save application"}
           </button>
         </div>
@@ -324,26 +400,39 @@ function ApplicationFormModal({
 
 function ApplicationDetailModal({
   detail,
+
   busy,
+
   onClose,
+
   onAddNote,
+
   onDeleteNote,
 }: {
   detail: ApplicationDetail
+
   busy: boolean
+
   onClose: () => void
+
   onAddNote: (content: string) => Promise<void>
+
   onDeleteNote: (noteId: number) => Promise<void>
 }) {
   const [note, setNote] = useState("")
+
   const [error, setError] = useState<string | null>(null)
 
   const addNote = async (event: FormEvent) => {
     event.preventDefault()
+
     if (!note.trim()) return
+
     setError(null)
+
     try {
       await onAddNote(note.trim())
+
       setNote("")
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Could not add note.")
@@ -377,7 +466,7 @@ function ApplicationDetailModal({
               disabled={busy || !note.trim()}
               aria-label="Add note"
             >
-              <Send size={15} />
+              <PaperPlaneRight size={15} weight="light" />
             </button>
           </form>
           {error && (
@@ -396,6 +485,7 @@ function ApplicationDetailModal({
                     type="button"
                     onClick={() => {
                       setError(null)
+
                       void onDeleteNote(item.noteId).catch((reason) =>
                         setError(
                           reason instanceof Error
@@ -406,7 +496,7 @@ function ApplicationDetailModal({
                     }}
                     aria-label="Delete note"
                   >
-                    <Trash2 size={13} />
+                    <TrashSimple size={13} weight="light" />
                   </button>
                 </div>
               </article>
@@ -423,6 +513,7 @@ function ApplicationDetailModal({
                 <span
                   style={{
                     background: STATUS_COLORS[item.newStatus].background,
+
                     color: STATUS_COLORS[item.newStatus].color,
                   }}
                 />
@@ -441,30 +532,45 @@ function ApplicationDetailModal({
 
 export default function AppTrackerScreen() {
   const [applications, setApplications] = useState<TrackedApplication[]>([])
+
   const [stats, setStats] = useState<ApplicationStats>(EMPTY_STATS)
+
   const [search, setSearch] = useState("")
+
   const [statusFilter, setStatusFilter] = useState<"All" | ApplicationStatus>(
     "All",
   )
+
   const [sourceFilter, setSourceFilter] = useState("All")
+
   const [remindersOnly, setRemindersOnly] = useState(false)
+
   const [loading, setLoading] = useState(true)
+
   const [saving, setSaving] = useState(false)
+
   const [error, setError] = useState<string | null>(null)
+
   const [formState, setFormState] = useState<{
     id: number | null
+
     initial: ApplicationInput
   } | null>(null)
+
   const [detail, setDetail] = useState<ApplicationDetail | null>(null)
 
   const load = async () => {
     setError(null)
+
     try {
       const [items, summary] = await Promise.all([
         applicationApi.list(),
+
         applicationApi.stats(),
       ])
+
       setApplications(items)
+
       setStats(summary)
     } catch (reason) {
       setError(
@@ -484,21 +590,28 @@ export default function AppTrackerScreen() {
   const sourceOptions = useMemo(
     () => [
       "All",
+
       ...Array.from(new Set(applications.map((item) => item.source))).sort(),
     ],
+
     [applications],
   )
+
   const filtered = useMemo(() => {
     const query = search.trim().toLocaleLowerCase()
+
     return applications.filter((item) => {
       const matchesSearch =
         !query ||
         item.companyName.toLocaleLowerCase().includes(query) ||
         item.positionTitle.toLocaleLowerCase().includes(query)
+
       const matchesStatus =
         statusFilter === "All" || item.status === statusFilter
+
       const matchesSource =
         sourceFilter === "All" || item.source === sourceFilter
+
       return (
         matchesSearch &&
         matchesStatus &&
@@ -510,15 +623,19 @@ export default function AppTrackerScreen() {
 
   const chartData = APPLICATION_STATUSES.map((stage) => ({
     stage,
+
     count: stats.byStatus[stage] ?? 0,
   }))
 
   const saveApplication = async (payload: ApplicationInput) => {
     setSaving(true)
+
     try {
       if (formState?.id) await applicationApi.update(formState.id, payload)
       else await applicationApi.create(payload)
+
       setFormState(null)
+
       await load()
     } finally {
       setSaving(false)
@@ -527,14 +644,18 @@ export default function AppTrackerScreen() {
 
   const updateStatus = async (
     application: TrackedApplication,
+
     nextStatus: ApplicationStatus,
   ) => {
     if (nextStatus === application.status) return
+
     setError(null)
+
     try {
       await applicationApi.update(application.applicationId, {
         status: nextStatus,
       })
+
       await load()
     } catch (reason) {
       setError(
@@ -545,6 +666,7 @@ export default function AppTrackerScreen() {
 
   const openDetail = async (applicationId: number) => {
     setError(null)
+
     try {
       setDetail(await applicationApi.get(applicationId))
     } catch (reason) {
@@ -558,7 +680,9 @@ export default function AppTrackerScreen() {
 
   const refreshDetail = async () => {
     if (!detail) return
+
     setDetail(await applicationApi.get(detail.applicationId))
+
     await load()
   }
 
@@ -569,9 +693,12 @@ export default function AppTrackerScreen() {
       )
     )
       return
+
     setError(null)
+
     try {
       await applicationApi.delete(application.applicationId)
+
       await load()
     } catch (reason) {
       setError(
@@ -596,13 +723,13 @@ export default function AppTrackerScreen() {
           className="fitcv-btn-primary"
           onClick={() => setFormState({ id: null, initial: emptyForm() })}
         >
-          <Plus size={15} /> Add application
+          <Plus size={15} weight="light" /> Add application
         </button>
       </div>
 
       {error && (
         <div className="tracker-alert tracker-alert--error" role="alert">
-          <AlertCircle size={16} /> <span>{error}</span>
+          <WarningCircle size={16} weight="light" /> <span>{error}</span>
           <button onClick={() => void load()}>Retry</button>
         </div>
       )}
@@ -612,7 +739,9 @@ export default function AppTrackerScreen() {
           <div
             style={{
               display: "flex",
+
               justifyContent: "space-between",
+
               gap: 12,
             }}
           >
@@ -621,7 +750,7 @@ export default function AppTrackerScreen() {
               <h2>{stats.total} applications</h2>
             </div>
             <span className="fc-badge fc-badge--amber">
-              <Bell size={12} /> {stats.remindersDue} due
+              <Bell size={12} weight="light" /> {stats.remindersDue} due
             </span>
           </div>
           <ResponsiveContainer width="100%" height={130}>
@@ -642,8 +771,11 @@ export default function AppTrackerScreen() {
               <Tooltip
                 contentStyle={{
                   background: "white",
+
                   border: "1px solid #E2E8F0",
+
                   borderRadius: 8,
+
                   fontSize: 13,
                 }}
               />
@@ -662,7 +794,7 @@ export default function AppTrackerScreen() {
 
       <div className="tracker-filters">
         <label className="fc-search tracker-search">
-          <Search size={15} />
+          <MagnifyingGlass size={15} weight="light" />
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -684,7 +816,7 @@ export default function AppTrackerScreen() {
           className={`fc-chip ${remindersOnly ? "fc-chip--active" : ""}`}
           onClick={() => setRemindersOnly((value) => !value)}
         >
-          <Bell size={13} /> Follow-ups
+          <Bell size={13} weight="light" /> Follow-ups
         </button>
       </div>
       <div className="tracker-status-filters" aria-label="Filter by status">
@@ -704,12 +836,12 @@ export default function AppTrackerScreen() {
       <div className="fitcv-card tracker-table-wrap">
         {loading ? (
           <div className="tracker-empty">
-            <LoaderCircle className="tracker-spin" size={24} />
+            <Spinner className="tracker-spin" size={24} weight="light" />
             <strong>Loading applications...</strong>
           </div>
         ) : filtered.length === 0 ? (
           <div className="tracker-empty">
-            <MessageSquare size={28} />
+            <ChatText size={28} weight="light" />
             <strong>
               {applications.length
                 ? "No applications match these filters."
@@ -727,10 +859,15 @@ export default function AppTrackerScreen() {
               <tr>
                 {[
                   "Company",
+
                   "Position",
+
                   "Date applied",
+
                   "Source",
+
                   "Status",
+
                   "Actions",
                 ].map((heading) => (
                   <th key={heading}>{heading}</th>
@@ -740,6 +877,7 @@ export default function AppTrackerScreen() {
             <tbody>
               {filtered.map((application) => {
                 const colors = STATUS_COLORS[application.status]
+
                 return (
                   <tr key={application.applicationId}>
                     <td>
@@ -751,7 +889,8 @@ export default function AppTrackerScreen() {
                           <strong>{application.companyName}</strong>
                           {application.reminderDue && (
                             <small>
-                              <Clock size={11} /> {application.reminderReason}
+                              <Clock size={11} weight="light" />{" "}
+                              {application.reminderReason}
                             </small>
                           )}
                         </div>
@@ -765,6 +904,7 @@ export default function AppTrackerScreen() {
                     <td
                       style={{
                         color: "var(--text-secondary)",
+
                         whiteSpace: "nowrap",
                       }}
                     >
@@ -783,11 +923,13 @@ export default function AppTrackerScreen() {
                         onChange={(e) =>
                           void updateStatus(
                             application,
+
                             e.target.value as ApplicationStatus,
                           )
                         }
                         style={{
                           color: colors.color,
+
                           background: colors.background,
                         }}
                       >
@@ -804,7 +946,7 @@ export default function AppTrackerScreen() {
                           }
                           aria-label="Open notes"
                         >
-                          <MessageSquare size={14} />
+                          <ChatText size={14} weight="light" />
                           <span>{application.noteCount}</span>
                         </button>
                         {application.jobUrl && (
@@ -814,25 +956,26 @@ export default function AppTrackerScreen() {
                             rel="noreferrer"
                             aria-label="Open job posting"
                           >
-                            <ExternalLink size={14} />
+                            <ArrowSquareOut size={14} weight="light" />
                           </a>
                         )}
                         <button
                           onClick={() =>
                             setFormState({
                               id: application.applicationId,
+
                               initial: applicationToForm(application),
                             })
                           }
                           aria-label="Edit application"
                         >
-                          <Pencil size={14} />
+                          <PencilSimpleLine size={14} weight="light" />
                         </button>
                         <button
                           onClick={() => void removeApplication(application)}
                           aria-label="Delete application"
                         >
-                          <Trash2 size={14} />
+                          <TrashSimple size={14} weight="light" />
                         </button>
                       </div>
                     </td>
@@ -859,8 +1002,10 @@ export default function AppTrackerScreen() {
           onClose={() => setDetail(null)}
           onAddNote={async (content) => {
             setSaving(true)
+
             try {
               await applicationApi.addNote(detail.applicationId, content)
+
               await refreshDetail()
             } finally {
               setSaving(false)
@@ -868,8 +1013,10 @@ export default function AppTrackerScreen() {
           }}
           onDeleteNote={async (noteId) => {
             setSaving(true)
+
             try {
               await applicationApi.deleteNote(detail.applicationId, noteId)
+
               await refreshDetail()
             } finally {
               setSaving(false)

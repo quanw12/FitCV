@@ -73,6 +73,12 @@ vi.mock("@/ui/screens/PublicJobScreen", () => ({
   default: ({ jobId }: { jobId: number }) => <div>Public job {jobId}</div>,
 }))
 
+vi.mock("@/ui/screens/LandingScreen", () => ({
+  default: ({ onGetStarted }: { onGetStarted: () => void }) => (
+    <button onClick={onGetStarted}>Get started</button>
+  ),
+}))
+
 const primarySession: AuthSession = {
   accessToken: "primary-token",
 
@@ -126,22 +132,24 @@ import App from "./App"
 describe("Analyzer to Improvement selection", () => {
   beforeEach(() => {
     window.history.replaceState({}, "", "/")
+
     authMocks.getSession.mockReturnValue(primarySession)
   })
 
-  it("opens a shared public job before the authentication gate", () => {
+  it("opens a shared public job before the authentication gate", async () => {
     window.history.replaceState({}, "", "/?job=91")
+
     authMocks.getSession.mockReturnValue(null)
 
     render(<App />)
 
-    expect(screen.getByText("Public job 91")).toBeInTheDocument()
+    expect(await screen.findByText("Public job 91")).toBeInTheDocument()
     expect(
       screen.queryByRole("button", { name: "Sign in second account" }),
     ).not.toBeInTheDocument()
   })
 
-  it("hydrates the selected match for the current account after a same-tab reload", () => {
+  it("hydrates the selected match for the current account after a same-tab reload", async () => {
     window.sessionStorage.setItem(
       improvementMatchStorageKey(primarySession.user.accountId),
 
@@ -152,15 +160,17 @@ describe("Analyzer to Improvement selection", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Open Improvement" }))
 
-    expect(screen.getByText("Selected match: 37")).toBeInTheDocument()
+    expect(await screen.findByText("Selected match: 37")).toBeInTheDocument()
   })
 
-  it("passes a completed analysis ID to Improvement and clears it when inputs change", () => {
+  it("passes a completed analysis ID to Improvement and clears it when inputs change", async () => {
     render(<App />)
 
     fireEvent.click(screen.getByRole("button", { name: "Open Analyzer" }))
 
-    fireEvent.click(screen.getByRole("button", { name: "Complete analysis" }))
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Complete analysis" }),
+    )
 
     expect(
       window.sessionStorage.getItem(
@@ -170,15 +180,17 @@ describe("Analyzer to Improvement selection", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Open Improvement" }))
 
-    expect(screen.getByText("Selected match: 42")).toBeInTheDocument()
+    expect(await screen.findByText("Selected match: 42")).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole("button", { name: "Open Analyzer" }))
 
-    fireEvent.click(screen.getByRole("button", { name: "Invalidate analysis" }))
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Invalidate analysis" }),
+    )
 
     fireEvent.click(screen.getByRole("button", { name: "Open Improvement" }))
 
-    expect(screen.getByText("Selected match: none")).toBeInTheDocument()
+    expect(await screen.findByText("Selected match: none")).toBeInTheDocument()
 
     expect(
       window.sessionStorage.getItem(
@@ -187,7 +199,7 @@ describe("Analyzer to Improvement selection", () => {
     ).toBeNull()
   })
 
-  it("clears selections on logout and account switch", () => {
+  it("clears selections on logout and account switch", async () => {
     window.sessionStorage.setItem(
       improvementMatchStorageKey(primarySession.user.accountId),
 
@@ -210,8 +222,10 @@ describe("Analyzer to Improvement selection", () => {
       ),
     ).toBeNull()
 
+    fireEvent.click(await screen.findByRole("button", { name: "Get started" }))
+
     fireEvent.click(
-      screen.getByRole("button", { name: "Sign in second account" }),
+      await screen.findByRole("button", { name: "Sign in second account" }),
     )
 
     expect(
@@ -222,6 +236,6 @@ describe("Analyzer to Improvement selection", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Open Improvement" }))
 
-    expect(screen.getByText("Selected match: none")).toBeInTheDocument()
+    expect(await screen.findByText("Selected match: none")).toBeInTheDocument()
   })
 })

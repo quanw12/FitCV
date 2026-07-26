@@ -17,10 +17,12 @@ export function getStoredImprovementMatchResultId(
   if (!canUseSessionStorage()) return null
 
   const key = improvementMatchStorageKey(accountId)
+
   const matchResultId = window.sessionStorage.getItem(key)?.trim()
 
   if (!matchResultId || !/^\d+$/.test(matchResultId)) {
     window.sessionStorage.removeItem(key)
+
     return null
   }
 
@@ -29,15 +31,18 @@ export function getStoredImprovementMatchResultId(
 
 export function storeImprovementMatchResultId(
   accountId: string,
+
   matchResultId: string,
 ): void {
   if (!canUseSessionStorage()) return
 
   const normalizedId = matchResultId.trim()
+
   const key = improvementMatchStorageKey(accountId)
 
   if (!/^\d+$/.test(normalizedId)) {
     window.sessionStorage.removeItem(key)
+
     return
   }
 
@@ -46,5 +51,6 @@ export function storeImprovementMatchResultId(
 
 export function clearStoredImprovementMatchResultId(accountId: string): void {
   if (!canUseSessionStorage()) return
+
   window.sessionStorage.removeItem(improvementMatchStorageKey(accountId))
 }

@@ -6,6 +6,7 @@ import type {
   CvVersion,
   MatchAnalysis,
 } from "@/types/analyzer"
+
 import { requestJson } from "./httpClient"
 
 interface BackendCvVersion {
@@ -68,27 +69,45 @@ interface BackendMatchAnalysis {
 
 interface BackendCvScorePoint {
   cv_id: number
+
   version_number: number
+
   file_name: string
+
   uploaded_at: string
+
   match_result_id: number
+
   overall_score: number
+
   skill_score: number | null
+
   experience_score: number | null
+
   education_score: number | null
+
   soft_skill_score: number | null
+
   match_label: string | null
+
   completed_at: string | null
+
   delta_from_previous: number | null
 }
 
 interface BackendCvComparisonSeries {
   job_description_id: number
+
   title: string
+
   created_at: string
+
   best_score: number
+
   latest_score: number
+
   latest_delta: number | null
+
   versions: BackendCvScorePoint[]
 }
 
@@ -159,24 +178,42 @@ function normalizeComparison(
 ): CvComparisonSeries {
   return {
     jobDescriptionId: payload.job_description_id,
+
     title: payload.title,
+
     createdAt: payload.created_at,
+
     bestScore: payload.best_score,
+
     latestScore: payload.latest_score,
+
     latestDelta: payload.latest_delta,
+
     versions: payload.versions.map((point) => ({
       cvId: point.cv_id,
+
       versionNumber: point.version_number,
+
       fileName: point.file_name,
+
       uploadedAt: point.uploaded_at,
+
       matchResultId: point.match_result_id,
+
       overallScore: point.overall_score,
+
       skillScore: point.skill_score,
+
       experienceScore: point.experience_score,
+
       educationScore: point.education_score,
+
       softSkillScore: point.soft_skill_score,
+
       matchLabel: point.match_label,
+
       completedAt: point.completed_at,
+
       deltaFromPrevious: point.delta_from_previous,
     })),
   }
@@ -222,10 +259,12 @@ export const analyzerApi = {
   async listCvComparisons(): Promise<CvComparisonSeries[]> {
     const payload = await requestJson<BackendCvComparisonSeries[]>(
       "/api/cvs/comparisons",
+
       {
         authenticated: true,
       },
     )
+
     return payload.map(normalizeComparison)
   },
 
@@ -244,6 +283,7 @@ export const analyzerApi = {
   ): Promise<MatchAnalysis> {
     const payload = await requestJson<BackendMatchAnalysis>(
       "/api/analyzer/matches",
+
       {
         method: "POST",
 
