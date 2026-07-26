@@ -6,13 +6,26 @@ from app.models.application import (
 )
 from app.models.analyzer import Cv, CvParseResult, JdParseResult, Job, JobDescription, MatchResult
 from app.models.improvement import AiTask, CvImprovementSuggestion
-from app.models.jobs import Application, Candidate, Company, JobHr, Level, Position
+from app.models.email_workflow import CandidateEmail
+from app.models.jobs import (
+    Application,
+    ApplicationNote,
+    ApplicationStageHistory,
+    Candidate,
+    Company,
+    JobHr,
+    Level,
+    Position,
+)
 
 __all__ = [
     "Account",
     "AiTask",
     "Application",
+    "ApplicationNote",
+    "ApplicationStageHistory",
     "Candidate",
+    "CandidateEmail",
     "Company",
     "Cv",
     "CvImprovementSuggestion",

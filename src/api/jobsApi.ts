@@ -1,6 +1,7 @@
 import type {
   JobApplicationCreated,
   JobApplicationWrite,
+  JobExtraction,
   JobPost,
   JobWrite,
 } from "@/types/jobs"
@@ -8,14 +9,22 @@ import type {
 import { requestJson } from "./httpClient"
 
 export const jobsApi = {
-  listPublic: () =>
-    requestJson<JobPost[]>("/api/jobs/public", { authenticated: true }),
+  listPublic: () => requestJson<JobPost[]>("/api/jobs/public"),
 
   getPublic: (jobId: number) =>
-    requestJson<JobPost>(`/api/jobs/public/${jobId}`, { authenticated: true }),
+    requestJson<JobPost>(`/api/jobs/public/${jobId}`),
 
-  listManaged: () =>
-    requestJson<JobPost[]>("/api/jobs/manage", { authenticated: true }),
+  extract: (jdText: string) =>
+    requestJson<JobExtraction>("/api/jobs/extract", {
+      authenticated: true,
+      method: "POST",
+      body: JSON.stringify({ jd_text: jdText }),
+    }),
+
+  listManaged: (archived = false) =>
+    requestJson<JobPost[]>(`/api/jobs/manage?archived=${archived}`, {
+      authenticated: true,
+    }),
 
   create: (payload: JobWrite) =>
     requestJson<JobPost>("/api/jobs", {
@@ -43,22 +52,28 @@ export const jobsApi = {
       method: "POST",
     }),
 
+  archive: (jobId: number) =>
+    requestJson<JobPost>(`/api/jobs/${jobId}/archive`, {
+      authenticated: true,
+      method: "POST",
+    }),
+
+  unarchive: (jobId: number) =>
+    requestJson<JobPost>(`/api/jobs/${jobId}/unarchive`, {
+      authenticated: true,
+      method: "POST",
+    }),
+
   apply: (jobId: number, payload: JobApplicationWrite) => {
     const formData = new FormData()
-
     formData.append("full_name", payload.fullName)
-
     formData.append("email", payload.email)
-
     formData.append("phone", payload.phone)
-
     formData.append("file", payload.file)
 
     return requestJson<JobApplicationCreated>(`/api/jobs/${jobId}/apply`, {
       authenticated: true,
-
       method: "POST",
-
       body: formData,
     })
   },

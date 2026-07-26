@@ -7,7 +7,13 @@ CATEGORY_WEIGHTS = {"skills": 45.0, "experience": 30.0, "education": 15.0, "soft
 EDUCATION_RANK = {"High School": 1, "Associate": 2, "Bachelor": 3, "Master": 4, "Doctorate": 5}
 
 
-def match_documents(cv: dict[str, Any], jd: dict[str, Any]) -> dict[str, Any]:
+def match_documents(
+    cv: dict[str, Any],
+    jd: dict[str, Any],
+    *,
+    weights: dict[str, float] | None = None,
+) -> dict[str, Any]:
+    scoring_weights = _validated_weights(weights)
     breakdown: dict[str, dict[str, Any]] = {}
     required_labels = _term_index(jd.get("required_skills") or [])
     preferred_labels = _term_index(jd.get("preferred_skills") or [])
@@ -100,9 +106,17 @@ def match_documents(cv: dict[str, Any], jd: dict[str, Any]) -> dict[str, Any]:
     if not breakdown:
         raise ValueError("The job description has no scorable skills, experience, education, or soft-skill requirements.")
 
-    active_weight = sum(CATEGORY_WEIGHTS[name] for name in breakdown)
+    active_weight = sum(scoring_weights[name] for name in breakdown)
+    if active_weight <= 0:
+        raise ValueError(
+            "The active job-description categories have a total scoring weight of 0."
+        )
     overall_score = round(
-        sum(item["score"] * CATEGORY_WEIGHTS[name] for name, item in breakdown.items()) / active_weight,
+        sum(
+            item["score"] * scoring_weights[name]
+            for name, item in breakdown.items()
+        )
+        / active_weight,
         2,
     )
     critical_scores = [breakdown[name]["score"] for name in ("skills", "experience") if name in breakdown]
@@ -123,9 +137,10 @@ def match_documents(cv: dict[str, Any], jd: dict[str, Any]) -> dict[str, Any]:
         "suggestions": suggestions,
         "match_summary": f"{label} based on the requirements explicitly found in the supplied job description.",
         "algorithm_version": ALGORITHM_VERSION,
+        "scoring_weights": scoring_weights,
         "framework_version": SCORING_FRAMEWORK_VERSION,
         "rubric": {
-            "weights": CATEGORY_WEIGHTS,
+            "weights": scoring_weights,
             "active_categories": list(breakdown),
             "missing_categories": [
                 name for name in CATEGORY_WEIGHTS if name not in breakdown
@@ -140,6 +155,26 @@ def match_documents(cv: dict[str, Any], jd: dict[str, Any]) -> dict[str, Any]:
             ),
         },
     }
+
+
+def _validated_weights(weights: dict[str, float] | None) -> dict[str, float]:
+    if weights is None:
+        return dict(CATEGORY_WEIGHTS)
+    if set(weights) != set(CATEGORY_WEIGHTS):
+        raise ValueError(
+            "Scoring weights must define skills, experience, education, and soft_skills."
+        )
+    normalized: dict[str, float] = {}
+    for name in CATEGORY_WEIGHTS:
+        value = weights[name]
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            raise ValueError(f"Scoring weight '{name}' must be numeric.")
+        normalized[name] = float(value)
+        if normalized[name] < 0 or normalized[name] > 100:
+            raise ValueError(f"Scoring weight '{name}' must be between 0 and 100.")
+    if abs(sum(normalized.values()) - 100.0) > 0.001:
+        raise ValueError("Scoring weights must total 100.")
+    return normalized
 
 
 def supplement_semantic_cv(

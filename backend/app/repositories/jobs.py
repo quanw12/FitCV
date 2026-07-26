@@ -7,7 +7,8 @@ from app.models import Application, Company, Job, JobHr
 
 WRITABLE_JOB_COLUMNS = {
     "title", "description", "requirements", "location", "employment_type",
-    "deadline", "status",
+    "deadline", "status", "archived_at", "skill_weight", "experience_weight",
+    "education_weight", "soft_skill_weight",
 }
 
 
@@ -26,7 +27,11 @@ def _job_rows(statement, db: Session):
 def public_jobs(db: Session, now: datetime):
     return _job_rows(
         select(Job, Company, func.count(Application.application_id))
-        .where(Job.status == "Published", or_(Job.deadline.is_(None), Job.deadline > now))
+        .where(
+            Job.status == "Published",
+            Job.archived_at.is_(None),
+            or_(Job.deadline.is_(None), Job.deadline > now),
+        )
         .order_by(Job.created_at.desc()),
         db,
     )
@@ -37,6 +42,7 @@ def public_job(db: Session, job_id: int, now: datetime):
         select(Job, Company, func.count(Application.application_id)).where(
             Job.job_id == job_id,
             Job.status == "Published",
+            Job.archived_at.is_(None),
             or_(Job.deadline.is_(None), Job.deadline > now),
         ),
         db,
@@ -44,13 +50,23 @@ def public_job(db: Session, job_id: int, now: datetime):
     return rows[0] if rows else None
 
 
-def managed_jobs(db: Session, company_id: int):
-    return _job_rows(
-        select(Job, Company, func.count(Application.application_id))
-        .where(Job.company_id == company_id)
-        .order_by(Job.created_at.desc()),
-        db,
-    )
+def managed_jobs(
+    db: Session,
+    company_id: int,
+    archived: bool | None = False,
+):
+    statement = select(
+        Job,
+        Company,
+        func.count(Application.application_id),
+    ).where(Job.company_id == company_id)
+    if archived is not None:
+        statement = statement.where(
+            Job.archived_at.is_not(None)
+            if archived
+            else Job.archived_at.is_(None)
+        )
+    return _job_rows(statement.order_by(Job.created_at.desc()), db)
 
 
 def managed_job(db: Session, job_id: int, company_id: int) -> Job | None:

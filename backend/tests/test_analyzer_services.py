@@ -253,6 +253,79 @@ class MatchingServiceTests(unittest.TestCase):
         )
         self.assertEqual(result["overall_score"], 100.0)
 
+    def test_custom_job_weights_change_the_candidate_score(self) -> None:
+        cv = {
+            "skills": ["Python"],
+            "experience_years": 1,
+            "education": None,
+            "soft_skills": [],
+        }
+        jd = {
+            "required_skills": ["Python"],
+            "preferred_skills": [],
+            "experience_years": 4,
+            "education": None,
+            "soft_skills": [],
+        }
+
+        skills_first = match_documents(
+            cv,
+            jd,
+            weights={
+                "skills": 80,
+                "experience": 20,
+                "education": 0,
+                "soft_skills": 0,
+            },
+        )
+        experience_first = match_documents(
+            cv,
+            jd,
+            weights={
+                "skills": 20,
+                "experience": 80,
+                "education": 0,
+                "soft_skills": 0,
+            },
+        )
+
+        self.assertEqual(skills_first["overall_score"], 85.0)
+        self.assertEqual(experience_first["overall_score"], 40.0)
+        self.assertEqual(skills_first["scoring_weights"]["skills"], 80.0)
+
+    def test_custom_weights_still_redistribute_missing_categories(self) -> None:
+        result = match_documents(
+            {"skills": ["Python"], "soft_skills": []},
+            {
+                "required_skills": ["Python"],
+                "preferred_skills": [],
+                "experience_years": None,
+                "education": None,
+                "soft_skills": [],
+            },
+            weights={
+                "skills": 25,
+                "experience": 50,
+                "education": 15,
+                "soft_skills": 10,
+            },
+        )
+
+        self.assertEqual(result["overall_score"], 100.0)
+
+    def test_rejects_invalid_custom_weights(self) -> None:
+        with self.assertRaisesRegex(ValueError, "total 100"):
+            match_documents(
+                {"skills": ["Python"]},
+                {"required_skills": ["Python"]},
+                weights={
+                    "skills": 50,
+                    "experience": 30,
+                    "education": 15,
+                    "soft_skills": 10,
+                },
+            )
+
     def test_rejects_unscorable_jd(self) -> None:
         with self.assertRaisesRegex(ValueError, "no scorable"):
             match_documents(

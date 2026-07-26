@@ -6,8 +6,14 @@ from app.db.session import get_db
 from app.middleware.auth_guard import require_role
 from app.models.account import Account, AccountRole
 from app.schemas.applications import ApplicationCreatedResponse
-from app.schemas.jobs import JobCreate, JobResponse, JobUpdate
-from app.services import application_service, jobs_service
+from app.schemas.jobs import (
+    JobCreate,
+    JobExtractionRequest,
+    JobExtractionResponse,
+    JobResponse,
+    JobUpdate,
+)
+from app.services import application_service, job_extraction_service, jobs_service
 
 router = APIRouter()
 student = require_role(AccountRole.student)
@@ -15,13 +21,21 @@ manager = require_role(AccountRole.hr, AccountRole.hiring_manager, AccountRole.a
 
 
 @router.get("/public", response_model=list[JobResponse])
-def list_public(db: Session = Depends(get_db), account: Account = Depends(student)):
+def list_public(db: Session = Depends(get_db)):
     return jobs_service.list_public(db)
 
 
 @router.get("/public/{job_id}", response_model=JobResponse)
-def get_public(job_id: int, db: Session = Depends(get_db), account: Account = Depends(student)):
+def get_public(job_id: int, db: Session = Depends(get_db)):
     return jobs_service.get_public(db, job_id)
+
+
+@router.post("/extract", response_model=JobExtractionResponse)
+def extract_job_description(
+    payload: JobExtractionRequest,
+    account: Account = Depends(manager),
+):
+    return job_extraction_service.extract(payload.jd_text)
 
 
 @router.post(
@@ -53,8 +67,12 @@ async def apply_to_job(
 
 
 @router.get("/manage", response_model=list[JobResponse])
-def list_manage(db: Session = Depends(get_db), account: Account = Depends(manager)):
-    return jobs_service.list_managed(db, account)
+def list_manage(
+    archived: bool = False,
+    db: Session = Depends(get_db),
+    account: Account = Depends(manager),
+):
+    return jobs_service.list_managed(db, account, archived=archived)
 
 
 @router.post("", response_model=JobResponse, status_code=201)
@@ -75,4 +93,22 @@ def publish_job(job_id: int, db: Session = Depends(get_db), account: Account = D
 @router.post("/{job_id}/close", response_model=JobResponse)
 def close_job(job_id: int, db: Session = Depends(get_db), account: Account = Depends(manager)):
     return jobs_service.close(db, account, job_id)
+
+
+@router.post("/{job_id}/archive", response_model=JobResponse)
+def archive_job(
+    job_id: int,
+    db: Session = Depends(get_db),
+    account: Account = Depends(manager),
+):
+    return jobs_service.archive(db, account, job_id)
+
+
+@router.post("/{job_id}/unarchive", response_model=JobResponse)
+def unarchive_job(
+    job_id: int,
+    db: Session = Depends(get_db),
+    account: Account = Depends(manager),
+):
+    return jobs_service.unarchive(db, account, job_id)
 
