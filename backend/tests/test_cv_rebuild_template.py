@@ -1,10 +1,19 @@
 from app.schemas.cv_rebuild import CVData
 from app.services.cv_rebuild.template_renderer import render_cv
 
+ALL_HEADINGS = (
+    "Profile",
+    "Core Competencies",
+    "Professional Experience",
+    "Selected Projects",
+    "Education",
+    "Certifications",
+)
+
 
 def test_empty_cv_omits_all_section_headings() -> None:
     html = render_cv(CVData())
-    for heading in ("Summary", "Experience", "Projects", "Skills", "Certifications", "Education"):
+    for heading in ALL_HEADINGS:
         assert f"<h2>{heading}</h2>" not in html
     assert "Nguyen" not in html
 
@@ -20,12 +29,14 @@ def test_partial_cv_renders_only_present_sections() -> None:
         ],
     )
     html = render_cv(cv)
-    assert "<h2>Summary</h2>" in html
-    assert "<h2>Experience</h2>" in html
+    assert "<h2>Profile</h2>" in html
+    assert "<h2>Professional Experience</h2>" in html
     assert "Engineer" in html
     assert "Acme" in html
     assert "Built APIs." in html
-    for heading in ("Projects", "Skills", "Certifications", "Education"):
+    assert "a@example.com" in html
+    assert "+84 912 345 678" in html
+    for heading in ("Core Competencies", "Selected Projects", "Education", "Certifications"):
         assert f"<h2>{heading}</h2>" not in html
 
 
@@ -46,3 +57,22 @@ def test_css_uses_custom_properties() -> None:
     html = render_cv(CVData(name="A"))
     assert "--accent:" in html
     assert "--text-primary:" in html
+
+
+def test_vietnamese_cv_uses_vietnamese_headings() -> None:
+    cv = CVData(
+        name="Nguyen Van A",
+        summary="Kỹ sư phần mềm.",
+        skills=["Python", "React"],
+    )
+    html = render_cv(cv, language="vi")
+    assert "<h2>Giới thiệu</h2>" in html
+    assert "<h2>Kỹ năng chuyên môn</h2>" in html
+    assert "<h2>Kinh nghiệm làm việc</h2>" not in html
+    for heading in ALL_HEADINGS:
+        assert f"<h2>{heading}</h2>" not in html
+
+
+def test_unknown_language_falls_back_to_english() -> None:
+    html = render_cv(CVData(name="A", summary="Hello."), language="fr")
+    assert "<h2>Profile</h2>" in html

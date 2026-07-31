@@ -11,6 +11,7 @@ from tempfile import TemporaryDirectory
 from pypdf.errors import PdfReadError
 
 from app.schemas.cv_rebuild import CvRebuildResponse
+from app.services.cv_rebuild.language import detect_language
 from app.services.cv_rebuild.llm_extractor import CvExtractor
 from app.services.cv_rebuild.pdf_renderer import render_pdf_with_thumbnail
 from app.services.cv_rebuild.template_renderer import render_cv
@@ -41,7 +42,7 @@ def rebuild_cv(
             raise ValueError(f"Unable to read the CV file: {exc}") from exc
 
     cv = (extractor or CvExtractor()).extract(raw_text)
-    html = render_cv(cv)
+    html = render_cv(cv, language=detect_language(raw_text))
     pdf_bytes, thumbnail_bytes = render_pdf_with_thumbnail(html)
 
     return CvRebuildResponse(

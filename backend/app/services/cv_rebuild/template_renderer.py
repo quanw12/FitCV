@@ -13,7 +13,27 @@ _environment = Environment(
     autoescape=select_autoescape(("html", "xml")),
 )
 
+_SECTION_HEADINGS = {
+    "en": {
+        "profile": "Profile",
+        "skills": "Core Competencies",
+        "experience": "Professional Experience",
+        "projects": "Selected Projects",
+        "education": "Education",
+        "certifications": "Certifications",
+    },
+    "vi": {
+        "profile": "Giới thiệu",
+        "skills": "Kỹ năng chuyên môn",
+        "experience": "Kinh nghiệm làm việc",
+        "projects": "Dự án tiêu biểu",
+        "education": "Học vấn",
+        "certifications": "Chứng chỉ",
+    },
+}
 
-def render_cv(cv: CVData) -> str:
+
+def render_cv(cv: CVData, *, language: str = "en") -> str:
     template = _environment.get_template("cv_template.html")
-    return template.render(data=cv)
+    headings = _SECTION_HEADINGS.get(language, _SECTION_HEADINGS["en"])
+    return template.render(data=cv, headings=headings)

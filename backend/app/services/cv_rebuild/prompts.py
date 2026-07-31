@@ -63,7 +63,10 @@ that are not present in the extracted data.
 Rules:
 - If a field is absent in the raw text, leave it as an empty string or an
   empty array. Never invent placeholder values.
-- Preserve the original language of the content.
+- Use one consistent language for the whole CV: the dominant language of the
+  raw text. If the source mixes languages, unify everything into that
+  dominant language. Keep technical terms, tools, and domain jargon in their
+  original form.
 - "name" is the candidate's full name; if not found, use an empty string.
 
 Raw CV text:

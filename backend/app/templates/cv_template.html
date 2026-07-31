@@ -5,43 +5,127 @@
 <title>CV</title>
 <style>
   :root {
-    --accent: #2563EB;
+    --accent: #305496;
     --text-primary: #0F172A;
     --text-secondary: #64748B;
-    --border: #E2E8F0;
+    --border: #C9D4E4;
     --bg: #FFFFFF;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
-    font-family: -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-    font-size: 11px;
+    font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    font-size: 10.5px;
     color: var(--text-primary);
     background: var(--bg);
-    line-height: 1.5;
+    line-height: 1.45;
   }
-  .page { padding: 36px 40px; }
-  header.cv-header { text-align: center; margin-bottom: 22px; }
-  header.cv-header h1 { font-size: 24px; letter-spacing: 0.02em; }
-  .contact { margin-top: 6px; color: var(--text-secondary); font-size: 10.5px; }
-  .contact span + span::before { content: " \00b7 "; }
-  section.cv-section { margin-bottom: 18px; page-break-inside: avoid; }
+  .page { padding: 15mm 14mm 10mm; }
+
+  header.cv-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16px;
+    margin-bottom: 12px;
+  }
+  header.cv-header h1 {
+    font-size: 30px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.01em;
+    line-height: 1.1;
+  }
+  .contact {
+    text-align: right;
+    color: var(--text-secondary);
+    font-size: 10px;
+    margin-top: 4px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 2px;
+  }
+  .contact-row {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    white-space: nowrap;
+  }
+  .contact-row svg {
+    width: 11px;
+    height: 11px;
+    stroke: var(--accent);
+    fill: none;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    flex-shrink: 0;
+  }
+
+  section.cv-section {
+    margin-bottom: 14px;
+    page-break-inside: avoid;
+  }
   section.cv-section h2 {
-    font-size: 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 11.5px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.08em;
     text-transform: uppercase;
-    letter-spacing: 0.12em;
-    border-bottom: 1.5px solid var(--accent);
-    padding-bottom: 4px;
-    margin-bottom: 8px;
+    margin-bottom: 7px;
   }
-  .item { margin-bottom: 10px; page-break-inside: avoid; }
-  .item-head { display: flex; justify-content: space-between; gap: 12px; }
-  .item-head .title { font-weight: 600; }
-  .item-head .sub { color: var(--text-secondary); }
-  .item-head .date { color: var(--text-secondary); white-space: nowrap; }
-  ul.bullets { padding-left: 16px; margin-top: 4px; }
-  ul.bullets li { margin-bottom: 2px; }
-  .skills-list { display: flex; flex-wrap: wrap; }
-  .skills-list span + span::before { content: " \00b7 "; }
+  section.cv-section h2::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: var(--accent);
+  }
+  section.cv-section p { margin-bottom: 4px; }
+
+  .entry {
+    margin-bottom: 9px;
+    page-break-inside: avoid;
+  }
+  .entry:last-child { margin-bottom: 0; }
+  .entry-head {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+  }
+  .entry-date {
+    width: 16mm;
+    flex-shrink: 0;
+    color: var(--accent);
+    font-size: 10px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .entry-title { font-weight: 700; }
+  .entry-org { font-style: italic; color: var(--text-secondary); }
+
+  ul.bullets {
+    list-style: none;
+    margin: 3px 0 0 17mm;
+  }
+  ul.bullets li {
+    position: relative;
+    padding-left: 13px;
+    margin-bottom: 2.5px;
+  }
+  ul.bullets li:last-child { margin-bottom: 0; }
+  ul.bullets li::before {
+    content: "";
+    position: absolute;
+    left: 1px;
+    top: 4.5px;
+    width: 5px;
+    height: 5px;
+    background: var(--accent);
+  }
+
   @page { size: A4; margin: 0; }
 </style>
 </head>
@@ -52,8 +136,18 @@
     <h1>{{ data.name }}</h1>
     {% if data.email or data.phone %}
     <div class="contact">
-      {% if data.email %}<span>{{ data.email }}</span>{% endif %}
-      {% if data.phone %}<span>{{ data.phone }}</span>{% endif %}
+      {% if data.phone %}
+      <div class="contact-row">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+        <span>{{ data.phone }}</span>
+      </div>
+      {% endif %}
+      {% if data.email %}
+      <div class="contact-row">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+        <span>{{ data.email }}</span>
+      </div>
+      {% endif %}
     </div>
     {% endif %}
   </header>
@@ -61,22 +155,31 @@
 
   {% if data.summary %}
   <section class="cv-section">
-    <h2>Summary</h2>
+    <h2>{{ headings.profile }}</h2>
     <p>{{ data.summary }}</p>
+  </section>
+  {% endif %}
+
+  {% if data.skills %}
+  <section class="cv-section">
+    <h2>{{ headings.skills }}</h2>
+    <ul class="bullets">
+      {% for skill in data.skills %}<li>{{ skill }}</li>{% endfor %}
+    </ul>
   </section>
   {% endif %}
 
   {% if data.experience %}
   <section class="cv-section">
-    <h2>Experience</h2>
+    <h2>{{ headings.experience }}</h2>
     {% for item in data.experience %}
-    <div class="item">
-      <div class="item-head">
+    <div class="entry">
+      <div class="entry-head">
+        {% if item.date %}<span class="entry-date">{{ item.date }}</span>{% endif %}
         <div>
-          <span class="title">{{ item.title }}</span>
-          {% if item.company %}<span class="sub"> — {{ item.company }}</span>{% endif %}
+          <span class="entry-title">{{ item.title }}</span>
+          {% if item.company %}<span class="entry-org"> — {{ item.company }}</span>{% endif %}
         </div>
-        {% if item.date %}<span class="date">{{ item.date }}</span>{% endif %}
       </div>
       {% if item.bullets %}
       <ul class="bullets">
@@ -90,11 +193,11 @@
 
   {% if data.projects %}
   <section class="cv-section">
-    <h2>Projects</h2>
+    <h2>{{ headings.projects }}</h2>
     {% for project in data.projects %}
-    <div class="item">
-      <div class="item-head">
-        <div><span class="title">{{ project.name }}</span></div>
+    <div class="entry">
+      <div class="entry-head">
+        <span class="entry-title">{{ project.name }}</span>
       </div>
       {% if project.description %}<p>{{ project.description }}</p>{% endif %}
     </div>
@@ -102,38 +205,29 @@
   </section>
   {% endif %}
 
-  {% if data.skills %}
+  {% if data.education %}
   <section class="cv-section">
-    <h2>Skills</h2>
-    <div class="skills-list">
-      {% for skill in data.skills %}<span>{{ skill }}</span>{% endfor %}
+    <h2>{{ headings.education }}</h2>
+    {% for education in data.education %}
+    <div class="entry">
+      <div class="entry-head">
+        {% if education.date %}<span class="entry-date">{{ education.date }}</span>{% endif %}
+        <div>
+          <span class="entry-title">{{ education.degree }}</span>
+          {% if education.institution %}<span class="entry-org"> — {{ education.institution }}</span>{% endif %}
+        </div>
+      </div>
     </div>
+    {% endfor %}
   </section>
   {% endif %}
 
   {% if data.certifications %}
   <section class="cv-section">
-    <h2>Certifications</h2>
+    <h2>{{ headings.certifications }}</h2>
     <ul class="bullets">
       {% for cert in data.certifications %}<li>{{ cert }}</li>{% endfor %}
     </ul>
-  </section>
-  {% endif %}
-
-  {% if data.education %}
-  <section class="cv-section">
-    <h2>Education</h2>
-    {% for education in data.education %}
-    <div class="item">
-      <div class="item-head">
-        <div>
-          <span class="title">{{ education.degree }}</span>
-          {% if education.institution %}<span class="sub"> — {{ education.institution }}</span>{% endif %}
-        </div>
-        {% if education.date %}<span class="date">{{ education.date }}</span>{% endif %}
-      </div>
-    </div>
-    {% endfor %}
   </section>
   {% endif %}
 </div>
