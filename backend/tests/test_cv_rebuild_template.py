@@ -44,7 +44,9 @@ def test_partial_cv_renders_only_present_sections() -> None:
     assert "Acme" in html
     assert "HCMC" in html
     assert "Built APIs." in html
+    assert 'href="mailto:a@example.com"' in html
     assert "a@example.com" in html
+    assert "tel:+84912345678" in html
     assert "+84 912 345 678" in html
     for heading in (
         "Core Competencies",
@@ -114,6 +116,8 @@ def test_renders_links_languages_publications_and_awards() -> None:
     html = render_cv(cv)
     assert "LinkedIn" in html
     assert "GitHub" in html
+    assert 'href="https://linkedin.com/in/a"' in html
+    assert 'href="https://github.com/a"' in html
     assert "<h2>Languages</h2>" in html
     assert "English" in html
     assert "Fluent" in html
