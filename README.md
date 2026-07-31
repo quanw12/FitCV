@@ -345,6 +345,11 @@ Lỗi thường gặp:
 - `400`: file rỗng, lớn hơn 10 MB hoặc không phải PDF/DOCX hợp lệ.
 - `422`: Gemini trả cấu trúc CV sai sau nhiều lần thử; kiểm tra `GEMINI_API_KEY`/`GEMINI_MODEL` và log backend.
 - `502`: lỗi gọi Gemini hoặc render PDF; kiểm tra key, quota Gemini và cài đặt Chromium ở trên.
+- `502` kèm `NotImplementedError` / `PDF rendering failed` khi chạy trên Windows: uvicorn
+  `reload=True` ép `WindowsSelectorEventLoopPolicy`, không hỗ trợ subprocess của
+  Playwright. Backend đã tự đặt `WindowsProactorEventLoopPolicy` + `loop="none"`
+  trong `backend/app/main.py`; nếu chạy uvicorn bằng lệnh riêng, thêm
+  `--loop none` và đặt policy Proactor trước khi `uvicorn.run(...)`.
 
 ## Google Sign-In
 
