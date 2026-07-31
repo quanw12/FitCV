@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 
 from app.api.deps import get_current_account
@@ -8,6 +10,8 @@ from app.services.cv_rebuild.llm_extractor import CvExtractionError
 from app.services.cv_rebuild.pdf_renderer import PdfRenderError
 from app.services.document_parser import MAX_CV_BYTES
 from app.services.gemini_client import GeminiClientError
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -25,8 +29,11 @@ def rebuild_from_cv(
     try:
         return orchestrator.rebuild_cv(content, file.filename or "cv.pdf")
     except ValueError as exc:
+        logger.exception("CV rebuild validation failed: %s", exc)
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except CvExtractionError as exc:
+        logger.exception("CV rebuild extraction failed: %s", exc)
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except (GeminiClientError, PdfRenderError) as exc:
+        logger.exception("CV rebuild pipeline failed: %s", exc)
         raise HTTPException(status_code=502, detail=str(exc)) from exc
