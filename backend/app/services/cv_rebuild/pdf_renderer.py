@@ -45,7 +45,15 @@ def _ensure_browser():
                     "Playwright is not installed; run `pip install playwright`."
                 ) from exc
             if _playwright is None:
-                _playwright = sync_playwright().start()
+                try:
+                    _playwright = sync_playwright().start()
+                except NotImplementedError as exc:
+                    raise PdfRenderError(
+                        "Playwright could not start the browser driver: asyncio "
+                        "needs the Proactor event loop on Windows. Run the "
+                        "backend with `python app/main.py` so the Proactor "
+                        "policy is applied."
+                    ) from exc
             try:
                 _browser = _playwright.chromium.launch()
             except Exception as exc:
