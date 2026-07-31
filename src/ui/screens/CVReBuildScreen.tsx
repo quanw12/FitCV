@@ -15,11 +15,56 @@ const ACCEPTED_TYPES =
 
 const MAX_BYTES = 10 * 1024 * 1024
 
+const CACHE_KEY = "fitcv:rebuild:last-result"
+
+type CachedResult = { fileName: string; result: CvRebuildResponse }
+
 type RebuildState =
   | { phase: "idle" }
   | { phase: "processing"; file: File }
   | { phase: "done"; file: File; result: CvRebuildResponse }
   | { phase: "error"; file: File; message: string }
+
+function loadCachedResult(): RebuildState {
+  try {
+    const raw = sessionStorage.getItem(CACHE_KEY)
+
+    if (!raw) return { phase: "idle" }
+
+    const cached = JSON.parse(raw) as CachedResult
+
+    if (!cached?.result?.pdf_base64 || !cached.result.filename) {
+      return { phase: "idle" }
+    }
+
+    const fileName =
+      cached.fileName || cached.result.filename || "rebuilt_cv.pdf"
+
+    const file = new File([], fileName, { type: "application/pdf" })
+
+    return { phase: "done", file, result: cached.result }
+  } catch {
+    return { phase: "idle" }
+  }
+}
+
+function saveResult(file: File, result: CvRebuildResponse) {
+  try {
+    const payload: CachedResult = { fileName: file.name, result }
+
+    sessionStorage.setItem(CACHE_KEY, JSON.stringify(payload))
+  } catch {
+    // Session storage may be full or unavailable; the result stays in memory.
+  }
+}
+
+function clearSavedResult() {
+  try {
+    sessionStorage.removeItem(CACHE_KEY)
+  } catch {
+    // Ignore storage errors; state still resets in memory.
+  }
+}
 
 function isValidFile(file: File): string | null {
   if (!/\.(pdf|docx)$/i.test(file.name)) {
@@ -34,7 +79,7 @@ function isValidFile(file: File): string | null {
 }
 
 export default function CVReBuildScreen() {
-  const [state, setState] = useState<RebuildState>({ phase: "idle" })
+  const [state, setState] = useState<RebuildState>(loadCachedResult)
   const [dragOver, setDragOver] = useState(false)
   const [modalOpen, setModalOpen] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -52,8 +97,12 @@ export default function CVReBuildScreen() {
 
     setState({ phase: "processing", file })
 
+    clearSavedResult()
+
     try {
       const result = await rebuildCv(file)
+
+      saveResult(file, result)
 
       setState({ phase: "done", file, result })
     } catch (error) {
@@ -64,6 +113,12 @@ export default function CVReBuildScreen() {
 
       toast.error(message)
     }
+  }
+
+  const handleReset = () => {
+    clearSavedResult()
+
+    setState({ phase: "idle" })
   }
 
   const handleFiles = (files: FileList | null) => {
@@ -269,7 +324,7 @@ export default function CVReBuildScreen() {
 
           <button
             type="button"
-            onClick={() => setState({ phase: "idle" })}
+            onClick={handleReset}
             style={{
               marginTop: 14,
               padding: "10px 18px",
@@ -371,7 +426,7 @@ export default function CVReBuildScreen() {
 
           <button
             type="button"
-            onClick={() => setState({ phase: "idle" })}
+            onClick={handleReset}
             style={{
               marginTop: 18,
               padding: "8px 14px",

@@ -47,6 +47,7 @@ const RESULT = {
 describe("CVReBuildScreen", () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    sessionStorage.clear()
     apiMocks.pdfBase64ToBlob.mockReturnValue(
       new Blob(["pdf"], { type: "application/pdf" }),
     )
@@ -162,5 +163,48 @@ describe("CVReBuildScreen", () => {
     })
 
     expect(await screen.findByText(/gemini is busy/i)).toBeInTheDocument()
+  })
+
+  it("restores the last result from session storage without rebuilding", async () => {
+    sessionStorage.setItem(
+      "fitcv:rebuild:last-result",
+      JSON.stringify({ fileName: "cv.pdf", result: RESULT }),
+    )
+
+    render(<CVReBuildScreen />)
+
+    expect(
+      await screen.findByRole("img", { name: /rebuilt cv preview/i }),
+    ).toBeInTheDocument()
+    expect(apiMocks.rebuildCv).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByRole("button", { name: /rebuild another cv/i }))
+
+    expect(screen.getByTestId("cv-rebuild-input")).toBeInTheDocument()
+    expect(sessionStorage.getItem("fitcv:rebuild:last-result")).toBeNull()
+  })
+
+  it("saves a successful result to session storage", async () => {
+    apiMocks.rebuildCv.mockResolvedValue(RESULT)
+
+    render(<CVReBuildScreen />)
+
+    fireEvent.change(screen.getByTestId("cv-rebuild-input"), {
+      target: { files: [makeFile("my_cv.pdf")] },
+    })
+
+    await screen.findByRole("img", { name: /rebuilt cv preview/i })
+
+    const saved = sessionStorage.getItem("fitcv:rebuild:last-result")
+
+    expect(saved).not.toBeNull()
+
+    const cached = JSON.parse(saved as string) as {
+      fileName: string
+      result: { pdf_base64: string }
+    }
+
+    expect(cached.fileName).toBe("my_cv.pdf")
+    expect(cached.result.pdf_base64).toBe("cGRm")
   })
 })
