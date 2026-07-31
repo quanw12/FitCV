@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>CV</title>
+<style>
+  :root {
+    --accent: #2563EB;
+    --text-primary: #0F172A;
+    --text-secondary: #64748B;
+    --border: #E2E8F0;
+    --bg: #FFFFFF;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-size: 11px;
+    color: var(--text-primary);
+    background: var(--bg);
+    line-height: 1.5;
+  }
+  .page { padding: 36px 40px; }
+  header.cv-header { text-align: center; margin-bottom: 22px; }
+  header.cv-header h1 { font-size: 24px; letter-spacing: 0.02em; }
+  .contact { margin-top: 6px; color: var(--text-secondary); font-size: 10.5px; }
+  .contact span + span::before { content: " \00b7 "; }
+  section.cv-section { margin-bottom: 18px; page-break-inside: avoid; }
+  section.cv-section h2 {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    border-bottom: 1.5px solid var(--accent);
+    padding-bottom: 4px;
+    margin-bottom: 8px;
+  }
+  .item { margin-bottom: 10px; page-break-inside: avoid; }
+  .item-head { display: flex; justify-content: space-between; gap: 12px; }
+  .item-head .title { font-weight: 600; }
+  .item-head .sub { color: var(--text-secondary); }
+  .item-head .date { color: var(--text-secondary); white-space: nowrap; }
+  ul.bullets { padding-left: 16px; margin-top: 4px; }
+  ul.bullets li { margin-bottom: 2px; }
+  .skills-list { display: flex; flex-wrap: wrap; }
+  .skills-list span + span::before { content: " \00b7 "; }
+  @page { size: A4; margin: 0; }
+</style>
+</head>
+<body>
+<div class="page">
+  {% if data.name %}
+  <header class="cv-header">
+    <h1>{{ data.name }}</h1>
+    {% if data.email or data.phone %}
+    <div class="contact">
+      {% if data.email %}<span>{{ data.email }}</span>{% endif %}
+      {% if data.phone %}<span>{{ data.phone }}</span>{% endif %}
+    </div>
+    {% endif %}
+  </header>
+  {% endif %}
+
+  {% if data.summary %}
+  <section class="cv-section">
+    <h2>Summary</h2>
+    <p>{{ data.summary }}</p>
+  </section>
+  {% endif %}
+
+  {% if data.experience %}
+  <section class="cv-section">
+    <h2>Experience</h2>
+    {% for item in data.experience %}
+    <div class="item">
+      <div class="item-head">
+        <div>
+          <span class="title">{{ item.title }}</span>
+          {% if item.company %}<span class="sub"> — {{ item.company }}</span>{% endif %}
+        </div>
+        {% if item.date %}<span class="date">{{ item.date }}</span>{% endif %}
+      </div>
+      {% if item.bullets %}
+      <ul class="bullets">
+        {% for bullet in item.bullets %}<li>{{ bullet }}</li>{% endfor %}
+      </ul>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </section>
+  {% endif %}
+
+  {% if data.projects %}
+  <section class="cv-section">
+    <h2>Projects</h2>
+    {% for project in data.projects %}
+    <div class="item">
+      <div class="item-head">
+        <div><span class="title">{{ project.name }}</span></div>
+      </div>
+      {% if project.description %}<p>{{ project.description }}</p>{% endif %}
+    </div>
+    {% endfor %}
+  </section>
+  {% endif %}
+
+  {% if data.skills %}
+  <section class="cv-section">
+    <h2>Skills</h2>
+    <div class="skills-list">
+      {% for skill in data.skills %}<span>{{ skill }}</span>{% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  {% if data.certifications %}
+  <section class="cv-section">
+    <h2>Certifications</h2>
+    <ul class="bullets">
+      {% for cert in data.certifications %}<li>{{ cert }}</li>{% endfor %}
+    </ul>
+  </section>
+  {% endif %}
+
+  {% if data.education %}
+  <section class="cv-section">
+    <h2>Education</h2>
+    {% for education in data.education %}
+    <div class="item">
+      <div class="item-head">
+        <div>
+          <span class="title">{{ education.degree }}</span>
+          {% if education.institution %}<span class="sub"> — {{ education.institution }}</span>{% endif %}
+        </div>
+        {% if education.date %}<span class="date">{{ education.date }}</span>{% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </section>
+  {% endif %}
+</div>
+</body>
+</html>
