@@ -8,10 +8,7 @@ import {
   rebuildCv,
   thumbnailDataUrl,
 } from "@/api/cvRebuildApi"
-import type {
-  CvRebuildResponse,
-  CvTemplateStyle,
-} from "@/types/cvRebuild"
+import type { CvRebuildResponse } from "@/types/cvRebuild"
 
 const ACCEPTED_TYPES =
   ".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
@@ -20,20 +17,7 @@ const MAX_BYTES = 10 * 1024 * 1024
 
 const CACHE_KEY = "fitcv:rebuild:last-result"
 
-type CachedResult = { fileName: string; style: CvTemplateStyle; result: CvRebuildResponse }
-
-const TEMPLATE_STYLES: { value: CvTemplateStyle; title: string; description: string }[] = [
-  {
-    value: "modern",
-    title: "Modern",
-    description: "Accent colors, icons, and a refined two-column look",
-  },
-  {
-    value: "classic",
-    title: "Classic (ATS)",
-    description: "Plain Harvard-style layout, best for ATS screening",
-  },
-]
+type CachedResult = { fileName: string; result: CvRebuildResponse }
 
 type RebuildState =
   | { phase: "idle" }
@@ -64,23 +48,9 @@ function loadCachedResult(): RebuildState {
   }
 }
 
-function loadCachedStyle(): CvTemplateStyle {
+function saveResult(file: File, result: CvRebuildResponse) {
   try {
-    const raw = sessionStorage.getItem(CACHE_KEY)
-
-    if (!raw) return "modern"
-
-    const cached = JSON.parse(raw) as CachedResult
-
-    return cached.style === "classic" ? "classic" : "modern"
-  } catch {
-    return "modern"
-  }
-}
-
-function saveResult(file: File, result: CvRebuildResponse, style: CvTemplateStyle) {
-  try {
-    const payload: CachedResult = { fileName: file.name, style, result }
+    const payload: CachedResult = { fileName: file.name, result }
 
     sessionStorage.setItem(CACHE_KEY, JSON.stringify(payload))
   } catch {
@@ -110,7 +80,6 @@ function isValidFile(file: File): string | null {
 
 export default function CVReBuildScreen() {
   const [state, setState] = useState<RebuildState>(loadCachedResult)
-  const [style, setStyle] = useState<CvTemplateStyle>(loadCachedStyle)
   const [dragOver, setDragOver] = useState(false)
   const [modalOpen, setModalOpen] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -131,9 +100,9 @@ export default function CVReBuildScreen() {
     clearSavedResult()
 
     try {
-      const result = await rebuildCv(file, style)
+      const result = await rebuildCv(file)
 
-      saveResult(file, result, style)
+      saveResult(file, result)
 
       setState({ phase: "done", file, result })
     } catch (error) {
@@ -204,72 +173,10 @@ export default function CVReBuildScreen() {
       </p>
 
       {state.phase === "idle" && (
-        <>
-          <p
-            style={{
-              fontSize: 13,
-              fontWeight: 600,
-              color: "var(--text-secondary)",
-              marginBottom: 10,
-            }}
-          >
-            Choose a template style
-          </p>
-
-          <div style={{ display: "flex", gap: 12, marginBottom: 18 }}>
-            {TEMPLATE_STYLES.map((template) => {
-              const selected = style === template.value
-
-              return (
-                <button
-                  key={template.value}
-                  type="button"
-                  data-testid={`style-${template.value}`}
-                  aria-pressed={selected}
-                  onClick={() => setStyle(template.value)}
-                  style={{
-                    flex: 1,
-                    textAlign: "left",
-                    padding: "14px 16px",
-                    borderRadius: 12,
-                    border: `2px solid ${
-                      selected ? "var(--accent)" : "var(--border)"
-                    }`,
-                    background: selected
-                      ? "color-mix(in srgb, var(--accent) 5%, white)"
-                      : "white",
-                    cursor: "pointer",
-                  }}
-                >
-                  <p
-                    style={{
-                      fontWeight: 700,
-                      color: "var(--text-primary)",
-                      fontSize: 14,
-                    }}
-                  >
-                    {template.title}
-                  </p>
-
-                  <p
-                    style={{
-                      marginTop: 4,
-                      color: "var(--text-secondary)",
-                      fontSize: 12,
-                      lineHeight: 1.4,
-                    }}
-                  >
-                    {template.description}
-                  </p>
-                </button>
-              )
-            })}
-          </div>
-
-          <div
-            role="button"
-            tabIndex={0}
-            onClick={() => inputRef.current?.click()}
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={() => inputRef.current?.click()}
           onKeyDown={(event) => {
             if (event.key === "Enter" || event.key === " ") {
               inputRef.current?.click()
@@ -321,7 +228,6 @@ export default function CVReBuildScreen() {
             }}
           />
           </div>
-        </>
       )}
 
       {state.phase === "processing" && (

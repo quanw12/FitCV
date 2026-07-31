@@ -73,10 +73,10 @@ def test_template_has_page_break_avoid() -> None:
     assert "page-break-inside: avoid" in html
 
 
-def test_css_uses_custom_properties() -> None:
+def test_template_uses_plain_harvard_font() -> None:
     html = render_cv(CVData(name="A"))
-    assert "--accent:" in html
-    assert "--text-primary:" in html
+    assert "Times New Roman" in html
+    assert "--accent:" not in html
 
 
 def test_vietnamese_cv_uses_vietnamese_headings() -> None:
@@ -114,14 +114,8 @@ def test_renders_links_languages_publications_and_awards() -> None:
         awards=["Dean's List", "Best Intern 2021"],
     )
     html = render_cv(cv)
-    assert (
-        '<a class="contact-link" href="https://linkedin.com/in/a">LinkedIn — https://linkedin.com/in/a</a>'
-        in html
-    )
-    assert (
-        '<a class="contact-link" href="https://github.com/a">GitHub — https://github.com/a</a>'
-        in html
-    )
+    assert '<a href="https://linkedin.com/in/a">LinkedIn — https://linkedin.com/in/a</a>' in html
+    assert '<a href="https://github.com/a">GitHub — https://github.com/a</a>' in html
     assert "<h2>Languages</h2>" in html
     assert "English" in html
     assert "Fluent" in html
@@ -147,14 +141,8 @@ def test_project_links_and_description_urls_are_clickable() -> None:
         ],
     )
     html = render_cv(cv)
-    assert (
-        '<a class="project-link" href="https://github.com/a/fitcv">GitHub — https://github.com/a/fitcv</a>'
-        in html
-    )
-    assert (
-        '<a class="project-link" href="https://fitcv.demo.app">Demo — https://fitcv.demo.app</a>'
-        in html
-    )
+    assert '<a href="https://github.com/a/fitcv">GitHub — https://github.com/a/fitcv</a>' in html
+    assert '<a href="https://fitcv.demo.app">Demo — https://fitcv.demo.app</a>' in html
     assert (
         '<a class="project-link" href="https://github.com/a/fitcv">https://github.com/a/fitcv</a>'
         in html
@@ -183,16 +171,7 @@ def test_unknown_language_falls_back_to_english() -> None:
     assert "<h2>Profile</h2>" in html
 
 
-def test_unknown_style_raises_value_error() -> None:
-    try:
-        render_cv(CVData(name="A"), style="fancy")
-    except ValueError as exc:
-        assert "Unknown template style" in str(exc)
-    else:
-        raise AssertionError("expected ValueError")
-
-
-def test_classic_template_uses_harvard_layout() -> None:
+def test_template_uses_harvard_layout() -> None:
     cv = CVData(
         name="Nguyen Van A",
         email="a@example.com",
@@ -218,7 +197,7 @@ def test_classic_template_uses_harvard_layout() -> None:
             }
         ],
     )
-    html = render_cv(cv, style="classic")
+    html = render_cv(cv)
     assert "Times New Roman" in html
     assert "<svg" not in html
     assert html.index("<h2>Education</h2>") < html.index("<h2>Professional Experience</h2>")
@@ -228,8 +207,8 @@ def test_classic_template_uses_harvard_layout() -> None:
     assert '<a href="https://github.com/a/fitcv">GitHub — https://github.com/a/fitcv</a>' in html
 
 
-def test_classic_template_uses_vietnamese_headings() -> None:
+def test_vietnamese_headings() -> None:
     cv = CVData(name="A", education=[{"degree": "Cử nhân"}], skills=["Python"])
-    html = render_cv(cv, language="vi", style="classic")
+    html = render_cv(cv, language="vi")
     assert "<h2>Học vấn</h2>" in html
     assert "<h2>Kỹ năng chuyên môn</h2>" in html

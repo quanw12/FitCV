@@ -42,19 +42,6 @@ class FakeExtractor:
 
 
 class TestRebuildCv:
-    def test_rejects_unknown_style(self) -> None:
-        try:
-            rebuild_cv(
-                _MINIMAL_PDF,
-                "cv.pdf",
-                style="fancy",
-                extractor=FakeExtractor(CVData()),
-            )
-        except ValueError as exc:
-            assert "Unknown template style" in str(exc)
-        else:
-            raise AssertionError("expected ValueError")
-
     def test_rejects_invalid_file_format(self) -> None:
         try:
             rebuild_cv(b"plain text", "cv.txt", extractor=FakeExtractor(CVData()))

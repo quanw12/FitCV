@@ -36,11 +36,6 @@ def _linkify(value: str) -> Markup:
 
 _environment.filters["linkify"] = _linkify
 
-_TEMPLATE_FILES = {
-    "modern": "cv_template.html",
-    "classic": "cv_template_classic.html",
-}
-
 _SECTION_HEADINGS = {
     "en": {
         "profile": "Profile",
@@ -67,10 +62,7 @@ _SECTION_HEADINGS = {
 }
 
 
-def render_cv(cv: CVData, *, language: str = "en", style: str = "modern") -> str:
-    template_name = _TEMPLATE_FILES.get(style)
-    if template_name is None:
-        raise ValueError(f"Unknown template style: {style!r}")
-    template = _environment.get_template(template_name)
+def render_cv(cv: CVData, *, language: str = "en") -> str:
+    template = _environment.get_template("cv_template.html")
     headings = _SECTION_HEADINGS.get(language, _SECTION_HEADINGS["en"])
     return template.render(data=cv, headings=headings)

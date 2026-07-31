@@ -1,5 +1,3 @@
-export type CvTemplateStyle = "modern" | "classic"
-
 export interface CvRebuildExperienceItem {
   title: string
 

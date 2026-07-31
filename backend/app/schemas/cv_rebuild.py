@@ -1,10 +1,6 @@
 """Pydantic schemas for the stateless AI Rebuild CV pipeline."""
 
-from typing import Literal
-
 from pydantic import BaseModel, Field
-
-CvTemplateStyle = Literal["modern", "classic"]
 
 
 class CvExperienceItem(BaseModel):

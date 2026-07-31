@@ -18,11 +18,10 @@ def _make_client() -> TestClient:
     return TestClient(app)
 
 
-def _post(client: TestClient, content: bytes, filename: str = "cv.pdf", style: str = "modern"):
+def _post(client: TestClient, content: bytes, filename: str = "cv.pdf"):
     return client.post(
         "/api/cv/rebuild",
         files={"file": (filename, content, "application/octet-stream")},
-        data={"style": style} if style else None,
     )
 
 
@@ -58,7 +57,7 @@ def test_rejects_oversized_file() -> None:
 
 
 def test_maps_extraction_error_to_422(monkeypatch) -> None:
-    def raise_extraction(content, filename, *, style="modern"):
+    def raise_extraction(content, filename):
         raise CvExtractionError("invalid structure after retries")
 
     monkeypatch.setattr(orchestrator, "rebuild_cv", raise_extraction)
@@ -69,7 +68,7 @@ def test_maps_extraction_error_to_422(monkeypatch) -> None:
 
 
 def test_maps_gemini_error_to_502(monkeypatch) -> None:
-    def raise_gemini(content, filename, *, style="modern"):
+    def raise_gemini(content, filename):
         raise GeminiClientError("busy")
 
     monkeypatch.setattr(orchestrator, "rebuild_cv", raise_gemini)
@@ -79,7 +78,7 @@ def test_maps_gemini_error_to_502(monkeypatch) -> None:
 
 
 def test_maps_render_error_to_502(monkeypatch) -> None:
-    def raise_render(content, filename, *, style="modern"):
+    def raise_render(content, filename):
         raise PdfRenderError("no chromium")
 
     monkeypatch.setattr(orchestrator, "rebuild_cv", raise_render)
@@ -89,7 +88,7 @@ def test_maps_render_error_to_502(monkeypatch) -> None:
 
 
 def test_success_shape(monkeypatch) -> None:
-    def fake_rebuild(content, filename, *, style="modern"):
+    def fake_rebuild(content, filename):
         return {
             "filename": "rebuilt_cv.pdf",
             "preview_json": CVData(name="A").model_dump(),
@@ -106,52 +105,3 @@ def test_success_shape(monkeypatch) -> None:
     assert payload["preview_json"]["name"] == "A"
     assert payload["pdf_base64"] == "cGRm"
     assert payload["thumbnail_base64"] == "dGh1bWI="
-
-
-def test_style_defaults_to_modern(monkeypatch) -> None:
-    seen = {}
-
-    def fake_rebuild(content, filename, *, style="modern"):
-        seen["style"] = style
-        return {
-            "filename": "rebuilt_cv.pdf",
-            "preview_json": CVData(name="A").model_dump(),
-            "pdf_base64": "",
-            "thumbnail_base64": "",
-        }
-
-    monkeypatch.setattr(orchestrator, "rebuild_cv", fake_rebuild)
-    client = _make_client()
-    response = _post(client, b"%PDF-1.4", style="")
-    assert response.status_code == 200
-    assert seen["style"] == "modern"
-
-
-def test_style_passes_through(monkeypatch) -> None:
-    seen = {}
-
-    def fake_rebuild(content, filename, *, style="modern"):
-        seen["style"] = style
-        return {
-            "filename": "rebuilt_cv.pdf",
-            "preview_json": CVData(name="A").model_dump(),
-            "pdf_base64": "",
-            "thumbnail_base64": "",
-        }
-
-    monkeypatch.setattr(orchestrator, "rebuild_cv", fake_rebuild)
-    client = _make_client()
-    response = _post(client, b"%PDF-1.4", style="classic")
-    assert response.status_code == 200
-    assert seen["style"] == "classic"
-
-
-def test_rejects_unknown_style(monkeypatch) -> None:
-    def fake_rebuild(content, filename, *, style="modern"):
-        raise ValueError(f"Unknown template style: {style!r}")
-
-    monkeypatch.setattr(orchestrator, "rebuild_cv", fake_rebuild)
-    client = _make_client()
-    response = _post(client, b"%PDF-1.4", style="fancy")
-    assert response.status_code == 400
-    assert "Unknown template style" in response.json()["detail"]

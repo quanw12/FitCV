@@ -1,6 +1,6 @@
 import logging
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 
 from app.api.deps import get_current_account
 from app.models.account import Account
@@ -19,7 +19,6 @@ router = APIRouter()
 @router.post("/rebuild", response_model=CvRebuildResponse)
 def rebuild_from_cv(
     file: UploadFile = File(...),
-    style: str = Form("modern"),
     account: Account = Depends(get_current_account),
 ) -> CvRebuildResponse:
     content = file.file.read(MAX_CV_BYTES + 1)
@@ -28,7 +27,7 @@ def rebuild_from_cv(
     if len(content) > MAX_CV_BYTES:
         raise HTTPException(status_code=400, detail="CV file must be 10 MB or smaller.")
     try:
-        return orchestrator.rebuild_cv(content, file.filename or "cv.pdf", style=style)
+        return orchestrator.rebuild_cv(content, file.filename or "cv.pdf")
     except ValueError as exc:
         logger.exception("CV rebuild validation failed: %s", exc)
         raise HTTPException(status_code=400, detail=str(exc)) from exc
