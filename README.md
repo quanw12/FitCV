@@ -95,6 +95,13 @@ Windows PowerShell:
 pip install -r requirements.txt
 ```
 
+Cài headless Chromium dùng cho AI Rebuild CV:
+
+```powershell
+cd backend
+.venv\Scripts\python.exe -m playwright install chromium
+```
+
 Tạo hoặc cập nhật `backend/.env`:
 
 ```env
