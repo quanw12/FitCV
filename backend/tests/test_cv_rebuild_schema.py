@@ -53,7 +53,13 @@ class TestCVData:
                     }
                 ],
                 "skills": ["Python"],
-                "projects": [{"name": "FitCV", "description": "CV tool."}],
+                "projects": [
+                    {
+                        "name": "FitCV",
+                        "description": "CV tool.",
+                        "links": [{"label": "GitHub", "url": "https://github.com/a/fitcv"}],
+                    }
+                ],
                 "certifications": ["AWS"],
                 "education": [{"degree": "BSc", "institution": "HCMUS", "date": "2016-2020"}],
                 "languages": [{"name": "English", "proficiency": "Fluent"}],
@@ -67,6 +73,7 @@ class TestCVData:
         assert cv.languages[0].proficiency == "Fluent"
         assert cv.publications[0].venue == "Journal"
         assert cv.awards == ["Dean's List"]
+        assert cv.projects[0].links[0].label == "GitHub"
 
     def test_rejects_links_as_string(self) -> None:
         with pytest.raises(ValidationError):

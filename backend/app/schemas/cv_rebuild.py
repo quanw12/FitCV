@@ -11,20 +11,21 @@ class CvExperienceItem(BaseModel):
     bullets: list[str] = Field(default_factory=list)
 
 
+class CvLinkItem(BaseModel):
+    label: str = ""
+    url: str = ""
+
+
 class CvProjectItem(BaseModel):
     name: str = ""
     description: str = ""
+    links: list[CvLinkItem] = Field(default_factory=list)
 
 
 class CvEducationItem(BaseModel):
     degree: str = ""
     institution: str = ""
     date: str = ""
-
-
-class CvLinkItem(BaseModel):
-    label: str = ""
-    url: str = ""
 
 
 class CvLanguageItem(BaseModel):

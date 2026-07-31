@@ -124,6 +124,15 @@
     font-size: 9.8px;
     flex-shrink: 0;
   }
+  .project-links {
+    margin-top: 2px;
+    font-size: 9.8px;
+  }
+  .project-links a.project-link,
+  a.project-link {
+    color: var(--accent);
+    text-decoration: none;
+  }
 
   ul.bullets {
     list-style: none;
@@ -196,7 +205,7 @@
       <div class="contact-row">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
         {% if link.url %}
-        <a class="contact-link" href="{{ link.url }}">{{ link.label or link.url }}</a>
+        <a class="contact-link" href="{{ link.url }}">{% if link.label %}{{ link.label }} — {% endif %}{{ link.url }}</a>
         {% else %}
         <span>{{ link.label }}</span>
         {% endif %}
@@ -255,7 +264,14 @@
       <div class="entry-head">
         <span class="entry-title">{{ project.name }}</span>
       </div>
-      {% if project.description %}<p>{{ project.description }}</p>{% endif %}
+      {% if project.description %}<p>{{ project.description | linkify }}</p>{% endif %}
+      {% if project.links %}
+      <p class="project-links">
+        {% for link in project.links %}
+        {% if link.url %}<a class="project-link" href="{{ link.url }}">{% if link.label %}{{ link.label }} — {% endif %}{{ link.url }}</a>{% if not loop.last %}<span aria-hidden="true"> · </span>{% endif %}{% endif %}
+        {% endfor %}
+      </p>
+      {% endif %}
     </div>
     {% endfor %}
   </section>

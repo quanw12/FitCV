@@ -14,6 +14,8 @@ export interface CvRebuildProjectItem {
   name: string
 
   description: string
+
+  links: CvRebuildLinkItem[]
 }
 
 export interface CvRebuildEducationItem {

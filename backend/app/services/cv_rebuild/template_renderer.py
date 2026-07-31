@@ -1,17 +1,40 @@
 """Render a CVData model into the fixed HTML template."""
 
+import re
 from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
+from markupsafe import Markup, escape
 
 from app.schemas.cv_rebuild import CVData
 
 _TEMPLATES_DIR = Path(__file__).resolve().parents[2] / "templates"
 
+_URL_PATTERN = re.compile(r"(https?://[^\s<>\"']+)")
+_URL_TRAILING_PUNCTUATION = re.compile(r"[.,;:!?)\"']+$")
+
 _environment = Environment(
     loader=FileSystemLoader(str(_TEMPLATES_DIR)),
     autoescape=select_autoescape(("html", "xml")),
 )
+
+
+def _linkify(value: str) -> Markup:
+    """Escape text and turn bare http(s) URLs into clickable anchors."""
+
+    def replace(match: re.Match) -> str:
+        url = match.group(1)
+        cleaned = _URL_TRAILING_PUNCTUATION.sub("", url)
+        trailing = url[len(cleaned) :]
+        if not cleaned:
+            return url
+        return f'<a class="project-link" href="{cleaned}">{cleaned}</a>{trailing}'
+
+    text = escape(value)
+    return Markup(_URL_PATTERN.sub(replace, str(text)))
+
+
+_environment.filters["linkify"] = _linkify
 
 _SECTION_HEADINGS = {
     "en": {

@@ -114,10 +114,14 @@ def test_renders_links_languages_publications_and_awards() -> None:
         awards=["Dean's List", "Best Intern 2021"],
     )
     html = render_cv(cv)
-    assert "LinkedIn" in html
-    assert "GitHub" in html
-    assert 'href="https://linkedin.com/in/a"' in html
-    assert 'href="https://github.com/a"' in html
+    assert (
+        '<a class="contact-link" href="https://linkedin.com/in/a">LinkedIn — https://linkedin.com/in/a</a>'
+        in html
+    )
+    assert (
+        '<a class="contact-link" href="https://github.com/a">GitHub — https://github.com/a</a>'
+        in html
+    )
     assert "<h2>Languages</h2>" in html
     assert "English" in html
     assert "Fluent" in html
@@ -126,6 +130,52 @@ def test_renders_links_languages_publications_and_awards() -> None:
     assert "Journal" in html
     assert "<h2>Awards</h2>" in html
     assert "Dean&#39;s List" in html
+
+
+def test_project_links_and_description_urls_are_clickable() -> None:
+    cv = CVData(
+        name="Nguyen Van A",
+        projects=[
+            {
+                "name": "FitCV",
+                "description": "AI CV screening tool. Repo: https://github.com/a/fitcv.",
+                "links": [
+                    {"label": "GitHub", "url": "https://github.com/a/fitcv"},
+                    {"label": "Demo", "url": "https://fitcv.demo.app"},
+                ],
+            }
+        ],
+    )
+    html = render_cv(cv)
+    assert (
+        '<a class="project-link" href="https://github.com/a/fitcv">GitHub — https://github.com/a/fitcv</a>'
+        in html
+    )
+    assert (
+        '<a class="project-link" href="https://fitcv.demo.app">Demo — https://fitcv.demo.app</a>'
+        in html
+    )
+    assert (
+        '<a class="project-link" href="https://github.com/a/fitcv">https://github.com/a/fitcv</a>'
+        in html
+    )
+
+
+def test_linkify_escapes_text_and_urls() -> None:
+    cv = CVData(
+        name="Nguyen Van A",
+        projects=[
+            {
+                "name": "X",
+                "description": "A <b>bold</b> & raw: https://example.com/a?x=1&y=2",
+            }
+        ],
+    )
+    html = render_cv(cv)
+    assert "<b>bold</b>" not in html
+    assert "&lt;b&gt;bold&lt;/b&gt;" in html
+    assert "&amp; raw:" in html
+    assert 'href="https://example.com/a?x=1&amp;y=2"' in html
 
 
 def test_unknown_language_falls_back_to_english() -> None:

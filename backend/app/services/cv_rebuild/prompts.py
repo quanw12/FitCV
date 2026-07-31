@@ -39,6 +39,16 @@ CV_DATA_JSON_SCHEMA: dict = {
                 "properties": {
                     "name": {"type": "string"},
                     "description": {"type": "string"},
+                    "links": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "label": {"type": "string"},
+                                "url": {"type": "string"},
+                            },
+                        },
+                    },
                 },
             },
         },
@@ -110,6 +120,9 @@ Rules:
 - "name" is the candidate's full name; if not found, use an empty string.
 - For "links", use the platform name as the label (for example "LinkedIn" or
   "GitHub") and the full URL as the "url".
+- Each project may have its own "links" containing the repository or demo URL
+  that appears in the raw text; give the link a short label (for example
+  "GitHub" or "Demo") and the full URL as the "url".
 
 Raw CV text:
 <cv_text>
