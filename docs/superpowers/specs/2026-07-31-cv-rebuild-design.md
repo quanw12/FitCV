@@ -49,10 +49,11 @@ Response `200` (synchronous):
 ```json
 {
   "filename": "rebuilt_cv.pdf",
-  "preview_json": { "name": "...", "email": "...", "phone": "...", "summary": "...",
-                    "experience": [{"title": "...", "company": "...", "date": "...", "bullets": ["..."]}],
-                    "skills": ["..."], "projects": [{"name": "...", "description": "..."}],
-                    "certifications": ["..."], "education": [{"...": "..."}] },
+  "preview_json": { "name": "Nguyen Van A", "email": "a@example.com", "phone": "+84 912 345 678",
+                    "summary": "...",
+                    "experience": [{"title": "Software Engineer", "company": "Acme", "date": "2020-2023", "bullets": ["..."]}],
+                    "skills": ["Python", "FastAPI"], "projects": [{"name": "FitCV", "description": "..."}],
+                    "certifications": ["AWS Certified"], "education": [{"degree": "BSc", "institution": "HCMUS", "date": "2016-2020"}] },
   "pdf_base64": "...",
   "thumbnail_base64": "..."
 }
@@ -167,9 +168,9 @@ session is ever created.
 ### Screen (`src/ui/screens/CVReBuildScreen.tsx`)
 
 - Replaces SeekerDashboard: nav item label "CV Rebuild", icon `FileText`-like
-  (phosphor icon per current nav style), screen id reused `seeker-dashboard` or
-  new id `cv-rebuild` (decided in implementation; must update `ScreenId` in
-  `src/types/app.ts` and `defaultScreen` in `App.tsx`).
+  (phosphor icon per current nav style). New screen id `cv-rebuild` added to
+  `ScreenId` in `src/types/app.ts`; `defaultScreen` in `App.tsx` returns
+  `cv-rebuild` for the seeker portal (replacing `seeker-dashboard`).
 - Flow:
   1. Upload dropzone (PDF/DOCX, ≤10 MB client-side check).
   2. On submit → skeleton/loading placeholder (animated card) while the
