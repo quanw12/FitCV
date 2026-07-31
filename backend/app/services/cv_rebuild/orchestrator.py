@@ -22,8 +22,11 @@ def rebuild_cv(
     content: bytes,
     filename: str,
     *,
+    style: str = "modern",
     extractor: CvExtractor | None = None,
 ) -> CvRebuildResponse:
+    if style not in ("modern", "classic"):
+        raise ValueError(f"Unknown template style: {style!r}")
     file_type = validate_cv_content(filename, content)
     suffix = Path(filename).suffix.lower() or (
         ".pdf" if file_type == "PDF" else ".docx"
@@ -42,7 +45,7 @@ def rebuild_cv(
             raise ValueError(f"Unable to read the CV file: {exc}") from exc
 
     cv = (extractor or CvExtractor()).extract(raw_text)
-    html = render_cv(cv, language=detect_cv_language(cv))
+    html = render_cv(cv, language=detect_cv_language(cv), style=style)
     pdf_bytes, thumbnail_bytes = render_pdf_with_thumbnail(html)
 
     return CvRebuildResponse(

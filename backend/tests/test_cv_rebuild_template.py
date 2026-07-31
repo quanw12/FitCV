@@ -181,3 +181,55 @@ def test_linkify_escapes_text_and_urls() -> None:
 def test_unknown_language_falls_back_to_english() -> None:
     html = render_cv(CVData(name="A", summary="Hello."), language="fr")
     assert "<h2>Profile</h2>" in html
+
+
+def test_unknown_style_raises_value_error() -> None:
+    try:
+        render_cv(CVData(name="A"), style="fancy")
+    except ValueError as exc:
+        assert "Unknown template style" in str(exc)
+    else:
+        raise AssertionError("expected ValueError")
+
+
+def test_classic_template_uses_harvard_layout() -> None:
+    cv = CVData(
+        name="Nguyen Van A",
+        email="a@example.com",
+        phone="+84 912 345 678",
+        links=[{"label": "GitHub", "url": "https://github.com/a"}],
+        summary="Backend engineer.",
+        education=[{"degree": "BSc", "institution": "HCMUS", "date": "2016-2020"}],
+        experience=[
+            {
+                "title": "Engineer",
+                "company": "Acme",
+                "location": "HCMC",
+                "date": "2020-2023",
+                "bullets": ["Built APIs."],
+            }
+        ],
+        skills=["Python"],
+        projects=[
+            {
+                "name": "FitCV",
+                "description": "Repo: https://github.com/a/fitcv",
+                "links": [{"label": "GitHub", "url": "https://github.com/a/fitcv"}],
+            }
+        ],
+    )
+    html = render_cv(cv, style="classic")
+    assert "Times New Roman" in html
+    assert "<svg" not in html
+    assert html.index("<h2>Education</h2>") < html.index("<h2>Professional Experience</h2>")
+    assert html.index("<h2>Professional Experience</h2>") < html.index("<h2>Core Competencies</h2>")
+    assert '<a href="mailto:a@example.com">a@example.com</a>' in html
+    assert 'class="entry-right">HCMC · 2020-2023' in html
+    assert '<a href="https://github.com/a/fitcv">GitHub — https://github.com/a/fitcv</a>' in html
+
+
+def test_classic_template_uses_vietnamese_headings() -> None:
+    cv = CVData(name="A", education=[{"degree": "Cử nhân"}], skills=["Python"])
+    html = render_cv(cv, language="vi", style="classic")
+    assert "<h2>Học vấn</h2>" in html
+    assert "<h2>Kỹ năng chuyên môn</h2>" in html

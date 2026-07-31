@@ -1,11 +1,16 @@
-import type { CvRebuildResponse } from "@/types/cvRebuild"
+import type { CvRebuildResponse, CvTemplateStyle } from "@/types/cvRebuild"
 
 import { requestJson } from "./httpClient"
 
-export function rebuildCv(file: File): Promise<CvRebuildResponse> {
+export function rebuildCv(
+  file: File,
+  style: CvTemplateStyle = "modern",
+): Promise<CvRebuildResponse> {
   const form = new FormData()
 
   form.append("file", file)
+
+  form.append("style", style)
 
   return requestJson<CvRebuildResponse>("/api/cv/rebuild", {
     method: "POST",

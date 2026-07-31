@@ -107,6 +107,9 @@ change facts, and do NOT add skills, responsibilities, numbers, or experiences
 that are not present in the extracted data.
 
 Rules:
+- Bullets: begin each bullet with a strong action verb, keep it to one or two
+  concise lines, avoid personal pronouns (I, we, my), and keep concrete
+  numbers or metrics when the source provides them.
 - Completeness: Do NOT omit important information just to fit the format.
   Every meaningful detail in the raw text belongs in the closest field. Only
   leave out content that is irrelevant for a professional CV, such as

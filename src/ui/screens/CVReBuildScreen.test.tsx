@@ -168,7 +168,7 @@ describe("CVReBuildScreen", () => {
   it("restores the last result from session storage without rebuilding", async () => {
     sessionStorage.setItem(
       "fitcv:rebuild:last-result",
-      JSON.stringify({ fileName: "cv.pdf", result: RESULT }),
+      JSON.stringify({ fileName: "cv.pdf", style: "classic", result: RESULT }),
     )
 
     render(<CVReBuildScreen />)
@@ -182,6 +182,40 @@ describe("CVReBuildScreen", () => {
 
     expect(screen.getByTestId("cv-rebuild-input")).toBeInTheDocument()
     expect(sessionStorage.getItem("fitcv:rebuild:last-result")).toBeNull()
+  })
+
+  it("restores the selected template style from session storage", async () => {
+    sessionStorage.setItem(
+      "fitcv:rebuild:last-result",
+      JSON.stringify({ fileName: "cv.pdf", style: "classic", result: RESULT }),
+    )
+
+    render(<CVReBuildScreen />)
+
+    fireEvent.click(screen.getByRole("button", { name: /rebuild another cv/i }))
+
+    expect(
+      screen.getByTestId("style-classic").getAttribute("aria-pressed"),
+    ).toBe("true")
+    expect(
+      screen.getByTestId("style-modern").getAttribute("aria-pressed"),
+    ).toBe("false")
+  })
+
+  it("passes the selected template style to the API", async () => {
+    apiMocks.rebuildCv.mockResolvedValue(RESULT)
+
+    render(<CVReBuildScreen />)
+
+    fireEvent.click(screen.getByTestId("style-classic"))
+
+    fireEvent.change(screen.getByTestId("cv-rebuild-input"), {
+      target: { files: [makeFile()] },
+    })
+
+    await screen.findByRole("img", { name: /rebuilt cv preview/i })
+
+    expect(apiMocks.rebuildCv).toHaveBeenCalledWith(expect.any(File), "classic")
   })
 
   it("saves a successful result to session storage", async () => {
@@ -201,10 +235,12 @@ describe("CVReBuildScreen", () => {
 
     const cached = JSON.parse(saved as string) as {
       fileName: string
+      style: string
       result: { pdf_base64: string }
     }
 
     expect(cached.fileName).toBe("my_cv.pdf")
+    expect(cached.style).toBe("modern")
     expect(cached.result.pdf_base64).toBe("cGRm")
   })
 })
