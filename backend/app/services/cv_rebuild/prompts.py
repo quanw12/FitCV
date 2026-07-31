@@ -7,6 +7,16 @@ CV_DATA_JSON_SCHEMA: dict = {
         "name": {"type": "string"},
         "email": {"type": "string"},
         "phone": {"type": "string"},
+        "links": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "label": {"type": "string"},
+                    "url": {"type": "string"},
+                },
+            },
+        },
         "summary": {"type": "string"},
         "experience": {
             "type": "array",
@@ -15,6 +25,7 @@ CV_DATA_JSON_SCHEMA: dict = {
                 "properties": {
                     "title": {"type": "string"},
                     "company": {"type": "string"},
+                    "location": {"type": "string"},
                     "date": {"type": "string"},
                     "bullets": {"type": "array", "items": {"type": "string"}},
                 },
@@ -43,6 +54,28 @@ CV_DATA_JSON_SCHEMA: dict = {
                 },
             },
         },
+        "languages": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string"},
+                    "proficiency": {"type": "string"},
+                },
+            },
+        },
+        "publications": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "title": {"type": "string"},
+                    "venue": {"type": "string"},
+                    "date": {"type": "string"},
+                },
+            },
+        },
+        "awards": {"type": "array", "items": {"type": "string"}},
     },
 }
 
@@ -51,7 +84,10 @@ _EXTRACT_PROMPT = """You are an expert CV reviewer and professional CV writer.
 You receive the raw text extracted from a candidate's CV.
 
 Step 1 — Extract: Build a structured JSON profile containing ONLY information
-explicitly present in the raw text. Keep numbers, dates, job titles, company
+explicitly present in the raw text. Capture ALL important information:
+contact details, profile links (LinkedIn, GitHub, portfolio), professional
+experience, projects, education, skills, certifications, languages,
+publications, awards, and honors. Keep numbers, dates, job titles, company
 names, and metrics exactly as written. Do not infer, guess, or add anything
 that is not in the text.
 
@@ -61,6 +97,10 @@ change facts, and do NOT add skills, responsibilities, numbers, or experiences
 that are not present in the extracted data.
 
 Rules:
+- Completeness: Do NOT omit important information just to fit the format.
+  Every meaningful detail in the raw text belongs in the closest field. Only
+  leave out content that is irrelevant for a professional CV, such as
+  references, age, or marital status.
 - If a field is absent in the raw text, leave it as an empty string or an
   empty array. Never invent placeholder values.
 - Use one consistent language for the whole CV: the dominant language of the
@@ -68,6 +108,8 @@ Rules:
   dominant language. Keep technical terms, tools, and domain jargon in their
   original form.
 - "name" is the candidate's full name; if not found, use an empty string.
+- For "links", use the platform name as the label (for example "LinkedIn" or
+  "GitHub") and the full URL as the "url".
 
 Raw CV text:
 <cv_text>

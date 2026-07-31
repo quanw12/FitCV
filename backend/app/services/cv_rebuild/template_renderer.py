@@ -20,7 +20,10 @@ _SECTION_HEADINGS = {
         "experience": "Professional Experience",
         "projects": "Selected Projects",
         "education": "Education",
+        "languages": "Languages",
         "certifications": "Certifications",
+        "publications": "Publications",
+        "awards": "Awards",
     },
     "vi": {
         "profile": "Giới thiệu",
@@ -28,7 +31,10 @@ _SECTION_HEADINGS = {
         "experience": "Kinh nghiệm làm việc",
         "projects": "Dự án tiêu biểu",
         "education": "Học vấn",
+        "languages": "Ngoại ngữ",
         "certifications": "Chứng chỉ",
+        "publications": "Công bố",
+        "awards": "Giải thưởng",
     },
 }
 

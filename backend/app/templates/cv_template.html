@@ -6,54 +6,57 @@
 <style>
   :root {
     --accent: #305496;
-    --text-primary: #0F172A;
-    --text-secondary: #64748B;
-    --border: #C9D4E4;
+    --accent-soft: rgba(48, 84, 150, 0.38);
+    --text-primary: #1A2433;
+    --text-secondary: #5B6B83;
+    --border: #D8DFEA;
     --bg: #FFFFFF;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
-    font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    font-family: "Calibri", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
     font-size: 10.5px;
+    line-height: 1.48;
     color: var(--text-primary);
     background: var(--bg);
-    line-height: 1.45;
+    -webkit-font-smoothing: antialiased;
   }
-  .page { padding: 15mm 14mm 10mm; }
+  .page { padding: 14mm 14mm 12mm; }
 
   header.cv-header {
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
-    gap: 16px;
-    margin-bottom: 12px;
+    gap: 18px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 13px;
   }
   header.cv-header h1 {
-    font-size: 30px;
+    font-size: 27px;
     font-weight: 700;
     color: var(--accent);
-    letter-spacing: 0.01em;
-    line-height: 1.1;
+    letter-spacing: 0.02em;
+    line-height: 1.15;
   }
   .contact {
-    text-align: right;
-    color: var(--text-secondary);
-    font-size: 10px;
-    margin-top: 4px;
     display: flex;
     flex-direction: column;
     align-items: flex-end;
-    gap: 2px;
+    gap: 3px;
+    font-size: 9.8px;
+    color: var(--text-secondary);
+    margin-top: 3px;
+    max-width: 80mm;
   }
   .contact-row {
     display: flex;
     align-items: center;
-    gap: 5px;
-    white-space: nowrap;
+    gap: 6px;
   }
   .contact-row svg {
-    width: 11px;
-    height: 11px;
+    width: 10px;
+    height: 10px;
     stroke: var(--accent);
     fill: none;
     stroke-width: 2;
@@ -63,17 +66,17 @@
   }
 
   section.cv-section {
-    margin-bottom: 14px;
+    margin-bottom: 12px;
     page-break-inside: avoid;
   }
   section.cv-section h2 {
     display: flex;
     align-items: center;
     gap: 10px;
-    font-size: 11.5px;
+    font-size: 11px;
     font-weight: 700;
     color: var(--accent);
-    letter-spacing: 0.08em;
+    letter-spacing: 0.12em;
     text-transform: uppercase;
     margin-bottom: 7px;
   }
@@ -81,7 +84,7 @@
     content: "";
     flex: 1;
     height: 1px;
-    background: var(--accent);
+    background: var(--accent-soft);
   }
   section.cv-section p { margin-bottom: 4px; }
 
@@ -99,12 +102,24 @@
     width: 16mm;
     flex-shrink: 0;
     color: var(--accent);
-    font-size: 10px;
+    font-size: 9.8px;
     font-weight: 600;
-    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.01em;
+  }
+  .entry-main {
+    flex: 1;
+    min-width: 0;
   }
   .entry-title { font-weight: 700; }
   .entry-org { font-style: italic; color: var(--text-secondary); }
+  .entry-loc {
+    margin-left: auto;
+    text-align: right;
+    color: var(--text-secondary);
+    font-size: 9.8px;
+    flex-shrink: 0;
+  }
 
   ul.bullets {
     list-style: none;
@@ -112,7 +127,7 @@
   }
   ul.bullets li {
     position: relative;
-    padding-left: 13px;
+    padding-left: 12px;
     margin-bottom: 2.5px;
   }
   ul.bullets li:last-child { margin-bottom: 0; }
@@ -120,9 +135,33 @@
     content: "";
     position: absolute;
     left: 1px;
-    top: 4.5px;
-    width: 5px;
-    height: 5px;
+    top: 5px;
+    width: 4px;
+    height: 4px;
+    border-radius: 1px;
+    background: var(--accent);
+  }
+
+  ul.skills-list {
+    columns: 2;
+    column-gap: 24px;
+    list-style: none;
+    margin-top: 2px;
+  }
+  ul.skills-list li {
+    break-inside: avoid;
+    position: relative;
+    padding-left: 12px;
+    margin-bottom: 2px;
+  }
+  ul.skills-list li::before {
+    content: "";
+    position: absolute;
+    left: 1px;
+    top: 5px;
+    width: 4px;
+    height: 4px;
+    border-radius: 1px;
     background: var(--accent);
   }
 
@@ -134,7 +173,7 @@
   {% if data.name %}
   <header class="cv-header">
     <h1>{{ data.name }}</h1>
-    {% if data.email or data.phone %}
+    {% if data.email or data.phone or data.links %}
     <div class="contact">
       {% if data.phone %}
       <div class="contact-row">
@@ -148,6 +187,14 @@
         <span>{{ data.email }}</span>
       </div>
       {% endif %}
+      {% for link in data.links %}
+      {% if link.url or link.label %}
+      <div class="contact-row">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+        <span>{{ link.label or link.url }}</span>
+      </div>
+      {% endif %}
+      {% endfor %}
     </div>
     {% endif %}
   </header>
@@ -163,7 +210,7 @@
   {% if data.skills %}
   <section class="cv-section">
     <h2>{{ headings.skills }}</h2>
-    <ul class="bullets">
+    <ul class="skills-list">
       {% for skill in data.skills %}<li>{{ skill }}</li>{% endfor %}
     </ul>
   </section>
@@ -176,10 +223,11 @@
     <div class="entry">
       <div class="entry-head">
         {% if item.date %}<span class="entry-date">{{ item.date }}</span>{% endif %}
-        <div>
+        <div class="entry-main">
           <span class="entry-title">{{ item.title }}</span>
           {% if item.company %}<span class="entry-org"> — {{ item.company }}</span>{% endif %}
         </div>
+        {% if item.location %}<span class="entry-loc">{{ item.location }}</span>{% endif %}
       </div>
       {% if item.bullets %}
       <ul class="bullets">
@@ -212,10 +260,24 @@
     <div class="entry">
       <div class="entry-head">
         {% if education.date %}<span class="entry-date">{{ education.date }}</span>{% endif %}
-        <div>
+        <div class="entry-main">
           <span class="entry-title">{{ education.degree }}</span>
           {% if education.institution %}<span class="entry-org"> — {{ education.institution }}</span>{% endif %}
         </div>
+      </div>
+    </div>
+    {% endfor %}
+  </section>
+  {% endif %}
+
+  {% if data.languages %}
+  <section class="cv-section">
+    <h2>{{ headings.languages }}</h2>
+    {% for language in data.languages %}
+    <div class="entry">
+      <div class="entry-head">
+        <span class="entry-title">{{ language.name }}</span>
+        {% if language.proficiency %}<span class="entry-org"> — {{ language.proficiency }}</span>{% endif %}
       </div>
     </div>
     {% endfor %}
@@ -227,6 +289,32 @@
     <h2>{{ headings.certifications }}</h2>
     <ul class="bullets">
       {% for cert in data.certifications %}<li>{{ cert }}</li>{% endfor %}
+    </ul>
+  </section>
+  {% endif %}
+
+  {% if data.publications %}
+  <section class="cv-section">
+    <h2>{{ headings.publications }}</h2>
+    {% for publication in data.publications %}
+    <div class="entry">
+      <div class="entry-head">
+        {% if publication.date %}<span class="entry-date">{{ publication.date }}</span>{% endif %}
+        <div class="entry-main">
+          <span class="entry-title">{{ publication.title }}</span>
+          {% if publication.venue %}<span class="entry-org"> — {{ publication.venue }}</span>{% endif %}
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </section>
+  {% endif %}
+
+  {% if data.awards %}
+  <section class="cv-section">
+    <h2>{{ headings.awards }}</h2>
+    <ul class="bullets">
+      {% for award in data.awards %}<li>{{ award }}</li>{% endfor %}
     </ul>
   </section>
   {% endif %}

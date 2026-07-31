@@ -3,6 +3,8 @@ export interface CvRebuildExperienceItem {
 
   company: string
 
+  location: string
+
   date: string
 
   bullets: string[]
@@ -22,12 +24,34 @@ export interface CvRebuildEducationItem {
   date: string
 }
 
+export interface CvRebuildLinkItem {
+  label: string
+
+  url: string
+}
+
+export interface CvRebuildLanguageItem {
+  name: string
+
+  proficiency: string
+}
+
+export interface CvRebuildPublicationItem {
+  title: string
+
+  venue: string
+
+  date: string
+}
+
 export interface CvRebuildData {
   name: string
 
   email: string
 
   phone: string
+
+  links: CvRebuildLinkItem[]
 
   summary: string
 
@@ -40,6 +64,12 @@ export interface CvRebuildData {
   certifications: string[]
 
   education: CvRebuildEducationItem[]
+
+  languages: CvRebuildLanguageItem[]
+
+  publications: CvRebuildPublicationItem[]
+
+  awards: string[]
 }
 
 export interface CvRebuildResponse {
