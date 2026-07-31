@@ -7,7 +7,7 @@ export function rebuildCv(file: File): Promise<CvRebuildResponse> {
 
   form.append("file", file)
 
-  return requestJson<CvRebuildResponse>("/cv/rebuild", {
+  return requestJson<CvRebuildResponse>("/api/cv/rebuild", {
     method: "POST",
     body: form,
     authenticated: true,
