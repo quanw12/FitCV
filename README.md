@@ -307,6 +307,45 @@ Các cột auth quan trọng trong bảng `account`:
 - `reset_token_hash`
 - `reset_token_expires_at`
 
+## AI Rebuild CV
+
+Feature giúp Student tạo lại CV thành file PDF chuẩn hóa từ CV đang có. Pipeline
+hoàn toàn stateless: backend đọc text từ PDF/DOCX đã upload, gọi Gemini một lần
+để trích xuất và làm gọn dữ liệu CV, render HTML bằng Jinja2 rồi tạo PDF và
+thumbnail bằng headless Chromium (Playwright). Toàn bộ chạy trong
+`TemporaryDirectory`; không ghi file vào `backend/uploads/` và không thay đổi
+database.
+
+Endpoint (yêu cầu đăng nhập):
+
+```text
+POST /api/cv/rebuild
+```
+
+Gửi `multipart/form-data` với field `file` (PDF/DOCX, tối đa 10 MB). Response trả
+về `preview_json` (dữ liệu CV đã trích xuất), `pdf_base64` và `thumbnail_base64`.
+
+Cấu hình trong `backend/.env`:
+
+```env
+GEMINI_API_KEY=<google-ai-studio-api-key>
+GEMINI_MODEL=gemini-3.1-flash-lite
+```
+
+Ngoài ra backend cần headless Chromium cho bước render PDF, xem phần
+"Cài đặt headless Chromium dùng cho AI Rebuild CV" trong mục Cài Backend:
+
+```powershell
+cd backend
+.venv\Scripts\python.exe -m playwright install chromium
+```
+
+Lỗi thường gặp:
+
+- `400`: file rỗng, lớn hơn 10 MB hoặc không phải PDF/DOCX hợp lệ.
+- `422`: Gemini trả cấu trúc CV sai sau nhiều lần thử; kiểm tra `GEMINI_API_KEY`/`GEMINI_MODEL` và log backend.
+- `502`: lỗi gọi Gemini hoặc render PDF; kiểm tra key, quota Gemini và cài đặt Chromium ở trên.
+
 ## Google Sign-In
 
 Google sign-in dùng Google Identity Services:
