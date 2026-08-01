@@ -1,6 +1,7 @@
 import type {
   ApplicationDetail,
   ApplicationInput,
+  ApplicationNotification,
   ApplicationNote,
   ApplicationStats,
   ApplicationStatus,
@@ -62,10 +63,26 @@ interface BackendStatusHistory {
   changed_at: string
 }
 
+interface BackendNotification {
+  notification_id: number
+
+  event_type: string
+
+  title: string
+
+  message: string
+
+  read_at: string | null
+
+  created_at: string
+}
+
 interface BackendApplicationDetail extends BackendApplication {
   notes: BackendApplicationNote[]
 
   status_history: BackendStatusHistory[]
+
+  notifications: BackendNotification[]
 }
 
 interface BackendStats {
@@ -128,6 +145,22 @@ function normalizeNote(payload: BackendApplicationNote): ApplicationNote {
   }
 }
 
+function normalizeNotification(payload: BackendNotification): ApplicationNotification {
+  return {
+    notificationId: payload.notification_id,
+
+    eventType: payload.event_type,
+
+    title: payload.title,
+
+    message: payload.message,
+
+    readAt: utcDateTime(payload.read_at),
+
+    createdAt: utcDateTime(payload.created_at)!,
+  }
+}
+
 function normalizeDetail(payload: BackendApplicationDetail): ApplicationDetail {
   return {
     ...normalizeApplication(payload),
@@ -143,6 +176,8 @@ function normalizeDetail(payload: BackendApplicationDetail): ApplicationDetail {
 
       changedAt: utcDateTime(item.changed_at)!,
     })),
+
+    notifications: payload.notifications.map(normalizeNotification),
   }
 }
 
@@ -199,6 +234,16 @@ export const applicationApi = {
     )
 
     return normalizeDetail(payload)
+  },
+
+  async notifications(applicationId: number): Promise<ApplicationNotification[]> {
+    const payload = await requestJson<BackendNotification[]>(
+      `/api/applications/${applicationId}/notifications`,
+
+      { authenticated: true },
+    )
+
+    return payload.map(normalizeNotification)
   },
 
   async create(payload: ApplicationInput): Promise<ApplicationDetail> {

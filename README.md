@@ -643,6 +643,7 @@ Database hiện hữu phải chạy migration sau trước khi dùng feature:
 
 ```text
 database/migrations/004_add_application_tracker.sql
+database/migrations/008_add_application_notifications.sql
 ```
 
 Lỗi thường gặp:

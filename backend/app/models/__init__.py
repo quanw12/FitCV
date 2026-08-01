@@ -1,6 +1,7 @@
 from app.models.account import Account
 from app.models.application import (
     TrackedApplication,
+    TrackedApplicationNotification,
     TrackedApplicationNote,
     TrackedApplicationStatusHistory,
 )
@@ -38,6 +39,7 @@ __all__ = [
     "MatchResult",
     "Position",
     "TrackedApplication",
+    "TrackedApplicationNotification",
     "TrackedApplicationNote",
     "TrackedApplicationStatusHistory",
 ]

@@ -58,3 +58,30 @@ class TrackedApplicationStatusHistory(Base):
     previous_status: Mapped[str | None] = mapped_column(String(20), nullable=True)
     new_status: Mapped[str] = mapped_column(String(20), nullable=False)
     changed_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
+
+
+class TrackedApplicationNotification(Base):
+    __tablename__ = "tracked_application_notification"
+    __table_args__ = (
+        Index("idx_tracked_application_notification_application_created", "tracked_application_id", "created_at"),
+        Index("idx_tracked_application_notification_account_read", "account_id", "read_at"),
+    )
+
+    notification_id: Mapped[int] = mapped_column(ID_TYPE, primary_key=True, autoincrement=True)
+    tracked_application_id: Mapped[int] = mapped_column(
+        ID_TYPE,
+        ForeignKey("tracked_application.tracked_application_id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    account_id: Mapped[int] = mapped_column(ID_TYPE, ForeignKey("account.account_id", ondelete="CASCADE"), nullable=False)
+    status_history_id: Mapped[int | None] = mapped_column(
+        ID_TYPE,
+        ForeignKey("tracked_application_status_history.status_history_id", ondelete="CASCADE"),
+        unique=True,
+        nullable=True,
+    )
+    event_type: Mapped[str] = mapped_column(String(40), nullable=False)
+    title: Mapped[str] = mapped_column(String(150), nullable=False)
+    message: Mapped[str] = mapped_column(String(500), nullable=False)
+    read_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
