@@ -2,7 +2,10 @@ import { requestJson } from "./httpClient"
 import type {
   BulkEmailSendResult,
   CandidateEmailDraft,
+  EmailThreadDetail,
+  EmailThreadSummary,
   EmailTemplate,
+  SmartReplyTone,
 } from "@/types/emailWorkflow"
 
 export const emailWorkflowApi = {
@@ -35,6 +38,11 @@ export const emailWorkflowApi = {
       `/api/hr/emails/drafts/${emailId}/approve`,
       { authenticated: true, method: "POST" },
     ),
+  reopen: (emailId: number) =>
+    requestJson<CandidateEmailDraft>(
+      `/api/hr/emails/drafts/${emailId}/reopen`,
+      { authenticated: true, method: "POST" },
+    ),
   send: (emailId: number) =>
     requestJson<CandidateEmailDraft>(`/api/hr/emails/drafts/${emailId}/send`, {
       authenticated: true,
@@ -46,4 +54,36 @@ export const emailWorkflowApi = {
       method: "POST",
       body: JSON.stringify({ email_ids: emailIds }),
     }),
+  listThreads: () =>
+    requestJson<EmailThreadSummary[]>("/api/hr/emails/threads", {
+      authenticated: true,
+    }),
+  getThread: (threadId: number) =>
+    requestJson<EmailThreadDetail>(`/api/hr/emails/threads/${threadId}`, {
+      authenticated: true,
+    }),
+  markThreadRead: (threadId: number) =>
+    requestJson<{ thread_id: number; unread_count: number }>(
+      `/api/hr/emails/threads/${threadId}/read`,
+      {
+        authenticated: true,
+        method: "PATCH",
+      },
+    ),
+  generateSmartReply: (
+    threadId: number,
+    tone: SmartReplyTone,
+    guidance?: string,
+  ) =>
+    requestJson<CandidateEmailDraft>(
+      `/api/hr/emails/threads/${threadId}/smart-reply`,
+      {
+        authenticated: true,
+        method: "POST",
+        body: JSON.stringify({
+          tone,
+          guidance: guidance?.trim() || null,
+        }),
+      },
+    ),
 }

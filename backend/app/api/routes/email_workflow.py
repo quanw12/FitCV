@@ -10,7 +10,11 @@ from app.schemas.email_workflow import (
     EmailDraftGenerate,
     EmailDraftResponse,
     EmailDraftUpdate,
+    EmailThreadDetailResponse,
+    EmailThreadReadResponse,
+    EmailThreadSummaryResponse,
     EmailTemplateResponse,
+    SmartReplyGenerate,
 )
 from app.services import email_workflow_service
 
@@ -34,6 +38,57 @@ def list_drafts(
     account: Account = Depends(manager),
 ):
     return email_workflow_service.list_drafts(db, account, job_id)
+
+
+@router.get("/threads", response_model=list[EmailThreadSummaryResponse])
+def list_threads(
+    db: Session = Depends(get_db),
+    account: Account = Depends(manager),
+):
+    return email_workflow_service.list_threads(db, account)
+
+
+@router.get(
+    "/threads/{thread_id}",
+    response_model=EmailThreadDetailResponse,
+)
+def get_thread(
+    thread_id: int,
+    db: Session = Depends(get_db),
+    account: Account = Depends(manager),
+):
+    return email_workflow_service.thread_detail(db, account, thread_id)
+
+
+@router.patch(
+    "/threads/{thread_id}/read",
+    response_model=EmailThreadReadResponse,
+)
+def mark_thread_read(
+    thread_id: int,
+    db: Session = Depends(get_db),
+    account: Account = Depends(manager),
+):
+    return email_workflow_service.mark_thread_read(db, account, thread_id)
+
+
+@router.post(
+    "/threads/{thread_id}/smart-reply",
+    response_model=EmailDraftResponse,
+    status_code=201,
+)
+def generate_smart_reply(
+    thread_id: int,
+    payload: SmartReplyGenerate,
+    db: Session = Depends(get_db),
+    account: Account = Depends(manager),
+):
+    return email_workflow_service.generate_smart_reply(
+        db,
+        account,
+        thread_id,
+        payload,
+    )
 
 
 @router.post("/drafts/generate", response_model=EmailDraftResponse, status_code=201)
@@ -73,6 +128,15 @@ def approve_draft(
     account: Account = Depends(manager),
 ):
     return email_workflow_service.approve(db, account, email_id)
+
+
+@router.post("/drafts/{email_id}/reopen", response_model=EmailDraftResponse)
+def reopen_failed_draft(
+    email_id: int,
+    db: Session = Depends(get_db),
+    account: Account = Depends(manager),
+):
+    return email_workflow_service.reopen_failed_draft(db, account, email_id)
 
 
 @router.post("/drafts/{email_id}/send", response_model=EmailDraftResponse)

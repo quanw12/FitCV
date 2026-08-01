@@ -17,6 +17,7 @@ import { emailWorkflowApi } from "@/api/emailWorkflowApi"
 import { pipelineApi } from "@/api/pipelineApi"
 import type { CandidateEmailDraft, EmailTemplate } from "@/types/emailWorkflow"
 import type { PipelineApplication } from "@/types/pipeline"
+import SmartReplyPanel from "@/ui/components/SmartReplyPanel"
 
 const errorMessage = (cause: unknown, fallback: string) =>
   cause instanceof Error ? cause.message : fallback
@@ -62,7 +63,7 @@ export default function AutoEmailScreen() {
   const [generating, setGenerating] = useState(false)
   const [saving, setSaving] = useState(false)
   const [workflowAction, setWorkflowAction] =
-    useState<"approve" | "send" | "bulk" | null>(null)
+    useState<"approve" | "send" | "reopen" | "bulk" | null>(null)
   const [error, setError] = useState("")
   const [success, setSuccess] = useState("")
 
@@ -240,6 +241,22 @@ export default function AutoEmailScreen() {
       } catch {
         // Keep the original delivery error if refresh also fails.
       }
+    } finally {
+      setWorkflowAction(null)
+    }
+  }
+
+  const reopen = async () => {
+    if (!activeDraft || activeDraft.status !== "Failed" || workflowAction) return
+    setWorkflowAction("reopen")
+    setError("")
+    setSuccess("")
+    try {
+      const reopened = await emailWorkflowApi.reopen(activeDraft.email_id)
+      replaceDraft(reopened)
+      setSuccess("Draft reopened. Review it and approve again before sending.")
+    } catch (cause) {
+      setError(errorMessage(cause, "Could not reopen this failed email draft."))
     } finally {
       setWorkflowAction(null)
     }
@@ -759,6 +776,20 @@ export default function AutoEmailScreen() {
                       </button>
                     )}
 
+                    {activeDraft.status === "Failed" && (
+                      <button
+                        type="button"
+                        className="fc-btn fc-btn--secondary"
+                        disabled={Boolean(workflowAction)}
+                        onClick={() => void reopen()}
+                      >
+                        <ArrowClockwise size={15} />
+                        {workflowAction === "reopen"
+                          ? "Reopening..."
+                          : "Reopen for review"}
+                      </button>
+                    )}
+
                     {activeDraft.status === "Sent" && (
                       <div
                         className="fc-panel"
@@ -918,6 +949,7 @@ export default function AutoEmailScreen() {
           </section>
         </div>
       )}
+      <SmartReplyPanel />
     </div>
   )
 }
