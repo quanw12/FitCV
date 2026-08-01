@@ -19,6 +19,7 @@ from app.schemas.analyzer import (
     JdLibraryInsightsResponse,
     JdLibraryItemResponse,
     MatchResultResponse,
+    SaveJdRequest,
 )
 from app.services import analyzer_service
 
@@ -113,6 +114,17 @@ def list_jd_library(
     db: Session = Depends(get_db),
 ) -> list[JdLibraryItemResponse]:
     return analyzer_service.list_jd_library(db, account=account, query=q)
+
+
+@router.post("/jd-library", response_model=JdLibraryItemResponse, status_code=status.HTTP_201_CREATED)
+def save_jd_library_item(
+    request: SaveJdRequest,
+    account: Account = Depends(get_current_account),
+    db: Session = Depends(get_db),
+) -> JdLibraryItemResponse:
+    return analyzer_service.save_jd_library_item(
+        db, title=request.title, raw_text=request.raw_text, account=account
+    )
 
 
 @router.get("/jd-library/insights", response_model=JdLibraryInsightsResponse)

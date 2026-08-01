@@ -63,7 +63,7 @@ describe("JDLibraryScreen", () => {
   })
 
   it("renders personal JD stats, requested skills, and recurring gaps", async () => {
-    render(<JDLibraryScreen onViewTracking={vi.fn()} />)
+    render(<JDLibraryScreen onViewTracking={vi.fn()} onUseJd={vi.fn()} />)
 
     expect(await screen.findByText("Cybersecurity Intern")).toBeInTheDocument()
     expect(screen.getByText("Analyzed JDs")).toBeInTheDocument()

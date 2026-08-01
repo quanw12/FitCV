@@ -27,6 +27,16 @@ class AnalyzeCvRequest(BaseModel):
         return value.strip()
 
 
+class SaveJdRequest(BaseModel):
+    title: str = Field(min_length=1, max_length=200)
+    raw_text: str = Field(min_length=50, max_length=100_000)
+
+    @field_validator("title", "raw_text")
+    @classmethod
+    def strip_text(cls, value: str) -> str:
+        return value.strip()
+
+
 class CategoryEvidence(BaseModel):
     score: float
     matched: list[str] = Field(default_factory=list)
