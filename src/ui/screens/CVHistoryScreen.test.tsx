@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 const analyzerMocks = vi.hoisted(() => ({
   listCvs: vi.fn(),
   listCvComparisons: vi.fn(),
+  compareCvVersions: vi.fn(),
   uploadCv: vi.fn(),
   deleteCv: vi.fn(),
 }))
@@ -85,6 +86,34 @@ describe("CVHistoryScreen", () => {
         ],
       },
     ])
+    analyzerMocks.compareCvVersions.mockResolvedValue({
+      base: {
+        cvId: 1,
+        fileName: "cv-v1.pdf",
+        fileType: "PDF",
+        fileSizeKb: 120,
+        versionNumber: 1,
+        isLatest: false,
+        uploadedAt: "2026-07-01T10:00:00Z",
+        parseStatus: "Success",
+        parserVersion: "test-v1",
+        errorMessage: null,
+      },
+      target: {
+        cvId: 2,
+        fileName: "cv-v2.pdf",
+        fileType: "PDF",
+        fileSizeKb: 130,
+        versionNumber: 2,
+        isLatest: true,
+        uploadedAt: "2026-07-02T10:00:00Z",
+        parseStatus: "Success",
+        parserVersion: "test-v1",
+        errorMessage: null,
+      },
+      changes: [],
+      scoreDeltas: [],
+    })
   })
 
   it("renders score progress and compares two versions against the same JD", async () => {

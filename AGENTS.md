@@ -111,6 +111,23 @@ Unified matching engine rules:
 - AI Improvement consumes the completed `match_result`; it must not calculate
   another independent CV/JD score.
 
+Candidate email and Smart Reply rules:
+
+- Auto Email and Smart Reply apply only to company-scoped `application` records
+  from Job Applicants/Pipeline. They do not apply to external Upload CV Batch
+  rows because those are not FitCV job applications.
+- Every outbound candidate email follows `Draft -> Approved -> Sent`; AI never
+  sends automatically and backend authorization must enforce HR review.
+- Each application has one company-scoped email thread and a unique inbound
+  reply token. Inbound sender email must match the application candidate.
+- Resend webhooks must be verified from the raw request body, deduplicated by
+  `svix-id`, and stored without treating open/click signals as hiring evidence.
+- Smart Reply treats inbound candidate content as untrusted input, uses only
+  grounded application/job/conversation context, and must not expose scores,
+  rankings, internal notes, or other candidates.
+- Replies use `In-Reply-To` and `References` headers to preserve email-client
+  threading. Provider sends use idempotency keys to make retries safe.
+
 ## Proposed System Architecture
 
 Use this architecture direction for future implementation:

@@ -14,6 +14,7 @@ from app.api.routes import (
     applications,
     auth,
     cv_ranking,
+    email_webhooks,
     email_workflow,
     improvements,
     jobs,
@@ -47,6 +48,11 @@ app.include_router(
     email_workflow.router,
     prefix="/api/hr/emails",
     tags=["candidate-emails"],
+)
+app.include_router(
+    email_webhooks.router,
+    prefix="/api/webhooks/email",
+    tags=["email-webhooks"],
 )
 
 

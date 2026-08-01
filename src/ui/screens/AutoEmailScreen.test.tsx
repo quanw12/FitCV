@@ -9,8 +9,13 @@ const emailMocks = vi.hoisted(() => ({
   generate: vi.fn(),
   update: vi.fn(),
   approve: vi.fn(),
+  reopen: vi.fn(),
   send: vi.fn(),
   bulkSend: vi.fn(),
+  listThreads: vi.fn(),
+  getThread: vi.fn(),
+  markThreadRead: vi.fn(),
+  generateSmartReply: vi.fn(),
 }))
 const pipelineMocks = vi.hoisted(() => ({
   list: vi.fn(),
@@ -26,14 +31,19 @@ import AutoEmailScreen from "./AutoEmailScreen"
 const draft: CandidateEmailDraft = {
   email_id: 7,
   application_id: 4,
+  thread_id: 2,
   template_key: "shortlist",
+  message_kind: "Initial",
   candidate_name: "Nguyen Minh",
   job_title: "Backend Engineer",
   recipient_email: "minh@example.com",
+  reply_to_email: "reply+token@inbound.example.com",
   subject: "Next steps for your application",
   body: "Dear Nguyen Minh,\n\nWe would like to continue with the next step.",
   status: "Draft",
+  delivery_status: null,
   ai_generated: true,
+  in_reply_to: null,
   approved_at: null,
   sent_at: null,
   provider_message_id: null,
@@ -69,6 +79,7 @@ describe("AutoEmailScreen", () => {
       },
     ])
     emailMocks.listDrafts.mockResolvedValue([])
+    emailMocks.listThreads.mockResolvedValue([])
     emailMocks.generate.mockResolvedValue(draft)
     emailMocks.update.mockImplementation(
       (_id: number, subject: string, body: string) =>
@@ -78,6 +89,12 @@ describe("AutoEmailScreen", () => {
       ...draft,
       status: "Approved",
       approved_at: "2026-07-23T09:00:00Z",
+    })
+    emailMocks.reopen.mockResolvedValue({
+      ...draft,
+      status: "Draft",
+      delivery_status: null,
+      error_message: null,
     })
     emailMocks.send.mockResolvedValue({
       ...draft,
@@ -156,5 +173,31 @@ describe("AutoEmailScreen", () => {
       expect(emailMocks.listTemplates).toHaveBeenCalledTimes(2)
     })
     expect(await screen.findByText("Template library")).toBeInTheDocument()
+  })
+
+  it("reopens a failed email for a new HR review", async () => {
+    emailMocks.listDrafts.mockResolvedValue([
+      {
+        ...draft,
+        status: "Failed",
+        delivery_status: "Failed",
+        approved_at: "2026-07-23T09:00:00Z",
+        error_message: "Provider temporarily unavailable.",
+      },
+    ])
+
+    render(<AutoEmailScreen />)
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Reopen for review" }),
+    )
+
+    await waitFor(() => {
+      expect(emailMocks.reopen).toHaveBeenCalledWith(7)
+    })
+    expect(
+      await screen.findByText(
+        "Draft reopened. Review it and approve again before sending.",
+      ),
+    ).toBeInTheDocument()
   })
 })
