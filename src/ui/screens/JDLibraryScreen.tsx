@@ -113,10 +113,12 @@ function validateApplication(
 
 interface JDLibraryScreenProps {
   onViewTracking: (applicationId: number) => void
+  onUseJd: (title: string, text: string) => void
 }
 
 export default function JDLibraryScreen({
   onViewTracking,
+  onUseJd,
 }: JDLibraryScreenProps) {
   const [jobs, setJobs] = useState<JobPost[]>([])
 
@@ -139,6 +141,8 @@ export default function JDLibraryScreen({
 
   const [query, setQuery] = useState("")
 
+  const [libraryQuery, setLibraryQuery] = useState("")
+
   const [location, setLocation] = useState("")
 
   const [loading, setLoading] = useState(true)
@@ -146,6 +150,8 @@ export default function JDLibraryScreen({
   const [libraryLoading, setLibraryLoading] = useState(true)
 
   const [deletingJdId, setDeletingJdId] = useState<number | null>(null)
+
+  const [savingJobId, setSavingJobId] = useState<number | null>(null)
 
   const [profileLoading, setProfileLoading] = useState(false)
 
@@ -180,14 +186,14 @@ export default function JDLibraryScreen({
       .finally(() => setLoading(false))
   }, [])
 
-  const loadLibrary = async () => {
+  const loadLibrary = async (search = libraryQuery) => {
     setLibraryLoading(true)
 
     setLibraryError("")
 
     try {
       const [items, summary] = await Promise.all([
-        jdLibraryApi.list(),
+        jdLibraryApi.list(search),
 
         jdLibraryApi.getInsights(),
       ])
@@ -207,8 +213,9 @@ export default function JDLibraryScreen({
   }
 
   useEffect(() => {
-    void loadLibrary()
-  }, [])
+    const timeoutId = window.setTimeout(() => void loadLibrary(libraryQuery), 250)
+    return () => window.clearTimeout(timeoutId)
+  }, [libraryQuery])
 
   const deleteSavedJd = async (item: JdLibraryItem) => {
     if (!window.confirm(`Delete “${item.title}” and its saved match results?`))
@@ -221,7 +228,7 @@ export default function JDLibraryScreen({
     try {
       await jdLibraryApi.delete(item.jobDescriptionId)
 
-      await loadLibrary()
+      await loadLibrary(libraryQuery)
     } catch (cause) {
       setLibraryError(
         cause instanceof Error
@@ -230,6 +237,25 @@ export default function JDLibraryScreen({
       )
     } finally {
       setDeletingJdId(null)
+    }
+  }
+
+  const saveJobJd = async (job: JobPost) => {
+    setSavingJobId(job.job_id)
+    setLibraryError("")
+    try {
+      await jdLibraryApi.save(
+        `${job.title} · ${job.company.name}`,
+        buildJobDescription(job),
+      )
+      toast.success("Job description saved to your JD library")
+      await loadLibrary(libraryQuery)
+    } catch (cause) {
+      setLibraryError(
+        cause instanceof Error ? cause.message : "Could not save this job description.",
+      )
+    } finally {
+      setSavingJobId(null)
     }
   }
 
@@ -482,6 +508,23 @@ export default function JDLibraryScreen({
               <BookOpenText size={16} weight="light" />
               <h2>My analyzed JD library</h2>
             </div>
+            <label style={{ display: "block", marginBottom: 14 }}>
+              <span className="fc-field-label">Search saved job descriptions</span>
+              <div style={{ position: "relative" }}>
+                <MagnifyingGlass
+                  size={16}
+                  weight="light"
+                  style={{ position: "absolute", left: 12, top: 12 }}
+                />
+                <input
+                  className="fc-input"
+                  style={{ paddingLeft: 38 }}
+                  value={libraryQuery}
+                  onChange={(event) => setLibraryQuery(event.target.value)}
+                  placeholder="Search title, skill, or JD text"
+                />
+              </div>
+            </label>
             {savedJds.length === 0 ? (
               <BezelCard innerClassName="fc-stagger">
                 <div
@@ -608,6 +651,17 @@ export default function JDLibraryScreen({
                           }}
                         >
                           <TrashSimple size={15} weight="light" />
+                        </button>
+                        <button
+                          type="button"
+                          className="fc-btn fc-btn--secondary"
+                          style={{ padding: "6px 10px", fontSize: 12 }}
+                          onClick={(event) => {
+                            event.preventDefault()
+                            onUseJd(item.title, item.rawText)
+                          }}
+                        >
+                          Analyze this JD
                         </button>
                       </span>
                     </summary>
@@ -930,9 +984,30 @@ export default function JDLibraryScreen({
                 marginTop: 14,
               }}
             >
+              <button
+                className="fc-btn fc-btn--primary"
+                type="button"
+                onClick={() =>
+                  onUseJd(
+                    `${selected.title} · ${selected.company.name}`,
+                    buildJobDescription(selected),
+                  )
+                }
+              >
+                <MagnifyingGlass size={15} weight="light" /> Analyze this JD
+              </button>
+              <button
+                className="fc-btn fc-btn--secondary"
+                type="button"
+                disabled={savingJobId === selected.job_id}
+                onClick={() => void saveJobJd(selected)}
+              >
+                <BookOpenText size={15} weight="light" />
+                {savingJobId === selected.job_id ? "Saving…" : "Save to JD library"}
+              </button>
               {applicationByJob.has(selected.job_id) ? (
                 <button
-                  className="fc-btn fc-btn--primary"
+                  className="fc-btn fc-btn--secondary"
                   onClick={() =>
                     viewTracking(applicationByJob.get(selected.job_id)!)
                   }
@@ -941,7 +1016,7 @@ export default function JDLibraryScreen({
                 </button>
               ) : (
                 <button
-                  className="fc-btn fc-btn--primary"
+                  className="fc-btn fc-btn--secondary"
                   onClick={() => setApplyJob(selected)}
                 >
                   <PaperPlaneRight size={15} weight="light" /> Apply now
@@ -1292,6 +1367,19 @@ export default function JDLibraryScreen({
       )}
     </div>
   )
+}
+
+function buildJobDescription(job: JobPost): string {
+  return [
+    `Role: ${job.title}`,
+    `Company: ${job.company.name}`,
+    job.about_job ? `About the job:\n${job.about_job}` : "",
+    job.responsibilities ? `Responsibilities:\n${job.responsibilities}` : "",
+    job.requirements ? `Requirements:\n${job.requirements}` : "",
+    job.we_offer ? `We offer:\n${job.we_offer}` : "",
+  ]
+    .filter(Boolean)
+    .join("\n\n")
 }
 
 function InsightMetric({

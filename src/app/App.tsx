@@ -153,6 +153,12 @@ export default function App() {
     setScreen("app-tracker")
   }
 
+  const handleUseJd = (title: string, text: string) => {
+    setAnalyzerDraft((current) => ({ ...current, jdText: text, result: null }))
+    setScreen("analyzer")
+    toast.success(`Loaded “${title}” into Match Analyzer`)
+  }
+
   const clearImprovementSelection = () => {
     if (session) clearStoredImprovementMatchResultId(session.user.accountId)
     setImprovementMatchResultId(null)
@@ -298,7 +304,12 @@ export default function App() {
           <AppTrackerScreen focusApplicationId={trackerFocusApplicationId} />
         )
       case "jd-library":
-        return <JDLibraryScreen onViewTracking={handleViewTracking} />
+        return (
+          <JDLibraryScreen
+            onViewTracking={handleViewTracking}
+            onUseJd={handleUseJd}
+          />
+        )
       case "profile":
         return <ProfileScreen session={session} onSessionChange={setSession} />
       case "hr-dashboard":

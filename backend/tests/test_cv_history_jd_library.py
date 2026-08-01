@@ -309,3 +309,21 @@ def test_jd_library_search_and_ownership_are_enforced(history_client) -> None:
     assert search.status_code == 200
     assert [item["title"] for item in search.json()] == ["Cybersecurity Intern"]
     assert missing.status_code == 404
+
+    saved = client.post(
+        "/api/jd-library",
+        json={
+            "title": "Cloud Security Intern",
+            "raw_text": "Cloud security intern role requiring Python, AWS, Linux, and strong communication skills.",
+        },
+    )
+    duplicate = client.post(
+        "/api/jd-library",
+        json={
+            "title": "Cloud Security Intern",
+            "raw_text": "Cloud security intern role requiring Python, AWS, Linux, and strong communication skills.",
+        },
+    )
+    assert saved.status_code == 201
+    assert duplicate.status_code == 201
+    assert duplicate.json()["job_description_id"] == saved.json()["job_description_id"]
