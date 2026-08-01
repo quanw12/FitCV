@@ -341,6 +341,28 @@ CREATE TABLE tracked_application_status_history (
         ON DELETE CASCADE
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
 
+CREATE TABLE tracked_application_notification (
+    notification_id        BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+    tracked_application_id BIGINT UNSIGNED NOT NULL,
+    account_id             BIGINT UNSIGNED NOT NULL,
+    status_history_id      BIGINT UNSIGNED NULL UNIQUE,
+    event_type             VARCHAR(40) NOT NULL,
+    title                  VARCHAR(150) NOT NULL,
+    message                VARCHAR(500) NOT NULL,
+    read_at                DATETIME NULL,
+    created_at             DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_tracked_application_notification_application
+        FOREIGN KEY (tracked_application_id) REFERENCES tracked_application(tracked_application_id)
+        ON DELETE CASCADE,
+    CONSTRAINT fk_tracked_application_notification_account
+        FOREIGN KEY (account_id) REFERENCES account(account_id)
+        ON DELETE CASCADE,
+    CONSTRAINT fk_tracked_application_notification_history
+        FOREIGN KEY (status_history_id) REFERENCES tracked_application_status_history(status_history_id)
+        ON DELETE CASCADE
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
+
 CREATE TABLE match_result (
     match_result_id   BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
     cv_id             BIGINT UNSIGNED NOT NULL,
@@ -461,6 +483,8 @@ CREATE INDEX idx_tracked_application_account_status ON tracked_application(accou
 CREATE INDEX idx_tracked_application_reminder ON tracked_application(account_id, reminder_at);
 CREATE INDEX idx_tracked_application_note_application ON tracked_application_note(tracked_application_id, created_at);
 CREATE INDEX idx_tracked_application_history_application ON tracked_application_status_history(tracked_application_id, changed_at);
+CREATE INDEX idx_tracked_application_notification_application_created ON tracked_application_notification(tracked_application_id, created_at);
+CREATE INDEX idx_tracked_application_notification_account_read ON tracked_application_notification(account_id, read_at);
 CREATE INDEX idx_match_result_cv_job ON match_result(cv_id, job_id);
 CREATE INDEX idx_match_cv_generated ON match_result(cv_id, generated_at);
 CREATE INDEX idx_cv_improvement_suggestion_match_result_id ON cv_improvement_suggestion(match_result_id);

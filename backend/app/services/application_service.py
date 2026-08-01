@@ -637,6 +637,7 @@ def get_application(
         **summary.model_dump(),
         notes=applications.list_notes(db, application_id),
         status_history=applications.list_status_history(db, application_id),
+        notifications=applications.list_notifications(db, application_id),
     )
 
 

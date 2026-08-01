@@ -64,10 +64,26 @@ export interface ApplicationStatusHistory {
   changedAt: string
 }
 
+export interface ApplicationNotification {
+  notificationId: number
+
+  eventType: "ApplicationCreated" | "StatusChanged" | string
+
+  title: string
+
+  message: string
+
+  readAt: string | null
+
+  createdAt: string
+}
+
 export interface ApplicationDetail extends TrackedApplication {
   notes: ApplicationNote[]
 
   statusHistory: ApplicationStatusHistory[]
+
+  notifications: ApplicationNotification[]
 }
 
 export interface ApplicationInput {

@@ -17,6 +17,7 @@ from app.models import (
 )
 from app.models.application import (
     TrackedApplication,
+    TrackedApplicationNotification,
     TrackedApplicationNote,
     TrackedApplicationStatusHistory,
 )
@@ -348,17 +349,72 @@ def download_context(db: Session, application_id: int):
         .where(Application.application_id == application_id)
     ).first()
 
+def _notification_copy(
+    *,
+    company_name: str,
+    position_title: str,
+    previous_status: str | None,
+    new_status: str,
+) -> tuple[str, str]:
+    if previous_status is None:
+        return (
+            "Application tracked",
+            f"{company_name} - {position_title} started in {new_status}.",
+        )
+    return (
+        "Application status changed",
+        f"{company_name} - {position_title} moved from {previous_status} to {new_status}.",
+    )
+
+
+def _add_status_notification(
+    db: Session,
+    *,
+    application: TrackedApplication,
+    history: TrackedApplicationStatusHistory,
+    created_at: datetime | None = None,
+) -> None:
+    if history.status_history_id is None:
+        db.flush()
+    exists = db.scalar(
+        select(TrackedApplicationNotification.notification_id).where(
+            TrackedApplicationNotification.status_history_id == history.status_history_id
+        )
+    )
+    if exists:
+        return
+    title, message = _notification_copy(
+        company_name=application.company_name,
+        position_title=application.position_title,
+        previous_status=history.previous_status,
+        new_status=history.new_status,
+    )
+    notification_values = {
+        "tracked_application_id": application.tracked_application_id,
+        "account_id": application.account_id,
+        "status_history_id": history.status_history_id,
+        "event_type": "ApplicationCreated" if history.previous_status is None else "StatusChanged",
+        "title": title,
+        "message": message,
+    }
+    event_time = created_at or history.changed_at
+    if event_time is not None:
+        notification_values["created_at"] = event_time
+    db.add(TrackedApplicationNotification(**notification_values))
+
+
 def create_application(db: Session, *, account_id: int, values: dict) -> TrackedApplication:
     application = TrackedApplication(account_id=account_id, **values)
     db.add(application)
     db.flush()
-    db.add(
-        TrackedApplicationStatusHistory(
-            tracked_application_id=application.tracked_application_id,
-            previous_status=None,
-            new_status=application.status,
-        )
+    history = TrackedApplicationStatusHistory(
+        tracked_application_id=application.tracked_application_id,
+        previous_status=None,
+        new_status=application.status,
     )
+    db.add(history)
+    db.flush()
+    _add_status_notification(db, application=application, history=history)
     db.commit()
     db.refresh(application)
     return application
@@ -449,6 +505,19 @@ def list_status_history(db: Session, application_id: int) -> list[TrackedApplica
     )
 
 
+def list_notifications(db: Session, application_id: int) -> list[TrackedApplicationNotification]:
+    return list(
+        db.scalars(
+            select(TrackedApplicationNotification)
+            .where(TrackedApplicationNotification.tracked_application_id == application_id)
+            .order_by(
+                TrackedApplicationNotification.created_at.desc(),
+                TrackedApplicationNotification.notification_id.desc(),
+            )
+        )
+    )
+
+
 def update_application(
     db: Session,
     application: TrackedApplication,
@@ -461,14 +530,15 @@ def update_application(
         setattr(application, field, value)
     application.last_activity_at = now
     if "status" in values and values["status"] != previous_status:
-        db.add(
-            TrackedApplicationStatusHistory(
-                tracked_application_id=application.tracked_application_id,
-                previous_status=previous_status,
-                new_status=values["status"],
-                changed_at=now,
-            )
+        history = TrackedApplicationStatusHistory(
+            tracked_application_id=application.tracked_application_id,
+            previous_status=previous_status,
+            new_status=values["status"],
+            changed_at=now,
         )
+        db.add(history)
+        db.flush()
+        _add_status_notification(db, application=application, history=history, created_at=now)
     db.commit()
     db.refresh(application)
     return application
