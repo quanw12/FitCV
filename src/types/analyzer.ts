@@ -129,3 +129,26 @@ export interface CvComparisonSeries {
 
   versions: CvScorePoint[]
 }
+
+export interface CvComparisonChange {
+  category: string
+  added: string[]
+  removed: string[]
+  retained: string[]
+  summary: string
+}
+
+export interface CvScoreDelta {
+  jobDescriptionId: number
+  title: string
+  baseScore: number
+  targetScore: number
+  delta: number
+}
+
+export interface CvSemanticComparison {
+  base: CvVersion
+  target: CvVersion
+  changes: CvComparisonChange[]
+  scoreDeltas: CvScoreDelta[]
+}

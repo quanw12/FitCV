@@ -14,6 +14,7 @@ from app.db.session import get_db
 from app.models.account import Account
 from app.schemas.analyzer import (
     AnalyzeCvRequest,
+    CvComparisonResponse,
     CvComparisonSeriesResponse,
     CvVersionResponse,
     JdLibraryInsightsResponse,
@@ -21,6 +22,7 @@ from app.schemas.analyzer import (
     MatchResultResponse,
 )
 from app.services import analyzer_service
+from app.services import cv_comparison_service
 
 router = APIRouter()
 
@@ -53,6 +55,21 @@ def list_cv_comparisons(
     db: Session = Depends(get_db),
 ) -> list[CvComparisonSeriesResponse]:
     return analyzer_service.list_cv_comparisons(db, account=account)
+
+
+@router.get("/cvs/compare", response_model=CvComparisonResponse)
+def compare_cv_versions(
+    base_cv_id: int,
+    target_cv_id: int,
+    account: Account = Depends(get_current_account),
+    db: Session = Depends(get_db),
+) -> CvComparisonResponse:
+    return cv_comparison_service.compare_cv_versions(
+        db,
+        base_cv_id=base_cv_id,
+        target_cv_id=target_cv_id,
+        account=account,
+    )
 
 
 @router.get("/cvs/{cv_id}", response_model=CvVersionResponse)

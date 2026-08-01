@@ -83,6 +83,29 @@ class CvComparisonSeriesResponse(BaseModel):
     versions: list[CvScorePointResponse] = Field(default_factory=list)
 
 
+class CvComparisonChangeResponse(BaseModel):
+    category: str
+    added: list[str] = Field(default_factory=list)
+    removed: list[str] = Field(default_factory=list)
+    retained: list[str] = Field(default_factory=list)
+    summary: str
+
+
+class CvScoreDeltaResponse(BaseModel):
+    job_description_id: int
+    title: str
+    base_score: float
+    target_score: float
+    delta: float
+
+
+class CvComparisonResponse(BaseModel):
+    base: CvVersionResponse
+    target: CvVersionResponse
+    changes: list[CvComparisonChangeResponse] = Field(default_factory=list)
+    score_deltas: list[CvScoreDeltaResponse] = Field(default_factory=list)
+
+
 class JdLibraryItemResponse(BaseModel):
     job_description_id: int
     title: str

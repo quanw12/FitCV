@@ -3,6 +3,7 @@ import type { AsyncStatus } from "@/types/app"
 import type {
   AnalyzeCvRequest,
   CvComparisonSeries,
+  CvSemanticComparison,
   CvVersion,
   MatchAnalysis,
 } from "@/types/analyzer"
@@ -109,6 +110,25 @@ interface BackendCvComparisonSeries {
   latest_delta: number | null
 
   versions: BackendCvScorePoint[]
+}
+
+interface BackendCvSemanticComparison {
+  base: BackendCvVersion
+  target: BackendCvVersion
+  changes: {
+    category: string
+    added: string[]
+    removed: string[]
+    retained: string[]
+    summary: string
+  }[]
+  score_deltas: {
+    job_description_id: number
+    title: string
+    base_score: number
+    target_score: number
+    delta: number
+  }[]
 }
 
 function normalizeCv(payload: BackendCvVersion): CvVersion {
@@ -219,6 +239,23 @@ function normalizeComparison(
   }
 }
 
+function normalizeSemanticComparison(
+  payload: BackendCvSemanticComparison,
+): CvSemanticComparison {
+  return {
+    base: normalizeCv(payload.base),
+    target: normalizeCv(payload.target),
+    changes: payload.changes,
+    scoreDeltas: payload.score_deltas.map((item) => ({
+      jobDescriptionId: item.job_description_id,
+      title: item.title,
+      baseScore: item.base_score,
+      targetScore: item.target_score,
+      delta: item.delta,
+    })),
+  }
+}
+
 export const analyzerApi = {
   async uploadCv(file: File, signal?: AbortSignal): Promise<CvVersion> {
     const body = new FormData()
@@ -266,6 +303,17 @@ export const analyzerApi = {
     )
 
     return payload.map(normalizeComparison)
+  },
+
+  async compareCvVersions(
+    baseCvId: number,
+    targetCvId: number,
+  ): Promise<CvSemanticComparison> {
+    const payload = await requestJson<BackendCvSemanticComparison>(
+      `/api/cvs/compare?base_cv_id=${baseCvId}&target_cv_id=${targetCvId}`,
+      { authenticated: true },
+    )
+    return normalizeSemanticComparison(payload)
   },
 
   deleteCv(cvId: number): Promise<void> {

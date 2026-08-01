@@ -25,7 +25,11 @@ import { toast } from "sonner"
 
 import { analyzerApi } from "@/api/analyzerApi"
 
-import type { CvComparisonSeries, CvVersion } from "@/types/analyzer"
+import type {
+  CvComparisonSeries,
+  CvSemanticComparison,
+  CvVersion,
+} from "@/types/analyzer"
 
 import BezelCard from "@/ui/components/BezelCard"
 
@@ -41,6 +45,11 @@ export default function CVHistoryScreen() {
   const [selectedJdId, setSelectedJdId] = useState<number | null>(null)
 
   const [selected, setSelected] = useState<number[]>([])
+
+  const [semanticComparison, setSemanticComparison] =
+    useState<CvSemanticComparison | null>(null)
+
+  const [comparisonLoading, setComparisonLoading] = useState(false)
 
   const [loading, setLoading] = useState(true)
 
@@ -84,6 +93,41 @@ export default function CVHistoryScreen() {
   useEffect(() => {
     void loadCvs()
   }, [loadCvs])
+
+  useEffect(() => {
+    if (selected.length !== 2) {
+      setSemanticComparison(null)
+      return
+    }
+    const orderedIds = [...selected].sort((left, right) => {
+      const leftVersion = cvs.find((cv) => cv.cvId === left)?.versionNumber ?? 0
+      const rightVersion = cvs.find((cv) => cv.cvId === right)?.versionNumber ?? 0
+      return leftVersion - rightVersion
+    })
+    let cancelled = false
+    setComparisonLoading(true)
+    void analyzerApi
+      .compareCvVersions(orderedIds[0], orderedIds[1])
+      .then((comparison) => {
+        if (!cancelled) setSemanticComparison(comparison)
+      })
+      .catch((caught) => {
+        if (!cancelled) {
+          setSemanticComparison(null)
+          setError(
+            caught instanceof Error
+              ? caught.message
+              : "Unable to compare these CV versions.",
+          )
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setComparisonLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [cvs, selected])
 
   const uploadVersion = async (file?: File) => {
     if (!file) return
@@ -588,6 +632,119 @@ export default function CVHistoryScreen() {
           </div>
         </div>
       )}
+
+      {compareItems.length === 2 && (
+        <div className="fitcv-card" style={{ padding: 24, marginTop: 16 }}>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "baseline",
+              gap: 12,
+              flexWrap: "wrap",
+            }}
+          >
+            <div>
+              <div className="fc-eyebrow">Semantic comparison</div>
+              <h3 style={{ fontSize: 16, fontWeight: 700 }}>
+                What changed between these CV versions?
+              </h3>
+              {semanticComparison && (
+                <p style={{ color: "var(--text-secondary)", fontSize: 12, marginTop: 4 }}>
+                  v{semanticComparison.base.versionNumber} {semanticComparison.base.fileName} → v{semanticComparison.target.versionNumber} {semanticComparison.target.fileName}
+                </p>
+              )}
+            </div>
+            {comparisonLoading && (
+              <span style={{ color: "var(--text-secondary)", fontSize: 12 }}>
+                Comparing parsed evidence…
+              </span>
+            )}
+          </div>
+          {semanticComparison && (
+            <>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+                  gap: 12,
+                  marginTop: 16,
+                }}
+              >
+                {semanticComparison.changes.map((change) => (
+                  <div
+                    key={change.category}
+                    style={{
+                      border: "1px solid var(--border)",
+                      borderRadius: 10,
+                      padding: 14,
+                    }}
+                  >
+                    <strong style={{ fontSize: 13 }}>{change.category}</strong>
+                    <p
+                      style={{
+                        color: "var(--text-secondary)",
+                        fontSize: 12,
+                        margin: "6px 0 10px",
+                      }}
+                    >
+                      {change.summary}
+                    </p>
+                    <ChangeLine label="Added" values={change.added} color="#166534" />
+                    <ChangeLine label="Removed" values={change.removed} color="#B91C1C" />
+                    <ChangeLine label="Retained" values={change.retained} color="#475569" />
+                  </div>
+                ))}
+              </div>
+              {semanticComparison.scoreDeltas.length > 0 && (
+                <div style={{ marginTop: 18 }}>
+                  <strong style={{ fontSize: 13 }}>Score impact by job description</strong>
+                  {semanticComparison.scoreDeltas.map((item) => (
+                    <div
+                      key={item.jobDescriptionId}
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        gap: 12,
+                        padding: "10px 0",
+                        borderBottom: "1px solid var(--border)",
+                        fontSize: 13,
+                      }}
+                    >
+                      <span>{item.title}</span>
+                      <span
+                        style={{
+                          color: item.delta >= 0 ? "#166534" : "#B91C1C",
+                          fontWeight: 700,
+                        }}
+                      >
+                        {item.baseScore.toFixed(1)} → {item.targetScore.toFixed(1)} ({item.delta >= 0 ? "+" : ""}{item.delta.toFixed(1)})
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function ChangeLine({
+  label,
+  values,
+  color,
+}: {
+  label: string
+  values: string[]
+  color: string
+}) {
+  if (values.length === 0) return null
+  return (
+    <div style={{ color, fontSize: 11, lineHeight: 1.5, marginTop: 4 }}>
+      <strong>{label}:</strong> {values.join(", ")}
     </div>
   )
 }

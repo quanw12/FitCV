@@ -845,9 +845,38 @@ class AnalyzerApiTests(unittest.TestCase):
         completed = self.client.get(f"/api/analyzer/matches/{match_id}")
         self.assertEqual(completed.json()["status"], "Success")
         self.assertIn(completed.json()["match_label"], {"Strong Match", "Moderate Match", "Weak Match"})
-        self.assertEqual(len(self.client.get("/api/cvs").json()), 1)
+        improved = Document()
+        improved.add_heading("Technical Skills")
+        improved.add_paragraph("Python, FastAPI, MySQL, Docker, Kubernetes and communication")
+        improved.add_heading("Experience")
+        improved.add_paragraph("5 years building REST APIs and cloud services.")
+        improved_buffer = BytesIO()
+        improved.save(improved_buffer)
+        second_upload = self.client.post(
+            "/api/cvs",
+            files={
+                "file": (
+                    "resume-v2.docx",
+                    improved_buffer.getvalue(),
+                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                )
+            },
+        )
+        self.assertEqual(second_upload.status_code, 201, second_upload.text)
+        second_cv_id = second_upload.json()["cv_id"]
+        comparison = self.client.get(
+            f"/api/cvs/compare?base_cv_id={cv_id}&target_cv_id={second_cv_id}"
+        )
+        self.assertEqual(comparison.status_code, 200, comparison.text)
+        self.assertEqual(comparison.json()["base"]["version_number"], 1)
+        self.assertEqual(comparison.json()["target"]["version_number"], 2)
+        skills_change = next(
+            item for item in comparison.json()["changes"] if item["category"] == "Skills"
+        )
+        self.assertIn("Kubernetes", skills_change["added"])
+        self.assertEqual(len(self.client.get("/api/cvs").json()), 2)
         self.assertEqual(self.client.delete(f"/api/cvs/{cv_id}").status_code, 204)
-        self.assertEqual(self.client.get("/api/cvs").json(), [])
+        self.assertEqual(len(self.client.get("/api/cvs").json()), 1)
 
 
 if __name__ == "__main__":
