@@ -20,6 +20,7 @@ from app.api.routes import (
     jobs,
     pipeline,
     profile,
+    reports,
 )
 from app.core.config import settings
 
@@ -44,6 +45,7 @@ app.include_router(improvements.router, prefix="/api/match-results", tags=["impr
 app.include_router(profile.router, prefix="/api/profile", tags=["profile"])
 app.include_router(jobs.router, prefix="/api/jobs", tags=["jobs"])
 app.include_router(pipeline.router, prefix="/api/hr/pipeline", tags=["pipeline"])
+app.include_router(reports.router, prefix="/api/hr/reports", tags=["reports"])
 app.include_router(
     email_workflow.router,
     prefix="/api/hr/emails",
