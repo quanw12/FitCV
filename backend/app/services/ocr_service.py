@@ -63,9 +63,8 @@ def extract_pdf_text(file_path: Path) -> str:
             }
         ],
         "generationConfig": {
-            "temperature": 0,
             "maxOutputTokens": settings.ocr_max_output_tokens,
-            "thinkingConfig": {"thinkingLevel": "minimal"},
+            "thinkingConfig": {"thinkingLevel": settings.gemini_thinking_level},
         },
     }
     url = f"{GEMINI_API_BASE_URL}/{quote(model, safe='')}:generateContent"

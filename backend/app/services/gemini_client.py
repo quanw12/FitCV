@@ -24,7 +24,9 @@ class GeminiClient:
             "generationConfig": {
                 "responseMimeType": "application/json",
                 "responseJsonSchema": response_schema,
-                "temperature": 0.2,
+                "thinkingConfig": {
+                    "thinkingLevel": settings.gemini_thinking_level,
+                },
             },
         }
         url = (

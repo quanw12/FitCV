@@ -14,8 +14,8 @@ from app.core.config import settings
 
 MAX_SOURCE_CHARS = 100_000
 GEMINI_API_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models"
-GEMINI_EXTRACTOR_VERSION = "v6"
-GEMINI_CV_PARSE_VERSION = "gemini-cv-v3"
+GEMINI_EXTRACTOR_VERSION = "v8"
+GEMINI_CV_PARSE_VERSION = "gemini-cv-v5"
 
 EMAIL_PATTERN = re.compile(r"\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b", re.IGNORECASE)
 URL_PATTERN = re.compile(
@@ -62,6 +62,8 @@ class _CvExtraction(BaseModel):
     experience_evidence: str | None = Field(max_length=300)
     education: Literal["High School", "Associate", "Bachelor", "Master", "Doctorate"] | None
     education_evidence: str | None = Field(max_length=300)
+    education_entries: list[_EvidenceTerm] = Field(default_factory=list, max_length=20)
+    experience_entries: list[_EvidenceTerm] = Field(default_factory=list, max_length=30)
     soft_skills: list[_EvidenceTerm] = Field(max_length=50)
 
 
@@ -156,6 +158,8 @@ ANALYZER_RESPONSE_JSON_SCHEMA = {
                 "experience_evidence": _NULLABLE_STRING_SCHEMA,
                 "education": _NULLABLE_EDUCATION_SCHEMA,
                 "education_evidence": _NULLABLE_STRING_SCHEMA,
+                "education_entries": {"type": "array", "items": _EVIDENCE_TERM_SCHEMA},
+                "experience_entries": {"type": "array", "items": _EVIDENCE_TERM_SCHEMA},
                 "soft_skills": {"type": "array", "items": _EVIDENCE_TERM_SCHEMA},
             },
             "required": [
@@ -164,6 +168,8 @@ ANALYZER_RESPONSE_JSON_SCHEMA = {
                 "experience_evidence",
                 "education",
                 "education_evidence",
+                "education_entries",
+                "experience_entries",
                 "soft_skills",
             ],
         },
@@ -236,8 +242,12 @@ JD quote that proves the relationship into group evidence. Use preferred_skill_g
 groups. Do not duplicate grouped skills in required_skills or preferred_skills. Do not create a group for
 an ordinary list where every skill is independently required.
 
-Education must use the supplied enum. Use null when years or education are not stated. Soft skills must
-be explicitly evidenced in the CV or requested by the JD.
+Education must use the supplied enum. CV education_entries must list each explicit school, major,
+qualification, or study period even when education is null because the degree level is unstated.
+CV experience_entries must list each explicit employment, internship, apprenticeship, or professional
+experience entry even when experience_years is null because no total duration is stated. Each entry name
+must be a concise factual label and its evidence must be an exact source quote. Use null when years or
+education level are not stated. Soft skills must be explicitly evidenced in the CV or requested by the JD.
 Return only the structured extraction; do not make a hiring decision or invent a match score."""
 
 CV_FILE_SYSTEM_PROMPT = """You extract structured, source-grounded facts from the attached CV file.
@@ -259,11 +269,14 @@ and RESTful APIs, Node.js instead of Nodejs, and VS Code instead of VSCode. Do n
 different technology merely because it is related to another one. Do not classify spoken-language
 proficiency such as English or Chinese as a technical skill or soft skill. Before returning, perform a coverage
 audit against the complete file and auxiliary text so every explicit technical term appears once.
-Education must use the supplied enum only when the degree level is
-explicitly named; a school name, university name, major, course list, or the word student is not a
-degree. Do not calculate experience_years from a date range; return it only when the CV explicitly
-states a total such as "2 years of experience". Do not treat an education date, project date, or an
-unexplained date range as work experience. Do not infer personality, protected traits, work
+Education must use the supplied enum only when the degree level is explicitly named; a school name,
+university name, major, course list, or the word student is not a degree. However, education_entries
+must preserve every explicit school, major, qualification, and study period even when education is null.
+Do not calculate experience_years from a date range; return it only when the CV explicitly states a
+total such as "2 years of experience". However, experience_entries must preserve every explicit job,
+internship, apprenticeship, or professional-experience entry with its title, organization or project,
+and date range when present. Never put education, projects, certifications, or unexplained date ranges
+in experience_entries. Do not infer personality, protected traits, work
 authorization, or qualifications that are not present. Return only the structured extraction and
 never a score or explanation."""
 
@@ -343,8 +356,8 @@ def extract_cv_inputs_from_file(
         "generationConfig": {
             "responseMimeType": "application/json",
             "responseJsonSchema": CV_RESPONSE_JSON_SCHEMA,
-            "temperature": 0,
             "maxOutputTokens": 8_000,
+            "thinkingConfig": {"thinkingLevel": settings.gemini_thinking_level},
         },
     }
     url = f"{GEMINI_API_BASE_URL}/{quote(model, safe='')}:generateContent"
@@ -362,6 +375,12 @@ def extract_cv_inputs_from_file(
         "experience_evidence": extracted.experience_evidence,
         "education": extracted.education,
         "education_evidence": extracted.education_evidence,
+        "education_entries": _file_grounded_terms(
+            extracted.education_entries, auxiliary_text
+        ),
+        "experience_entries": _file_grounded_terms(
+            extracted.experience_entries, auxiliary_text
+        ),
         "soft_skills": _names(extracted.soft_skills),
         "sections": {},
         "_extraction_provider": "gemini",
@@ -417,8 +436,8 @@ def extract_match_inputs(
         "generationConfig": {
             "responseMimeType": "application/json",
             "responseJsonSchema": ANALYZER_RESPONSE_JSON_SCHEMA,
-            "temperature": 0,
             "maxOutputTokens": 8_000,
+            "thinkingConfig": {"thinkingLevel": settings.gemini_thinking_level},
         },
     }
     url = f"{GEMINI_API_BASE_URL}/{quote(model, safe='')}:generateContent"
@@ -519,8 +538,8 @@ def _audit_cv_skill_coverage(
         "generationConfig": {
             "responseMimeType": "application/json",
             "responseJsonSchema": CV_COVERAGE_RESPONSE_JSON_SCHEMA,
-            "temperature": 0,
             "maxOutputTokens": 8_000,
+            "thinkingConfig": {"thinkingLevel": settings.gemini_thinking_level},
         },
     }
     url = f"{GEMINI_API_BASE_URL}/{quote(model, safe='')}:generateContent"
@@ -572,6 +591,13 @@ def _sanitize_cv_payload(payload: dict) -> dict:
     ):
         sanitized["experience_years"] = None
     return sanitized
+
+
+def _file_grounded_terms(values: list[_EvidenceTerm], source: str) -> list[str]:
+    """Keep source-backed factual entries without requiring a degree or total years."""
+    if source:
+        return _grounded_terms(values, source, {})
+    return _canonical_terms(_names(values), {})
 
 
 def _send_request(*, url: str, body: dict) -> dict:
@@ -694,6 +720,12 @@ def _normalize_extraction(
             extracted.cv.education,
             extracted.cv.education_evidence,
             cv_source,
+        ),
+        "education_entries": _grounded_terms(
+            extracted.cv.education_entries, cv_source, {}
+        ),
+        "experience_entries": _grounded_terms(
+            extracted.cv.experience_entries, cv_source, {}
         ),
         "soft_skills": _grounded_terms(
             extracted.cv.soft_skills, cv_source, soft_skill_names

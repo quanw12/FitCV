@@ -81,7 +81,7 @@ def selected_analyzer_config() -> tuple[str, str | None]:
         if not model_slug:
             raise GeminiAnalyzerError("GEMINI_MODEL must not be empty.")
         return (
-            f"fitcv-gemini-{model_slug[:22]}-{GEMINI_EXTRACTOR_VERSION}-s5",
+            f"fitcv-gemini-{model_slug[:22]}-{GEMINI_EXTRACTOR_VERSION}-s7",
             settings.gemini_model,
         )
     raise GeminiAnalyzerError(
