@@ -4,7 +4,7 @@ from io import BytesIO
 from pathlib import Path
 from zipfile import BadZipFile, ZipFile
 
-PARSER_VERSION = "fitcv-parser-v3-preprocess"
+PARSER_VERSION = "fitcv-parser-v5-gemini-source"
 MAX_CV_BYTES = 10 * 1024 * 1024
 
 SKILL_ALIASES: dict[str, tuple[str, ...]] = {
@@ -16,16 +16,18 @@ SKILL_ALIASES: dict[str, tuple[str, ...]] = {
     "C#": ("c#", "c sharp"),
     "Go": ("golang",),
     "PHP": ("php",),
-    "HTML": ("html",),
-    "CSS": ("css",),
+    "HTML": ("html", "html5"),
+    "CSS": ("css", "css3"),
     "React": ("react.js", "reactjs", "react"),
     "Node.js": ("node.js", "nodejs", "node js"),
+    "ASP.NET": ("asp.net", "asp net", "aspnet"),
     "FastAPI": ("fastapi",),
     "Django": ("django",),
     "Flask": ("flask",),
     "Laravel": ("laravel",),
     "SQL": ("sql",),
     "MySQL": ("mysql",),
+    "SQL Server": ("sql server",),
     "PostgreSQL": ("postgresql", "postgres"),
     "MongoDB": ("mongodb", "mongo db"),
     "Redis": ("redis",),
@@ -41,6 +43,13 @@ SKILL_ALIASES: dict[str, tuple[str, ...]] = {
     "CI/CD": ("ci/cd", "continuous integration", "continuous delivery"),
     "Linux": ("linux",),
     "Bash": ("bash", "shell scripting"),
+    "Tailwind CSS": ("tailwind css",),
+    "Bootstrap": ("bootstrap",),
+    "Figma": ("figma",),
+    "Postman": ("postman",),
+    "XAMPP": ("xampp",),
+    "JWT": ("jwt",),
+    "VNPay": ("vnpay",),
     "Agile": ("agile",),
     "Scrum": ("scrum",),
     "Machine Learning": ("machine learning",),
@@ -242,12 +251,15 @@ def _extract_sections(text: str) -> dict[str, str]:
         "summary": "summary",
         "professional summary": "summary",
         "experience": "experience",
+        "professional experience": "experience",
         "work experience": "experience",
         "employment history": "experience",
         "education": "education",
         "skills": "skills",
         "technical skills": "skills",
+        "core competencies": "skills",
         "projects": "projects",
+        "selected projects": "projects",
     }
     sections: dict[str, list[str]] = {}
     current = "other"
