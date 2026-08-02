@@ -372,7 +372,7 @@ export default function ReportsScreen() {
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "repeat(4, 1fr)",
+              gridTemplateColumns: "repeat(5, 1fr)",
               gap: 16,
               marginBottom: 20,
             }}
