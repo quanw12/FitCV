@@ -5,6 +5,7 @@ import {
   ClockCounterClockwise,
   CheckSquare,
   BookOpenText,
+  LinkedinLogo,
   UserCircle,
   Briefcase,
   ChartBar,
@@ -73,6 +74,14 @@ export const seekerNavItems: NavItem[] = [
     label: "JD Library",
 
     screen: "jd-library",
+  },
+
+  {
+    icon: <LinkedinLogo size={18} weight="light" />,
+
+    label: "LinkedIn Jobs",
+
+    screen: "linkedin-jobs",
   },
 
   {
