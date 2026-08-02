@@ -65,8 +65,8 @@ vi.mock("@/ui/screens/ImprovementScreen", () => ({
   ),
 }))
 
-vi.mock("@/ui/screens/SeekerDashboard", () => ({
-  default: () => <div>Seeker dashboard</div>,
+vi.mock("@/ui/screens/CVReBuildScreen", () => ({
+  default: () => <div>CV rebuild screen</div>,
 }))
 
 vi.mock("@/ui/screens/PublicJobScreen", () => ({
@@ -144,6 +144,7 @@ describe("Analyzer to Improvement selection", () => {
     render(<App />)
 
     expect(await screen.findByText("Public job 91")).toBeInTheDocument()
+
     expect(
       screen.queryByRole("button", { name: "Sign in second account" }),
     ).not.toBeInTheDocument()

@@ -1,8 +1,12 @@
 from pathlib import Path
+import asyncio
 import sys
 
 if __package__ in {None, ""}:
     sys.path.append(str(Path(__file__).resolve().parents[1]))
+
+if sys.platform == "win32":
+    asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -14,6 +18,7 @@ from app.api.routes import (
     applications,
     auth,
     cv_ranking,
+    cv_rebuild,
     email_webhooks,
     email_workflow,
     improvements,
@@ -51,6 +56,7 @@ app.include_router(
     prefix="/api/hr/emails",
     tags=["candidate-emails"],
 )
+app.include_router(cv_rebuild.router, prefix="/api/cv", tags=["cv-rebuild"])
 app.include_router(
     email_webhooks.router,
     prefix="/api/webhooks/email",
@@ -64,4 +70,10 @@ def health_check() -> dict[str, str]:
 
 
 if __name__ == "__main__":
-    uvicorn.run("app.main:app", host="127.0.0.1", port=8000, reload=True)
+    uvicorn.run(
+        "app.main:app",
+        host="127.0.0.1",
+        port=8000,
+        reload=True,
+        loop="none",
+    )

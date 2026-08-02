@@ -1,0 +1,287 @@
+"""Prompts and JSON schema for the single-call Gemini CV rebuild step."""
+
+CV_DATA_JSON_SCHEMA: dict = {
+    "type": "object",
+    "required": ["name"],
+    "properties": {
+        "name": {"type": "string"},
+        "email": {"type": "string"},
+        "phone": {"type": "string"},
+        "links": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "label": {"type": "string"},
+                    "url": {"type": "string"},
+                },
+            },
+        },
+        "summary": {"type": "string"},
+        "experience": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "title": {"type": "string"},
+                    "company": {"type": "string"},
+                    "location": {"type": "string"},
+                    "date": {"type": "string"},
+                    "bullets": {"type": "array", "items": {"type": "string"}},
+                },
+            },
+        },
+        "skills": {"type": "array", "items": {"type": "string"}},
+        "core_competencies": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string"},
+                    "description": {"type": "string"},
+                },
+            },
+        },
+        "skill_groups": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "category": {"type": "string"},
+                    "items": {"type": "array", "items": {"type": "string"}},
+                },
+            },
+        },
+        "projects": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string"},
+                    "description": {"type": "string"},
+                    "links": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "label": {"type": "string"},
+                                "url": {"type": "string"},
+                            },
+                        },
+                    },
+                },
+            },
+        },
+        "certifications": {"type": "array", "items": {"type": "string"}},
+        "education": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "degree": {"type": "string"},
+                    "institution": {"type": "string"},
+                    "date": {"type": "string"},
+                },
+            },
+        },
+        "languages": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string"},
+                    "proficiency": {"type": "string"},
+                },
+            },
+        },
+        "publications": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "title": {"type": "string"},
+                    "venue": {"type": "string"},
+                    "date": {"type": "string"},
+                },
+            },
+        },
+        "awards": {"type": "array", "items": {"type": "string"}},
+    },
+}
+
+_EXTRACT_PROMPT = """You are an expert CV reviewer and professional CV writer.
+
+You receive the raw text extracted from a candidate's CV.
+
+Step 1 — Extract: Build a structured JSON profile containing ONLY information
+explicitly present in the raw text. Capture ALL important information:
+contact details, profile links (LinkedIn, GitHub, portfolio), professional
+experience, projects, education, skills, certifications, languages,
+publications, awards, and honors. Keep numbers, dates, job titles, company
+names, and metrics exactly as written. Do not infer, guess, or add anything
+that is not in the text.
+
+Step 2 — Polish: Rewrite the summary and each experience bullet to be
+professional, concise, grammatically correct, and consistent in style. Do NOT
+change facts, and do NOT add skills, responsibilities, numbers, or experiences
+that are not present in the extracted data.
+
+Rules:
+- Bullets: begin each bullet with a strong action verb, keep it to one or two
+  concise lines, avoid personal pronouns (I, we, my), and keep concrete
+  numbers or metrics when the source provides them.
+- Preserve technical detail: NEVER drop technology keywords, product names,
+  or acronyms that appear in the source (for example JWT, VNPay, Admin
+  Dashboard, Redis, microservices). When polishing bullets and project
+  descriptions, keep every such keyword and keep the concrete work detail.
+  When in doubt, keep MORE detail instead of summarizing into generic lines;
+  technical recruiters judge projects by the keywords and the real work.
+- Career goal: if the source contains a personal objective or career goal,
+  merge it into "summary" so the intro shows the direction; do not delete
+  it and do not add a separate objective section.
+- Certifications: keep ONLY certifications the candidate has completed. Do
+  not include planned or in-progress certifications; a CV lists credentials,
+  not intentions.
+- ATS-safe text: convert rating symbols (★, ☆, ●, ▲, ■ and similar) in
+  languages or skills into clear words, for example "Native", "Fluent",
+  "Intermediate" (English) or "Thành thạo", "Khá", "Cơ bản" (Vietnamese), or
+  a CEFR level. Do not output decorative symbols anywhere in the JSON; ATS
+  scanners cannot read them.
+- Preserve self-directed learning: keep expressions of self-study and
+  initiative exactly as they appear ("self-taught", "tự học", "tự tìm hiểu",
+  "built a HomeLab", "nghiên cứu độc lập"). Do not rewrite them into neutral
+  administrative language; for intern and fresher candidates these are
+  highlights.
+- Completeness: Do NOT omit important information just to fit the format.
+  Every meaningful detail in the raw text belongs in the closest field. Only
+  leave out content that is irrelevant for a professional CV, such as
+  references, age, or marital status.
+- "skills" is a compact list of short technology, framework, and tool names
+  only (for example "Python", "React", "Docker"); keep the raw names exactly
+  as written, without explanations.
+- "core_competencies" is a curated section: choose the 5-7 most important
+  competencies demonstrated in the CV. For each one, write a "name" (for
+  example "Backend Development" or "Python") and a "description" of one short
+  sentence explaining the depth or value, grounded strictly in the CV
+  (years of experience, scale, domain, or notable results). Do not invent
+  depth that the CV does not show.
+- "skill_groups" organizes the technical "skills" into 2-4 categories (for
+  example "Languages", "Frameworks & Libraries", "Tools & Platforms"); each
+  item stays a short name. Only include this field when there are enough
+  skills to group; otherwise leave it as an empty array.
+- If a field is absent in the raw text, leave it as an empty string or an
+  empty array. Never invent placeholder values.
+- Language consistency is MANDATORY: choose ONE language for the entire CV —
+  the dominant language of the raw text — and write EVERY field in that
+  language: summary, job titles, experience bullets, project descriptions,
+  competency names and descriptions, certifications, education degrees, and
+  awards. If the source mixes languages, translate the minority-language
+  content into the dominant language. A CV whose summary is in one language
+  while its bullets, headings, or other sections are in another is a defect;
+  never produce that. Only the candidate's name, technical terms, tool
+  names, company names, locations, and URLs stay in their original form.
+- "name" is the candidate's full name; if not found, use an empty string.
+  Keep it exactly as written, including Vietnamese diacritics (for example
+  "Nguyễn Văn A"), even when the rest of the CV is in English.
+- For "links", use the platform name as the label (for example "LinkedIn" or
+  "GitHub") and the full URL as the "url".
+- Each project may have its own "links" containing the repository or demo URL
+  that appears in the raw text; give the link a short label (for example
+  "GitHub" or "Demo") and the full URL as the "url".
+
+Raw CV text:
+<cv_text>
+
+Output ONLY the JSON object matching the provided schema."""
+
+_VALIDATION_SUFFIX = """
+
+Previous attempt was rejected by validation. Fix exactly these errors and
+output only the corrected JSON:
+
+<validation_error>
+"""
+
+_LANGUAGE_LABELS = {"en": "English", "vi": "Vietnamese"}
+
+_BUILD_PROMPT = """You are an expert CV writer. The candidate entered their CV
+information in a form and selected the CV language: <language_label>.
+
+Polish the entered information into a professional, ATS-friendly CV profile.
+Follow the schema exactly.
+
+Rules:
+- Polish for impact: paraphrase the entered information into confident,
+  impressive, results-oriented language with strong action verbs ("built",
+  "led", "designed", "optimized", "delivered" instead of "did", "worked on",
+  "helped with"). Fix grammar and avoid personal pronouns (I, we, my).
+  Never upgrade an action the candidate did not claim: "participated in"
+  must not become "led". Never change facts, numbers, dates, names, or
+  URLs, and never add experience the candidate did not enter.
+- Never invent anything: no new skills, technologies, numbers, metrics,
+  percentages, counts, responsibilities, projects, or outcomes beyond what
+  the candidate entered. Every number in your output must already exist in
+  the entered information.
+- Completeness is MANDATORY: every entered section and every entered entry
+  must survive the polish. Keep ALL sections — education, projects,
+  certifications, publications, awards, languages, experience — even when a
+  section seems minor. Never drop an entered bullet, project, publication,
+  certification, award, education entry, or language, and never merge
+  several entered entries into one. Keep every bullet and description
+  complete; do not truncate them for brevity. When in doubt, keep MORE
+  detail instead of summarizing into generic lines.
+- Preserve technical detail: NEVER drop technology keywords, product names,
+  or acronyms the candidate entered (for example JWT, VNPay, Admin
+  Dashboard, Redis).
+- Keep expressions of self-study and initiative exactly as they appear
+  ("self-taught", "tự học", "built a HomeLab", "nghiên cứu độc lập").
+- Keep the candidate's name exactly as entered, including Vietnamese
+  diacritics (for example "Nguyễn Văn A"), even when the selected CV
+  language is English.
+- Language consistency is MANDATORY: write EVERY field — summary, job titles,
+  experience bullets, project descriptions, competency names and
+  descriptions, certifications, education degrees, and awards — in the
+  selected language (<language_label>), translating the entered content when
+  needed. Never leave a field in a different language. Only the candidate's
+  name, technical terms, tool names, company names, locations, and URLs stay
+  in their original form.
+- "summary": polish it and merge in any career goal the candidate mentioned.
+- "skills": keep the short tool names exactly as entered. If there are
+  enough skills, also organize them into "skill_groups" with 2-4 categories
+  (for example Languages, Frameworks & Libraries, Tools & Platforms).
+- "core_competencies": derive 5-7 competencies from the entered experience
+  and skills. For each one write a "name" and a one-sentence "description"
+  explaining depth or value, grounded ONLY in the entered data. Do not invent
+  facts.
+- ATS-safe: do not output decorative symbols anywhere (★, ☆, ●, ✓, ▲...).
+  Convert rating symbols in language proficiency into words ("Native",
+  "Fluent", "Intermediate" or "Thành thạo", "Khá", "Cơ bản").
+- Empty arrays mean the candidate did not provide that section; leave them
+  empty. Do not invent placeholder values.
+
+Entered CV JSON:
+<cv_json>
+
+Output ONLY the JSON object matching the provided schema."""
+
+
+def build_extraction_prompt(raw_text: str, validation_error: str | None = None) -> str:
+    prompt = _EXTRACT_PROMPT.replace("<cv_text>", raw_text.strip())
+    if validation_error:
+        prompt = prompt + _VALIDATION_SUFFIX.replace(
+            "<validation_error>", validation_error.strip()
+        )
+    return prompt
+
+
+def build_polish_prompt(
+    cv_json: str, language: str, validation_error: str | None = None
+) -> str:
+    prompt = _BUILD_PROMPT.replace(
+        "<language_label>", _LANGUAGE_LABELS.get(language, "English")
+    ).replace("<cv_json>", cv_json.strip())
+    if validation_error:
+        prompt = prompt + _VALIDATION_SUFFIX.replace(
+            "<validation_error>", validation_error.strip()
+        )
+    return prompt

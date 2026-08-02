@@ -1,43 +1,67 @@
 import { lazy, Suspense, useEffect, useState } from "react"
 
 import { AnimatePresence } from "framer-motion"
+
 import { toast } from "sonner"
 
 import { authApi, profileApi } from "@/api"
+
 import {
   clearStoredImprovementMatchResultId,
   getStoredImprovementMatchResultId,
   storeImprovementMatchResultId,
 } from "@/services/improvementSelection"
+
 import { isCompanyProfileComplete, requiresCompanyProfile } from "@/services"
+
 import type { AnalyzerDraftState } from "@/types/analyzer"
+
 import type { Portal, ScreenId } from "@/types/app"
+
 import { portalFromAccountRole, type AuthSession } from "@/types/auth"
+
 import FullPageSkeleton from "@/ui/components/FullPageSkeleton"
+
 import Layout from "@/ui/components/Layout"
+
 import ToastProvider from "@/ui/components/ToastProvider"
 
 const AuthScreen = lazy(() => import("@/ui/screens/AuthScreen"))
+
 const LandingScreen = lazy(() => import("@/ui/screens/LandingScreen"))
-const SeekerDashboard = lazy(() => import("@/ui/screens/SeekerDashboard"))
+
+const CVReBuildScreen = lazy(() => import("@/ui/screens/CVReBuildScreen"))
+
 const AnalyzerScreen = lazy(() => import("@/ui/screens/AnalyzerScreen"))
+
 const ImprovementScreen = lazy(() => import("@/ui/screens/ImprovementScreen"))
+
 const CVHistoryScreen = lazy(() => import("@/ui/screens/CVHistoryScreen"))
+
 const AppTrackerScreen = lazy(() => import("@/ui/screens/AppTrackerScreen"))
+
 const JDLibraryScreen = lazy(() => import("@/ui/screens/JDLibraryScreen"))
+
 const HRDashboard = lazy(() => import("@/ui/screens/HRDashboard"))
+
 const JobPostsScreen = lazy(() => import("@/ui/screens/JobPostsScreen"))
+
 const CVRankingScreen = lazy(() => import("@/ui/screens/CVRankingScreen"))
+
 const PipelineScreen = lazy(() => import("@/ui/screens/PipelineScreen"))
+
 const AutoEmailScreen = lazy(() => import("@/ui/screens/AutoEmailScreen"))
+
 const ReportsScreen = lazy(() => import("@/ui/screens/ReportsScreen"))
+
 const ProfileScreen = lazy(() => import("@/ui/screens/ProfileScreen"))
+
 const PublicJobScreen = lazy(() => import("@/ui/screens/PublicJobScreen"))
 
 type CompanyProfileGate = "checking" | "required" | "complete"
 
 function defaultScreen(portal: Portal) {
-  return portal === "seeker" ? "seeker-dashboard" : "hr-dashboard"
+  return portal === "seeker" ? "cv-rebuild" : "hr-dashboard"
 }
 
 function emptyAnalyzerDraft(): AnalyzerDraftState {
@@ -47,8 +71,11 @@ function emptyAnalyzerDraft(): AnalyzerDraftState {
 export default function App() {
   const [publicJobId, setPublicJobId] = useState<number | null>(() => {
     const rawJobId = new URLSearchParams(window.location.search).get("job")
+
     if (!rawJobId) return null
+
     const parsed = Number(rawJobId)
+
     return Number.isInteger(parsed) && parsed > 0 ? parsed : null
   })
 
@@ -58,6 +85,7 @@ export default function App() {
 
   const [screen, setScreen] = useState<ScreenId | "">(() => {
     const currentSession = authApi.getSession()
+
     return currentSession?.user.role
       ? defaultScreen(portalFromAccountRole(currentSession.user.role))
       : ""
@@ -66,6 +94,7 @@ export default function App() {
   const [improvementMatchResultId, setImprovementMatchResultId] =
     useState<string | null>(() => {
       const currentSession = authApi.getSession()
+
       return currentSession
         ? getStoredImprovementMatchResultId(currentSession.user.accountId)
         : null
@@ -73,9 +102,12 @@ export default function App() {
 
   const [analyzerDraft, setAnalyzerDraft] =
     useState<AnalyzerDraftState>(emptyAnalyzerDraft)
+
   const [trackerFocusApplicationId, setTrackerFocusApplicationId] =
     useState<number | null>(null)
+
   const [showLanding, setShowLanding] = useState(() => !authApi.getSession())
+
   const [companyProfileGate, setCompanyProfileGate] =
     useState<CompanyProfileGate>("checking")
 
@@ -85,18 +117,23 @@ export default function App() {
 
   useEffect(() => {
     let active = true
+
     const role = session?.user.role ?? null
 
     if (!session || !requiresCompanyProfile(role)) {
       setCompanyProfileGate("complete")
+
       return () => {
         active = false
       }
     }
 
     setCompanyProfileGate("checking")
+
     profileApi
+
       .get()
+
       .then((profile) => {
         if (active) {
           setCompanyProfileGate(
@@ -104,6 +141,7 @@ export default function App() {
           )
         }
       })
+
       .catch(() => {
         if (active) setCompanyProfileGate("required")
       })
@@ -115,14 +153,21 @@ export default function App() {
 
   const handleAuth = (nextSession: AuthSession) => {
     if (session) clearStoredImprovementMatchResultId(session.user.accountId)
+
     clearStoredImprovementMatchResultId(nextSession.user.accountId)
 
     setShowLanding(false)
+
     setSession(nextSession)
+
     setCompanyProfileGate("checking")
+
     setAnalyzerDraft(emptyAnalyzerDraft())
+
     setImprovementMatchResultId(null)
+
     setTrackerFocusApplicationId(null)
+
     toast.success(`Welcome, ${nextSession.user.fullName}`)
 
     if (nextSession.user.role) {
@@ -132,24 +177,35 @@ export default function App() {
 
   const handleLogout = () => {
     if (session) clearStoredImprovementMatchResultId(session.user.accountId)
+
     authApi.logout()
+
     toast("Signed out successfully")
+
     setSession(null)
+
     setShowLanding(true)
+
     setCompanyProfileGate("complete")
+
     setScreen("")
+
     setAnalyzerDraft(emptyAnalyzerDraft())
+
     setImprovementMatchResultId(null)
+
     setTrackerFocusApplicationId(null)
   }
 
   const handleNavigate = (nextScreen: ScreenId) => {
     if (nextScreen !== "app-tracker") setTrackerFocusApplicationId(null)
+
     setScreen(nextScreen)
   }
 
   const handleViewTracking = (applicationId: number) => {
     setTrackerFocusApplicationId(applicationId)
+
     setScreen("app-tracker")
   }
 
@@ -161,12 +217,15 @@ export default function App() {
 
   const clearImprovementSelection = () => {
     if (session) clearStoredImprovementMatchResultId(session.user.accountId)
+
     setImprovementMatchResultId(null)
   }
 
   const selectImprovementMatch = (matchResultId: string) => {
     if (!session) return
+
     storeImprovementMatchResultId(session.user.accountId, matchResultId)
+
     setImprovementMatchResultId(matchResultId)
   }
 
@@ -179,8 +238,11 @@ export default function App() {
             jobId={publicJobId}
             onBack={() => {
               const nextUrl = new URL(window.location.href)
+
               nextUrl.searchParams.delete("job")
+
               window.history.replaceState({}, "", nextUrl)
+
               setPublicJobId(null)
             }}
           />
@@ -215,9 +277,13 @@ export default function App() {
         <div
           style={{
             minHeight: "100vh",
+
             display: "grid",
+
             placeItems: "center",
+
             background: "var(--bg)",
+
             color: "var(--text-secondary)",
           }}
         >
@@ -235,11 +301,17 @@ export default function App() {
           <header
             style={{
               minHeight: 64,
+
               padding: "0 24px",
+
               display: "flex",
+
               alignItems: "center",
+
               justifyContent: "space-between",
+
               borderBottom: "1px solid var(--border)",
+
               background: "white",
             }}
           >
@@ -251,11 +323,17 @@ export default function App() {
               onClick={handleLogout}
               style={{
                 border: "1px solid var(--border)",
+
                 background: "white",
+
                 borderRadius: 8,
+
                 padding: "8px 12px",
+
                 color: "var(--text-secondary)",
+
                 cursor: "pointer",
+
                 fontWeight: 600,
               }}
             >
@@ -283,8 +361,9 @@ export default function App() {
 
   const renderScreen = () => {
     switch (screen) {
-      case "seeker-dashboard":
-        return <SeekerDashboard onNavigate={handleNavigate} />
+      case "cv-rebuild":
+        return <CVReBuildScreen />
+
       case "analyzer":
         return (
           <AnalyzerScreen
@@ -295,14 +374,18 @@ export default function App() {
             onViewSuggestions={() => setScreen("improvement")}
           />
         )
+
       case "improvement":
         return <ImprovementScreen matchResultId={improvementMatchResultId} />
+
       case "cv-history":
         return <CVHistoryScreen />
+
       case "app-tracker":
         return (
           <AppTrackerScreen focusApplicationId={trackerFocusApplicationId} />
         )
+
       case "jd-library":
         return (
           <JDLibraryScreen
@@ -312,23 +395,31 @@ export default function App() {
         )
       case "profile":
         return <ProfileScreen session={session} onSessionChange={setSession} />
+
       case "hr-dashboard":
         return <HRDashboard onNavigate={handleNavigate} />
+
       case "job-posts":
         return <JobPostsScreen />
+
       case "cv-ranking":
         return <CVRankingScreen />
+
       case "pipeline":
         return <PipelineScreen />
+
       case "auto-email":
         return <AutoEmailScreen />
+
       case "reports":
         return <ReportsScreen />
+
       case "hr-settings":
         return <ProfileScreen session={session} onSessionChange={setSession} />
+
       default:
         return portal === "seeker" ? (
-          <SeekerDashboard onNavigate={handleNavigate} />
+          <CVReBuildScreen />
         ) : (
           <HRDashboard onNavigate={handleNavigate} />
         )

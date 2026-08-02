@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>CV</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "Times New Roman", Times, serif;
+    font-size: 10.5pt;
+    line-height: 1.4;
+    color: #000;
+    background: #fff;
+  }
+  .page { padding: 0.6in 0.65in 0.5in; }
+
+  header.cv-header {
+    text-align: center;
+    margin-bottom: 14pt;
+  }
+  header.cv-header h1 {
+    font-size: 16pt;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    margin-bottom: 3pt;
+  }
+  .contact {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    font-size: 10pt;
+  }
+  .contact-sep { margin: 0 7px; }
+  a { color: #000; text-decoration: none; }
+
+  .cv-avatar {
+    width: 76px;
+    height: 76px;
+    border-radius: 50%;
+    object-fit: cover;
+    display: block;
+    margin: 0 auto 8pt;
+    border: 0.75pt solid #000;
+  }
+
+  section.cv-section {
+    margin-bottom: 12pt;
+    page-break-inside: avoid;
+  }
+  section.cv-section h2 {
+    font-size: 11pt;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    border-bottom: 0.75pt solid #000;
+    padding-bottom: 2pt;
+    margin-bottom: 6pt;
+  }
+  section.cv-section p { margin-bottom: 3pt; }
+
+  .entry {
+    margin-bottom: 8pt;
+    page-break-inside: avoid;
+  }
+  .entry:last-child { margin-bottom: 0; }
+  .entry-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12pt;
+  }
+  .entry-main {
+    flex: 1;
+    min-width: 0;
+  }
+  .entry-title { font-weight: 700; }
+  .entry-org { font-style: italic; }
+  .entry-right {
+    flex-shrink: 0;
+    text-align: right;
+    font-size: 10pt;
+    white-space: nowrap;
+  }
+
+  ul.bullets {
+    margin: 3pt 0 0 20pt;
+  }
+  ul.bullets li { margin-bottom: 2pt; }
+  ul.bullets li:last-child { margin-bottom: 0; }
+
+  ul.skills-list {
+    columns: 2;
+    column-gap: 28pt;
+    margin: 2pt 0 0 20pt;
+  }
+  ul.skills-list li {
+    break-inside: avoid;
+    margin-bottom: 1pt;
+  }
+
+  .project-links {
+    margin-top: 1pt;
+    font-size: 10pt;
+  }
+
+  @page { size: A4; margin: 0; }
+</style>
+</head>
+<body>
+<div class="page">
+  {% if data.name %}
+  <header class="cv-header">
+    {% if avatar %}
+    <img class="cv-avatar" src="{{ avatar }}" alt="Profile photo" />
+    {% endif %}
+    <h1>{{ data.name }}</h1>
+    <div class="contact">
+      {% if data.phone %}
+      <span><a href="tel:{{ data.phone | replace(' ', '') | replace('-', '') | replace('(', '') | replace(')', '') }}">{{ data.phone }}</a></span>
+      {% endif %}
+      {% if data.email %}
+      <span>{% if data.phone %}<span class="contact-sep">•</span>{% endif %}<a href="{% if data.email.startswith('mailto:') %}{{ data.email }}{% else %}mailto:{{ data.email }}{% endif %}">{{ data.email }}</a></span>
+      {% endif %}
+      {% for link in data.links %}
+      {% if link.url or link.label %}
+      <span>{% if data.phone or data.email or not loop.first %}<span class="contact-sep">•</span>{% endif %}<a href="{{ link.url }}">{% if link.label %}{{ link.label }} — {% endif %}{{ link.url }}</a></span>
+      {% endif %}
+      {% endfor %}
+    </div>
+  </header>
+  {% endif %}
+
+  {% if data.summary %}
+  <section class="cv-section">
+    <h2>{{ headings.profile }}</h2>
+    <p>{{ data.summary }}</p>
+  </section>
+  {% endif %}
+
+  {% if data.core_competencies %}
+  <section class="cv-section">
+    <h2>{{ headings.core_competencies }}</h2>
+    <ul class="bullets">
+      {% for item in data.core_competencies %}
+      <li><span class="entry-title">{{ item.name }}</span>{% if item.description %} — {{ item.description }}{% endif %}</li>
+      {% endfor %}
+    </ul>
+  </section>
+  {% endif %}
+
+  {% if data.education %}
+  <section class="cv-section">
+    <h2>{{ headings.education }}</h2>
+    {% for education in data.education %}
+    <div class="entry">
+      <div class="entry-head">
+        <div class="entry-main">
+          <span class="entry-title">{{ education.degree }}</span>
+          {% if education.institution %}<span class="entry-org"> — {{ education.institution }}</span>{% endif %}
+        </div>
+        {% if education.date %}<span class="entry-right">{{ education.date }}</span>{% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </section>
+  {% endif %}
+
+  {% if data.experience %}
+  <section class="cv-section">
+    <h2>{{ headings.experience }}</h2>
+    {% for item in data.experience %}
+    <div class="entry">
+      <div class="entry-head">
+        <div class="entry-main">
+          <span class="entry-title">{{ item.title }}</span>
+          {% if item.company %}<span class="entry-org"> — {{ item.company }}</span>{% endif %}
+        </div>
+        <span class="entry-right">{% if item.location %}{{ item.location }}{% endif %}{% if item.location and item.date %} · {% endif %}{% if item.date %}{{ item.date }}{% endif %}</span>
+      </div>
+      {% if item.bullets %}
+      <ul class="bullets">
+        {% for bullet in item.bullets %}<li>{{ bullet }}</li>{% endfor %}
+      </ul>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </section>
+  {% endif %}
+
+  {% if data.projects %}
+  <section class="cv-section">
+    <h2>{{ headings.projects }}</h2>
+    {% for project in data.projects %}
+    <div class="entry">
+      <div class="entry-head">
+        <div class="entry-main">
+          <span class="entry-title">{{ project.name }}</span>
+        </div>
+      </div>
+      {% if project.description %}<p>{{ project.description | linkify }}</p>{% endif %}
+      {% if project.links %}
+      <p class="project-links">
+        {% for link in project.links %}
+        {% if link.url %}<a href="{{ link.url }}">{% if link.label %}{{ link.label }} — {% endif %}{{ link.url }}</a>{% if not loop.last %}<span aria-hidden="true"> · </span>{% endif %}{% endif %}
+        {% endfor %}
+      </p>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </section>
+  {% endif %}
+
+  {% if data.languages %}
+  <section class="cv-section">
+    <h2>{{ headings.languages }}</h2>
+    {% for language in data.languages %}
+    <p><span class="entry-title">{{ language.name }}</span>{% if language.proficiency %} — {{ language.proficiency }}{% endif %}</p>
+    {% endfor %}
+  </section>
+  {% endif %}
+
+  {% if data.certifications %}
+  <section class="cv-section">
+    <h2>{{ headings.certifications }}</h2>
+    <ul class="bullets">
+      {% for cert in data.certifications %}<li>{{ cert }}</li>{% endfor %}
+    </ul>
+  </section>
+  {% endif %}
+
+  {% if data.publications %}
+  <section class="cv-section">
+    <h2>{{ headings.publications }}</h2>
+    {% for publication in data.publications %}
+    <div class="entry">
+      <div class="entry-head">
+        <div class="entry-main">
+          <span class="entry-title">{{ publication.title }}</span>
+          {% if publication.venue %}<span class="entry-org"> — {{ publication.venue }}</span>{% endif %}
+        </div>
+        {% if publication.date %}<span class="entry-right">{{ publication.date }}</span>{% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </section>
+  {% endif %}
+
+  {% if data.awards %}
+  <section class="cv-section">
+    <h2>{{ headings.awards }}</h2>
+    <ul class="bullets">
+      {% for award in data.awards %}<li>{{ award }}</li>{% endfor %}
+    </ul>
+  </section>
+  {% endif %}
+
+  {% if data.skill_groups %}
+  <section class="cv-section">
+    <h2>{{ headings.technical_skills }}</h2>
+    {% for group in data.skill_groups %}
+    <p><span class="entry-title">{{ group.category }}:</span> {{ group.items | join(", ") }}</p>
+    {% endfor %}
+  </section>
+  {% elif data.skills %}
+  <section class="cv-section">
+    <h2>{{ headings.technical_skills }}</h2>
+    <ul class="skills-list">
+      {% for skill in data.skills %}<li>{{ skill }}</li>{% endfor %}
+    </ul>
+  </section>
+  {% endif %}
+</div>
+</body>
+</html>
