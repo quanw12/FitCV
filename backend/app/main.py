@@ -19,6 +19,7 @@ from app.api.routes import (
     auth,
     cv_ranking,
     cv_rebuild,
+    email_webhooks,
     email_workflow,
     improvements,
     jobs,
@@ -54,6 +55,11 @@ app.include_router(
     tags=["candidate-emails"],
 )
 app.include_router(cv_rebuild.router, prefix="/api/cv", tags=["cv-rebuild"])
+app.include_router(
+    email_webhooks.router,
+    prefix="/api/webhooks/email",
+    tags=["email-webhooks"],
+)
 
 
 @app.get("/api/health")

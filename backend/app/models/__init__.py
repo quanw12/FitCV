@@ -1,12 +1,18 @@
 from app.models.account import Account
 from app.models.application import (
     TrackedApplication,
+    TrackedApplicationNotification,
     TrackedApplicationNote,
     TrackedApplicationStatusHistory,
 )
 from app.models.analyzer import Cv, CvParseResult, JdParseResult, Job, JobDescription, MatchResult
 from app.models.improvement import AiTask, CvImprovementSuggestion
-from app.models.email_workflow import CandidateEmail
+from app.models.email_workflow import (
+    CandidateEmail,
+    CandidateEmailEvent,
+    CandidateEmailInbound,
+    CandidateEmailThread,
+)
 from app.models.jobs import (
     Application,
     ApplicationNote,
@@ -26,6 +32,9 @@ __all__ = [
     "ApplicationStageHistory",
     "Candidate",
     "CandidateEmail",
+    "CandidateEmailEvent",
+    "CandidateEmailInbound",
+    "CandidateEmailThread",
     "Company",
     "Cv",
     "CvImprovementSuggestion",
@@ -38,6 +47,7 @@ __all__ = [
     "MatchResult",
     "Position",
     "TrackedApplication",
+    "TrackedApplicationNotification",
     "TrackedApplicationNote",
     "TrackedApplicationStatusHistory",
 ]

@@ -14,13 +14,16 @@ from app.db.session import get_db
 from app.models.account import Account
 from app.schemas.analyzer import (
     AnalyzeCvRequest,
+    CvComparisonResponse,
     CvComparisonSeriesResponse,
     CvVersionResponse,
     JdLibraryInsightsResponse,
     JdLibraryItemResponse,
     MatchResultResponse,
+    SaveJdRequest,
 )
 from app.services import analyzer_service
+from app.services import cv_comparison_service
 
 router = APIRouter()
 
@@ -53,6 +56,21 @@ def list_cv_comparisons(
     db: Session = Depends(get_db),
 ) -> list[CvComparisonSeriesResponse]:
     return analyzer_service.list_cv_comparisons(db, account=account)
+
+
+@router.get("/cvs/compare", response_model=CvComparisonResponse)
+def compare_cv_versions(
+    base_cv_id: int,
+    target_cv_id: int,
+    account: Account = Depends(get_current_account),
+    db: Session = Depends(get_db),
+) -> CvComparisonResponse:
+    return cv_comparison_service.compare_cv_versions(
+        db,
+        base_cv_id=base_cv_id,
+        target_cv_id=target_cv_id,
+        account=account,
+    )
 
 
 @router.get("/cvs/{cv_id}", response_model=CvVersionResponse)
@@ -113,6 +131,17 @@ def list_jd_library(
     db: Session = Depends(get_db),
 ) -> list[JdLibraryItemResponse]:
     return analyzer_service.list_jd_library(db, account=account, query=q)
+
+
+@router.post("/jd-library", response_model=JdLibraryItemResponse, status_code=status.HTTP_201_CREATED)
+def save_jd_library_item(
+    request: SaveJdRequest,
+    account: Account = Depends(get_current_account),
+    db: Session = Depends(get_db),
+) -> JdLibraryItemResponse:
+    return analyzer_service.save_jd_library_item(
+        db, title=request.title, raw_text=request.raw_text, account=account
+    )
 
 
 @router.get("/jd-library/insights", response_model=JdLibraryInsightsResponse)

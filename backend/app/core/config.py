@@ -20,6 +20,10 @@ class Settings(BaseSettings):
     google_client_id: str | None = None
     resend_api_key: str | None = None
     resend_from_email: str | None = None
+    resend_webhook_secret: str | None = None
+    resend_inbound_domain: str | None = None
+    resend_timeout_seconds: float = 15.0
+    resend_max_retries: int = 2
     avatar_storage: str = "local"
     backend_public_url: str | None = None
     cloudinary_cloud_name: str | None = None

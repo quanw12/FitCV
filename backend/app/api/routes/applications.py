@@ -9,6 +9,7 @@ from app.models.account import Account, AccountRole
 from app.schemas.application import (
     ApplicationCreate,
     ApplicationDetailResponse,
+    ApplicationNotificationResponse,
     ApplicationNoteCreate,
     ApplicationNoteResponse,
     ApplicationNoteUpdate,
@@ -115,6 +116,19 @@ def get_application(
     db: Session = Depends(get_db),
 ) -> ApplicationDetailResponse:
     return application_service.get_application(db, application_id=application_id, account=account)
+
+
+@router.get("/{application_id}/notifications", response_model=list[ApplicationNotificationResponse])
+def list_application_notifications(
+    application_id: int,
+    account: Account = Depends(student_account),
+    db: Session = Depends(get_db),
+) -> list[ApplicationNotificationResponse]:
+    return application_service.get_application(
+        db,
+        application_id=application_id,
+        account=account,
+    ).notifications
 
 
 @router.patch("/{application_id}", response_model=ApplicationDetailResponse)

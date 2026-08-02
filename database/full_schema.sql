@@ -260,16 +260,50 @@ CREATE TABLE application_note (
     INDEX idx_application_note_application_created (application_id, created_at)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
 
+CREATE TABLE candidate_email_thread (
+    thread_id       BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+    company_id      BIGINT UNSIGNED NOT NULL,
+    application_id  BIGINT UNSIGNED NOT NULL,
+    reply_token     CHAR(36) NOT NULL,
+    subject         VARCHAR(300) NULL,
+    last_message_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    last_inbound_at DATETIME NULL,
+    created_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at      DATETIME NULL ON UPDATE CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_candidate_email_thread_company
+        FOREIGN KEY (company_id) REFERENCES company(company_id)
+        ON DELETE CASCADE,
+    CONSTRAINT fk_candidate_email_thread_application
+        FOREIGN KEY (application_id) REFERENCES application(application_id)
+        ON DELETE CASCADE,
+    CONSTRAINT uq_candidate_email_thread_company_application
+        UNIQUE (company_id, application_id),
+    CONSTRAINT uq_candidate_email_thread_reply_token
+        UNIQUE (reply_token),
+    INDEX idx_candidate_email_thread_company_activity (company_id, last_message_at)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
+
 CREATE TABLE candidate_email (
     email_id                BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
     company_id              BIGINT UNSIGNED NOT NULL,
     application_id          BIGINT UNSIGNED NOT NULL,
+    thread_id               BIGINT UNSIGNED NULL,
     template_key            VARCHAR(50) NOT NULL,
+    message_kind            ENUM('Initial', 'Reply') NOT NULL DEFAULT 'Initial',
     recipient_email         VARCHAR(150) NOT NULL,
     subject                 VARCHAR(300) NOT NULL,
     body                    LONGTEXT NOT NULL,
     status                  ENUM('Draft', 'Approved', 'Sent', 'Failed') NOT NULL DEFAULT 'Draft',
+    delivery_status         ENUM(
+                                'Queued', 'Sent', 'Delivered', 'Delayed',
+                                'Bounced', 'Complained', 'Opened', 'Clicked',
+                                'Suppressed', 'Failed'
+                            ) NULL,
     ai_generated            BOOLEAN NOT NULL DEFAULT TRUE,
+    in_reply_to             VARCHAR(500) NULL,
+    references_json         JSON NULL,
+    idempotency_key         VARCHAR(256) NULL,
     created_by_account_id   BIGINT UNSIGNED NULL,
     approved_by_account_id  BIGINT UNSIGNED NULL,
     approved_at             DATETIME NULL,
@@ -285,14 +319,65 @@ CREATE TABLE candidate_email (
     CONSTRAINT fk_candidate_email_application
         FOREIGN KEY (application_id) REFERENCES application(application_id)
         ON DELETE CASCADE,
+    CONSTRAINT fk_candidate_email_thread
+        FOREIGN KEY (thread_id) REFERENCES candidate_email_thread(thread_id)
+        ON DELETE SET NULL,
     CONSTRAINT fk_candidate_email_creator
         FOREIGN KEY (created_by_account_id) REFERENCES account(account_id)
         ON DELETE SET NULL,
     CONSTRAINT fk_candidate_email_approver
         FOREIGN KEY (approved_by_account_id) REFERENCES account(account_id)
         ON DELETE SET NULL,
+    CONSTRAINT uq_candidate_email_idempotency_key
+        UNIQUE (idempotency_key),
     INDEX idx_candidate_email_company_status (company_id, status),
-    INDEX idx_candidate_email_application_created (application_id, created_at)
+    INDEX idx_candidate_email_application_created (application_id, created_at),
+    INDEX idx_candidate_email_thread_created (thread_id, created_at),
+    INDEX idx_candidate_email_provider (provider_message_id)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
+
+CREATE TABLE candidate_email_inbound (
+    inbound_id          BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+    thread_id           BIGINT UNSIGNED NOT NULL,
+    provider_email_id   VARCHAR(200) NOT NULL,
+    provider_message_id VARCHAR(500) NULL,
+    sender_email        VARCHAR(150) NOT NULL,
+    recipient_email     VARCHAR(150) NOT NULL,
+    subject             VARCHAR(300) NOT NULL,
+    body_text           LONGTEXT NOT NULL,
+    in_reply_to         VARCHAR(500) NULL,
+    references_text     LONGTEXT NULL,
+    attachments_json    JSON NULL,
+    is_read             BOOLEAN NOT NULL DEFAULT FALSE,
+    received_at         DATETIME NOT NULL,
+    created_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_candidate_email_inbound_thread
+        FOREIGN KEY (thread_id) REFERENCES candidate_email_thread(thread_id)
+        ON DELETE CASCADE,
+    CONSTRAINT uq_candidate_email_inbound_provider_email
+        UNIQUE (provider_email_id),
+    INDEX idx_candidate_email_inbound_thread_received (thread_id, received_at),
+    INDEX idx_candidate_email_inbound_thread_unread (thread_id, is_read)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
+
+CREATE TABLE candidate_email_event (
+    email_event_id       BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+    candidate_email_id   BIGINT UNSIGNED NULL,
+    provider_event_id    VARCHAR(200) NOT NULL,
+    provider_email_id    VARCHAR(200) NULL,
+    event_type           VARCHAR(50) NOT NULL,
+    event_data_json      JSON NULL,
+    occurred_at          DATETIME NOT NULL,
+    created_at           DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_candidate_email_event_email
+        FOREIGN KEY (candidate_email_id) REFERENCES candidate_email(email_id)
+        ON DELETE CASCADE,
+    CONSTRAINT uq_candidate_email_event_provider_event
+        UNIQUE (provider_event_id),
+    INDEX idx_candidate_email_event_email_occurred (candidate_email_id, occurred_at),
+    INDEX idx_candidate_email_event_provider_email (provider_email_id)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
 
 -- Student-owned applications tracked outside FitCV's recruiter pipeline.
@@ -338,6 +423,28 @@ CREATE TABLE tracked_application_status_history (
 
     CONSTRAINT fk_tracked_application_history_application
         FOREIGN KEY (tracked_application_id) REFERENCES tracked_application(tracked_application_id)
+        ON DELETE CASCADE
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
+
+CREATE TABLE tracked_application_notification (
+    notification_id        BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+    tracked_application_id BIGINT UNSIGNED NOT NULL,
+    account_id             BIGINT UNSIGNED NOT NULL,
+    status_history_id      BIGINT UNSIGNED NULL UNIQUE,
+    event_type             VARCHAR(40) NOT NULL,
+    title                  VARCHAR(150) NOT NULL,
+    message                VARCHAR(500) NOT NULL,
+    read_at                DATETIME NULL,
+    created_at             DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_tracked_application_notification_application
+        FOREIGN KEY (tracked_application_id) REFERENCES tracked_application(tracked_application_id)
+        ON DELETE CASCADE,
+    CONSTRAINT fk_tracked_application_notification_account
+        FOREIGN KEY (account_id) REFERENCES account(account_id)
+        ON DELETE CASCADE,
+    CONSTRAINT fk_tracked_application_notification_history
+        FOREIGN KEY (status_history_id) REFERENCES tracked_application_status_history(status_history_id)
         ON DELETE CASCADE
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
 
@@ -461,6 +568,8 @@ CREATE INDEX idx_tracked_application_account_status ON tracked_application(accou
 CREATE INDEX idx_tracked_application_reminder ON tracked_application(account_id, reminder_at);
 CREATE INDEX idx_tracked_application_note_application ON tracked_application_note(tracked_application_id, created_at);
 CREATE INDEX idx_tracked_application_history_application ON tracked_application_status_history(tracked_application_id, changed_at);
+CREATE INDEX idx_tracked_application_notification_application_created ON tracked_application_notification(tracked_application_id, created_at);
+CREATE INDEX idx_tracked_application_notification_account_read ON tracked_application_notification(account_id, read_at);
 CREATE INDEX idx_match_result_cv_job ON match_result(cv_id, job_id);
 CREATE INDEX idx_match_cv_generated ON match_result(cv_id, generated_at);
 CREATE INDEX idx_cv_improvement_suggestion_match_result_id ON cv_improvement_suggestion(match_result_id);

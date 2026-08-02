@@ -9,7 +9,12 @@ from app.api.deps import get_current_account
 from app.db.session import Base, get_db
 from app.main import app
 from app.models.account import Account, AccountRole, AuthProvider
-from app.models.application import TrackedApplication, TrackedApplicationNote, TrackedApplicationStatusHistory
+from app.models.application import (
+    TrackedApplication,
+    TrackedApplicationNotification,
+    TrackedApplicationNote,
+    TrackedApplicationStatusHistory,
+)
 
 
 class TestApplicationTrackerApi:
@@ -32,6 +37,7 @@ class TestApplicationTrackerApi:
                 TrackedApplication.__table__,
                 TrackedApplicationNote.__table__,
                 TrackedApplicationStatusHistory.__table__,
+                TrackedApplicationNotification.__table__,
             ],
         )
         db = self.session_factory()
@@ -99,6 +105,8 @@ class TestApplicationTrackerApi:
         application_id = created.json()["application_id"]
         assert created.json()["status"] == "Applied"
         assert len(created.json()["status_history"]) == 1
+        assert len(created.json()["notifications"]) == 1
+        assert created.json()["notifications"][0]["event_type"] == "ApplicationCreated"
 
         listed = self.client.get("/api/applications", params={"search": "backend", "status": "Applied"})
         assert listed.status_code == 200
@@ -112,6 +120,12 @@ class TestApplicationTrackerApi:
         assert updated.json()["status"] == "Interview"
         assert updated.json()["status_history"][0]["previous_status"] == "Applied"
         assert updated.json()["status_history"][0]["new_status"] == "Interview"
+        assert updated.json()["notifications"][0]["event_type"] == "StatusChanged"
+        assert "moved from Applied to Interview" in updated.json()["notifications"][0]["message"]
+
+        notifications = self.client.get(f"/api/applications/{application_id}/notifications")
+        assert notifications.status_code == 200
+        assert len(notifications.json()) == 2
 
         note = self.client.post(
             f"/api/applications/{application_id}/notes",
@@ -141,6 +155,7 @@ class TestApplicationTrackerApi:
         with self.session_factory() as db:
             assert db.scalars(select(TrackedApplicationNote)).all() == []
             assert db.scalars(select(TrackedApplicationStatusHistory)).all() == []
+            assert db.scalars(select(TrackedApplicationNotification)).all() == []
 
     def test_scheduled_and_stale_reminders(self) -> None:
         scheduled = self.client.post(

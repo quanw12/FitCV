@@ -124,6 +124,17 @@ class ApplicationStatusHistoryResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class ApplicationNotificationResponse(BaseModel):
+    notification_id: int
+    event_type: str
+    title: str
+    message: str
+    read_at: datetime | None
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
 class ApplicationSummaryResponse(BaseModel):
     application_id: int
     company_name: str
@@ -145,6 +156,7 @@ class ApplicationSummaryResponse(BaseModel):
 class ApplicationDetailResponse(ApplicationSummaryResponse):
     notes: list[ApplicationNoteResponse]
     status_history: list[ApplicationStatusHistoryResponse]
+    notifications: list[ApplicationNotificationResponse]
 
 
 class ApplicationStatsResponse(BaseModel):

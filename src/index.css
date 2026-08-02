@@ -2087,6 +2087,17 @@ h1, h2, h3, h4, h5, h6 {
   color: var(--text-muted);
   white-space: nowrap;
 }
+.smart-reply-grid {
+  display: grid;
+  grid-template-columns: minmax(230px, 290px) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+.smart-reply-options {
+  display: grid;
+  grid-template-columns: 180px minmax(0, 1fr);
+  gap: 10px;
+}
 @media (max-width: 900px) {
   .email-workflow-grid { grid-template-columns: 1fr; }
   .email-template-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -2096,6 +2107,7 @@ h1, h2, h3, h4, h5, h6 {
     grid-template-columns: minmax(120px, 1fr) minmax(160px, 2fr) auto;
   }
   .email-record-list article time { display: none; }
+  .smart-reply-grid { grid-template-columns: 1fr; }
 }
 @media (max-width: 640px) {
   .email-template-list,
@@ -2109,4 +2121,5 @@ h1, h2, h3, h4, h5, h6 {
     grid-template-columns: minmax(0, 1fr) auto;
   }
   .email-record-list article > button > p { grid-column: 1 / -1; }
+  .smart-reply-options { grid-template-columns: 1fr; }
 }

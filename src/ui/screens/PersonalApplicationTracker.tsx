@@ -505,24 +505,37 @@ function ApplicationDetailModal({
         </div>
         <div>
           <div className="fc-eyebrow" style={{ marginBottom: 9 }}>
-            Status history
+            Notification timeline
           </div>
           <div className="tracker-history">
-            {detail.statusHistory.map((item) => (
-              <div key={item.statusHistoryId}>
-                <span
-                  style={{
-                    background: STATUS_COLORS[item.newStatus].background,
+            {detail.notifications.length === 0 && (
+              <p className="tracker-muted">No notification events yet.</p>
+            )}
+            {detail.notifications.map((item) => {
+              const relatedHistory = detail.statusHistory.find(
+                (history) => history.changedAt === item.createdAt,
+              )
+              const status = relatedHistory?.newStatus ?? detail.status
 
-                    color: STATUS_COLORS[item.newStatus].color,
-                  }}
-                />
-                <div>
-                  <strong>{item.newStatus}</strong>
-                  <time>{formatDateTime(item.changedAt)}</time>
+              return (
+                <div key={item.notificationId}>
+                  <span
+                    style={{
+                      background: STATUS_COLORS[status].background,
+
+                      color: STATUS_COLORS[status].color,
+                    }}
+                  />
+                  <div>
+                    <strong>{item.title}</strong>
+                    <p className="tracker-muted" style={{ margin: "2px 0" }}>
+                      {item.message}
+                    </p>
+                    <time>{formatDateTime(item.createdAt)}</time>
+                  </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         </div>
       </div>

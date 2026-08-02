@@ -131,6 +131,15 @@ export const jdLibraryApi = {
     return normalizeInsights(payload)
   },
 
+  async save(title: string, rawText: string): Promise<JdLibraryItem> {
+    const payload = await requestJson<BackendJdLibraryItem>("/api/jd-library", {
+      method: "POST",
+      authenticated: true,
+      body: JSON.stringify({ title, raw_text: rawText }),
+    })
+    return normalizeItem(payload)
+  },
+
   delete(jobDescriptionId: number): Promise<void> {
     return requestJson(`/api/jd-library/${jobDescriptionId}`, {
       method: "DELETE",

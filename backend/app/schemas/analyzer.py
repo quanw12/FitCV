@@ -27,6 +27,16 @@ class AnalyzeCvRequest(BaseModel):
         return value.strip()
 
 
+class SaveJdRequest(BaseModel):
+    title: str = Field(min_length=1, max_length=200)
+    raw_text: str = Field(min_length=50, max_length=100_000)
+
+    @field_validator("title", "raw_text")
+    @classmethod
+    def strip_text(cls, value: str) -> str:
+        return value.strip()
+
+
 class CategoryEvidence(BaseModel):
     score: float
     matched: list[str] = Field(default_factory=list)
@@ -81,6 +91,29 @@ class CvComparisonSeriesResponse(BaseModel):
     latest_score: float
     latest_delta: float | None = None
     versions: list[CvScorePointResponse] = Field(default_factory=list)
+
+
+class CvComparisonChangeResponse(BaseModel):
+    category: str
+    added: list[str] = Field(default_factory=list)
+    removed: list[str] = Field(default_factory=list)
+    retained: list[str] = Field(default_factory=list)
+    summary: str
+
+
+class CvScoreDeltaResponse(BaseModel):
+    job_description_id: int
+    title: str
+    base_score: float
+    target_score: float
+    delta: float
+
+
+class CvComparisonResponse(BaseModel):
+    base: CvVersionResponse
+    target: CvVersionResponse
+    changes: list[CvComparisonChangeResponse] = Field(default_factory=list)
+    score_deltas: list[CvScoreDeltaResponse] = Field(default_factory=list)
 
 
 class JdLibraryItemResponse(BaseModel):

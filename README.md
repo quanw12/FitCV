@@ -235,19 +235,23 @@ những nhóm thực sự có yêu cầu trong JD.
 
 ### Recruiter Pipeline And Candidate Email
 
-Database hiện hữu cần chạy tuần tự hai migration sau trước khi bật màn hình
+Database hiện hữu cần chạy tuần tự ba migration sau trước khi bật màn hình
 Pipeline và Auto Email:
 
 ```text
 database/migrations/006_add_recruiter_pipeline.sql
 database/migrations/007_add_candidate_email_workflow.sql
+database/migrations/009_add_smart_reply_workflow.sql
 ```
 
 Migration 006 thêm notes và lịch sử cho sáu stage backend hiện tại:
 `Applied`, `Screening`, `Interview`, `Offer`, `Hired`, `Rejected`. Migration 007
 lưu AI draft, bước HR approval, provider message ID, trạng thái `Failed` và thời
-điểm gửi. Cả hai migration có preflight/postflight, có thể chạy lại, và có file
-rollback tương ứng; rollback sẽ xóa vĩnh viễn dữ liệu workflow đã tạo.
+điểm gửi. Migration 009 thêm application-scoped email thread, địa chỉ reply
+riêng, inbound message, delivery event, idempotency key và metadata chuẩn
+`In-Reply-To`/`References`. Các migration có preflight/postflight, có thể chạy
+lại, và có file rollback tương ứng; rollback sẽ xóa vĩnh viễn dữ liệu workflow
+được nêu trong file.
 
 ```text
 GET   /api/hr/pipeline
@@ -261,14 +265,57 @@ GET   /api/hr/emails/drafts
 POST  /api/hr/emails/drafts/generate
 PATCH /api/hr/emails/drafts/{email_id}
 POST  /api/hr/emails/drafts/{email_id}/approve
+POST  /api/hr/emails/drafts/{email_id}/reopen
 POST  /api/hr/emails/drafts/{email_id}/send
 POST  /api/hr/emails/bulk-send
+GET   /api/hr/emails/threads
+GET   /api/hr/emails/threads/{thread_id}
+PATCH /api/hr/emails/threads/{thread_id}/read
+POST  /api/hr/emails/threads/{thread_id}/smart-reply
+
+POST  /api/webhooks/email/resend
 ```
 
 Email ứng viên luôn theo luồng `Draft -> Approved -> Sent`. Backend từ chối gửi
 Draft chưa được HR duyệt. Khác password-reset fallback, candidate email không
 giả lập thành công khi thiếu Resend; record chuyển `Failed`, hiển thị lỗi và cho
 Retry sau khi cấu hình `RESEND_API_KEY` cùng `RESEND_FROM_EMAIL`.
+
+Auto Email và Smart Reply chỉ áp dụng cho ứng viên thuộc `application` của
+company job post, tức `Job Applicants/Pipeline`. Không dùng `application` để gửi
+email cho CV từ `Upload CV Batch`.
+
+Smart Reply là inbound email thật:
+
+```text
+Outbound email with per-application Reply-To
+  -> candidate replies
+  -> verified Resend email.received webhook
+  -> FitCV retrieves and sanitizes the plain-text body
+  -> sender must match candidate.email
+  -> Gemini drafts a reply from trusted application/conversation context
+  -> HR edits, approves, and explicitly sends
+```
+
+Backend không bao giờ auto-send AI reply. Candidate content là untrusted input
+và không được dùng như model instruction. Delivery webhooks được deduplicate
+bằng `svix-id`; outbound retry dùng Resend idempotency key.
+
+Cấu hình Smart Reply trong `backend/.env`:
+
+```env
+RESEND_API_KEY=<server-side-key>
+RESEND_FROM_EMAIL=FitCV <recruiting@verified-sender-domain>
+RESEND_WEBHOOK_SECRET=<whsec-from-resend-webhook>
+RESEND_INBOUND_DOMAIN=replies.example.com
+RESEND_TIMEOUT_SECONDS=15
+RESEND_MAX_RETRIES=2
+```
+
+Tại Resend, verify sender domain, cấu hình MX cho inbound subdomain, rồi đăng ký
+webhook public `https://<backend-domain>/api/webhooks/email/resend` cho
+`email.received` cùng các event delivery cần theo dõi. Webhook verification phải
+dùng raw request body; không parse rồi serialize lại trước khi verify.
 
 ## AI Improvement Suggestions
 
@@ -694,6 +741,7 @@ Database hiện hữu phải chạy migration sau trước khi dùng feature:
 
 ```text
 database/migrations/004_add_application_tracker.sql
+database/migrations/008_add_application_notifications.sql
 ```
 
 Lỗi thường gặp:

@@ -197,6 +197,28 @@ def list_jd_library(
     ]
 
 
+def save_jd_library_item(
+    db: Session, *, title: str, raw_text: str, account: Account
+) -> JdLibraryItemResponse:
+    scoring_text = normalize_scoring_jd_text(raw_text)
+    try:
+        parsed_payload = parse_jd_text(scoring_text)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
+    description, parsed = analyzer.get_or_create_job_description(
+        db,
+        account_id=account.account_id,
+        title=title,
+        raw_text=raw_text,
+        content_sha256=hashlib.sha256(raw_text.encode("utf-8")).hexdigest(),
+        parsed_payload=parsed_payload,
+        parser_version=PARSER_VERSION,
+    )
+    return _jd_response(description, parsed, [])
+
+
 def get_jd_library_item(
     db: Session, *, job_description_id: int, account: Account
 ) -> JdLibraryItemResponse:

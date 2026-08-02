@@ -89,6 +89,49 @@ def get_cv_record(
     return (cv, get_latest_parse(db, cv.cv_id)) if cv else None
 
 
+def get_cv_comparison_records(
+    db: Session, *, base_cv_id: int, target_cv_id: int, account_id: int
+) -> tuple[tuple[Cv, CvParseResult | None], tuple[Cv, CvParseResult | None]] | None:
+    base = get_cv_record(db, base_cv_id, account_id)
+    target = get_cv_record(db, target_cv_id, account_id)
+    if base is None or target is None or base_cv_id == target_cv_id:
+        return None
+    return base, target
+
+
+def list_cv_score_deltas(
+    db: Session, *, base_cv_id: int, target_cv_id: int, account_id: int
+) -> list[tuple[JobDescription, float, float]]:
+    rows = list(
+        db.execute(
+            select(MatchResult, JobDescription)
+            .join(JobDescription, JobDescription.job_description_id == MatchResult.job_description_id)
+            .join(Cv, Cv.cv_id == MatchResult.cv_id)
+            .where(
+                Cv.account_id == account_id,
+                JobDescription.account_id == account_id,
+                MatchResult.cv_id.in_((base_cv_id, target_cv_id)),
+                MatchResult.status == "Success",
+                MatchResult.overall_score.is_not(None),
+            )
+            .order_by(MatchResult.generated_at.desc(), MatchResult.match_result_id.desc())
+        ).all()
+    )
+    latest: dict[tuple[int, int], tuple[MatchResult, JobDescription]] = {}
+    for match, description in rows:
+        latest.setdefault((match.cv_id, description.job_description_id), (match, description))
+    by_jd: dict[int, dict[int, tuple[MatchResult, JobDescription]]] = {}
+    for (cv_id, jd_id), value in latest.items():
+        by_jd.setdefault(jd_id, {})[cv_id] = value
+    deltas: list[tuple[JobDescription, float, float]] = []
+    for values in by_jd.values():
+        base = values.get(base_cv_id)
+        target = values.get(target_cv_id)
+        if base and target:
+            deltas.append((base[1], float(base[0].overall_score), float(target[0].overall_score)))
+    return deltas
+
+
 def list_cv_records(
     db: Session, account_id: int
 ) -> list[tuple[Cv, CvParseResult | None]]:
