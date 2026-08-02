@@ -9,6 +9,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 
 const apiMocks = vi.hoisted(() => ({
   rebuildCv: vi.fn(),
+  buildCv: vi.fn(),
+  profileAvatarDataUrl: vi.fn(async () => "data:image/png;base64,QUFB"),
   pdfBase64ToBlob: vi.fn(),
   thumbnailDataUrl: vi.fn(),
 }))
@@ -32,7 +34,9 @@ const RESULT = {
     links: [],
     summary: "Backend engineer.",
     experience: [],
+    core_competencies: [],
     skills: ["Python"],
+    skill_groups: [],
     projects: [],
     certifications: [],
     education: [],
@@ -78,14 +82,14 @@ describe("CVReBuildScreen", () => {
     })
 
     const thumbnail = await screen.findByRole("img", {
-      name: /rebuilt cv preview/i,
+      name: /built cv preview/i,
     })
 
     expect(apiMocks.thumbnailDataUrl).toHaveBeenCalledWith("aW1n")
 
     fireEvent.click(thumbnail)
 
-    expect(await screen.findByTitle("Rebuilt CV")).toBeInTheDocument()
+    expect(await screen.findByTitle("Built CV")).toBeInTheDocument()
   })
 
   it("downloads from cached base64 without calling the API again", async () => {
@@ -114,7 +118,7 @@ describe("CVReBuildScreen", () => {
     })
 
     fireEvent.click(
-      await screen.findByRole("img", { name: /rebuilt cv preview/i }),
+      await screen.findByRole("img", { name: /built cv preview/i }),
     )
 
     const dialog = await screen.findByRole("dialog")
@@ -174,11 +178,11 @@ describe("CVReBuildScreen", () => {
     render(<CVReBuildScreen />)
 
     expect(
-      await screen.findByRole("img", { name: /rebuilt cv preview/i }),
+      await screen.findByRole("img", { name: /built cv preview/i }),
     ).toBeInTheDocument()
     expect(apiMocks.rebuildCv).not.toHaveBeenCalled()
 
-    fireEvent.click(screen.getByRole("button", { name: /rebuild another cv/i }))
+    fireEvent.click(screen.getByRole("button", { name: /create another cv/i }))
 
     expect(screen.getByTestId("cv-rebuild-input")).toBeInTheDocument()
     expect(sessionStorage.getItem("fitcv:rebuild:last-result")).toBeNull()
@@ -193,7 +197,7 @@ describe("CVReBuildScreen", () => {
       target: { files: [makeFile("my_cv.pdf")] },
     })
 
-    await screen.findByRole("img", { name: /rebuilt cv preview/i })
+    await screen.findByRole("img", { name: /built cv preview/i })
 
     const saved = sessionStorage.getItem("fitcv:rebuild:last-result")
 
@@ -206,5 +210,72 @@ describe("CVReBuildScreen", () => {
 
     expect(cached.fileName).toBe("my_cv.pdf")
     expect(cached.result.pdf_base64).toBe("cGRm")
+  })
+
+  it("switches to the build form and submits the entered data to the API", async () => {
+    apiMocks.buildCv.mockResolvedValue(RESULT)
+
+    render(<CVReBuildScreen />)
+
+    fireEvent.click(screen.getByRole("tab", { name: /build from form/i }))
+
+    fireEvent.change(screen.getByTestId("cv-build-name"), {
+      target: { value: "Tran Thi B" },
+    })
+
+    fireEvent.change(screen.getByTestId("cv-build-summary"), {
+      target: { value: "Backend engineer aiming for security roles." },
+    })
+
+    fireEvent.change(screen.getByTestId("cv-build-skills"), {
+      target: { value: "Python, FastAPI, Docker" },
+    })
+
+    fireEvent.change(screen.getByTestId("cv-build-language"), {
+      target: { value: "vi" },
+    })
+
+    fireEvent.click(screen.getByTestId("cv-build-submit"))
+
+    expect(await screen.findByRole("img", { name: /built cv preview/i })).toBeInTheDocument()
+
+    await waitFor(() => {
+      expect(apiMocks.buildCv).toHaveBeenCalledTimes(1)
+
+      const payload = apiMocks.buildCv.mock.calls[0][0]
+
+      expect(payload.cv.name).toBe("Tran Thi B")
+      expect(payload.cv.summary).toBe("Backend engineer aiming for security roles.")
+      expect(payload.cv.skills).toEqual(["Python", "FastAPI", "Docker"])
+      expect(payload.language).toBe("vi")
+      expect(payload.avatar).toBeUndefined()
+    })
+  })
+
+  it("requires a name before submitting the build form", async () => {
+    render(<CVReBuildScreen />)
+
+    fireEvent.click(screen.getByRole("tab", { name: /build from form/i }))
+
+    fireEvent.click(screen.getByTestId("cv-build-submit"))
+
+    expect(apiMocks.buildCv).not.toHaveBeenCalled()
+    expect(screen.getByTestId("cv-build-name")).toBeInTheDocument()
+  })
+
+  it("shows the build API error message on failure", async () => {
+    apiMocks.buildCv.mockRejectedValue(new Error("Gemini timed out."))
+
+    render(<CVReBuildScreen />)
+
+    fireEvent.click(screen.getByRole("tab", { name: /build from form/i }))
+
+    fireEvent.change(screen.getByTestId("cv-build-name"), {
+      target: { value: "Tran Thi B" },
+    })
+
+    fireEvent.click(screen.getByTestId("cv-build-submit"))
+
+    expect(await screen.findByText(/gemini timed out/i)).toBeInTheDocument()
   })
 })

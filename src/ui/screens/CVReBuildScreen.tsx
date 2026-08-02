@@ -3,12 +3,17 @@ import { useRef, useState } from "react"
 import { CloudArrowUp, Download, FileText, X } from "@phosphor-icons/react"
 import { toast } from "sonner"
 
+import { authApi } from "@/api"
 import {
+  buildCv,
   pdfBase64ToBlob,
+  profileAvatarDataUrl,
   rebuildCv,
   thumbnailDataUrl,
 } from "@/api/cvRebuildApi"
+import type { CvBuildPayload } from "@/api/cvRebuildApi"
 import type { CvRebuildResponse } from "@/types/cvRebuild"
+import CVBuildForm from "@/ui/components/CVBuildForm"
 
 const ACCEPTED_TYPES =
   ".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
@@ -17,24 +22,26 @@ const MAX_BYTES = 10 * 1024 * 1024
 
 const CACHE_KEY = "fitcv:rebuild:last-result"
 
+type BuildMode = "rebuild" | "build"
+
 type CachedResult = { fileName: string; result: CvRebuildResponse }
 
-type RebuildState =
-  | { phase: "idle" }
-  | { phase: "processing"; file: File }
-  | { phase: "done"; file: File; result: CvRebuildResponse }
-  | { phase: "error"; file: File; message: string }
+type BuildState =
+  | { phase: "idle"; mode: BuildMode }
+  | { phase: "processing"; mode: BuildMode; file: File | null }
+  | { phase: "done"; mode: BuildMode; file: File | null; result: CvRebuildResponse }
+  | { phase: "error"; mode: BuildMode; file: File | null; message: string }
 
-function loadCachedResult(): RebuildState {
+function loadCachedResult(): BuildState {
   try {
     const raw = sessionStorage.getItem(CACHE_KEY)
 
-    if (!raw) return { phase: "idle" }
+    if (!raw) return { phase: "idle", mode: "rebuild" }
 
     const cached = JSON.parse(raw) as CachedResult
 
     if (!cached?.result?.pdf_base64 || !cached.result.filename) {
-      return { phase: "idle" }
+      return { phase: "idle", mode: "rebuild" }
     }
 
     const fileName =
@@ -42,15 +49,18 @@ function loadCachedResult(): RebuildState {
 
     const file = new File([], fileName, { type: "application/pdf" })
 
-    return { phase: "done", file, result: cached.result }
+    return { phase: "done", mode: "rebuild", file, result: cached.result }
   } catch {
-    return { phase: "idle" }
+    return { phase: "idle", mode: "rebuild" }
   }
 }
 
-function saveResult(file: File, result: CvRebuildResponse) {
+function saveResult(file: File | null, result: CvRebuildResponse) {
   try {
-    const payload: CachedResult = { fileName: file.name, result }
+    const payload: CachedResult = {
+      fileName: file?.name || result.filename,
+      result,
+    }
 
     sessionStorage.setItem(CACHE_KEY, JSON.stringify(payload))
   } catch {
@@ -79,37 +89,77 @@ function isValidFile(file: File): string | null {
 }
 
 export default function CVReBuildScreen() {
-  const [state, setState] = useState<RebuildState>(loadCachedResult)
+  const [state, setState] = useState<BuildState>(loadCachedResult)
   const [dragOver, setDragOver] = useState(false)
   const [modalOpen, setModalOpen] = useState(false)
+  const [useAvatar, setUseAvatar] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
+
+  const profileAvatarUrl = authApi.getSession()?.user.avatarUrl ?? null
 
   const runRebuild = async (file: File) => {
     const validationError = isValidFile(file)
 
     if (validationError) {
-      setState({ phase: "idle" })
+      setState({ phase: "idle", mode: "rebuild" })
 
       toast.error(validationError)
 
       return
     }
 
-    setState({ phase: "processing", file })
+    setState({ phase: "processing", mode: "rebuild", file })
 
     clearSavedResult()
 
     try {
-      const result = await rebuildCv(file)
+      const avatar = useAvatar
+        ? await profileAvatarDataUrl(profileAvatarUrl)
+        : undefined
+
+      if (useAvatar && !avatar) {
+        toast.warning("Couldn't load your profile avatar — building without it.")
+      }
+
+      const result = await rebuildCv(file, avatar ?? undefined)
 
       saveResult(file, result)
 
-      setState({ phase: "done", file, result })
+      setState({ phase: "done", mode: "rebuild", file, result })
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Rebuild failed. Try again later."
 
-      setState({ phase: "error", file, message })
+      setState({ phase: "error", mode: "rebuild", file, message })
+
+      toast.error(message)
+    }
+  }
+
+  const runBuild = async (payload: CvBuildPayload) => {
+    setState({ phase: "processing", mode: "build", file: null })
+
+    clearSavedResult()
+
+    try {
+      const avatar = payload.avatar
+        ? await profileAvatarDataUrl(payload.avatar)
+        : undefined
+
+      if (payload.avatar && !avatar) {
+        toast.warning("Couldn't load your profile avatar — building without it.")
+      }
+
+      const result = await buildCv({ ...payload, avatar: avatar ?? undefined })
+
+      saveResult(null, result)
+
+      setState({ phase: "done", mode: "build", file: null, result })
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Build failed. Try again later."
+
+      setState({ phase: "error", mode: "build", file: null, message })
 
       toast.error(message)
     }
@@ -118,7 +168,7 @@ export default function CVReBuildScreen() {
   const handleReset = () => {
     clearSavedResult()
 
-    setState({ phase: "idle" })
+    setState({ phase: "idle", mode: "rebuild" })
   }
 
   const handleFiles = (files: FileList | null) => {
@@ -164,75 +214,169 @@ export default function CVReBuildScreen() {
           marginBottom: 8,
         }}
       >
-        AI Rebuild CV
+        CV Build
       </h1>
 
       <p style={{ color: "var(--text-secondary)", marginBottom: 28 }}>
-        Upload your CV and our AI extracts, professionalizes, and renders a new
-        polished PDF you can preview and download.
+        Rebuild your existing CV with AI polishing, or build a fresh one from a
+        form — then preview and download the rendered PDF.
       </p>
 
       {state.phase === "idle" && (
-        <div
-          role="button"
-          tabIndex={0}
-          onClick={() => inputRef.current?.click()}
-          onKeyDown={(event) => {
-            if (event.key === "Enter" || event.key === " ") {
-              inputRef.current?.click()
-            }
-          }}
-          onDragOver={(event) => {
-            event.preventDefault()
-
-            setDragOver(true)
-          }}
-          onDragLeave={() => setDragOver(false)}
-          onDrop={(event) => {
-            event.preventDefault()
-
-            setDragOver(false)
-
-            handleFiles(event.dataTransfer.files)
-          }}
-          style={{
-            border: `2px dashed ${dragOver ? "var(--accent)" : "var(--border)"}`,
-            borderRadius: 16,
-            background: dragOver ? "color-mix(in srgb, var(--accent) 6%, white)" : "white",
-            padding: "64px 24px",
-            textAlign: "center",
-            cursor: "pointer",
-          }}
-        >
-          <CloudArrowUp size={40} weight="light" color="var(--text-secondary)" />
-
-          <p style={{ marginTop: 14, fontWeight: 600, color: "var(--text-primary)" }}>
-            Drag and drop your CV here, or browse files
-          </p>
-
-          <p style={{ marginTop: 6, color: "var(--text-secondary)", fontSize: 13 }}>
-            PDF or DOCX, up to 10 MB
-          </p>
-
-          <input
-            ref={inputRef}
-            type="file"
-            accept={ACCEPTED_TYPES}
-            aria-label="Upload your CV"
-            data-testid="cv-rebuild-input"
-            style={{ display: "none" }}
-            onChange={(event) => {
-              handleFiles(event.target.files)
-
-              event.target.value = ""
+        <div style={{ marginBottom: 22 }}>
+          <div
+            role="tablist"
+            aria-label="CV build mode"
+            style={{
+              display: "inline-flex",
+              gap: 4,
+              padding: 4,
+              borderRadius: 12,
+              background: "var(--border)",
             }}
-          />
+          >
+            <button
+              type="button"
+              role="tab"
+              aria-selected={state.mode === "rebuild"}
+              onClick={() => setState({ phase: "idle", mode: "rebuild" })}
+              style={{
+                padding: "9px 18px",
+                borderRadius: 9,
+                border: "none",
+                background: state.mode === "rebuild" ? "white" : "transparent",
+                color: "var(--text-primary)",
+                fontWeight: 600,
+                fontSize: 14,
+                cursor: "pointer",
+                boxShadow: state.mode === "rebuild" ? "0 1px 4px rgba(15,23,42,0.12)" : "none",
+              }}
+            >
+              Rebuild from file
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={state.mode === "build"}
+              onClick={() => setState({ phase: "idle", mode: "build" })}
+              style={{
+                padding: "9px 18px",
+                borderRadius: 9,
+                border: "none",
+                background: state.mode === "build" ? "white" : "transparent",
+                color: "var(--text-primary)",
+                fontWeight: 600,
+                fontSize: 14,
+                cursor: "pointer",
+                boxShadow: state.mode === "build" ? "0 1px 4px rgba(15,23,42,0.12)" : "none",
+              }}
+            >
+              Build from form
+            </button>
           </div>
+        </div>
+      )}
+
+      {state.phase === "idle" && state.mode === "rebuild" && (
+        <>
+          <label
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 8,
+              marginBottom: 14,
+              fontSize: 14,
+              color: profileAvatarUrl
+                ? "var(--text-primary)"
+                : "var(--text-secondary)",
+              cursor: profileAvatarUrl ? "pointer" : "not-allowed",
+            }}
+          >
+            <input
+              type="checkbox"
+              data-testid="cv-rebuild-avatar"
+              checked={useAvatar}
+              disabled={!profileAvatarUrl}
+              onChange={(event) => setUseAvatar(event.target.checked)}
+              style={{ width: 16, height: 16, accentColor: "var(--accent)", cursor: "inherit" }}
+            />
+            Use my profile avatar on the CV
+          </label>
+          {!profileAvatarUrl && (
+            <p style={{ marginBottom: 14, fontSize: 12, color: "var(--text-secondary)" }}>
+              No profile avatar yet — add one in Profile to use it on your CV.
+            </p>
+          )}
+
+          <div
+            role="button"
+            tabIndex={0}
+            onClick={() => inputRef.current?.click()}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                inputRef.current?.click()
+              }
+            }}
+            onDragOver={(event) => {
+              event.preventDefault()
+
+              setDragOver(true)
+            }}
+            onDragLeave={() => setDragOver(false)}
+            onDrop={(event) => {
+              event.preventDefault()
+
+              setDragOver(false)
+
+              handleFiles(event.dataTransfer.files)
+            }}
+            style={{
+              border: `2px dashed ${dragOver ? "var(--accent)" : "var(--border)"}`,
+              borderRadius: 16,
+              background: dragOver ? "color-mix(in srgb, var(--accent) 6%, white)" : "white",
+              padding: "64px 24px",
+              textAlign: "center",
+              cursor: "pointer",
+            }}
+          >
+            <CloudArrowUp size={40} weight="light" color="var(--text-secondary)" />
+
+            <p style={{ marginTop: 14, fontWeight: 600, color: "var(--text-primary)" }}>
+              Drag and drop your CV here, or browse files
+            </p>
+
+            <p style={{ marginTop: 6, color: "var(--text-secondary)", fontSize: 13 }}>
+              PDF or DOCX, up to 10 MB
+            </p>
+
+            <input
+              ref={inputRef}
+              type="file"
+              accept={ACCEPTED_TYPES}
+              aria-label="Upload your CV"
+              data-testid="cv-rebuild-input"
+              style={{ display: "none" }}
+              onChange={(event) => {
+                handleFiles(event.target.files)
+
+                event.target.value = ""
+              }}
+            />
+          </div>
+        </>
+      )}
+
+      {state.phase === "idle" && state.mode === "build" && (
+        <CVBuildForm
+          avatarUrl={profileAvatarUrl}
+          busy={false}
+          onSubmit={(payload) => void runBuild(payload)}
+        />
       )}
 
       {state.phase === "processing" && (
         <div
-          aria-label="Rebuilding CV"
+          aria-label="Building CV"
           style={{
             border: "1px solid var(--border)",
             borderRadius: 16,
@@ -256,10 +400,12 @@ export default function CVReBuildScreen() {
 
             <div style={{ flex: 1 }}>
               <p style={{ fontWeight: 700, color: "var(--text-primary)" }}>
-                Rebuilding CV…{" "}
-                <span style={{ color: "var(--text-secondary)", fontWeight: 400 }}>
-                  ({state.file.name})
-                </span>
+                {state.mode === "rebuild" ? "Rebuilding CV…" : "Building CV…"}{" "}
+                {state.file && (
+                  <span style={{ color: "var(--text-secondary)", fontWeight: 400 }}>
+                    ({state.file.name})
+                  </span>
+                )}
               </p>
 
               <p
@@ -269,8 +415,9 @@ export default function CVReBuildScreen() {
                   fontSize: 13,
                 }}
               >
-                Extracting details, polishing wording, and rendering the PDF.
-                This usually takes a few seconds.
+                {state.mode === "rebuild"
+                  ? "Extracting details, polishing wording, and rendering the PDF. This usually takes a few seconds."
+                  : "Polishing your information with AI and rendering the PDF. This usually takes a few seconds."}
               </p>
 
               <div
@@ -319,7 +466,7 @@ export default function CVReBuildScreen() {
           }}
         >
           <p style={{ color: "#B91C1C", fontWeight: 600 }}>
-            Rebuild failed: {state.message}
+            CV creation failed: {state.message}
           </p>
 
           <button
@@ -336,7 +483,7 @@ export default function CVReBuildScreen() {
               cursor: "pointer",
             }}
           >
-            Try another file
+            Try again
           </button>
         </div>
       )}
@@ -353,7 +500,7 @@ export default function CVReBuildScreen() {
           <div style={{ display: "flex", gap: 24, alignItems: "flex-start" }}>
             <img
               src={thumbnailDataUrl(state.result.thumbnail_base64)}
-              alt="Rebuilt CV preview"
+              alt="Built CV preview"
               role="img"
               onClick={() => setModalOpen(true)}
               style={{
@@ -368,7 +515,7 @@ export default function CVReBuildScreen() {
 
             <div style={{ flex: 1 }}>
               <h2 style={{ fontSize: 17, fontWeight: 700, color: "var(--text-primary)" }}>
-                {state.result.preview_json.name || "Your rebuilt CV"}
+                {state.result.preview_json.name || "Your built CV"}
               </h2>
 
               <p
@@ -379,7 +526,7 @@ export default function CVReBuildScreen() {
                 }}
               >
                 {state.result.preview_json.summary ||
-                  "Your CV has been rebuilt. Click the preview to inspect the full document."}
+                  "Your CV is ready. Click the preview to inspect the full document."}
               </p>
 
               <div style={{ display: "flex", gap: 12, marginTop: 18 }}>
@@ -438,7 +585,7 @@ export default function CVReBuildScreen() {
               cursor: "pointer",
             }}
           >
-            Rebuild another CV
+            Create another CV
           </button>
         </div>
       )}
@@ -483,7 +630,7 @@ export default function CVReBuildScreen() {
               }}
             >
               <strong style={{ color: "var(--text-primary)" }}>
-                {state.result.preview_json.name || "Rebuilt CV"}
+                {state.result.preview_json.name || "Built CV"}
               </strong>
 
               <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
@@ -529,7 +676,7 @@ export default function CVReBuildScreen() {
             </div>
 
             <iframe
-              title="Rebuilt CV"
+              title="Built CV"
               src={pdfDataUrl ?? undefined}
               style={{ flex: 1, border: "none", width: "100%" }}
             />

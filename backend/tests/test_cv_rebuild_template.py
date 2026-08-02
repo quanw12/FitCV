@@ -11,6 +11,7 @@ ALL_HEADINGS = (
     "Certifications",
     "Publications",
     "Awards",
+    "Technical Skills",
 )
 
 
@@ -56,6 +57,7 @@ def test_partial_cv_renders_only_present_sections() -> None:
         "Certifications",
         "Publications",
         "Awards",
+        "Technical Skills",
     ):
         assert f"<h2>{heading}</h2>" not in html
 
@@ -84,13 +86,15 @@ def test_vietnamese_cv_uses_vietnamese_headings() -> None:
         name="Nguyen Van A",
         summary="Kỹ sư phần mềm.",
         skills=["Python", "React"],
+        core_competencies=[{"name": "Phát triển Backend", "description": "3 năm kinh nghiệm."}],
         languages=[{"name": "Tiếng Anh", "proficiency": "Thành thạo"}],
         publications=[{"title": "Bài báo", "venue": "Tạp chí", "date": "2023"}],
         awards=["Sinh viên giỏi"],
     )
     html = render_cv(cv, language="vi")
     assert "<h2>Giới thiệu</h2>" in html
-    assert "<h2>Kỹ năng chuyên môn</h2>" in html
+    assert "<h2>Năng lực cốt lõi</h2>" in html
+    assert "<h2>Kỹ năng kỹ thuật</h2>" in html
     assert "<h2>Kinh nghiệm làm việc</h2>" not in html
     assert "<h2>Ngoại ngữ</h2>" in html
     assert "<h2>Công bố</h2>" in html
@@ -189,6 +193,7 @@ def test_template_uses_harvard_layout() -> None:
             }
         ],
         skills=["Python"],
+        core_competencies=[{"name": "Backend", "description": "4 years of APIs."}],
         projects=[
             {
                 "name": "FitCV",
@@ -200,15 +205,72 @@ def test_template_uses_harvard_layout() -> None:
     html = render_cv(cv)
     assert "Times New Roman" in html
     assert "<svg" not in html
+    assert html.index("<h2>Profile</h2>") < html.index("<h2>Core Competencies</h2>")
+    assert html.index("<h2>Core Competencies</h2>") < html.index("<h2>Education</h2>")
     assert html.index("<h2>Education</h2>") < html.index("<h2>Professional Experience</h2>")
-    assert html.index("<h2>Professional Experience</h2>") < html.index("<h2>Core Competencies</h2>")
+    assert html.index("<h2>Professional Experience</h2>") < html.index("<h2>Technical Skills</h2>")
     assert '<a href="mailto:a@example.com">a@example.com</a>' in html
     assert 'class="entry-right">HCMC · 2020-2023' in html
     assert '<a href="https://github.com/a/fitcv">GitHub — https://github.com/a/fitcv</a>' in html
+
+
+def test_core_competencies_render_with_value_descriptions() -> None:
+    cv = CVData(
+        name="Nguyen Van A",
+        core_competencies=[
+            {"name": "Backend Development", "description": "4 years building payment APIs."},
+            {"name": "SQL", "description": "Designed schemas for 1M+ rows."},
+        ],
+    )
+    html = render_cv(cv)
+    assert "<h2>Core Competencies</h2>" in html
+    assert '<li><span class="entry-title">Backend Development</span> — 4 years building payment APIs.</li>' in html
+    assert '<li><span class="entry-title">SQL</span> — Designed schemas for 1M+ rows.</li>' in html
+    assert "<h2>Technical Skills</h2>" not in html
+
+
+def test_skill_groups_render_categorized_technical_skills() -> None:
+    cv = CVData(
+        name="Nguyen Van A",
+        skill_groups=[
+            {"category": "Languages", "items": ["Python", "TypeScript"]},
+            {"category": "Frameworks", "items": ["React", "FastAPI"]},
+        ],
+    )
+    html = render_cv(cv)
+    assert "<h2>Technical Skills</h2>" in html
+    assert "<span class=\"entry-title\">Languages:</span> Python, TypeScript" in html
+    assert "<span class=\"entry-title\">Frameworks:</span> React, FastAPI" in html
+
+
+def test_plain_skills_list_renders_when_no_groups() -> None:
+    cv = CVData(name="Nguyen Van A", skills=["Python", "Docker"])
+    html = render_cv(cv)
+    assert "<h2>Technical Skills</h2>" in html
+    assert '<ul class="skills-list">' in html
+    assert "<li>Python</li>" in html
+    assert "<li>Docker</li>" in html
+    assert "<h2>Core Competencies</h2>" not in html
 
 
 def test_vietnamese_headings() -> None:
     cv = CVData(name="A", education=[{"degree": "Cử nhân"}], skills=["Python"])
     html = render_cv(cv, language="vi")
     assert "<h2>Học vấn</h2>" in html
-    assert "<h2>Kỹ năng chuyên môn</h2>" in html
+    assert "<h2>Kỹ năng kỹ thuật</h2>" in html
+
+
+def test_avatar_data_url_is_embedded_in_header() -> None:
+    html = render_cv(
+        CVData(name="Nguyen Van A"),
+        avatar="data:image/png;base64,QUFB",
+    )
+    assert (
+        '<img class="cv-avatar" src="data:image/png;base64,QUFB" alt="Profile photo" />'
+        in html
+    )
+
+
+def test_non_data_url_avatar_is_ignored() -> None:
+    html = render_cv(CVData(name="Nguyen Van A"), avatar="https://example.com/x.jpg")
+    assert 'class="cv-avatar"' not in html

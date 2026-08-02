@@ -39,7 +39,7 @@ _environment.filters["linkify"] = _linkify
 _SECTION_HEADINGS = {
     "en": {
         "profile": "Profile",
-        "skills": "Core Competencies",
+        "core_competencies": "Core Competencies",
         "experience": "Professional Experience",
         "projects": "Selected Projects",
         "education": "Education",
@@ -47,10 +47,11 @@ _SECTION_HEADINGS = {
         "certifications": "Certifications",
         "publications": "Publications",
         "awards": "Awards",
+        "technical_skills": "Technical Skills",
     },
     "vi": {
         "profile": "Giới thiệu",
-        "skills": "Kỹ năng chuyên môn",
+        "core_competencies": "Năng lực cốt lõi",
         "experience": "Kinh nghiệm làm việc",
         "projects": "Dự án tiêu biểu",
         "education": "Học vấn",
@@ -58,11 +59,15 @@ _SECTION_HEADINGS = {
         "certifications": "Chứng chỉ",
         "publications": "Công bố",
         "awards": "Giải thưởng",
+        "technical_skills": "Kỹ năng kỹ thuật",
     },
 }
 
 
-def render_cv(cv: CVData, *, language: str = "en") -> str:
+def render_cv(
+    cv: CVData, *, language: str = "en", avatar: str | None = None
+) -> str:
     template = _environment.get_template("cv_template.html")
     headings = _SECTION_HEADINGS.get(language, _SECTION_HEADINGS["en"])
-    return template.render(data=cv, headings=headings)
+    safe_avatar = avatar if avatar and avatar.startswith("data:image/") else None
+    return template.render(data=cv, headings=headings, avatar=safe_avatar)

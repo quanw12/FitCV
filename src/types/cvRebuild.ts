@@ -46,6 +46,18 @@ export interface CvRebuildPublicationItem {
   date: string
 }
 
+export interface CvRebuildCompetencyItem {
+  name: string
+
+  description: string
+}
+
+export interface CvRebuildSkillGroup {
+  category: string
+
+  items: string[]
+}
+
 export interface CvRebuildData {
   name: string
 
@@ -59,7 +71,11 @@ export interface CvRebuildData {
 
   experience: CvRebuildExperienceItem[]
 
+  core_competencies: CvRebuildCompetencyItem[]
+
   skills: string[]
+
+  skill_groups: CvRebuildSkillGroup[]
 
   projects: CvRebuildProjectItem[]
 

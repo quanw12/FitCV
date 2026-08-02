@@ -13,7 +13,9 @@ class TestCVData:
         assert cv.links == []
         assert cv.summary == ""
         assert cv.experience == []
+        assert cv.core_competencies == []
         assert cv.skills == []
+        assert cv.skill_groups == []
         assert cv.projects == []
         assert cv.certifications == []
         assert cv.education == []
@@ -24,6 +26,32 @@ class TestCVData:
     def test_rejects_skills_as_string(self) -> None:
         with pytest.raises(ValidationError):
             CVData.model_validate({"skills": "Python"})
+
+    def test_rejects_core_competency_as_string(self) -> None:
+        with pytest.raises(ValidationError):
+            CVData.model_validate({"core_competencies": "Backend"})
+
+    def test_rejects_skill_group_items_as_string(self) -> None:
+        with pytest.raises(ValidationError):
+            CVData.model_validate(
+                {"skill_groups": [{"category": "Languages", "items": "Python"}]}
+            )
+
+    def test_accepts_competencies_and_skill_groups(self) -> None:
+        cv = CVData.model_validate(
+            {
+                "core_competencies": [
+                    {"name": "Backend", "description": "4 years of APIs."}
+                ],
+                "skill_groups": [
+                    {"category": "Languages", "items": ["Python", "Go"]}
+                ],
+            }
+        )
+        assert cv.core_competencies[0].name == "Backend"
+        assert cv.core_competencies[0].description == "4 years of APIs."
+        assert cv.skill_groups[0].category == "Languages"
+        assert cv.skill_groups[0].items == ["Python", "Go"]
 
     def test_rejects_experience_bullets_as_string(self) -> None:
         with pytest.raises(ValidationError):
@@ -53,6 +81,12 @@ class TestCVData:
                     }
                 ],
                 "skills": ["Python"],
+                "core_competencies": [
+                    {"name": "Backend", "description": "4 years of APIs."}
+                ],
+                "skill_groups": [
+                    {"category": "Languages", "items": ["Python"]}
+                ],
                 "projects": [
                     {
                         "name": "FitCV",
@@ -74,6 +108,8 @@ class TestCVData:
         assert cv.publications[0].venue == "Journal"
         assert cv.awards == ["Dean's List"]
         assert cv.projects[0].links[0].label == "GitHub"
+        assert cv.core_competencies[0].description == "4 years of APIs."
+        assert cv.skill_groups[0].items == ["Python"]
 
     def test_rejects_links_as_string(self) -> None:
         with pytest.raises(ValidationError):

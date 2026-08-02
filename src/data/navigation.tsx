@@ -30,7 +30,7 @@ export const seekerNavItems: NavItem[] = [
   {
     icon: <FileText size={18} weight="light" />,
 
-    label: "CV Rebuild",
+    label: "CV Build",
 
     screen: "cv-rebuild",
   },

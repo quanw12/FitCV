@@ -1,17 +1,67 @@
-import type { CvRebuildResponse } from "@/types/cvRebuild"
+import type { CvRebuildData, CvRebuildResponse } from "@/types/cvRebuild"
 
 import { requestJson } from "./httpClient"
 
-export function rebuildCv(file: File): Promise<CvRebuildResponse> {
+export interface CvBuildPayload {
+  cv: CvRebuildData
+
+  language: "en" | "vi"
+
+  avatar?: string
+}
+
+export function rebuildCv(
+  file: File,
+  avatar?: string,
+): Promise<CvRebuildResponse> {
   const form = new FormData()
 
   form.append("file", file)
+
+  if (avatar) form.append("avatar", avatar)
 
   return requestJson<CvRebuildResponse>("/api/cv/rebuild", {
     method: "POST",
     body: form,
     authenticated: true,
   })
+}
+
+export function buildCv(payload: CvBuildPayload): Promise<CvRebuildResponse> {
+  return requestJson<CvRebuildResponse>("/api/cv/build", {
+    method: "POST",
+    body: JSON.stringify(payload),
+    authenticated: true,
+  })
+}
+
+export async function profileAvatarDataUrl(
+  avatarUrl: string | null | undefined,
+): Promise<string | null> {
+  if (!avatarUrl) return null
+
+  if (avatarUrl.startsWith("data:image/")) return avatarUrl
+
+  try {
+    const response = await fetch(avatarUrl)
+
+    if (!response.ok) return null
+
+    const blob = await response.blob()
+
+    return await new Promise<string | null>((resolve) => {
+      const reader = new FileReader()
+
+      reader.onload = () =>
+        resolve(typeof reader.result === "string" ? reader.result : null)
+
+      reader.onerror = () => resolve(null)
+
+      reader.readAsDataURL(blob)
+    })
+  } catch {
+    return null
+  }
 }
 
 export function pdfBase64ToBlob(base64: string): Blob {

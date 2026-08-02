@@ -33,6 +33,16 @@
   .contact-sep { margin: 0 7px; }
   a { color: #000; text-decoration: none; }
 
+  .cv-avatar {
+    width: 76px;
+    height: 76px;
+    border-radius: 50%;
+    object-fit: cover;
+    display: block;
+    margin: 0 auto 8pt;
+    border: 0.75pt solid #000;
+  }
+
   section.cv-section {
     margin-bottom: 12pt;
     page-break-inside: avoid;
@@ -100,6 +110,9 @@
 <div class="page">
   {% if data.name %}
   <header class="cv-header">
+    {% if avatar %}
+    <img class="cv-avatar" src="{{ avatar }}" alt="Profile photo" />
+    {% endif %}
     <h1>{{ data.name }}</h1>
     <div class="contact">
       {% if data.phone %}
@@ -121,6 +134,17 @@
   <section class="cv-section">
     <h2>{{ headings.profile }}</h2>
     <p>{{ data.summary }}</p>
+  </section>
+  {% endif %}
+
+  {% if data.core_competencies %}
+  <section class="cv-section">
+    <h2>{{ headings.core_competencies }}</h2>
+    <ul class="bullets">
+      {% for item in data.core_competencies %}
+      <li><span class="entry-title">{{ item.name }}</span>{% if item.description %} — {{ item.description }}{% endif %}</li>
+      {% endfor %}
+    </ul>
   </section>
   {% endif %}
 
@@ -230,9 +254,16 @@
   </section>
   {% endif %}
 
-  {% if data.skills %}
+  {% if data.skill_groups %}
   <section class="cv-section">
-    <h2>{{ headings.skills }}</h2>
+    <h2>{{ headings.technical_skills }}</h2>
+    {% for group in data.skill_groups %}
+    <p><span class="entry-title">{{ group.category }}:</span> {{ group.items | join(", ") }}</p>
+    {% endfor %}
+  </section>
+  {% elif data.skills %}
+  <section class="cv-section">
+    <h2>{{ headings.technical_skills }}</h2>
     <ul class="skills-list">
       {% for skill in data.skills %}<li>{{ skill }}</li>{% endfor %}
     </ul>
