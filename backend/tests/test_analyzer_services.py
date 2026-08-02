@@ -36,11 +36,40 @@ from app.services.analyzer_service import _selected_analyzer_config
 from app.services import ocr_service
 from app.services.gemini_analyzer import (
     GeminiAnalyzerError,
+    extract_cv_inputs_from_file,
     extract_match_inputs,
 )
 
 
 class DocumentParserTests(unittest.TestCase):
+    def test_extracts_build_cv_aliases_and_sections(self) -> None:
+        cv = parse_cv_text(
+            """CORE COMPETENCIES
+            Backend Development using ASP.NET (C#) and PHP.
+            EDUCATION
+            Major: Information Technology - Saigon Technology University.
+            PROFESSIONAL EXPERIENCE
+            Internship project using ReactJS, HTML5, CSS3, REST APIs and Figma.
+            SELECTED PROJECTS
+            Built a payment flow with SQL Server, Tailwind CSS, Bootstrap, JWT,
+            Postman, XAMPP and VNPay.
+            """
+        )
+
+        self.assertIn("ASP.NET", cv["skills"])
+        self.assertIn("HTML", cv["skills"])
+        self.assertIn("CSS", cv["skills"])
+        self.assertIn("SQL Server", cv["skills"])
+        self.assertIn("Tailwind CSS", cv["skills"])
+        self.assertIn("Bootstrap", cv["skills"])
+        self.assertIn("Figma", cv["skills"])
+        self.assertIn("Postman", cv["skills"])
+        self.assertIn("JWT", cv["skills"])
+        self.assertIn("VNPay", cv["skills"])
+        self.assertIn("skills", cv["sections"])
+        self.assertIn("experience", cv["sections"])
+        self.assertIn("projects", cv["sections"])
+
     def test_extracts_shared_cv_and_jd_contract(self) -> None:
         cv = parse_cv_text(
             """Technical Skills
@@ -658,8 +687,77 @@ Bachelor student using Splunk, Wireshark, and Python. Communication.""",
         algorithm_version, model_name = _selected_analyzer_config()
         self.assertTrue(algorithm_version.startswith("fitcv-gemini-"))
         self.assertLessEqual(len(algorithm_version), 50)
-        self.assertTrue(algorithm_version.endswith("-v3-s2"))
+        self.assertTrue(algorithm_version.endswith("-v6-s5"))
         self.assertEqual(model_name, "gemini-3.1-flash-lite")
+
+    def test_extracts_structured_cv_from_original_file(self) -> None:
+        output = {
+            "skills": [
+                {"name": "Git", "evidence": "Git and GitHub"},
+                {"name": "ASP.NET", "evidence": "ASP.NET Core"},
+            ],
+            "experience_years": 0.16,
+            "experience_evidence": "Professional Experience",
+            "education": "Bachelor",
+            "education_evidence": "Major: Information Technology - Saigon Technology University",
+            "soft_skills": [
+                {"name": "Communication", "evidence": "Excellent communication"}
+            ],
+        }
+        response = MagicMock(status_code=200)
+        response.json.return_value = {
+            "candidates": [
+                {
+                    "content": {"parts": [{"text": json.dumps(output)}]},
+                    "finishReason": "STOP",
+                }
+            ]
+        }
+        coverage_response = MagicMock(status_code=200)
+        coverage_response.json.return_value = {
+            "candidates": [
+                {
+                    "content": {
+                        "parts": [
+                            {
+                                "text": json.dumps(
+                                    {
+                                        "skills": [
+                                            {"name": "Git", "evidence": "Git and GitHub"}
+                                        ],
+                                        "soft_skills": [],
+                                    }
+                                )
+                            }
+                        ]
+                    },
+                    "finishReason": "STOP",
+                }
+            ]
+        }
+
+        with TemporaryDirectory() as directory:
+            path = Path(directory) / "resume.pdf"
+            path.write_bytes(b"%PDF-fake-cv")
+            with patch(
+                "app.services.gemini_analyzer.requests.post",
+                side_effect=[response, coverage_response],
+            ) as post:
+                payload = extract_cv_inputs_from_file(
+                    file_path=path,
+                    file_type="PDF",
+                )
+
+        request_body = post.call_args_list[0].kwargs["json"]
+        parts = request_body["contents"][0]["parts"]
+        self.assertEqual(parts[0]["inlineData"]["mimeType"], "application/pdf")
+        self.assertEqual(parts[0]["inlineData"]["data"], base64.b64encode(b"%PDF-fake-cv").decode("ascii"))
+        self.assertEqual(payload["skills"], ["ASP.NET", "Git"])
+        self.assertEqual(payload["soft_skills"], ["Communication"])
+        self.assertEqual(payload["experience_years"], None)
+        self.assertEqual(payload["education"], None)
+        self.assertEqual(payload["education_evidence"], "Major: Information Technology - Saigon Technology University")
+        self.assertEqual(payload["_extraction_provider"], "gemini")
 
 
 class AnalyzerRepositoryTests(unittest.TestCase):
