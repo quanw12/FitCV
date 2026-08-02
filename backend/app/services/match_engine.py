@@ -10,6 +10,7 @@ from app.services.document_parser import (
     preprocess_document_text,
 )
 from app.services.gemini_analyzer import (
+    GEMINI_CV_PARSE_VERSION,
     GEMINI_EXTRACTOR_VERSION,
     GeminiAnalyzerError,
     extract_match_inputs,
@@ -18,8 +19,6 @@ from app.services.matching_service import (
     ALGORITHM_VERSION,
     SCORING_FRAMEWORK_VERSION,
     match_documents,
-    supplement_semantic_cv,
-    supplement_semantic_jd,
 )
 
 LEGACY_DETERMINISTIC_VERSION = "fitcv-deterministic-v1"
@@ -82,7 +81,7 @@ def selected_analyzer_config() -> tuple[str, str | None]:
         if not model_slug:
             raise GeminiAnalyzerError("GEMINI_MODEL must not be empty.")
         return (
-            f"fitcv-gemini-{model_slug[:22]}-{GEMINI_EXTRACTOR_VERSION}-s2",
+            f"fitcv-gemini-{model_slug[:22]}-{GEMINI_EXTRACTOR_VERSION}-s5",
             settings.gemini_model,
         )
     raise GeminiAnalyzerError(
@@ -148,13 +147,11 @@ def score_match(
     weights: dict[str, float] | None = None,
 ) -> dict[str, Any]:
     normalized_jd = normalize_scoring_jd_text(jd_text)
-    local_cv = parsed_cv or parse_cv_text(cv_text)
-    local_jd = parsed_jd or parse_jd_text(normalized_jd)
     selected_version = algorithm_version or selected_analyzer_config()[0]
 
     if selected_version in {ALGORITHM_VERSION, LEGACY_DETERMINISTIC_VERSION}:
-        score_cv = local_cv
-        score_jd = local_jd
+        score_cv = parsed_cv or parse_cv_text(cv_text)
+        score_jd = parsed_jd or parse_jd_text(normalized_jd)
         extraction_provider = "deterministic"
     elif selected_version.startswith("fitcv-gemini-"):
         semantic_cv, semantic_jd = extract_match_inputs(
@@ -162,8 +159,18 @@ def score_match(
             job_description=normalized_jd,
             model_name=model_name,
         )
-        score_cv = supplement_semantic_cv(semantic_cv, local_cv)
-        score_jd = supplement_semantic_jd(semantic_jd, local_jd)
+        # Gemini is authoritative for the Gemini analyzer. The local parser is intentionally
+        # not used to add skills, education, experience, or soft skills to model output.
+        if (
+            isinstance(parsed_cv, dict)
+            and parsed_cv.get("_extraction_provider") == "gemini"
+            and parsed_cv.get("_extraction_version") == GEMINI_CV_PARSE_VERSION
+        ):
+            # This is the exhaustive file-level extraction, including its coverage audit.
+            score_cv = parsed_cv
+        else:
+            score_cv = semantic_cv
+        score_jd = semantic_jd
         extraction_provider = "gemini"
     else:
         raise ValueError(f"Unsupported analyzer version: {selected_version}")
@@ -188,7 +195,7 @@ def score_match(
     if extraction_provider == "gemini":
         result["match_summary"] = (
             f"{result['match_label']} using source-grounded Gemini extraction, "
-            "locally verified CV/JD facts, and FitCV's shared weighted scorer."
+            "and FitCV's shared weighted scorer."
         )
     return result
 
