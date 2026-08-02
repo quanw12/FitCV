@@ -72,12 +72,6 @@ const scoreColor = (score: number | null) =>
         ? "#2563EB"
         : "#D97706"
 
-const statusBadge = (status: string) => {
-  if (status === "Published") return "fc-badge--green"
-  if (status === "Closed") return "fc-badge--gray"
-  return "fc-badge--amber"
-}
-
 const deltaText = (current: number | null, prev: number | null, suffix: string) => {
   if (current == null) return "—"
   if (prev == null) return "n/a"
@@ -91,11 +85,9 @@ const scoreDisplay = (score: number | null) =>
 
 export default function HRDashboard({ onNavigate }: HRDashboardProps) {
   const [summary, setSummary] = useState<ReportSummary | null>(null)
-  const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState("")
 
   const load = useCallback(async () => {
-    setLoading(true)
     setLoadError("")
     try {
       setSummary(await reportsApi.summary(trailing30Days()))
@@ -103,8 +95,6 @@ export default function HRDashboard({ onNavigate }: HRDashboardProps) {
       setLoadError(
         cause instanceof Error ? cause.message : "Could not load the dashboard.",
       )
-    } finally {
-      setLoading(false)
     }
   }, [])
 
