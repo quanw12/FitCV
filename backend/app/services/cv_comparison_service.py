@@ -55,15 +55,15 @@ def compare_cv_versions(
     changes = [
         _list_change("Skills", base_parse.parsed_json.get("skills"), target_parse.parsed_json.get("skills")),
         _list_change("Soft skills", base_parse.parsed_json.get("soft_skills"), target_parse.parsed_json.get("soft_skills")),
-        _scalar_change(
+        _list_change(
             "Experience",
-            base_parse.parsed_json.get("experience_years"),
-            target_parse.parsed_json.get("experience_years"),
+            base_parse.parsed_json.get("experience_entries"),
+            target_parse.parsed_json.get("experience_entries"),
         ),
-        _scalar_change(
+        _list_change(
             "Education",
-            base_parse.parsed_json.get("education"),
-            target_parse.parsed_json.get("education"),
+            base_parse.parsed_json.get("education_entries"),
+            target_parse.parsed_json.get("education_entries"),
         ),
     ]
     deltas = [

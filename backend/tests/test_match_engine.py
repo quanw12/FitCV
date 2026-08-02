@@ -218,7 +218,7 @@ Candidates meet the teamwork panel in three interviews.
             "education": None,
             "soft_skills": [],
             "_extraction_provider": "gemini",
-            "_extraction_version": "gemini-cv-v3",
+            "_extraction_version": "gemini-cv-v5",
         }
         text_only_cv = {
             "skills": ["ASP.NET"],
@@ -244,7 +244,7 @@ Candidates meet the teamwork panel in three interviews.
                 cv_text="CV text",
                 jd_text="C# required",
                 parsed_cv=audited_file_cv,
-                algorithm_version="fitcv-gemini-test-v6-s5",
+                algorithm_version="fitcv-gemini-test-v8-s7",
                 source_scope="test-file-payload",
             )
 
