@@ -14,6 +14,9 @@ interface BackendJobSearchHit {
   date: string | null
   url: string
   matched_keywords: string[]
+  seniority: string | null
+  category: string | null
+  source: "linkedin" | "freehire"
 }
 
 interface BackendJobSearchResponse {
@@ -21,6 +24,8 @@ interface BackendJobSearchResponse {
   location: string
   results: BackendJobSearchHit[]
   note: string
+  derived_by: "ai" | "deterministic"
+  derived_level: string | null
 }
 
 function normalizeHit(hit: BackendJobSearchHit): JobSearchHit {
@@ -32,6 +37,9 @@ function normalizeHit(hit: BackendJobSearchHit): JobSearchHit {
     date: hit.date,
     url: hit.url,
     matchedKeywords: hit.matched_keywords,
+    seniority: hit.seniority,
+    category: hit.category,
+    source: hit.source,
   }
 }
 
@@ -49,6 +57,7 @@ export const jobSearchApi = {
           remote: params.remote ?? null,
           jobage: params.jobage ?? 30,
           limit: params.limit ?? 12,
+          level: params.level?.trim() ? params.level.trim() : null,
         }),
       },
     )
@@ -56,6 +65,8 @@ export const jobSearchApi = {
       query: payload.query,
       location: payload.location,
       note: payload.note,
+      derivedBy: payload.derived_by,
+      derivedLevel: payload.derived_level,
       results: payload.results.map(normalizeHit),
     }
   },

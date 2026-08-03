@@ -5,7 +5,7 @@ import {
   ClockCounterClockwise,
   CheckSquare,
   BookOpenText,
-  LinkedinLogo,
+  MagnifyingGlass,
   UserCircle,
   Briefcase,
   ChartBar,
@@ -77,11 +77,11 @@ export const seekerNavItems: NavItem[] = [
   },
 
   {
-    icon: <LinkedinLogo size={18} weight="light" />,
+    icon: <MagnifyingGlass size={18} weight="light" />,
 
-    label: "LinkedIn Jobs",
+    label: "Job Search",
 
-    screen: "linkedin-jobs",
+    screen: "job-search",
   },
 
   {

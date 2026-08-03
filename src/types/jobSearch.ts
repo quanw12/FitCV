@@ -6,6 +6,9 @@ export interface JobSearchHit {
   date: string | null
   url: string
   matchedKeywords: string[]
+  seniority: string | null
+  category: string | null
+  source: "linkedin" | "freehire"
 }
 
 export interface JobSearchResult {
@@ -13,6 +16,8 @@ export interface JobSearchResult {
   location: string
   results: JobSearchHit[]
   note: string
+  derivedBy: "ai" | "deterministic"
+  derivedLevel: string | null
 }
 
 export interface JobSearchParams {
@@ -22,4 +27,5 @@ export interface JobSearchParams {
   remote?: "remote" | "hybrid" | "onsite"
   jobage?: number
   limit?: number
+  level?: string
 }

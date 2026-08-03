@@ -2,10 +2,10 @@ import { useCallback, useEffect, useState } from "react"
 
 import {
   ArrowSquareOut,
+  Briefcase,
   Buildings,
   CalendarBlank,
   FileText,
-  LinkedinLogo,
   MagnifyingGlass,
   MapPin,
   Spinner,
@@ -59,7 +59,7 @@ const cardIconStyle: React.CSSProperties = {
   marginBottom: 14,
 }
 
-export default function LinkedInJobSearchScreen() {
+export default function JobSearchScreen() {
   const [cvs, setCvs] = useState<CvVersion[]>([])
 
   const [selectedCvId, setSelectedCvId] = useState<number | null>(null)
@@ -71,6 +71,8 @@ export default function LinkedInJobSearchScreen() {
   const [remote, setRemote] = useState("any")
 
   const [jobage, setJobage] = useState("30")
+
+  const [level, setLevel] = useState("")
 
   const [result, setResult] = useState<JobSearchResult | null>(null)
 
@@ -133,6 +135,7 @@ export default function LinkedInJobSearchScreen() {
             ? undefined
             : remote as "remote" | "hybrid" | "onsite",
         jobage: jobage ? Number(jobage) : undefined,
+        level: level || undefined,
         limit: 12,
       })
 
@@ -143,7 +146,7 @@ export default function LinkedInJobSearchScreen() {
       setError(
         caught instanceof Error
           ? caught.message
-          : "Unable to search LinkedIn for matching jobs.",
+          : "Unable to search for matching jobs.",
       )
     } finally {
       setSearching(false)
@@ -173,17 +176,17 @@ export default function LinkedInJobSearchScreen() {
               marginBottom: 4,
             }}
           >
-            LinkedIn Jobs
+            Job Search
           </h1>
           <p style={{ color: "var(--text-secondary)", fontSize: 14 }}>
-            Scan your CV, find a few matching job postings, and open them on
-            LinkedIn to apply. Nothing is saved.
+            Scan your CV, find a few matching tech job postings, and open them
+            to apply. Nothing is saved.
           </p>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <LinkedinLogo size={20} weight="light" color="#0A66C2" />
+          <Briefcase size={20} weight="light" color="#2563EB" />
           <span style={{ fontSize: 13, color: "var(--text-secondary)" }}>
-            Personal-use prototype · low volume
+            freehire.me + LinkedIn · tech-focused · best-effort
           </span>
         </div>
       </div>
@@ -230,7 +233,7 @@ export default function LinkedInJobSearchScreen() {
             <input
               className="fc-input"
               type="text"
-              placeholder="e.g. react python aws"
+              placeholder="e.g. software engineer intern"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
             />
@@ -275,6 +278,27 @@ export default function LinkedInJobSearchScreen() {
             </select>
           </label>
 
+          <label>
+            <span className="fc-field-label">
+              Experience level (leave empty to auto-detect)
+            </span>
+            <select
+              className="fc-input"
+              value={level}
+              onChange={(event) => setLevel(event.target.value)}
+            >
+              <option value="">Any</option>
+              <option value="Intern">Intern</option>
+              <option value="Entry">Entry</option>
+              <option value="Fresher">Fresher</option>
+              <option value="Junior">Junior</option>
+              <option value="Mid-level">Mid-level</option>
+              <option value="Senior">Senior</option>
+              <option value="Lead">Lead</option>
+              <option value="Manager">Manager</option>
+            </select>
+          </label>
+
           <div style={{ display: "flex", alignItems: "flex-end" }}>
             <button
               type="button"
@@ -288,7 +312,7 @@ export default function LinkedInJobSearchScreen() {
               ) : (
                 <MagnifyingGlass size={15} weight="light" />
               )}
-              {searching ? "Searching LinkedIn…" : "Find matching jobs"}
+              {searching ? "Searching…" : "Find matching jobs"}
             </button>
           </div>
         </div>
@@ -326,15 +350,36 @@ export default function LinkedInJobSearchScreen() {
             </strong>
             <p style={{ maxWidth: 420 }}>
               Upload your CV in CV Build or Match Analyzer, then come back here
-              to find matching LinkedIn jobs.
+              to find matching jobs.
             </p>
           </div>
         </div>
       )}
 
       {result && (
-        <div className="fc-eyebrow" style={{ marginBottom: 10 }}>
+        <div
+          className="fc-eyebrow"
+          style={{ marginBottom: 10, display: "flex", alignItems: "center", gap: 8 }}
+        >
           {result.results.length} jobs for “{result.query}” in {result.location}
+          {result.derivedLevel && (
+            <span
+              className="fc-badge"
+              data-testid="derived-level-badge"
+              style={{ fontSize: 11 }}
+            >
+              Level: {result.derivedLevel}
+            </span>
+          )}
+          {result.derivedBy === "ai" && (
+            <span
+              className="fc-badge fc-badge--blue"
+              data-testid="ai-derived-badge"
+              style={{ fontSize: 11 }}
+            >
+              AI-derived from CV
+            </span>
+          )}
         </div>
       )}
 
@@ -381,6 +426,38 @@ export default function LinkedInJobSearchScreen() {
                   }}
                 >
                   {job.title}
+                </div>
+                <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
+                  {job.source === "linkedin" && (
+                    <span
+                      style={{
+                        fontSize: 11, background: "#E8F0FE", color: "#0A66C2",
+                        borderRadius: 6, padding: "2px 8px", fontWeight: 600,
+                        display: "inline-flex", alignItems: "center", gap: 4,
+                      }}
+                    >
+                      LinkedIn
+                    </span>
+                  )}
+                  {job.source === "freehire" && (
+                    <span
+                      style={{
+                        fontSize: 11, background: "#E8F8EA", color: "#0D7A3F",
+                        borderRadius: 6, padding: "2px 8px", fontWeight: 600,
+                        display: "inline-flex", alignItems: "center", gap: 4,
+                      }}
+                    >
+                      freehire
+                    </span>
+                  )}
+                  {job.seniority && (
+                    <span
+                      className="fc-badge"
+                      style={{ fontSize: 11 }}
+                    >
+                      {job.seniority}
+                    </span>
+                  )}
                 </div>
                 <div
                   style={{
@@ -453,7 +530,7 @@ export default function LinkedInJobSearchScreen() {
                     }}
                   >
                     <ArrowSquareOut size={14} weight="light" />
-                    View on LinkedIn
+                    View job
                   </a>
                 </div>
               </div>

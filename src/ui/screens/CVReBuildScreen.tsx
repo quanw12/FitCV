@@ -1,9 +1,10 @@
 import { useRef, useState } from "react"
 
-import { CloudArrowUp, Download, FileText, X } from "@phosphor-icons/react"
+import { CloudArrowUp, Download, FileText, FloppyDisk, X } from "@phosphor-icons/react"
 import { toast } from "sonner"
 
 import { authApi } from "@/api"
+import { analyzerApi } from "@/api/analyzerApi"
 import {
   buildCv,
   pdfBase64ToBlob,
@@ -93,6 +94,7 @@ export default function CVReBuildScreen() {
   const [dragOver, setDragOver] = useState(false)
   const [modalOpen, setModalOpen] = useState(false)
   const [useAvatar, setUseAvatar] = useState(false)
+  const [saving, setSaving] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
   const profileAvatarUrl = authApi.getSession()?.user.avatarUrl ?? null
@@ -197,6 +199,33 @@ export default function CVReBuildScreen() {
     anchor.remove()
 
     URL.revokeObjectURL(url)
+  }
+
+  const handleSaveToHistory = async () => {
+    if (state.phase !== "done" || saving) return
+
+    setSaving(true)
+
+    try {
+      const blob = pdfBase64ToBlob(state.result.pdf_base64)
+
+      const file = new File([blob], state.result.filename, {
+        type: "application/pdf",
+      })
+
+      await analyzerApi.uploadCv(file)
+
+      toast.success("Saved to CV History")
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Unable to save this CV to history."
+
+      toast.error(message)
+    } finally {
+      setSaving(false)
+    }
   }
 
   const pdfDataUrl =
@@ -566,6 +595,28 @@ export default function CVReBuildScreen() {
                   }}
                 >
                   <Download size={16} weight="light" /> Download PDF
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => void handleSaveToHistory()}
+                  disabled={saving}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 8,
+                    padding: "10px 18px",
+                    borderRadius: 10,
+                    border: "1px solid var(--border)",
+                    background: "white",
+                    color: "var(--text-primary)",
+                    fontWeight: 600,
+                    cursor: saving ? "wait" : "pointer",
+                    opacity: saving ? 0.7 : 1,
+                  }}
+                >
+                  <FloppyDisk size={16} weight="light" />
+                  {saving ? "Saving…" : "Save to History"}
                 </button>
               </div>
             </div>

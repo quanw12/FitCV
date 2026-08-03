@@ -42,9 +42,7 @@ const AppTrackerScreen = lazy(() => import("@/ui/screens/AppTrackerScreen"))
 
 const JDLibraryScreen = lazy(() => import("@/ui/screens/JDLibraryScreen"))
 
-const LinkedInJobSearchScreen = lazy(
-  () => import("@/ui/screens/LinkedInJobSearchScreen"),
-)
+const JobSearchScreen = lazy(() => import("@/ui/screens/JobSearchScreen"))
 
 const HRDashboard = lazy(() => import("@/ui/screens/HRDashboard"))
 
@@ -400,8 +398,8 @@ export default function App() {
           />
         )
 
-      case "linkedin-jobs":
-        return <LinkedInJobSearchScreen />
+      case "job-search":
+        return <JobSearchScreen />
 
       case "profile":
         return <ProfileScreen session={session} onSessionChange={setSession} />

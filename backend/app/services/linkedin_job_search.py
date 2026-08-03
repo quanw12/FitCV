@@ -33,6 +33,46 @@ DEFAULT_LOCATION = "Remote"
 MAX_RESULTS = 20
 _DEFAULT_JOBAGE_DAYS = 30
 
+SUPPORTED_LEVELS = (
+    "Intern",
+    "Entry",
+    "Fresher",
+    "Junior",
+    "Mid-level",
+    "Senior",
+    "Lead",
+    "Manager",
+)
+
+# FitCV level -> LinkedIn f_E experience filter. f_E=1 (Internship) is silently
+# ignored by the guest API, so Intern searches use Entry (2) and rely on the
+# level word in the query plus the low-level title blocker to stay on target.
+LEVEL_TO_F_E = {
+    "Intern": "2",
+    "Entry": "2",
+    "Fresher": "2",
+    "Junior": "3",
+    "Mid-level": "4",
+    "Senior": "4",
+    "Lead": "5",
+    "Manager": "5",
+}
+
+# Titles that clearly contradict a low-level search. "manager"/"lead" are left
+# out on purpose: "Junior Product Manager" is a real entry-level title.
+_LOW_LEVEL_BLOCKERS = re.compile(
+    r"\b(senior|sr\.?|principal|staff|director|architect|expert|head of)\b",
+    re.IGNORECASE,
+)
+
+
+def normalize_level(value) -> str | None:
+    """Return the level only when it is one of the supported values."""
+    if not isinstance(value, str):
+        return None
+    cleaned = value.strip()
+    return cleaned if cleaned in SUPPORTED_LEVELS else None
+
 
 class LinkedInSearchError(RuntimeError):
     """Raised when LinkedIn is unreachable or returns an error."""
@@ -182,15 +222,30 @@ def recommend_jobs(
     remote: str | None = None,
     jobage: int = _DEFAULT_JOBAGE_DAYS,
     limit: int = 12,
+    level: str | None = None,
 ) -> list[dict]:
     """Search LinkedIn for jobs matching the query and return the top hits.
 
     Jobs are sorted so the ones whose titles mention the most query keywords
     appear first; ties break on newest posting date. Nothing is persisted.
+
+    When a level is supplied it is added to the query as a word (LinkedIn's
+    f_E experience filter is fuzzy, so the word improves precision) and the
+    f_E parameter is set. Intern/Entry/Fresher additionally drop titles that
+    clearly contradict a low-level search.
     """
     params: dict[str, str] = {"start": "0"}
     query = (query or "").strip()
     location = (location or "").strip() or DEFAULT_LOCATION
+    level = normalize_level(level)
+    if level:
+        f_e = LEVEL_TO_F_E.get(level)
+        if f_e:
+            params["f_E"] = f_e
+        if query:
+            query = f"{level} {query}"
+        else:
+            query = level
     if query:
         params["keywords"] = query
     params["location"] = location
@@ -202,6 +257,8 @@ def recommend_jobs(
         params["f_WT"] = wt
 
     cards = parse_job_cards(html_fetch(SEARCH_URL, params))
+    if level in {"Intern", "Entry", "Fresher"}:
+        cards = [card for card in cards if not _LOW_LEVEL_BLOCKERS.search(card["title"])]
     keywords = [token for token in re.split(r"\s+", query.lower()) if token]
     for card in cards:
         title_lower = card["title"].lower()

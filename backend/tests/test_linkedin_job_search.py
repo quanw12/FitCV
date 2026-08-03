@@ -98,6 +98,70 @@ def test_recommend_jobs_uses_supplied_params(monkeypatch):
     assert captured[0]["f_WT"] == "2"
 
 
+def test_recommend_jobs_applies_level_filter_and_level_word(monkeypatch):
+    captured: list[dict] = []
+
+    def fake_fetch(url, params):
+        captured.append(params)
+        return ""
+
+    monkeypatch.setattr(ljs, "html_fetch", fake_fetch)
+
+    ljs.recommend_jobs(query="python", location="Remote", level="Junior")
+
+    assert captured[0]["f_E"] == "3"
+    assert captured[0]["keywords"] == "Junior python"
+
+
+def test_recommend_jobs_uses_entry_filter_for_intern(monkeypatch):
+    captured: list[dict] = []
+
+    def fake_fetch(url, params):
+        captured.append(params)
+        return ""
+
+    monkeypatch.setattr(ljs, "html_fetch", fake_fetch)
+
+    ljs.recommend_jobs(query="python", location="Remote", level="Intern")
+
+    assert captured[0]["f_E"] == "2"
+    assert captured[0]["keywords"] == "Intern python"
+
+
+def test_recommend_jobs_blocks_senior_titles_for_low_levels(monkeypatch):
+    titles = ["Senior Software Engineer", "Software Engineer Intern", "Staff Engineer"]
+    html = "".join(
+        f'data-entity-urn="urn:li:jobPosting:{1000000000 + i}"'
+        f'<h3 class="base-search-card__title">{title}</h3>'
+        for i, title in enumerate(titles)
+    )
+    monkeypatch.setattr(ljs, "html_fetch", lambda url, params: html)
+
+    results = ljs.recommend_jobs(query="engineer intern", location="Remote", level="Intern")
+
+    assert [card["title"] for card in results] == ["Software Engineer Intern"]
+
+
+def test_recommend_jobs_keeps_senior_titles_for_senior_level(monkeypatch):
+    html = (
+        'data-entity-urn="urn:li:jobPosting:1000000000"'
+        '<h3 class="base-search-card__title">Senior Software Engineer</h3>'
+    )
+    monkeypatch.setattr(ljs, "html_fetch", lambda url, params: html)
+
+    results = ljs.recommend_jobs(query="engineer", location="Remote", level="Senior")
+
+    assert [card["title"] for card in results] == ["Senior Software Engineer"]
+
+
+def test_normalize_level():
+    assert ljs.normalize_level("Intern") == "Intern"
+    assert ljs.normalize_level("  Senior ") == "Senior"
+    assert ljs.normalize_level("Principal") is None
+    assert ljs.normalize_level("") is None
+    assert ljs.normalize_level(None) is None
+
+
 def test_jobage_to_tpr_and_work_type_flag():
     assert ljs.jobage_to_tpr(7) == "r604800"
     assert ljs.jobage_to_tpr(30) == "r2592000"

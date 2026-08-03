@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react"
+import { fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 const apiMocks = vi.hoisted(() => ({
@@ -13,7 +13,7 @@ vi.mock("@/api/jobSearchApi", () => ({
   jobSearchApi: { recommendations: apiMocks.recommendations },
 }))
 
-import LinkedInJobSearchScreen from "./LinkedInJobSearchScreen"
+import JobSearchScreen from "./JobSearchScreen"
 
 const parsedCv = {
   cvId: 1,
@@ -28,7 +28,7 @@ const parsedCv = {
   errorMessage: null,
 }
 
-describe("LinkedInJobSearchScreen", () => {
+describe("JobSearchScreen", () => {
   beforeEach(() => {
     vi.clearAllMocks()
     apiMocks.listCvs.mockResolvedValue([parsedCv])
@@ -36,22 +36,27 @@ describe("LinkedInJobSearchScreen", () => {
       query: "react python",
       location: "Remote",
       note: "Personal-use prototype",
+      derivedBy: "deterministic",
+      derivedLevel: "Junior",
       results: [
         {
-          id: "123456789",
+          id: "frontend-engineer-example-abc123",
           title: "Frontend Engineer (React)",
           company: "Example Co",
-          location: "Remote",
+          location: "Ho Chi Minh City, Vietnam",
           date: "2026-07-20",
-          url: "https://www.linkedin.com/jobs/view/123456789",
+          url: "https://job-boards.greenhouse.io/example/123",
           matchedKeywords: ["react"],
+          seniority: "junior",
+          category: "frontend",
+          source: "freehire",
         },
       ],
     })
   })
 
   it("renders parsed CVs and searches with a click", async () => {
-    render(<LinkedInJobSearchScreen />)
+    render(<JobSearchScreen />)
 
     expect(await screen.findByText("resume.pdf (v1)")).toBeInTheDocument()
 
@@ -65,10 +70,10 @@ describe("LinkedInJobSearchScreen", () => {
       expect.objectContaining({ cvId: 1 }),
     )
 
-    const link = screen.getByRole("link", { name: /view on linkedin/i })
+    const link = screen.getByRole("link", { name: /view job/i })
     expect(link).toHaveAttribute(
       "href",
-      "https://www.linkedin.com/jobs/view/123456789",
+      "https://job-boards.greenhouse.io/example/123",
     )
     expect(link).toHaveAttribute("target", "_blank")
   })
@@ -76,24 +81,68 @@ describe("LinkedInJobSearchScreen", () => {
   it("shows an empty state when there are no CVs", async () => {
     apiMocks.listCvs.mockResolvedValue([])
 
-    render(<LinkedInJobSearchScreen />)
+    render(<JobSearchScreen />)
 
     expect(await screen.findByText("No CV uploaded yet")).toBeInTheDocument()
   })
 
-  it("shows an error when the search fails", async () => {
-    apiMocks.recommendations.mockRejectedValue(
-      new Error("LinkedIn request failed: 429"),
+  it("shows an AI-derived badge and the derived level", async () => {
+    apiMocks.recommendations.mockResolvedValue({
+      query: "Senior Backend Engineer python fastapi",
+      location: "Remote",
+      note: "Personal-use prototype",
+      derivedBy: "ai",
+      derivedLevel: "Senior",
+      results: [],
+    })
+
+    render(<JobSearchScreen />)
+
+    await screen.findByText("resume.pdf (v1)")
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /find matching jobs/i }),
     )
 
-    render(<LinkedInJobSearchScreen />)
+    expect(
+      await screen.findByTestId("ai-derived-badge"),
+    ).toHaveTextContent("AI-derived from CV")
+    expect(screen.getByTestId("derived-level-badge")).toHaveTextContent(
+      "Level: Senior",
+    )
+    expect(screen.getByText(/no jobs found/i)).toBeInTheDocument()
+  })
+
+  it("sends the selected experience level", async () => {
+    render(<JobSearchScreen />)
+
+    await screen.findByText("resume.pdf (v1)")
+
+    fireEvent.change(screen.getByLabelText(/experience level/i), {
+      target: { value: "Senior" },
+    })
+    fireEvent.click(screen.getByRole("button", { name: /find matching jobs/i }))
+
+    await waitFor(() =>
+      expect(apiMocks.recommendations).toHaveBeenCalledWith(
+        expect.objectContaining({ cvId: 1, level: "Senior" }),
+      ),
+    )
+  })
+
+  it("shows an error when the search fails", async () => {
+    apiMocks.recommendations.mockRejectedValue(
+      new Error("freehire request failed: 500"),
+    )
+
+    render(<JobSearchScreen />)
 
     await screen.findByText("resume.pdf (v1)")
 
     fireEvent.click(screen.getByRole("button", { name: /find matching jobs/i }))
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
-      "LinkedIn request failed: 429",
+      "freehire request failed: 500",
     )
   })
 })

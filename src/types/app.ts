@@ -1,6 +1,6 @@
 export type Portal = "seeker" | "hr"
 
-export type SeekerScreenId = "cv-rebuild" | "analyzer" | "improvement" | "cv-history" | "app-tracker" | "jd-library" | "linkedin-jobs" | "profile"
+export type SeekerScreenId = "cv-rebuild" | "analyzer" | "improvement" | "cv-history" | "app-tracker" | "jd-library" | "job-search" | "profile"
 
 export type HrScreenId = "hr-dashboard" | "job-posts" | "cv-ranking" | "pipeline" | "auto-email" | "reports" | "hr-settings"
 
