@@ -5,6 +5,7 @@ from collections.abc import Iterable
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.models.account import Account
 from app.repositories import analyzer
 from app.schemas.analyzer import (
@@ -13,6 +14,13 @@ from app.schemas.analyzer import (
     CvScoreDeltaResponse,
     CvVersionResponse,
 )
+from app.services.document_parser import PARSER_VERSION, extract_document_text
+from app.services.gemini_analyzer import (
+    GEMINI_CV_PARSE_VERSION,
+    GeminiAnalyzerError,
+    extract_cv_inputs_from_file,
+)
+from app.services.match_engine import selected_analyzer_config
 
 
 def compare_cv_versions(
@@ -41,12 +49,22 @@ def compare_cv_versions(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail=f"The {label} CV could not be parsed for comparison.",
             )
+    _refresh_legacy_cv_parses(db, base, base_parse)
+    _refresh_legacy_cv_parses(db, target, target_parse)
 
     changes = [
         _list_change("Skills", base_parse.parsed_json.get("skills"), target_parse.parsed_json.get("skills")),
         _list_change("Soft skills", base_parse.parsed_json.get("soft_skills"), target_parse.parsed_json.get("soft_skills")),
-        _scalar_change("Experience", base_parse.parsed_json.get("experience_years"), target_parse.parsed_json.get("experience_years")),
-        _scalar_change("Education", base_parse.parsed_json.get("education"), target_parse.parsed_json.get("education")),
+        _list_change(
+            "Experience",
+            base_parse.parsed_json.get("experience_entries"),
+            target_parse.parsed_json.get("experience_entries"),
+        ),
+        _list_change(
+            "Education",
+            base_parse.parsed_json.get("education_entries"),
+            target_parse.parsed_json.get("education_entries"),
+        ),
     ]
     deltas = [
         CvScoreDeltaResponse(
@@ -125,6 +143,53 @@ def _scalar_change(category: str, base: object, target: object) -> CvComparisonC
         if added or removed
         else f"{category} unchanged.",
     )
+
+
+def _refresh_legacy_cv_parses(db: Session, cv, parsed) -> None:
+    """Upgrade existing CV records before comparison when Gemini is enabled."""
+    if not isinstance(parsed.parsed_json, dict):
+        return
+    if (
+        parsed.parsed_json.get("_extraction_provider") == "gemini"
+        and parsed.parsed_json.get("_extraction_version") == GEMINI_CV_PARSE_VERSION
+    ):
+        return
+    try:
+        algorithm_version, model_name = selected_analyzer_config()
+    except GeminiAnalyzerError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)
+        ) from exc
+    if not algorithm_version.startswith("fitcv-gemini-"):
+        return
+
+    root = settings.upload_dir.resolve()
+    stored_path = (root / cv.file_path).resolve()
+    if stored_path != root and root not in stored_path.parents:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="The stored CV path is invalid.",
+        )
+    try:
+        text = parsed.parsed_text or extract_document_text(stored_path, cv.file_type)
+        payload = extract_cv_inputs_from_file(
+            file_path=stored_path,
+            file_type=cv.file_type,
+            model_name=model_name,
+            source_text=text,
+        )
+        analyzer.set_parse_success(
+            db,
+            parsed,
+            text=text,
+            payload=payload,
+        )
+        parsed.parser_version = PARSER_VERSION
+        db.commit()
+    except GeminiAnalyzerError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)
+        ) from exc
 
 
 def _summary(category: str, added: set[str], removed: set[str]) -> str:

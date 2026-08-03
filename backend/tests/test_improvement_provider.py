@@ -381,6 +381,7 @@ def test_gemini_request_uses_header_schema_and_retry(
 ) -> None:
     monkeypatch.setattr(settings, "gemini_api_key", "test-key")
     monkeypatch.setattr(settings, "gemini_model", "gemini-test-model")
+    monkeypatch.setattr(settings, "gemini_thinking_level", "high")
     monkeypatch.setattr(settings, "gemini_timeout_seconds", 1)
     monkeypatch.setattr(settings, "gemini_max_retries", 1)
     monkeypatch.setattr(gemini_client.time, "sleep", lambda _seconds: None)
@@ -433,6 +434,10 @@ def test_gemini_request_uses_header_schema_and_retry(
     assert "key=" not in calls[0]["url"]
     assert calls[0]["headers"]["x-goog-api-key"] == "test-key"
     assert calls[0]["json"]["generationConfig"]["responseMimeType"] == "application/json"
+    assert calls[0]["json"]["generationConfig"]["thinkingConfig"] == {
+        "thinkingLevel": "high"
+    }
+    assert "temperature" not in calls[0]["json"]["generationConfig"]
     response_schema = calls[0]["json"]["generationConfig"]["responseJsonSchema"]
     assert response_schema == IMPROVEMENT_RESPONSE_JSON_SCHEMA
     assert "$defs" not in json.dumps(response_schema)
