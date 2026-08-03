@@ -1,5 +1,6 @@
 import unittest
 from types import SimpleNamespace
+from unittest.mock import patch
 
 from app.services.document_parser import parse_cv_text, parse_jd_text
 from app.services.match_engine import (
@@ -170,6 +171,84 @@ Candidates meet the teamwork panel in three interviews.
         self.assertEqual(supplemented["experience_years"], 3)
         self.assertEqual(supplemented["education"], "Bachelor")
         self.assertEqual(supplemented["soft_skills"], ["Communication"])
+
+    def test_gemini_matching_does_not_supplement_with_local_keyword_parser(self) -> None:
+        semantic_cv = {
+            "skills": ["Git"],
+            "experience_years": None,
+            "education": None,
+            "soft_skills": [],
+        }
+        semantic_jd = {
+            "required_skills": ["Git"],
+            "preferred_skills": [],
+            "required_skill_groups": [],
+            "preferred_skill_groups": [],
+            "experience_years": None,
+            "education": None,
+            "soft_skills": [],
+        }
+        local_cv = {
+            "skills": ["Invented local keyword"],
+            "experience_years": 10,
+            "education": "Master",
+            "soft_skills": ["Invented soft skill"],
+        }
+
+        with patch(
+            "app.services.match_engine.extract_match_inputs",
+            return_value=(semantic_cv, semantic_jd),
+        ):
+            result = score_match(
+                cv_text="CV text",
+                jd_text="Git required",
+                parsed_cv=local_cv,
+                algorithm_version="fitcv-gemini-test-v4-s3",
+                source_scope="test-gemini-authoritative",
+            )
+
+        self.assertEqual(result["matching_inputs"]["cv"], semantic_cv)
+        self.assertNotIn("Invented local keyword", result["matching_inputs"]["cv"]["skills"])
+        self.assertIsNone(result["matching_inputs"]["cv"]["education"])
+
+    def test_gemini_matching_uses_audited_file_payload_when_available(self) -> None:
+        audited_file_cv = {
+            "skills": ["C#", "JWT", "VNPay"],
+            "experience_years": None,
+            "education": None,
+            "soft_skills": [],
+            "_extraction_provider": "gemini",
+            "_extraction_version": "gemini-cv-v5",
+        }
+        text_only_cv = {
+            "skills": ["ASP.NET"],
+            "experience_years": None,
+            "education": None,
+            "soft_skills": [],
+        }
+        semantic_jd = {
+            "required_skills": ["C#"],
+            "preferred_skills": [],
+            "required_skill_groups": [],
+            "preferred_skill_groups": [],
+            "experience_years": None,
+            "education": None,
+            "soft_skills": [],
+        }
+
+        with patch(
+            "app.services.match_engine.extract_match_inputs",
+            return_value=(text_only_cv, semantic_jd),
+        ):
+            result = score_match(
+                cv_text="CV text",
+                jd_text="C# required",
+                parsed_cv=audited_file_cv,
+                algorithm_version="fitcv-gemini-test-v8-s7",
+                source_scope="test-file-payload",
+            )
+
+        self.assertEqual(result["matching_inputs"]["cv"]["skills"], ["C#", "JWT", "VNPay"])
 
     def test_improvement_consumes_the_same_persisted_engine_result(self) -> None:
         result = score_match(

@@ -36,11 +36,40 @@ from app.services.analyzer_service import _selected_analyzer_config
 from app.services import ocr_service
 from app.services.gemini_analyzer import (
     GeminiAnalyzerError,
+    extract_cv_inputs_from_file,
     extract_match_inputs,
 )
 
 
 class DocumentParserTests(unittest.TestCase):
+    def test_extracts_build_cv_aliases_and_sections(self) -> None:
+        cv = parse_cv_text(
+            """CORE COMPETENCIES
+            Backend Development using ASP.NET (C#) and PHP.
+            EDUCATION
+            Major: Information Technology - Saigon Technology University.
+            PROFESSIONAL EXPERIENCE
+            Internship project using ReactJS, HTML5, CSS3, REST APIs and Figma.
+            SELECTED PROJECTS
+            Built a payment flow with SQL Server, Tailwind CSS, Bootstrap, JWT,
+            Postman, XAMPP and VNPay.
+            """
+        )
+
+        self.assertIn("ASP.NET", cv["skills"])
+        self.assertIn("HTML", cv["skills"])
+        self.assertIn("CSS", cv["skills"])
+        self.assertIn("SQL Server", cv["skills"])
+        self.assertIn("Tailwind CSS", cv["skills"])
+        self.assertIn("Bootstrap", cv["skills"])
+        self.assertIn("Figma", cv["skills"])
+        self.assertIn("Postman", cv["skills"])
+        self.assertIn("JWT", cv["skills"])
+        self.assertIn("VNPay", cv["skills"])
+        self.assertIn("skills", cv["sections"])
+        self.assertIn("experience", cv["sections"])
+        self.assertIn("projects", cv["sections"])
+
     def test_extracts_shared_cv_and_jd_contract(self) -> None:
         cv = parse_cv_text(
             """Technical Skills
@@ -116,16 +145,19 @@ class OcrServiceTests(unittest.TestCase):
         self.original_model = settings.ocr_model
         self.original_key = settings.gemini_api_key
         self.original_timeout = settings.ocr_timeout_seconds
+        self.original_thinking_level = settings.gemini_thinking_level
         settings.ocr_provider = "gemini"
         settings.ocr_model = "gemini-ocr-test"
         settings.gemini_api_key = "test-key"
         settings.ocr_timeout_seconds = 7
+        settings.gemini_thinking_level = "high"
 
     def tearDown(self) -> None:
         settings.ocr_provider = self.original_provider
         settings.ocr_model = self.original_model
         settings.gemini_api_key = self.original_key
         settings.ocr_timeout_seconds = self.original_timeout
+        settings.gemini_thinking_level = self.original_thinking_level
 
     def test_sends_pdf_inline_and_returns_transcription(self) -> None:
         response = MagicMock()
@@ -172,8 +204,9 @@ class OcrServiceTests(unittest.TestCase):
         self.assertEqual(base64.b64decode(inline["data"]), pdf_bytes)
         self.assertEqual(
             request.kwargs["json"]["generationConfig"]["thinkingConfig"],
-            {"thinkingLevel": "minimal"},
+            {"thinkingLevel": "high"},
         )
+        self.assertNotIn("temperature", request.kwargs["json"]["generationConfig"])
 
     def test_reports_ocr_finish_reason(self) -> None:
         with self.assertRaisesRegex(ocr_service.OcrError, "MAX_TOKENS"):
@@ -442,9 +475,11 @@ class GeminiAnalyzerTests(unittest.TestCase):
         self.original_model = settings.gemini_model
         self.original_timeout = settings.gemini_timeout_seconds
         self.original_retries = settings.gemini_max_retries
+        self.original_thinking_level = settings.gemini_thinking_level
         settings.analyzer_provider = "gemini"
         settings.gemini_api_key = "test-key"
-        settings.gemini_model = "gemini-3.1-flash-lite"
+        settings.gemini_model = "gemini-3.6-flash"
+        settings.gemini_thinking_level = "high"
         settings.gemini_timeout_seconds = 1
         settings.gemini_max_retries = 1
 
@@ -454,6 +489,7 @@ class GeminiAnalyzerTests(unittest.TestCase):
         settings.gemini_model = self.original_model
         settings.gemini_timeout_seconds = self.original_timeout
         settings.gemini_max_retries = self.original_retries
+        settings.gemini_thinking_level = self.original_thinking_level
 
     def test_extracts_structured_keywords_for_weighted_matching(self) -> None:
         output = {
@@ -516,7 +552,7 @@ Bachelor student using Splunk, Wireshark, and Python. Communication.""",
 
         self.assertEqual(
             post.call_args.args[0],
-            "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent",
+            "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent",
         )
         request_body = post.call_args.kwargs["json"]
         self.assertEqual(post.call_args.kwargs["headers"]["x-goog-api-key"], "test-key")
@@ -525,6 +561,11 @@ Bachelor student using Splunk, Wireshark, and Python. Communication.""",
             request_body["generationConfig"]["responseMimeType"],
             "application/json",
         )
+        self.assertEqual(
+            request_body["generationConfig"]["thinkingConfig"],
+            {"thinkingLevel": "high"},
+        )
+        self.assertNotIn("temperature", request_body["generationConfig"])
         self.assertIn(
             "cv", request_body["generationConfig"]["responseJsonSchema"]["properties"]
         )
@@ -658,8 +699,97 @@ Bachelor student using Splunk, Wireshark, and Python. Communication.""",
         algorithm_version, model_name = _selected_analyzer_config()
         self.assertTrue(algorithm_version.startswith("fitcv-gemini-"))
         self.assertLessEqual(len(algorithm_version), 50)
-        self.assertTrue(algorithm_version.endswith("-v3-s2"))
-        self.assertEqual(model_name, "gemini-3.1-flash-lite")
+        self.assertTrue(algorithm_version.endswith("-v8-s7"))
+        self.assertEqual(model_name, "gemini-3.6-flash")
+
+    def test_extracts_structured_cv_from_original_file(self) -> None:
+        output = {
+            "skills": [
+                {"name": "Git", "evidence": "Git and GitHub"},
+                {"name": "ASP.NET", "evidence": "ASP.NET Core"},
+            ],
+            "experience_years": 0.16,
+            "experience_evidence": "Professional Experience",
+            "education": "Bachelor",
+            "education_evidence": "Major: Information Technology - Saigon Technology University",
+            "education_entries": [
+                {
+                    "name": "Information Technology — Saigon Technology University",
+                    "evidence": "Major: Information Technology - Saigon Technology University",
+                }
+            ],
+            "experience_entries": [
+                {
+                    "name": "University Graduation Internship — PDF to ICS Web Application",
+                    "evidence": "University Graduation Internship",
+                }
+            ],
+            "soft_skills": [
+                {"name": "Communication", "evidence": "Excellent communication"}
+            ],
+        }
+        response = MagicMock(status_code=200)
+        response.json.return_value = {
+            "candidates": [
+                {
+                    "content": {"parts": [{"text": json.dumps(output)}]},
+                    "finishReason": "STOP",
+                }
+            ]
+        }
+        coverage_response = MagicMock(status_code=200)
+        coverage_response.json.return_value = {
+            "candidates": [
+                {
+                    "content": {
+                        "parts": [
+                            {
+                                "text": json.dumps(
+                                    {
+                                        "skills": [
+                                            {"name": "Git", "evidence": "Git and GitHub"}
+                                        ],
+                                        "soft_skills": [],
+                                    }
+                                )
+                            }
+                        ]
+                    },
+                    "finishReason": "STOP",
+                }
+            ]
+        }
+
+        with TemporaryDirectory() as directory:
+            path = Path(directory) / "resume.pdf"
+            path.write_bytes(b"%PDF-fake-cv")
+            with patch(
+                "app.services.gemini_analyzer.requests.post",
+                side_effect=[response, coverage_response],
+            ) as post:
+                payload = extract_cv_inputs_from_file(
+                    file_path=path,
+                    file_type="PDF",
+                )
+
+        request_body = post.call_args_list[0].kwargs["json"]
+        parts = request_body["contents"][0]["parts"]
+        self.assertEqual(parts[0]["inlineData"]["mimeType"], "application/pdf")
+        self.assertEqual(parts[0]["inlineData"]["data"], base64.b64encode(b"%PDF-fake-cv").decode("ascii"))
+        self.assertEqual(payload["skills"], ["ASP.NET", "Git"])
+        self.assertEqual(payload["soft_skills"], ["Communication"])
+        self.assertEqual(payload["experience_years"], None)
+        self.assertEqual(payload["education"], None)
+        self.assertEqual(payload["education_evidence"], "Major: Information Technology - Saigon Technology University")
+        self.assertEqual(
+            payload["education_entries"],
+            ["Information Technology — Saigon Technology University"],
+        )
+        self.assertEqual(
+            payload["experience_entries"],
+            ["University Graduation Internship — PDF to ICS Web Application"],
+        )
+        self.assertEqual(payload["_extraction_provider"], "gemini")
 
 
 class AnalyzerRepositoryTests(unittest.TestCase):

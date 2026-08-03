@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Literal
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -26,12 +27,13 @@ class Settings(BaseSettings):
     cloudinary_api_key: str | None = None
     cloudinary_api_secret: str | None = None
     gemini_api_key: str | None = None
-    gemini_model: str = "gemini-3.1-flash-lite"
-    gemini_timeout_seconds: float = 30.0
+    gemini_model: str = "gemini-3.6-flash"
+    gemini_thinking_level: Literal["minimal", "low", "medium", "high"] = "high"
+    gemini_timeout_seconds: float = 90.0
     gemini_max_retries: int = 2
     ocr_provider: str = "gemini"
     ocr_model: str = ""
-    ocr_timeout_seconds: float = 60.0
+    ocr_timeout_seconds: float = 120.0
     ocr_max_output_tokens: int = 20_000
     improvement_task_stale_minutes: int = 10
     improvement_max_cv_chars: int = 120_000

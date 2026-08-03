@@ -30,7 +30,10 @@ from app.services.document_parser import (
     parse_jd_text,
     validate_cv_content,
 )
-from app.services.gemini_analyzer import GeminiAnalyzerError
+from app.services.gemini_analyzer import (
+    GeminiAnalyzerError,
+    extract_cv_inputs_from_file,
+)
 from app.services.match_engine import (
     normalize_scoring_jd_text,
     score_match,
@@ -99,8 +102,21 @@ def run_cv_parse(cv_id: int) -> None:
         if cv is None or parsed is None or parsed.parse_status == "Success":
             return
         analyzer.set_parse_processing(db, parsed)
-        text = extract_document_text(_stored_file_path(cv.file_path), cv.file_type)
-        analyzer.set_parse_success(db, parsed, text=text, payload=parse_cv_text(text))
+        stored_path = _stored_file_path(cv.file_path)
+        text = extract_document_text(stored_path, cv.file_type)
+        algorithm_version, model_name = selected_analyzer_config()
+        if algorithm_version.startswith("fitcv-gemini-"):
+            # The original document is the source of truth for structured CV facts. The local
+            # text parser is retained only for readable text used by improvement/display flows.
+            payload = extract_cv_inputs_from_file(
+                file_path=stored_path,
+                file_type=cv.file_type,
+                model_name=model_name,
+                source_text=text,
+            )
+        else:
+            payload = parse_cv_text(text)
+        analyzer.set_parse_success(db, parsed, text=text, payload=payload)
     except Exception as exc:
         logger.exception("CV parse task failed for cv_id=%s", cv_id)
         db.rollback()
