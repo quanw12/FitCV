@@ -22,6 +22,7 @@ from app.api.routes import (
     email_webhooks,
     email_workflow,
     improvements,
+    job_search,
     jobs,
     pipeline,
     profile,
@@ -44,6 +45,7 @@ app.add_middleware(
 
 app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
 app.include_router(analyzer.router, prefix="/api", tags=["cv-jd-analyzer"])
+app.include_router(job_search.router, prefix="/api", tags=["job-search"])
 app.include_router(applications.router, prefix="/api/applications", tags=["applications"])
 app.include_router(cv_ranking.router, prefix="/api/hr/cv-ranking", tags=["cv-ranking"])
 app.include_router(improvements.router, prefix="/api/match-results", tags=["improvement-reports"])

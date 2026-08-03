@@ -42,6 +42,8 @@ const AppTrackerScreen = lazy(() => import("@/ui/screens/AppTrackerScreen"))
 
 const JDLibraryScreen = lazy(() => import("@/ui/screens/JDLibraryScreen"))
 
+const JobSearchScreen = lazy(() => import("@/ui/screens/JobSearchScreen"))
+
 const HRDashboard = lazy(() => import("@/ui/screens/HRDashboard"))
 
 const JobPostsScreen = lazy(() => import("@/ui/screens/JobPostsScreen"))
@@ -211,7 +213,9 @@ export default function App() {
 
   const handleUseJd = (title: string, text: string) => {
     setAnalyzerDraft((current) => ({ ...current, jdText: text, result: null }))
+
     setScreen("analyzer")
+
     toast.success(`Loaded “${title}” into Match Analyzer`)
   }
 
@@ -393,6 +397,10 @@ export default function App() {
             onUseJd={handleUseJd}
           />
         )
+
+      case "job-search":
+        return <JobSearchScreen />
+
       case "profile":
         return <ProfileScreen session={session} onSessionChange={setSession} />
 
