@@ -5,6 +5,7 @@ import {
   ClockCounterClockwise,
   CheckSquare,
   BookOpenText,
+  MagnifyingGlass,
   UserCircle,
   Briefcase,
   ChartBar,
@@ -73,6 +74,14 @@ export const seekerNavItems: NavItem[] = [
     label: "JD Library",
 
     screen: "jd-library",
+  },
+
+  {
+    icon: <MagnifyingGlass size={18} weight="light" />,
+
+    label: "Job Search",
+
+    screen: "job-search",
   },
 
   {

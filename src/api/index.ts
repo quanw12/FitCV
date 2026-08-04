@@ -14,6 +14,10 @@ export * from "./jobsApi"
 
 export * from "./jdLibraryApi"
 
+export * from "./jobSearchApi"
+
 export * from "./profileApi"
+
 export * from "./pipelineApi"
+
 export * from "./emailWorkflowApi"

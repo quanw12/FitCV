@@ -13,9 +13,14 @@ const apiMocks = vi.hoisted(() => ({
   profileAvatarDataUrl: vi.fn(async () => "data:image/png;base64,QUFB"),
   pdfBase64ToBlob: vi.fn(),
   thumbnailDataUrl: vi.fn(),
+  uploadCv: vi.fn(),
 }))
 
 vi.mock("@/api/cvRebuildApi", () => apiMocks)
+
+vi.mock("@/api/analyzerApi", () => ({
+  analyzerApi: { uploadCv: apiMocks.uploadCv },
+}))
 
 import ToastProvider from "@/ui/components/ToastProvider"
 
@@ -58,6 +63,18 @@ describe("CVReBuildScreen", () => {
     apiMocks.thumbnailDataUrl.mockImplementation(
       (base64: string) => `data:image/jpeg;base64,${base64}`,
     )
+    apiMocks.uploadCv.mockResolvedValue({
+      cvId: 5,
+      fileName: "rebuilt_cv.pdf",
+      fileType: "PDF",
+      fileSizeKb: 4,
+      versionNumber: 2,
+      isLatest: true,
+      uploadedAt: "2026-07-25T10:00:00Z",
+      parseStatus: "Pending",
+      parserVersion: "1.0",
+      errorMessage: null,
+    })
   })
 
   it("shows a skeleton while the pipeline is processing", async () => {
@@ -210,6 +227,63 @@ describe("CVReBuildScreen", () => {
 
     expect(cached.fileName).toBe("my_cv.pdf")
     expect(cached.result.pdf_base64).toBe("cGRm")
+  })
+
+  it("saves the built PDF to CV history when Save to History is clicked", async () => {
+    apiMocks.rebuildCv.mockResolvedValue(RESULT)
+
+    render(
+      <>
+        <ToastProvider />
+        <CVReBuildScreen />
+      </>,
+    )
+
+    fireEvent.change(screen.getByTestId("cv-rebuild-input"), {
+      target: { files: [makeFile()] },
+    })
+
+    await screen.findByRole("img", { name: /built cv preview/i })
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /save to history/i }),
+    )
+
+    await waitFor(() => {
+      expect(apiMocks.pdfBase64ToBlob).toHaveBeenCalledWith("cGRm")
+      expect(apiMocks.uploadCv).toHaveBeenCalledTimes(1)
+    })
+
+    const uploaded = apiMocks.uploadCv.mock.calls[0][0] as File
+    expect(uploaded.name).toBe("rebuilt_cv.pdf")
+    expect(uploaded.type).toBe("application/pdf")
+    expect(await screen.findByText(/saved to cv history/i)).toBeInTheDocument()
+  })
+
+  it("shows an error toast when saving to history fails", async () => {
+    apiMocks.rebuildCv.mockResolvedValue(RESULT)
+    apiMocks.uploadCv.mockRejectedValue(new Error("CV files must be 10 MB or smaller."))
+
+    render(
+      <>
+        <ToastProvider />
+        <CVReBuildScreen />
+      </>,
+    )
+
+    fireEvent.change(screen.getByTestId("cv-rebuild-input"), {
+      target: { files: [makeFile()] },
+    })
+
+    await screen.findByRole("img", { name: /built cv preview/i })
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /save to history/i }),
+    )
+
+    expect(
+      await screen.findByText(/cv files must be 10 mb or smaller/i),
+    ).toBeInTheDocument()
   })
 
   it("switches to the build form and submits the entered data to the API", async () => {
