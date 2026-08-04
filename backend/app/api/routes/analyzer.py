@@ -24,6 +24,7 @@ from app.schemas.analyzer import (
 )
 from app.services import analyzer_service
 from app.services import cv_comparison_service
+from app.services import ai_task_service
 
 router = APIRouter()
 
@@ -38,7 +39,15 @@ async def upload_cv(
     db: Session = Depends(get_db),
 ) -> CvVersionResponse:
     response = await analyzer_service.upload_cv(db, file=file, account=account)
-    background_tasks.add_task(analyzer_service.run_cv_parse, response.cv_id)
+    ai_task_service.enqueue(
+        db,
+        task_type="CvParse",
+        resource_id=response.cv_id,
+        account=account,
+        idempotency_key=f"cv-parse:{response.cv_id}",
+    )
+    if ai_task_service.should_eager_execute():
+        background_tasks.add_task(analyzer_service.run_cv_parse, response.cv_id)
     return response
 
 
@@ -107,9 +116,17 @@ def analyze_cv(
         db, request=request, account=account
     )
     if should_start:
-        background_tasks.add_task(
-            analyzer_service.run_match_task, response.match_result_id
+        ai_task_service.enqueue(
+            db,
+            task_type="MatchAnalysis",
+            resource_id=response.match_result_id,
+            account=account,
+            idempotency_key=f"match-analysis:{response.match_result_id}",
         )
+        if ai_task_service.should_eager_execute():
+            background_tasks.add_task(
+                analyzer_service.run_match_task, response.match_result_id
+            )
     return response
 
 

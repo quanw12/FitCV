@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from dataclasses import dataclass
 from hashlib import sha256
 from secrets import randbelow
 
@@ -6,22 +7,50 @@ from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.core.google_auth import verify_google_credential
-from app.core.security import create_access_token, create_reset_token, hash_password, verify_password
+from app.core.security import (
+    create_access_token,
+    create_refresh_token,
+    create_reset_token,
+    hash_password,
+    hash_refresh_token,
+    verify_password,
+)
 from app.models.account import Account, AccountRole
 from app.repositories.accounts import create_oauth_account, create_password_account, get_account_by_email
+from app.repositories import auth_sessions
 from app.schemas.auth import AuthSession
 from app.services.email_service import send_password_reset_code
 
 
-def _session_for(account: Account) -> AuthSession:
+@dataclass(frozen=True)
+class IssuedAuthSession:
+    session: AuthSession
+    refresh_token: str
+
+
+def _auth_payload(account: Account, session_id: str) -> AuthSession:
     return AuthSession(
-        access_token=create_access_token(str(account.account_id)),
+        access_token=create_access_token(str(account.account_id), session_id),
         user=account,
         requires_role_selection=account.role is None,
     )
 
 
-def register(db: Session, *, email: str, password: str, full_name: str) -> AuthSession:
+def _issue_new_session(db: Session, account: Account) -> IssuedAuthSession:
+    refresh_token, expires_at = create_refresh_token()
+    record = auth_sessions.create(
+        db,
+        account_id=account.account_id,
+        refresh_token_hash=hash_refresh_token(refresh_token),
+        expires_at=expires_at,
+    )
+    return IssuedAuthSession(
+        session=_auth_payload(account, record.session_id),
+        refresh_token=refresh_token,
+    )
+
+
+def register(db: Session, *, email: str, password: str, full_name: str) -> IssuedAuthSession:
     existing = get_account_by_email(db, email)
     if existing:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email is already registered.")
@@ -32,17 +61,17 @@ def register(db: Session, *, email: str, password: str, full_name: str) -> AuthS
         password_hash=hash_password(password),
         full_name=full_name,
     )
-    return _session_for(account)
+    return _issue_new_session(db, account)
 
 
-def login(db: Session, *, email: str, password: str) -> AuthSession:
+def login(db: Session, *, email: str, password: str) -> IssuedAuthSession:
     account = get_account_by_email(db, email)
     if not account or not account.password_hash or not verify_password(password, account.password_hash):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password.")
-    return _session_for(account)
+    return _issue_new_session(db, account)
 
 
-def oauth_login(db: Session, *, credential: str) -> AuthSession:
+def oauth_login(db: Session, *, credential: str) -> IssuedAuthSession:
     google_profile = verify_google_credential(credential)
     email = google_profile["email"]
     full_name = google_profile["full_name"] or email
@@ -51,15 +80,65 @@ def oauth_login(db: Session, *, credential: str) -> AuthSession:
     account = get_account_by_email(db, email)
     if not account:
         account = create_oauth_account(db, email=email, full_name=full_name, avatar_url=avatar_url)
-    return _session_for(account)
+    return _issue_new_session(db, account)
 
 
-def select_role(db: Session, *, account: Account, role: AccountRole) -> AuthSession:
+def select_role(
+    db: Session, *, account: Account, role: AccountRole, session_id: str
+) -> AuthSession:
     account.role = role
     db.add(account)
     db.commit()
     db.refresh(account)
-    return _session_for(account)
+    return _auth_payload(account, session_id)
+
+
+def refresh(db: Session, *, refresh_token: str) -> IssuedAuthSession:
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    record = auth_sessions.get_active_by_refresh_hash(
+        db,
+        hash_refresh_token(refresh_token),
+        now=now,
+        for_update=True,
+    )
+    if record is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Refresh session is invalid or expired.",
+        )
+    account = db.get(Account, record.account_id)
+    if account is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Account not found.")
+    next_token, expires_at = create_refresh_token()
+    auth_sessions.rotate(
+        db,
+        record,
+        refresh_token_hash=hash_refresh_token(next_token),
+        expires_at=expires_at,
+        now=now,
+    )
+    return IssuedAuthSession(
+        session=_auth_payload(account, record.session_id),
+        refresh_token=next_token,
+    )
+
+
+def logout(db: Session, *, session_id: str) -> None:
+    auth_sessions.revoke(
+        db,
+        session_id,
+        reason="Logout",
+        now=datetime.now(timezone.utc).replace(tzinfo=None),
+    )
+
+
+def logout_by_refresh_token(db: Session, *, refresh_token: str) -> None:
+    auth_sessions.revoke_by_refresh_hash(
+        db,
+        hash_refresh_token(refresh_token),
+        reason="Logout",
+        now=datetime.now(timezone.utc).replace(tzinfo=None),
+    )
 
 
 def _hash_reset_code(email: str, code: str) -> str:
@@ -114,3 +193,9 @@ def reset_password(db: Session, *, email: str, code: str, password: str) -> None
     account.reset_token_expires_at = None
     db.add(account)
     db.commit()
+    auth_sessions.revoke_all(
+        db,
+        account.account_id,
+        reason="PasswordReset",
+        now=datetime.now(timezone.utc).replace(tzinfo=None),
+    )

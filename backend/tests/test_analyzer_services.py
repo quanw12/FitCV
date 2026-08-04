@@ -18,6 +18,7 @@ from app.db.session import Base, get_db
 from app.main import app
 from app.models.account import Account, AuthProvider
 from app.models.analyzer import Cv, CvParseResult, JdParseResult, Job, JobDescription, MatchResult
+from app.models.improvement import AiTask
 from app.repositories import analyzer
 from app.services.document_parser import (
     PARSER_VERSION,
@@ -805,6 +806,7 @@ class AnalyzerRepositoryTests(unittest.TestCase):
                 JobDescription.__table__,
                 JdParseResult.__table__,
                 MatchResult.__table__,
+                AiTask.__table__,
             ],
         )
         self.db = Session(self.engine)
@@ -902,6 +904,7 @@ class AnalyzerApiTests(unittest.TestCase):
                 JobDescription.__table__,
                 JdParseResult.__table__,
                 MatchResult.__table__,
+                AiTask.__table__,
             ],
         )
         db = self.session_factory()

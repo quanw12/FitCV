@@ -52,6 +52,12 @@ export interface ParsedCvCandidate {
   weaknesses: string[]
 
   parseNotes: string[]
+
+  screeningCandidateId?: number | null
+
+  isSelected?: boolean
+
+  isConfirmed?: boolean
 }
 
 export interface BatchParseCvResponse {
@@ -62,6 +68,38 @@ export interface BatchParseCvResponse {
   candidates: ParsedCvCandidate[]
 
   warnings: string[]
+
+  batchId?: number | null
+
+  taskId?: number | null
+
+  status?: ScreeningBatchStatus | null
+
+  title?: string | null
+
+  createdAt?: string | null
+
+  totalFiles?: number | null
+
+  processedCount?: number | null
+}
+
+export type ScreeningBatchStatus =
+  | "Pending"
+  | "Processing"
+  | "Completed"
+  | "Partial"
+  | "Failed"
+
+export interface ScreeningBatchSummary {
+  screeningBatchId: number
+  title: string
+  status: ScreeningBatchStatus
+  totalFiles: number
+  processedCount: number
+  selectedCount: number
+  createdAt: string
+  completedAt?: string | null
 }
 
 export type CvAnalysisStatus = "Pending" | "Processing" | "Failed" | "Success"

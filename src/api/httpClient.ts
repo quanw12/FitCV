@@ -1,6 +1,36 @@
-import { getStoredSession } from "./authSession"
+import {
+  type BackendAuthSession,
+  clearStoredSession,
+  getStoredSession,
+  persistBackendSession,
+} from "./authSession"
 
 import { API_BASE_URL } from "./config"
+
+let refreshInFlight: Promise<ReturnType<typeof persistBackendSession> | null> | null =
+  null
+
+function refreshSession() {
+  if (!refreshInFlight) {
+    refreshInFlight = fetch(`${API_BASE_URL}/api/auth/refresh`, {
+      method: "POST",
+      credentials: "include",
+    })
+      .then(async (response) => {
+        if (!response.ok) {
+          clearStoredSession()
+          return null
+        }
+        return persistBackendSession(
+          (await response.json()) as BackendAuthSession,
+        )
+      })
+      .finally(() => {
+        refreshInFlight = null
+      })
+  }
+  return refreshInFlight
+}
 
 interface ApiRequestOptions extends RequestInit {
   authenticated?: boolean
@@ -12,8 +42,6 @@ export async function requestJson<T>(
 ): Promise<T> {
   const { authenticated = false, headers, ...init } = options
 
-  const token = authenticated ? getStoredSession()?.accessToken : undefined
-
   const requestHeaders = new Headers(headers)
 
   if (
@@ -24,13 +52,27 @@ export async function requestJson<T>(
     requestHeaders.set("Content-Type", "application/json")
   }
 
-  if (token) requestHeaders.set("Authorization", `Bearer ${token}`)
+  const send = (token?: string) => {
+    const nextHeaders = new Headers(requestHeaders)
+    if (token) nextHeaders.set("Authorization", `Bearer ${token}`)
+    else nextHeaders.delete("Authorization")
+    return fetch(`${API_BASE_URL}${path}`, {
+      ...init,
+      credentials: init.credentials ?? "include",
+      headers: nextHeaders,
+    })
+  }
 
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    ...init,
+  let response = await send(
+    authenticated ? getStoredSession()?.accessToken : undefined,
+  )
 
-    headers: requestHeaders,
-  })
+  if (authenticated && response.status === 401 && path !== "/api/auth/refresh") {
+    const session = await refreshSession()
+    if (session) {
+      response = await send(session.accessToken)
+    }
+  }
 
   if (!response.ok) {
     const payload = (await response.json().catch(() => null)) as {

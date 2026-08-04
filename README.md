@@ -107,6 +107,9 @@ Tạo hoặc cập nhật `backend/.env`:
 ```env
 DATABASE_URL=mysql+pymysql://<db_user>:<url_encoded_password>@<db_host>:3306/fitcv
 JWT_SECRET_KEY=<local-secret>
+ACCESS_TOKEN_EXPIRE_MINUTES=15
+REFRESH_TOKEN_EXPIRE_DAYS=30
+REFRESH_COOKIE_SECURE=false
 GOOGLE_CLIENT_ID=<google-oauth-client-id>
 CORS_ORIGINS=["http://localhost:5173","http://127.0.0.1:5173","https://fit-cv.vercel.app"]
 RESEND_API_KEY=
@@ -117,6 +120,7 @@ ANALYZER_PROVIDER=deterministic
 GEMINI_API_KEY=<google-ai-studio-api-key>
 GEMINI_MODEL=gemini-3.6-flash
 GEMINI_THINKING_LEVEL=high
+AI_WORKER_ENABLED=true
 ```
 
 Chạy backend:
@@ -144,10 +148,14 @@ Khi deploy backend lên Render, vào Render service > Environment và thêm các
 ```env
 DATABASE_URL=mysql+pymysql://<db_user>:<url_encoded_password>@<db_host>:3306/fitcv
 JWT_SECRET_KEY=<strong-secret>
+ACCESS_TOKEN_EXPIRE_MINUTES=15
+REFRESH_TOKEN_EXPIRE_DAYS=30
+REFRESH_COOKIE_SECURE=true
 GOOGLE_CLIENT_ID=<google-oauth-client-id>
 CORS_ORIGINS=["http://localhost:5173","http://127.0.0.1:5173","https://fit-cv.vercel.app"]
 RESEND_API_KEY=
 RESEND_FROM_EMAIL=
+AI_WORKER_ENABLED=true
 ```
 
 Nếu frontend Vercel đổi domain, thêm domain mới vào `CORS_ORIGINS`, ví dụ:
@@ -183,6 +191,44 @@ Nếu tạo database mới:
 1. Tạo database `fitcv`.
 2. Chạy toàn bộ `database/full_schema.sql` bằng MySQL user có quyền tạo bảng/index.
 3. Backend runtime user cần quyền `SELECT`, `INSERT`, `UPDATE`, `DELETE`.
+
+### Platform Hardening: Screening, AI Queue, Auth Session
+
+Database hiện hữu phải backup rồi chạy migration sau đúng một lần trước khi
+deploy phiên bản backend này:
+
+```text
+database/migrations/010_add_platform_hardening.sql
+```
+
+Migration thêm `hr_screening_batch`, `hr_screening_candidate`, `auth_session`,
+`auth_rate_limit` và mở rộng `ai_task` thành hàng đợi bền vững. Database mới tạo
+từ `database/full_schema.sql` đã có sẵn các bảng/cột này nên không chạy lại
+migration `010`.
+
+Mặc định API chạy một worker nền trong cùng process (`AI_WORKER_ENABLED=true`).
+Có thể tách worker thành Render Background Worker bằng lệnh sau và đặt
+`AI_WORKER_ENABLED=false` trên Web Service để tránh chạy hai worker không cần thiết:
+
+```powershell
+cd backend
+python -m app.worker
+```
+
+Các biến liên quan:
+
+```env
+AI_WORKER_ENABLED=true
+AI_WORKER_POLL_SECONDS=1
+AI_WORKER_LEASE_SECONDS=1800
+AI_WORKER_HEARTBEAT_SECONDS=30
+AI_TASK_MAX_ATTEMPTS=3
+```
+
+Local dùng `REFRESH_COOKIE_SECURE=false`. Render dùng
+`REFRESH_COOKIE_SECURE=true`; backend khi đó đặt cookie `SameSite=None; Secure`
+để frontend Vercel gọi `/api/auth/refresh` với `credentials: include`. Domain
+Vercel chính xác vẫn phải có trong `CORS_ORIGINS`.
 
 ### Job Post Archiving And Scoring Schema
 
@@ -459,11 +505,19 @@ POST /api/auth/register
 POST /api/auth/login
 POST /api/auth/oauth/google
 POST /api/auth/select-role
+POST /api/auth/refresh
+POST /api/auth/logout
 GET  /api/auth/me
 POST /api/auth/forgot-password
 POST /api/auth/verify-reset-code
 POST /api/auth/reset-password
 ```
+
+Access token sống ngắn và được giữ trong `sessionStorage`. Refresh token chỉ
+nằm trong HttpOnly cookie, được xoay sau mỗi lần refresh và không thể đọc từ
+JavaScript. Logout thu hồi session phía server; reset password thu hồi toàn bộ
+session của tài khoản. Các endpoint auth nhạy cảm dùng rate limit lưu trong
+MySQL nên giới hạn vẫn còn hiệu lực sau khi API restart.
 
 ## CV & JD Match Analyzer API
 
@@ -487,6 +541,11 @@ apply through FitCV and it does not require HR to publish a FitCV job first.
 
 ```text
 POST /api/hr/cv-ranking/parse
+GET  /api/hr/cv-ranking/batches
+GET  /api/hr/cv-ranking/batches/{batch_id}
+PATCH /api/hr/cv-ranking/batches/{batch_id}/selection
+GET  /api/hr/cv-ranking/batches/{batch_id}/candidates/{candidate_id}/cv
+GET  /api/ai/tasks/{task_id}
 ```
 
 Send a `multipart/form-data` request with:
@@ -541,11 +600,15 @@ FitCV keeps its own four evidence categories because it does not currently have
 verified behavioral-interview or career-goal profile data. Source documents are
 untrusted input and are never treated as model instructions.
 
-The selection made in the current CV Ranking screen is session-local because
-the current database schema has no screening-batch or shortlist table. Do not
-store it in `application`, because that table represents a candidate applying
-to a published FitCV job. Add a dedicated schema/migration only when the team
-agrees that screening sessions must be persisted.
+`POST /parse` returns `202 Accepted` after files and the screening batch have
+been persisted. The worker parses and scores each CV; the frontend polls the
+batch detail until it reaches `Completed`, `Partial`, or `Failed`. Search,
+status/date/min-score filters, ranked results, manual selection and confirmed
+shortlist survive page reload. Every read/write is scoped by `company_id`.
+
+External screening batches remain separate from `application`: they represent
+CVs collected outside FitCV, while `application` is reserved for a Student who
+applied to a published FitCV job.
 
 ### Job Applicants
 

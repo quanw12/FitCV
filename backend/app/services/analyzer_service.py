@@ -94,13 +94,13 @@ async def upload_cv(
     return _cv_response(cv, parsed)
 
 
-def run_cv_parse(cv_id: int) -> None:
+def run_cv_parse(cv_id: int) -> bool:
     db = SessionLocal()
     try:
         cv = analyzer.get_cv_for_parse(db, cv_id)
         parsed = analyzer.get_latest_parse(db, cv_id)
         if cv is None or parsed is None or parsed.parse_status == "Success":
-            return
+            return True
         analyzer.set_parse_processing(db, parsed)
         stored_path = _stored_file_path(cv.file_path)
         text = extract_document_text(stored_path, cv.file_type)
@@ -117,12 +117,14 @@ def run_cv_parse(cv_id: int) -> None:
         else:
             payload = parse_cv_text(text)
         analyzer.set_parse_success(db, parsed, text=text, payload=payload)
+        return True
     except Exception as exc:
         logger.exception("CV parse task failed for cv_id=%s", cv_id)
         db.rollback()
         parsed = analyzer.get_latest_parse(db, cv_id)
         if parsed is not None:
             analyzer.set_parse_failed(db, parsed, str(exc) or "CV parsing failed.")
+        return False
     finally:
         db.close()
 
@@ -398,12 +400,12 @@ def request_analysis(
     return _match_response(db, match), should_start
 
 
-def run_match_task(match_result_id: int) -> None:
+def run_match_task(match_result_id: int) -> bool:
     db = SessionLocal()
     match = db.get(MatchResult, match_result_id)
     try:
         if match is None or match.status == "Success":
-            return
+            return True
         analyzer.set_match_processing(db, match)
         match, parsed_cv, parsed_jd, description = analyzer.get_match_context(
             db, match_result_id
@@ -422,11 +424,13 @@ def run_match_task(match_result_id: int) -> None:
             source_scope="student-analyzer",
         )
         analyzer.set_match_success(db, match, result)
+        return True
     except Exception as exc:
         db.rollback()
         match = db.get(MatchResult, match_result_id)
         if match is not None:
             analyzer.set_match_failed(db, match, str(exc) or "CV/JD matching failed.")
+        return False
     finally:
         db.close()
 
