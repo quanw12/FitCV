@@ -1,6 +1,16 @@
 import { useRef, useState } from "react"
 
-import { CloudArrowUp, Download, FileText, X } from "@phosphor-icons/react"
+import {
+  ArrowRight,
+  CheckCircle,
+  CloudArrowUp,
+  Download,
+  FileText,
+  Lightning,
+  MagnifyingGlass,
+  Sparkle,
+  X,
+} from "@phosphor-icons/react"
 import { toast } from "sonner"
 
 import { authApi } from "@/api"
@@ -13,6 +23,7 @@ import {
 } from "@/api/cvRebuildApi"
 import type { CvBuildPayload } from "@/api/cvRebuildApi"
 import type { CvRebuildResponse } from "@/types/cvRebuild"
+import type { ScreenId } from "@/types/app"
 import CVBuildForm from "@/ui/components/CVBuildForm"
 
 const ACCEPTED_TYPES =
@@ -88,7 +99,11 @@ function isValidFile(file: File): string | null {
   return null
 }
 
-export default function CVReBuildScreen() {
+interface CVReBuildScreenProps {
+  onNavigate?: (screen: ScreenId) => void
+}
+
+export default function CVReBuildScreen({ onNavigate }: CVReBuildScreenProps) {
   const [state, setState] = useState<BuildState>(loadCachedResult)
   const [dragOver, setDragOver] = useState(false)
   const [modalOpen, setModalOpen] = useState(false)
@@ -205,52 +220,36 @@ export default function CVReBuildScreen() {
       : null
 
   return (
-    <div style={{ maxWidth: 860, margin: "0 auto", padding: "28px 20px 56px" }}>
-      <h1
-        style={{
-          fontSize: 24,
-          fontWeight: 700,
-          color: "var(--text-primary)",
-          marginBottom: 8,
-        }}
-      >
-        CV Build
-      </h1>
+    <div className="cv-workspace">
+      <style>{`
+        .cv-workspace{max-width:1120px;margin:0 auto;padding:34px 28px 64px}.cv-workspace *{box-sizing:border-box}.cv-workspace__intro{display:flex;justify-content:space-between;gap:28px;align-items:flex-end;margin-bottom:28px}.cv-workspace__eyebrow{display:flex;gap:8px;align-items:center;color:var(--accent);font:700 11px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;margin-bottom:10px}.cv-workspace__intro h1{margin:0;color:#111827;font-size:clamp(30px,4vw,42px);letter-spacing:-.045em;line-height:1.04}.cv-workspace__intro p{max-width:620px;margin:12px 0 0;color:var(--text-secondary);font-size:15px;line-height:1.65}.cv-workspace__signal{min-width:210px;border-left:1px solid var(--border);padding:8px 0 8px 22px}.cv-workspace__signal b{display:block;font-size:14px;color:var(--text-primary)}.cv-workspace__signal span{display:block;margin-top:5px;color:var(--text-muted);font-size:12px;line-height:1.45}.cv-workspace__routes{display:grid;grid-template-columns:1.35fr 1fr 1fr;gap:12px;margin-bottom:26px}.cv-route{border:1px solid var(--border);border-radius:14px;background:var(--surface);padding:16px;min-height:138px;text-align:left;color:inherit;box-shadow:none}.cv-route--main{background:#111827;border-color:#111827;color:white}.cv-route__top{display:flex;align-items:center;justify-content:space-between;margin-bottom:22px}.cv-route__icon{display:grid;place-items:center;width:30px;height:30px;border-radius:9px;background:#f1f5ff;color:var(--accent)}.cv-route--main .cv-route__icon{background:rgba(255,255,255,.12);color:white}.cv-route h2{font:700 15px/1.25 var(--font-body);letter-spacing:-.015em;margin:0}.cv-route p{margin:6px 0 0;font-size:12px;line-height:1.45;color:var(--text-muted)}.cv-route--main p{color:#aeb8cb}.cv-route button{padding:0;border:0;background:transparent;color:inherit;cursor:pointer;font:600 12px/1 var(--font-body)}.cv-route button span{display:inline-flex;align-items:center;gap:6px}.cv-workspace__build{border:1px solid var(--border);border-radius:18px;background:var(--surface);padding:22px;box-shadow:0 16px 42px -35px rgba(15,23,42,.28)}.cv-workspace__build-head{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:20px}.cv-workspace__build-head h2{margin:0;font:700 17px/1.3 var(--font-body);letter-spacing:-.02em}.cv-workspace__build-head p{margin:4px 0 0;color:var(--text-muted);font-size:12px}.cv-mode-tabs{display:inline-flex;gap:3px;padding:3px;border:1px solid var(--border);border-radius:10px;background:#f8fafc}.cv-mode-tabs button{padding:8px 12px;border:0;border-radius:7px;background:transparent;color:var(--text-secondary);font:600 12px var(--font-body);cursor:pointer}.cv-mode-tabs button[aria-selected=true]{background:white;color:var(--text-primary);box-shadow:0 1px 3px rgba(15,23,42,.12)}.cv-upload-zone{border:1.5px dashed #cbd5e1!important;border-radius:14px!important;background:#fbfdff!important;padding:58px 24px!important;transition:border-color .18s ease,background .18s ease}.cv-upload-zone:hover{border-color:var(--accent)!important;background:var(--accent-soft)!important}.cv-upload-zone p:first-of-type{font-size:15px!important}.cv-upload-zone p:last-of-type{font-size:12px!important}.cv-workspace .cv-stage{border:1px solid var(--border)!important;border-radius:18px!important;box-shadow:0 16px 42px -35px rgba(15,23,42,.26)}@media(max-width:850px){.cv-workspace__routes{grid-template-columns:1fr 1fr}.cv-route--main{grid-column:span 2}.cv-workspace__signal{display:none}}@media(max-width:620px){.cv-workspace{padding:24px 16px 48px}.cv-workspace__intro{display:block}.cv-workspace__routes{grid-template-columns:1fr}.cv-route--main{grid-column:auto}.cv-workspace__build-head{align-items:flex-start;flex-direction:column}.cv-mode-tabs{width:100%}.cv-mode-tabs button{flex:1}}
+      `}</style>
+      <header className="cv-workspace__intro">
+        <div>
+          <div className="cv-workspace__eyebrow"><Sparkle size={14} weight="fill" /> Career workspace</div>
+          <h1>Make your next CV<br />the strongest version.</h1>
+          <p>Start with the document you have, turn it into a clean PDF, then compare it against a role when you are ready.</p>
+        </div>
+      </header>
 
-      <p style={{ color: "var(--text-secondary)", marginBottom: 28 }}>
-        Rebuild your existing CV with AI polishing, or build a fresh one from a
-        form — then preview and download the rendered PDF.
-      </p>
+      <section className="cv-workspace__build">
+        <div className="cv-workspace__build-head">
+          <div><h2>{state.phase === "done" ? "Your CV is ready" : "Build your CV"}</h2><p>{state.phase === "done" ? "Preview it, download it, or start a new version." : "Choose the fastest starting point for this version."}</p></div>
+          {state.phase === "done" && <span style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "var(--success)", fontSize: 12, fontWeight: 700 }}><CheckCircle size={16} weight="fill" /> Ready</span>}
+        </div>
 
       {state.phase === "idle" && (
         <div style={{ marginBottom: 22 }}>
           <div
             role="tablist"
             aria-label="CV build mode"
-            style={{
-              display: "inline-flex",
-              gap: 4,
-              padding: 4,
-              borderRadius: 12,
-              background: "var(--border)",
-            }}
+            className="cv-mode-tabs"
           >
             <button
               type="button"
               role="tab"
               aria-selected={state.mode === "rebuild"}
               onClick={() => setState({ phase: "idle", mode: "rebuild" })}
-              style={{
-                padding: "9px 18px",
-                borderRadius: 9,
-                border: "none",
-                background: state.mode === "rebuild" ? "white" : "transparent",
-                color: "var(--text-primary)",
-                fontWeight: 600,
-                fontSize: 14,
-                cursor: "pointer",
-                boxShadow: state.mode === "rebuild" ? "0 1px 4px rgba(15,23,42,0.12)" : "none",
-              }}
             >
               Rebuild from file
             </button>
@@ -259,17 +258,6 @@ export default function CVReBuildScreen() {
               role="tab"
               aria-selected={state.mode === "build"}
               onClick={() => setState({ phase: "idle", mode: "build" })}
-              style={{
-                padding: "9px 18px",
-                borderRadius: 9,
-                border: "none",
-                background: state.mode === "build" ? "white" : "transparent",
-                color: "var(--text-primary)",
-                fontWeight: 600,
-                fontSize: 14,
-                cursor: "pointer",
-                boxShadow: state.mode === "build" ? "0 1px 4px rgba(15,23,42,0.12)" : "none",
-              }}
             >
               Build from form
             </button>
@@ -330,11 +318,10 @@ export default function CVReBuildScreen() {
 
               handleFiles(event.dataTransfer.files)
             }}
+            className="cv-upload-zone"
             style={{
-              border: `2px dashed ${dragOver ? "var(--accent)" : "var(--border)"}`,
-              borderRadius: 16,
-              background: dragOver ? "color-mix(in srgb, var(--accent) 6%, white)" : "white",
-              padding: "64px 24px",
+              borderColor: dragOver ? "var(--accent)" : undefined,
+              background: dragOver ? "var(--accent-soft)" : undefined,
               textAlign: "center",
               cursor: "pointer",
             }}
@@ -376,6 +363,7 @@ export default function CVReBuildScreen() {
 
       {state.phase === "processing" && (
         <div
+          className="cv-stage"
           aria-label="Building CV"
           style={{
             border: "1px solid var(--border)",
@@ -457,6 +445,7 @@ export default function CVReBuildScreen() {
 
       {state.phase === "error" && (
         <div
+          className="cv-stage"
           style={{
             border: "1px solid #FECACA",
             borderRadius: 16,
@@ -490,6 +479,7 @@ export default function CVReBuildScreen() {
 
       {state.phase === "done" && (
         <div
+          className="cv-stage"
           style={{
             border: "1px solid var(--border)",
             borderRadius: 16,
@@ -683,6 +673,7 @@ export default function CVReBuildScreen() {
           </div>
         </div>
       )}
+      </section>
     </div>
   )
 }

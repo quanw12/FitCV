@@ -1,0 +1,110 @@
+{
+  "input": "C:\\Studybase\\Use-case Specs --rup_ucspec.docx",
+  "fonts_by_char_count": {
+    "Arial": 11
+  },
+  "direct_run_formatting_runs": 30,
+  "direct_paragraph_formatting_paragraphs": 10,
+  "heading_like_paragraphs_not_heading_style": [
+    {
+      "para_index": 30,
+      "text": "Date",
+      "style": "Tabletext"
+    },
+    {
+      "para_index": 31,
+      "text": "Version",
+      "style": "Tabletext"
+    },
+    {
+      "para_index": 32,
+      "text": "Description",
+      "style": "Tabletext"
+    },
+    {
+      "para_index": 33,
+      "text": "Author",
+      "style": "Tabletext"
+    },
+    {
+      "para_index": 64,
+      "text": "Alternative flow 1: User cannot find products searched",
+      "style": "Normal"
+    },
+    {
+      "para_index": 68,
+      "text": "Alternative flow 2: Shopping cart has already had the product",
+      "style": "Normal"
+    },
+    {
+      "para_index": 72,
+      "text": "Alternative flow 3: \u2026",
+      "style": "Normal"
+    },
+    {
+      "para_index": 79,
+      "text": "<Team Name>",
+      "style": "Normal"
+    }
+  ],
+  "examples": {
+    "direct_run_formatting": [
+      {
+        "para_index": 4,
+        "run_text": "Version <1.0>",
+        "style": "Title"
+      },
+      {
+        "para_index": 16,
+        "run_text": "\t",
+        "style": "toc 1"
+      },
+      {
+        "para_index": 17,
+        "run_text": "\t",
+        "style": "toc 1"
+      },
+      {
+        "para_index": 18,
+        "run_text": "\t",
+        "style": "toc 2"
+      },
+      {
+        "para_index": 19,
+        "run_text": "\t",
+        "style": "toc 2"
+      }
+    ],
+    "direct_paragraph_formatting": [
+      {
+        "para_index": 57,
+        "text": "At the homepage, the user enters keywords on the \u2018Search\u2019 field",
+        "style": "List Paragraph"
+      },
+      {
+        "para_index": 58,
+        "text": "Users clicks on \u2018Search\u2019 button to start searching a product",
+        "style": "List Paragraph"
+      },
+      {
+        "para_index": 59,
+        "text": "System displays the products found",
+        "style": "List Paragraph"
+      },
+      {
+        "para_index": 60,
+        "text": "User clicks \u2018Add to cart\u2019 button on the expected product",
+        "style": "List Paragraph"
+      },
+      {
+        "para_index": 61,
+        "text": "System adds a new product to shopping cart",
+        "style": "List Paragraph"
+      }
+    ]
+  },
+  "notes": [
+    "Direct formatting is not always wrong, but it often causes inconsistent output when templates change.",
+    "Heading-like paragraphs not using Heading styles can break TOC and accessibility."
+  ]
+}

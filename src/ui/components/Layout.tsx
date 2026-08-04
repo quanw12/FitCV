@@ -1,14 +1,8 @@
-import { useState, useEffect } from "react"
+import { useEffect, useState } from "react"
 
-import {
-  Lightning,
-  CaretLeft,
-  CaretRight,
-  SignOut,
-} from "@phosphor-icons/react"
+import { Moon, SignOut, Sun } from "@phosphor-icons/react"
 
 import FloatingTopbar from "./FloatingTopbar"
-
 import CommandPalette from "./CommandPalette"
 
 import { getPortalNavigation } from "@/data/navigation"
@@ -17,17 +11,11 @@ import type { Portal, ScreenId } from "@/types/app"
 
 interface LayoutProps {
   portal: Portal
-
   currentScreen: ScreenId | ""
-
   onNavigate: (screen: ScreenId) => void
-
   onLogout: () => void
-
   children: React.ReactNode
-
   userName?: string
-
   userAvatarUrl?: string | null
 }
 
@@ -40,156 +28,51 @@ export default function Layout({
   userName = "Nguyen Minh",
   userAvatarUrl,
 }: LayoutProps) {
-  const [collapsed, setCollapsed] = useState(false)
-
   const [showUserMenu, setShowUserMenu] = useState(false)
-
   const [paletteOpen, setPaletteOpen] = useState(false)
+  const [theme, setTheme] = useState<"light" | "dark">(() => {
+    const savedTheme = window.localStorage.getItem("fitcv-theme")
+    return savedTheme === "dark" ? "dark" : "light"
+  })
 
   useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
-        e.preventDefault()
-
-        setPaletteOpen((p) => !p)
+    const handler = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key === "k") {
+        event.preventDefault()
+        setPaletteOpen((isOpen) => !isOpen)
       }
     }
 
     window.addEventListener("keydown", handler)
-
     return () => window.removeEventListener("keydown", handler)
   }, [])
 
-  const navItems = getPortalNavigation(portal)
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme
+    window.localStorage.setItem("fitcv-theme", theme)
+  }, [theme])
 
+  const navItems = getPortalNavigation(portal)
   const portalLabel = portal === "seeker" ? "Job Seeker" : "HR Recruiter"
+  const accountScreen: ScreenId = portal === "seeker" ? "profile" : "hr-settings"
+  const accountItem = navItems.find((item) => item.screen === accountScreen)
 
   return (
-    <div
-      data-portal={portal}
-      style={{
-        display: "flex",
-        height: "100vh",
-        overflow: "hidden",
-        background: "var(--bg)",
-      }}
-    >
-      {/* Ink sidebar */}
-      <aside
-        className="fc-sidebar"
-        style={{
-          width: collapsed ? "var(--sidebar-w-collapsed)" : "var(--sidebar-w)",
-          minWidth: collapsed
-            ? "var(--sidebar-w-collapsed)"
-            : "var(--sidebar-w)",
-        }}
-      >
-        <div className="fc-sidebar__brand">
-          <div className="fc-brandmark">
-            <Lightning size={20} color="white" weight="light" />
-          </div>
-          {!collapsed && (
-            <div>
-              <div
-                style={{
-                  fontFamily: "var(--font-display)",
-                  fontWeight: 700,
-                  fontSize: 17,
-                  color: "white",
-                  lineHeight: 1,
-                }}
-              >
-                FitCV
-              </div>
-              <div
-                style={{
-                  fontSize: 10.5,
-                  color: "#8b95b5",
-                  fontWeight: 600,
-                  marginTop: 3,
-                  letterSpacing: "0.04em",
-                }}
-              >
-                {portalLabel}
-              </div>
-            </div>
-          )}
-        </div>
-
-        <nav className="fc-sidebar__nav">
-          {navItems.map((item) => {
-            const active = currentScreen === item.screen
-
-            return (
-              <button
-                key={item.screen}
-                onClick={() => onNavigate(item.screen)}
-                className={`fc-navitem ${active ? "fc-navitem--active" : ""}`}
-                style={{ justifyContent: collapsed ? "center" : "flex-start" }}
-                title={collapsed ? item.label : undefined}
-              >
-                <span style={{ flexShrink: 0, display: "flex" }}>
-                  {item.icon}
-                </span>
-                {!collapsed && <span>{item.label}</span>}
-              </button>
-            )
-          })}
-        </nav>
-
-        <div className="fc-sidebar__footer">
-          <button
-            onClick={() => setCollapsed(!collapsed)}
-            className="fc-navitem"
-            style={{
-              justifyContent: collapsed ? "center" : "flex-start",
-              marginBottom: 0,
-            }}
-          >
-            {collapsed ? (
-              <CaretRight size={16} weight="light" />
-            ) : (
-              <>
-                <CaretLeft size={16} weight="light" />
-                <span>Collapse</span>
-              </>
-            )}
-          </button>
-        </div>
-      </aside>
-
-      {/* Main */}
-      <div
-        style={{
-          flex: 1,
-          display: "flex",
-          flexDirection: "column",
-          overflow: "hidden",
-        }}
-      >
-        <div style={{ position: "relative" }}>
+    <div data-portal={portal} className="fc-app-shell">
+      <div className="fc-app-main">
+        <div className="fc-topbar-wrap">
           <FloatingTopbar
             userName={userName}
             userAvatarUrl={userAvatarUrl}
-            onSearchFocus={() => setPaletteOpen(true)}
-            onUserMenuClick={() => setShowUserMenu(!showUserMenu)}
+            navItems={navItems}
+            currentScreen={currentScreen}
+            onNavigate={onNavigate}
+            onUserMenuClick={() => setShowUserMenu((isOpen) => !isOpen)}
+            onNotificationClick={() => onNavigate("app-tracker")}
           />
+
           {showUserMenu && (
-            <div
-              style={{
-                position: "absolute",
-                top: "calc(8px + var(--topbar-h) + 4px)",
-                right: 16,
-                background: "var(--surface)",
-                border: "1px solid var(--border)",
-                borderRadius: 14,
-                boxShadow: "var(--shadow-lg)",
-                padding: 8,
-                minWidth: 180,
-                zIndex: 100,
-                animation: "fc-pop 0.14s ease",
-              }}
-            >
+            <div className="fc-user-menu">
               <div
                 style={{
                   padding: "8px 12px 12px",
@@ -210,6 +93,54 @@ export default function Layout({
                   {portalLabel} workspace
                 </div>
               </div>
+              {accountItem && (
+                <button
+                  onClick={() => {
+                    setShowUserMenu(false)
+                    onNavigate(accountScreen)
+                  }}
+                  style={{
+                    width: "100%",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 9,
+                    padding: "9px 12px",
+                    borderRadius: 9,
+                    border: "none",
+                    background: "transparent",
+                    color: "var(--text-secondary)",
+                    fontSize: 13.5,
+                    fontWeight: 600,
+                    cursor: "pointer",
+                  }}
+                >
+                  {accountItem.icon} {accountItem.label}
+                </button>
+              )}
+              <button
+                onClick={() => setTheme((currentTheme) => currentTheme === "light" ? "dark" : "light")}
+                style={{
+                  width: "100%",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: 9,
+                  padding: "9px 12px",
+                  borderRadius: 9,
+                  border: "none",
+                  background: "transparent",
+                  color: "var(--text-secondary)",
+                  fontSize: 13.5,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                }}
+              >
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 9 }}>
+                  {theme === "light" ? <Moon size={15} weight="light" /> : <Sun size={15} weight="light" />}
+                  {theme === "light" ? "Dark mode" : "Light mode"}
+                </span>
+                <span className="fc-theme-toggle" aria-hidden="true"><span /></span>
+              </button>
               <button
                 onClick={onLogout}
                 style={{
@@ -233,17 +164,7 @@ export default function Layout({
           )}
         </div>
 
-        <main
-          style={{
-            flex: 1,
-            overflowY: "auto",
-            padding: 30,
-            position: "relative",
-          }}
-        >
-          {children}
-        </main>
-        <div className="fc-grain" />
+        <main className="fc-app-content">{children}</main>
       </div>
 
       <CommandPalette

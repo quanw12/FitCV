@@ -24,16 +24,6 @@ import {
   X,
 } from "@phosphor-icons/react"
 
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts"
-
 import { toast } from "sonner"
 
 import { applicationsApi } from "@/api/applicationsApi"
@@ -151,8 +141,6 @@ export default function JDLibraryScreen({
 
   const [deletingJdId, setDeletingJdId] = useState<number | null>(null)
 
-  const [savingJobId, setSavingJobId] = useState<number | null>(null)
-
   const [profileLoading, setProfileLoading] = useState(false)
 
   const [submitting, setSubmitting] = useState(false)
@@ -237,25 +225,6 @@ export default function JDLibraryScreen({
       )
     } finally {
       setDeletingJdId(null)
-    }
-  }
-
-  const saveJobJd = async (job: JobPost) => {
-    setSavingJobId(job.job_id)
-    setLibraryError("")
-    try {
-      await jdLibraryApi.save(
-        `${job.title} · ${job.company.name}`,
-        buildJobDescription(job),
-      )
-      toast.success("Job description saved to your JD library")
-      await loadLibrary(libraryQuery)
-    } catch (cause) {
-      setLibraryError(
-        cause instanceof Error ? cause.message : "Could not save this job description.",
-      )
-    } finally {
-      setSavingJobId(null)
     }
   }
 
@@ -413,14 +382,14 @@ export default function JDLibraryScreen({
   }
 
   return (
-    <div className="fc-stagger">
+    <div className="fc-stagger jd-library-workspace">
       <div className="fc-page-head">
         <div>
           <div className="fc-eyebrow">Career intelligence</div>
           <h1>JD Library & Market Insights</h1>
           <p>
-            Review analyzed job descriptions, see recurring skill demand, and
-            browse active opportunities.
+            Reuse each completed analysis, spot recurring skills, and browse
+            active opportunities without maintaining the same JD twice.
           </p>
         </div>
       </div>
@@ -488,14 +457,14 @@ export default function JDLibraryScreen({
               title="Most requested skills"
               description="Share of your analyzed JDs that mention each required skill."
               data={insights?.requiredSkills ?? []}
-              color="#2563EB"
+              tone="accent"
               emptyMessage="Analyze JDs to discover recurring required skills."
             />
             <SkillInsightChart
               title="Skills missing most"
               description="Share of completed CV/JD matches where evidence for the skill was missing."
               data={insights?.missingSkills ?? []}
-              color="#D97706"
+              tone="warning"
               emptyMessage="No repeated skill gaps have been found yet."
             />
           </div>
@@ -506,7 +475,7 @@ export default function JDLibraryScreen({
           >
             <div className="fc-section-title" style={{ marginBottom: 14 }}>
               <BookOpenText size={16} weight="light" />
-              <h2>My analyzed JD library</h2>
+              <h2>Saved analyses</h2>
             </div>
             <label style={{ display: "block", marginBottom: 14 }}>
               <span className="fc-field-label">Search saved job descriptions</span>
@@ -573,9 +542,8 @@ export default function JDLibraryScreen({
                       maxWidth: 280,
                     }}
                   >
-                    JDs used in Match Analyzer are saved here automatically with
-                    their parsed skill requirements and recurring skill demand
-                    data.
+                    A JD appears here after you run Match Analyzer. Each entry
+                    keeps its parsed requirements and score history together.
                   </span>
                   <button
                     type="button"
@@ -995,15 +963,6 @@ export default function JDLibraryScreen({
                 }
               >
                 <MagnifyingGlass size={15} weight="light" /> Analyze this JD
-              </button>
-              <button
-                className="fc-btn fc-btn--secondary"
-                type="button"
-                disabled={savingJobId === selected.job_id}
-                onClick={() => void saveJobJd(selected)}
-              >
-                <BookOpenText size={15} weight="light" />
-                {savingJobId === selected.job_id ? "Saving…" : "Save to JD library"}
               </button>
               {applicationByJob.has(selected.job_id) ? (
                 <button
@@ -1434,7 +1393,7 @@ function SkillInsightChart({
 
   data,
 
-  color,
+  tone,
 
   emptyMessage,
 }: {
@@ -1444,12 +1403,12 @@ function SkillInsightChart({
 
   data: JdLibraryInsights["requiredSkills"]
 
-  color: string
+  tone: "accent" | "warning"
 
   emptyMessage: string
 }) {
   return (
-    <div className="fc-card fc-card--pad">
+    <div className={`fc-card fc-card--pad skill-insight skill-insight--${tone}`}>
       <h2 style={{ fontSize: 16 }}>{title}</h2>
       <p style={{ color: "var(--text-secondary)", fontSize: 12, marginTop: 3 }}>
         {description}
@@ -1467,31 +1426,17 @@ function SkillInsightChart({
           {emptyMessage}
         </p>
       ) : (
-        <div style={{ width: "100%", height: 240, marginTop: 12 }}>
-          <ResponsiveContainer>
-            <BarChart
-              data={data.slice(0, 7)}
-              layout="vertical"
-              margin={{ left: 20, right: 18 }}
-            >
-              <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
-              <XAxis type="number" domain={[0, 100]} unit="%" />
-              <YAxis
-                type="category"
-                dataKey="skill"
-                width={90}
-                tick={{ fontSize: 11 }}
-              />
-              <Tooltip
-                formatter={(value) => [
-                  `${Number(value ?? 0).toFixed(1)}%`,
-
-                  "Frequency",
-                ]}
-              />
-              <Bar dataKey="percentage" fill={color} radius={[0, 5, 5, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
+        <div className="skill-insight-list">
+          {data.slice(0, 6).map((item, index) => (
+            <div key={item.skill} className="skill-insight-row">
+              <span className="skill-insight-rank">{String(index + 1).padStart(2, "0")}</span>
+              <div className="skill-insight-name">
+                <strong>{item.skill}</strong>
+                <span><i style={{ width: `${Math.min(100, Math.max(4, item.percentage))}%` }} /></span>
+              </div>
+              <b>{item.percentage.toFixed(0)}%</b>
+            </div>
+          ))}
         </div>
       )}
     </div>

@@ -5,10 +5,10 @@ import {
   FileText,
   TrashSimple,
   UploadSimple,
-  Lightning,
 } from "@phosphor-icons/react"
 
 import { analyzerApi } from "@/api/analyzerApi"
+import sparklesIcon from "@/imports/navigation-icons/sparkles.svg"
 
 import { getScoreTone } from "@/services/matchScore"
 
@@ -303,6 +303,7 @@ export default function AnalyzerScreen({
       </div>
 
       <div
+        className="analyzer-workbench"
         style={{
           display: "grid",
 
@@ -316,7 +317,7 @@ export default function AnalyzerScreen({
         <div className="fc-bezel">
           <div className="fc-bezel__inner" style={{ padding: 0 }}>
             <div
-              className="fc-card fc-card--pad fc-card--lift"
+            className="fc-card fc-card--pad fc-card--lift analyzer-cv-drop"
               onDragOver={(event) => {
                 event.preventDefault()
 
@@ -472,7 +473,7 @@ export default function AnalyzerScreen({
         </div>
 
         <div
-          className="fc-card fc-card--pad"
+          className="fc-card fc-card--pad analyzer-jd-panel"
           style={{ display: "flex", flexDirection: "column" }}
         >
           <div
@@ -597,6 +598,7 @@ export default function AnalyzerScreen({
 
       <div
         aria-live="polite"
+        className="analyzer-submit-row"
         style={{ display: "flex", justifyContent: "center", marginBottom: 28 }}
       >
         <button
@@ -611,7 +613,8 @@ export default function AnalyzerScreen({
             </>
           ) : (
             <>
-              <Lightning size={18} weight="light" /> Analyze match
+              <img className="fc-action-svg" src={sparklesIcon} alt="" aria-hidden="true" />
+              Analyze match
             </>
           )}
         </button>

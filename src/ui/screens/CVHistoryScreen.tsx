@@ -200,8 +200,9 @@ export default function CVHistoryScreen() {
   )
 
   return (
-    <div>
+    <div className="cv-history-workspace">
       <div
+        className="cv-history-header"
         style={{
           display: "flex",
 
@@ -485,10 +486,10 @@ export default function CVHistoryScreen() {
                   padding: 20,
 
                   border: `2px solid ${
-                    isSelected ? "#2563EB" : "var(--border)"
+                    isSelected ? "var(--accent)" : "var(--border)"
                   }`,
 
-                  background: isSelected ? "#EFF6FF" : "white",
+                  background: isSelected ? "var(--accent-soft)" : "var(--surface)",
 
                   position: "relative",
                 }}
