@@ -16,7 +16,10 @@ class Settings(BaseSettings):
     database_url: str
     jwt_secret_key: str = "change-me-before-production"
     jwt_algorithm: str = "HS256"
-    access_token_expire_minutes: int = 60 * 24
+    access_token_expire_minutes: int = 15
+    refresh_token_expire_days: int = 30
+    refresh_cookie_name: str = "fitcv_refresh"
+    refresh_cookie_secure: bool = False
     reset_token_expire_minutes: int = 30
     google_client_id: str | None = None
     resend_api_key: str | None = None
@@ -40,6 +43,11 @@ class Settings(BaseSettings):
     ocr_timeout_seconds: float = 120.0
     ocr_max_output_tokens: int = 20_000
     improvement_task_stale_minutes: int = 10
+    ai_worker_enabled: bool = True
+    ai_worker_poll_seconds: float = 1.0
+    ai_worker_lease_seconds: int = 1800
+    ai_worker_heartbeat_seconds: int = 30
+    ai_task_max_attempts: int = 3
     improvement_max_cv_chars: int = 120_000
     improvement_max_jd_chars: int = 60_000
     analyzer_provider: str = "deterministic"

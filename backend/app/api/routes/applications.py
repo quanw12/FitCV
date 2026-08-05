@@ -23,6 +23,7 @@ from app.schemas.applications import (
     TrackedApplicationResponse,
 )
 from app.services import application_service
+from app.services import ai_task_service
 
 router = APIRouter()
 student = require_role(AccountRole.student)
@@ -53,10 +54,14 @@ def retry_application_analysis(
         application_id=application_id,
         account=account,
     )
-    background_tasks.add_task(
-        application_service.run_analysis,
-        application_id,
+    ai_task_service.enqueue(
+        db,
+        task_type="ApplicationAnalysis",
+        resource_id=application_id,
+        account=account,
     )
+    if ai_task_service.should_eager_execute():
+        background_tasks.add_task(application_service.run_analysis, application_id)
     return response
 
 

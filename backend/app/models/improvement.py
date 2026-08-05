@@ -1,7 +1,7 @@
 from datetime import datetime
 from enum import Enum
 
-from sqlalchemy import DateTime, Enum as SqlEnum, ForeignKey, Index, Integer, JSON, String, Text, func
+from sqlalchemy import DateTime, Enum as SqlEnum, ForeignKey, Index, Integer, JSON, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.session import Base
@@ -60,15 +60,34 @@ class CvImprovementSuggestion(Base):
 
 class AiTask(Base):
     __tablename__ = "ai_task"
-    __table_args__ = (Index("idx_ai_task_resource", "task_type", "resource_id", "created_at"),)
+    __table_args__ = (
+        UniqueConstraint("idempotency_key", name="uq_ai_task_idempotency_key"),
+        Index("idx_ai_task_resource", "task_type", "resource_id", "created_at"),
+        Index("idx_ai_task_claim", "status", "available_at", "created_at"),
+        Index("idx_ai_task_owner_created", "owner_account_id", "created_at"),
+    )
 
     ai_task_id: Mapped[int] = mapped_column(ID_TYPE, primary_key=True, autoincrement=True)
     task_type: Mapped[str] = mapped_column(String(50))
     resource_id: Mapped[int] = mapped_column(ID_TYPE)
+    owner_account_id: Mapped[int | None] = mapped_column(
+        ID_TYPE, ForeignKey("account.account_id", ondelete="CASCADE"), nullable=True
+    )
+    company_id: Mapped[int | None] = mapped_column(
+        ID_TYPE, ForeignKey("company.company_id", ondelete="CASCADE"), nullable=True
+    )
     status: Mapped[AiTaskStatus] = mapped_column(SqlEnum(AiTaskStatus, values_callable=enum_values), default=AiTaskStatus.pending)
     provider: Mapped[str | None] = mapped_column(String(50), nullable=True)
     model_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    payload_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    idempotency_key: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    attempt_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    max_attempts: Mapped[int] = mapped_column(Integer, default=3, nullable=False)
+    available_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
+    locked_by: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    heartbeat_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     error_message: Mapped[str | None] = mapped_column(String(1000), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    updated_at: Mapped[datetime | None] = mapped_column(DateTime, onupdate=func.now(), nullable=True)
     started_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

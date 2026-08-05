@@ -194,7 +194,7 @@ def _job_text(job) -> str:
     )
 
 
-def run_analysis(application_id: int) -> None:
+def run_analysis(application_id: int) -> bool:
     db = SessionLocal()
     parsed_cv = None
     parsed_jd = None
@@ -202,10 +202,10 @@ def run_analysis(application_id: int) -> None:
     try:
         context = applications.analysis_context(db, application_id)
         if context is None:
-            return
+            return True
         application, cv, parsed_cv, job, match = context
         if match.status == "Success":
-            return
+            return True
         match.cv_parse_id = parsed_cv.cv_parse_id
         db.commit()
         analyzer.set_match_processing(db, match)
@@ -254,6 +254,7 @@ def run_analysis(application_id: int) -> None:
             },
         )
         analyzer.set_match_success(db, match, result)
+        return True
     except Exception as exc:
         logger.exception("Application analysis failed for application_id=%s", application_id)
         db.rollback()
@@ -265,6 +266,7 @@ def run_analysis(application_id: int) -> None:
             )
         if match is not None:
             analyzer.set_match_failed(db, match, str(exc) or "Matching failed.")
+        return False
     finally:
         db.close()
 

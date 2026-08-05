@@ -12,71 +12,36 @@ import type {
 } from "@/types/auth"
 
 import {
+  type BackendAuthSession,
   clearStoredSession,
   getStoredSession,
+  persistBackendSession,
   storeSession,
 } from "./authSession"
 
 import { requestJson } from "./httpClient"
 
-interface BackendAuthSession {
-  access_token: string
-
-  token_type?: "bearer"
-
-  requires_role_selection: boolean
-
-  user: {
-    account_id: number
-
-    email: string
-
-    full_name: string
-
-    role: AuthSession["user"]["role"]
-
-    avatar_url?: string | null
-
-    auth_provider?: AuthSession["user"]["authProvider"]
-  }
-}
-
-function normalizeBackendSession(payload: BackendAuthSession): AuthSession {
-  return {
-    accessToken: payload.access_token,
-
-    tokenType: payload.token_type ?? "bearer",
-
-    requiresRoleSelection: payload.requires_role_selection,
-
-    user: {
-      accountId: String(payload.user.account_id),
-
-      email: payload.user.email,
-
-      fullName: payload.user.full_name,
-
-      role: payload.user.role,
-
-      avatarUrl: payload.user.avatar_url,
-
-      authProvider: payload.user.auth_provider ?? "Password",
-    },
-  }
-}
-
-function persistBackendSession(payload: BackendAuthSession): AuthSession {
-  const session = normalizeBackendSession(payload)
-
-  storeSession(session)
-
-  return session
-}
-
 export const authApi = {
   getSession: getStoredSession,
 
-  logout: clearStoredSession,
+  async logout(): Promise<void> {
+    try {
+      await requestJson<void>("/api/auth/logout", {
+        method: "POST",
+        authenticated: true,
+      })
+    } finally {
+      clearStoredSession()
+    }
+  },
+
+  async refresh(): Promise<AuthSession> {
+    const response = await requestJson<BackendAuthSession>(
+      "/api/auth/refresh",
+      { method: "POST" },
+    )
+    return persistBackendSession(response)
+  },
 
   updateCurrentUser(
     patch: Partial<Pick<AuthSession["user"], "fullName" | "avatarUrl">>,
@@ -174,6 +139,7 @@ export const authApi = {
   },
 
   resetPassword(payload: ResetPasswordRequest): Promise<void> {
+    clearStoredSession()
     return requestJson("/api/auth/reset-password", {
       method: "POST",
 

@@ -14,6 +14,7 @@ from app.schemas.jobs import (
     JobUpdate,
 )
 from app.services import application_service, job_extraction_service, jobs_service
+from app.services import ai_task_service
 
 router = APIRouter()
 student = require_role(AccountRole.student)
@@ -62,7 +63,17 @@ async def apply_to_job(
         file=file,
         account=account,
     )
-    background_tasks.add_task(application_service.run_analysis, response.application_id)
+    ai_task_service.enqueue(
+        db,
+        task_type="ApplicationAnalysis",
+        resource_id=response.application_id,
+        account=account,
+        idempotency_key=f"application-analysis:{response.application_id}",
+    )
+    if ai_task_service.should_eager_execute():
+        background_tasks.add_task(
+            application_service.run_analysis, response.application_id
+        )
     return response
 
 

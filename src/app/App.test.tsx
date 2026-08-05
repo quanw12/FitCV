@@ -14,6 +14,8 @@ const authMocks = vi.hoisted(() => ({
   getSession: vi.fn(),
 
   logout: vi.fn(),
+
+  refresh: vi.fn(),
 }))
 
 vi.mock("@/api", () => ({ authApi: authMocks }))
@@ -134,6 +136,7 @@ describe("Analyzer to Improvement selection", () => {
     window.history.replaceState({}, "", "/")
 
     authMocks.getSession.mockReturnValue(primarySession)
+    authMocks.refresh.mockResolvedValue(primarySession)
   })
 
   it("opens a shared public job before the authentication gate", async () => {
@@ -162,6 +165,15 @@ describe("Analyzer to Improvement selection", () => {
     fireEvent.click(screen.getByRole("button", { name: "Open Improvement" }))
 
     expect(await screen.findByText("Selected match: 37")).toBeInTheDocument()
+  })
+
+  it("restores the session from the refresh cookie when tab storage is empty", async () => {
+    authMocks.getSession.mockReturnValue(null)
+
+    render(<App />)
+
+    expect(await screen.findByText("CV rebuild screen")).toBeInTheDocument()
+    expect(authMocks.refresh).toHaveBeenCalledOnce()
   })
 
   it("passes a completed analysis ID to Improvement and clears it when inputs change", async () => {

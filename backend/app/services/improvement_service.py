@@ -18,6 +18,7 @@ from app.services.improvement_validator import (
     ImprovementValidationError,
     filter_grounded_report,
 )
+from app.services import ai_task_service
 
 logger = logging.getLogger(__name__)
 
@@ -160,19 +161,25 @@ def request_generation(
         provider = get_improvement_provider()
     except ImprovementProviderError as exc:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
-    task = improvements.create_task(db, match_result_id, provider.name, provider.model_name)
+    task = ai_task_service.enqueue(
+        db,
+        task_type="ImprovementReport",
+        resource_id=match_result_id,
+        account=account,
+        provider=provider.name,
+        model_name=provider.model_name,
+    )
     return GenerateImprovementResponse(
         match_result_id=match_result_id, status=task.status, task_id=task.ai_task_id
     ), True
 
 
-def run_generation_task(task_id: int) -> None:
+def execute_generation_task(task_id: int) -> None:
     db = SessionLocal()
-    task = None
     try:
-        task = improvements.claim_task(db, task_id, started_at=_utcnow_naive())
+        task = db.get(AiTask, task_id)
         if task is None:
-            return
+            raise LookupError("Improvement task not found.")
 
         match, parsed, job_description = improvements.get_generation_context(db, task.resource_id)
         provider = get_improvement_provider()
@@ -208,28 +215,45 @@ def run_generation_task(task_id: int) -> None:
         )
         rows = report_to_suggestions(task.resource_id, report)
         improvements.replace_suggestions(db, task.resource_id, rows)
-        improvements.complete_claimed_task(
-            db,
-            task.ai_task_id,
-            completed_at=_utcnow_naive(),
-        )
-    except Exception as exc:
+        db.commit()
+    except Exception:
         db.rollback()
-        if task is not None:
-            marked_failed = improvements.mark_active_task_failed(
+        raise
+    finally:
+        db.close()
+
+
+def run_generation_task(task_id: int) -> None:
+    """Compatibility wrapper for direct/background execution in older deployments."""
+    db = SessionLocal()
+    task = None
+    try:
+        task = improvements.claim_task(db, task_id, started_at=_utcnow_naive())
+    finally:
+        db.close()
+    if task is None:
+        return
+    try:
+        execute_generation_task(task_id)
+        db = SessionLocal()
+        try:
+            improvements.complete_claimed_task(db, task_id, completed_at=_utcnow_naive())
+        finally:
+            db.close()
+    except Exception as exc:
+        db = SessionLocal()
+        try:
+            improvements.mark_active_task_failed(
                 db,
-                task.ai_task_id,
+                task_id,
                 error_message=_safe_error_message(exc),
                 completed_at=_utcnow_naive(),
             )
-            if marked_failed:
-                db.commit()
-            else:
-                db.rollback()
+            db.commit()
+        finally:
+            db.close()
         if not isinstance(exc, (ImprovementProviderError, ImprovementValidationError)):
             logger.exception("Unexpected improvement generation failure for task %s", task_id)
-    finally:
-        db.close()
 
 
 def get_report(db: Session, *, match_result_id: int, account: Account) -> ImprovementReportResponse:
