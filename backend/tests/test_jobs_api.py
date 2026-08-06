@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import unittest
 
 from fastapi.testclient import TestClient
@@ -9,7 +9,7 @@ from sqlalchemy.pool import StaticPool
 from app.api.deps import get_current_account
 from app.db.session import Base, get_db
 from app.main import app
-from app.models import Company, Job
+from app.models import Application, Company, Job
 from app.models.account import Account, AccountRole, AuthProvider
 
 
@@ -157,6 +157,98 @@ class JobsApiIntegrationTests(unittest.TestCase):
         closed = self.client.post(f"/api/jobs/{job_id}/close")
         self.assertEqual(closed.status_code, 200)
         self.assertEqual(closed.json()["status"], "Closed")
+
+        reopened = self.client.post(f"/api/jobs/{job_id}/reopen")
+        self.assertEqual(reopened.status_code, 200)
+        self.assertEqual(reopened.json()["status"], "Published")
+
+    def test_preview_and_duplicate_create_a_new_draft_without_deadline(self) -> None:
+        source = self.create_published_job()
+        self.db.add(Application(candidate_id=1, cv_id=1, job_id=source.job_id))
+        self.db.commit()
+
+        preview = self.client.get(f"/api/jobs/{source.job_id}/preview")
+        self.assertEqual(preview.status_code, 200)
+        self.assertEqual(preview.json()["job_id"], source.job_id)
+        self.assertEqual(preview.json()["application_count"], 1)
+
+        duplicated = self.client.post(f"/api/jobs/{source.job_id}/duplicate")
+        self.assertEqual(duplicated.status_code, 201)
+        duplicate = duplicated.json()
+        self.assertNotEqual(duplicate["job_id"], source.job_id)
+        self.assertEqual(duplicate["title"], "Copy of Backend Engineer")
+        self.assertEqual(duplicate["status"], "Draft")
+        self.assertIsNone(duplicate["deadline"])
+        self.assertEqual(duplicate["application_count"], 0)
+        self.assertEqual(
+            self.db.query(Application)
+            .filter_by(job_id=source.job_id)
+            .count(),
+            1,
+        )
+
+    def test_reopen_requires_a_future_deadline(self) -> None:
+        job = self.create_published_job()
+        self.assertEqual(
+            self.client.post(f"/api/jobs/{job.job_id}/close").status_code,
+            200,
+        )
+        expired = self.client.patch(
+            f"/api/jobs/{job.job_id}",
+            json={
+                "deadline": (
+                    datetime.now(timezone.utc) - timedelta(minutes=1)
+                ).isoformat()
+            },
+        )
+        self.assertEqual(expired.status_code, 200)
+        blocked = self.client.post(f"/api/jobs/{job.job_id}/reopen")
+        self.assertEqual(blocked.status_code, 422)
+        self.assertIn("future application deadline", blocked.json()["detail"])
+
+        self.assertEqual(
+            self.client.patch(
+                f"/api/jobs/{job.job_id}",
+                json={
+                    "deadline": (
+                        datetime.now(timezone.utc) + timedelta(days=7)
+                    ).isoformat()
+                },
+            ).status_code,
+            200,
+        )
+        self.assertEqual(
+            self.client.post(f"/api/jobs/{job.job_id}/reopen").status_code,
+            200,
+        )
+
+    def test_lifecycle_actions_preserve_existing_applications(self) -> None:
+        job = self.create_published_job()
+        application = Application(candidate_id=1, cv_id=1, job_id=job.job_id)
+        self.db.add(application)
+        self.db.commit()
+        application_id = application.application_id
+
+        self.assertEqual(
+            self.client.post(f"/api/jobs/{job.job_id}/close").status_code,
+            200,
+        )
+        self.assertEqual(
+            self.client.post(f"/api/jobs/{job.job_id}/reopen").status_code,
+            200,
+        )
+        self.assertEqual(
+            self.client.post(f"/api/jobs/{job.job_id}/archive").status_code,
+            200,
+        )
+        self.assertEqual(
+            self.client.post(f"/api/jobs/{job.job_id}/unarchive").status_code,
+            200,
+        )
+        self.assertIsNotNone(self.db.get(Application, application_id))
+        preview = self.client.get(f"/api/jobs/{job.job_id}/preview")
+        self.assertEqual(preview.status_code, 200)
+        self.assertEqual(preview.json()["application_count"], 1)
 
     def test_rejects_invalid_weight_total_and_student_management(self) -> None:
         invalid = self.client.post(

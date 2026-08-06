@@ -85,8 +85,43 @@ class PipelineApiIntegrationTests(unittest.TestCase):
                 algorithm_version="fitcv-deterministic-v1",
             )
         )
+        second_candidate = Candidate(
+            full_name="Tran An",
+            email="an@example.com",
+            phone="0900000001",
+        )
+        self.db.add(second_candidate)
+        self.db.flush()
+        second_cv = Cv(
+            candidate_id=second_candidate.candidate_id,
+            file_name="an.pdf",
+            file_path="applications/an.pdf",
+            file_type="PDF",
+            file_size_kb=120,
+        )
+        self.db.add(second_cv)
+        self.db.flush()
+        second_application = Application(
+            candidate_id=second_candidate.candidate_id,
+            job_id=job.job_id,
+            cv_id=second_cv.cv_id,
+        )
+        self.db.add(second_application)
+        self.db.flush()
+        self.db.add(
+            MatchResult(
+                cv_id=second_cv.cv_id,
+                job_id=job.job_id,
+                application_id=second_application.application_id,
+                status="Success",
+                overall_score=42,
+                match_label="Weak Match",
+                algorithm_version="fitcv-deterministic-v1",
+            )
+        )
         self.db.commit()
         self.application_id = application.application_id
+        self.second_application_id = second_application.application_id
 
         self.current_account = self.manager
         app.dependency_overrides[get_db] = lambda: self.db
@@ -105,8 +140,13 @@ class PipelineApiIntegrationTests(unittest.TestCase):
     def test_lists_moves_and_records_history(self) -> None:
         listed = self.client.get("/api/hr/pipeline")
         self.assertEqual(listed.status_code, 200)
-        self.assertEqual(listed.json()[0]["candidate_name"], "Nguyen Minh")
-        self.assertEqual(listed.json()[0]["overall_score"], 88.0)
+        listed_by_id = {
+            item["application_id"]: item for item in listed.json()
+        }
+        self.assertEqual(
+            listed_by_id[self.application_id]["candidate_name"], "Nguyen Minh"
+        )
+        self.assertEqual(listed_by_id[self.application_id]["overall_score"], 88.0)
 
         moved = self.client.patch(
             f"/api/hr/pipeline/applications/{self.application_id}/stage",
@@ -137,7 +177,10 @@ class PipelineApiIntegrationTests(unittest.TestCase):
         self.assertEqual(len(notes.json()), 1)
 
         listed = self.client.get("/api/hr/pipeline")
-        self.assertEqual(listed.json()[0]["note_count"], 1)
+        listed_by_id = {
+            item["application_id"]: item for item in listed.json()
+        }
+        self.assertEqual(listed_by_id[self.application_id]["note_count"], 1)
 
     def test_company_scope_hides_other_applications(self) -> None:
         self.current_account = self.outsider
@@ -151,6 +194,55 @@ class PipelineApiIntegrationTests(unittest.TestCase):
         self.assertEqual(listed.status_code, 200)
         self.assertEqual(listed.json(), [])
         self.assertEqual(moved.status_code, 404)
+
+    def test_bulk_stage_update_changes_selected_applications(self) -> None:
+        updated = self.client.patch(
+            "/api/hr/pipeline/applications/bulk-stage",
+            json={
+                "application_ids": [
+                    self.application_id,
+                    self.second_application_id,
+                ],
+                "stage": "Interview",
+            },
+        )
+
+        self.assertEqual(updated.status_code, 200)
+        payload = updated.json()
+        self.assertEqual(
+            [item["application_id"] for item in payload["updated"]],
+            [self.application_id, self.second_application_id],
+        )
+        self.assertEqual(payload["skipped_application_ids"], [])
+        self.assertEqual(len(payload["history_ids"]), 2)
+
+        history = self.client.get(
+            f"/api/hr/pipeline/applications/{self.second_application_id}/history"
+        )
+        self.assertEqual(history.status_code, 200)
+        self.assertEqual(history.json()[0]["new_stage"], "Interview")
+
+    def test_bulk_stage_update_enforces_company_scope(self) -> None:
+        self.current_account = self.outsider
+
+        response = self.client.patch(
+            "/api/hr/pipeline/applications/bulk-stage",
+            json={"application_ids": [self.application_id], "stage": "Offer"},
+        )
+
+        self.assertEqual(response.status_code, 404)
+
+    def test_bulk_stage_update_reports_noop_ids(self) -> None:
+        response = self.client.patch(
+            "/api/hr/pipeline/applications/bulk-stage",
+            json={"application_ids": [self.application_id], "stage": "Applied"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["updated"], [])
+        self.assertEqual(
+            response.json()["skipped_application_ids"], [self.application_id]
+        )
 
     def test_terminal_stage_updates_recruitment_status(self) -> None:
         hired = self.client.patch(

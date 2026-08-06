@@ -1,6 +1,7 @@
 from pathlib import Path
 import asyncio
 import sys
+from contextlib import asynccontextmanager
 
 if __package__ in {None, ""}:
     sys.path.append(str(Path(__file__).resolve().parents[1]))
@@ -15,6 +16,7 @@ import uvicorn
 
 from app.api.routes import (
     analyzer,
+    ai_tasks,
     applications,
     auth,
     cv_ranking,
@@ -22,14 +24,33 @@ from app.api.routes import (
     email_webhooks,
     email_workflow,
     improvements,
+    job_search,
     jobs,
     pipeline,
     profile,
     reports,
 )
 from app.core.config import settings
+from app.services.ai_worker import run_worker
 
-app = FastAPI(title="FitCV API", version="0.1.0")
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    stop = asyncio.Event()
+    worker_task = (
+        asyncio.create_task(run_worker(stop))
+        if settings.ai_worker_enabled and "pytest" not in sys.modules
+        else None
+    )
+    try:
+        yield
+    finally:
+        if worker_task is not None:
+            stop.set()
+            await worker_task
+
+
+app = FastAPI(title="FitCV API", version="0.1.0", lifespan=lifespan)
 
 settings.upload_dir.mkdir(parents=True, exist_ok=True)
 app.mount("/uploads", StaticFiles(directory=settings.upload_dir), name="uploads")
@@ -43,7 +64,9 @@ app.add_middleware(
 )
 
 app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
+app.include_router(ai_tasks.router, prefix="/api/ai/tasks", tags=["ai-tasks"])
 app.include_router(analyzer.router, prefix="/api", tags=["cv-jd-analyzer"])
+app.include_router(job_search.router, prefix="/api", tags=["job-search"])
 app.include_router(applications.router, prefix="/api/applications", tags=["applications"])
 app.include_router(cv_ranking.router, prefix="/api/hr/cv-ranking", tags=["cv-ranking"])
 app.include_router(improvements.router, prefix="/api/match-results", tags=["improvement-reports"])

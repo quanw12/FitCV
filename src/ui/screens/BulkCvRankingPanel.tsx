@@ -1,4 +1,11 @@
-import { useEffect, useMemo, useRef, useState, type DragEvent } from "react"
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type DragEvent,
+} from "react"
 
 import {
   WarningCircle,
@@ -16,12 +23,19 @@ import {
   Sparkle,
   CloudArrowUp,
   UserCheck,
+  ClockCounterClockwise,
+  MagnifyingGlass,
   X,
 } from "@phosphor-icons/react"
 
 import { cvRankingApi } from "@/api/cvRankingApi"
 
-import type { BatchParseCvResponse, ParsedCvCandidate } from "@/types/cvRanking"
+import type {
+  BatchParseCvResponse,
+  ParsedCvCandidate,
+  ScreeningBatchStatus,
+  ScreeningBatchSummary,
+} from "@/types/cvRanking"
 
 import ScoreRing from "../components/ScoreRing"
 
@@ -97,22 +111,88 @@ export default function BulkCvRankingPanel() {
 
   const [fileError, setFileError] = useState("")
 
+  const [history, setHistory] = useState<ScreeningBatchSummary[]>([])
+
+  const [historyQuery, setHistoryQuery] = useState("")
+
+  const [historyStatus, setHistoryStatus] =
+    useState<ScreeningBatchStatus | "">("")
+
+  const [historyMinScore, setHistoryMinScore] = useState("")
+
+  const [historyCreatedFrom, setHistoryCreatedFrom] = useState("")
+
+  const [historyCreatedTo, setHistoryCreatedTo] = useState("")
+
+  const [historyLoading, setHistoryLoading] = useState(false)
+
   const selectedFile =
     selectedCandidate != null ? files[selectedCandidate.sourceIndex] : undefined
 
   useEffect(() => {
-    if (!selectedFile) {
-      setPreviewUrl("")
-
-      return
+    let active = true
+    let objectUrl = ""
+    const load = async () => {
+      if (selectedFile) {
+        objectUrl = URL.createObjectURL(selectedFile)
+      } else if (
+        result?.batchId &&
+        selectedCandidate?.screeningCandidateId
+      ) {
+        const blob = await cvRankingApi.getBatchCandidateCv(
+          result.batchId,
+          selectedCandidate.screeningCandidateId,
+        )
+        objectUrl = URL.createObjectURL(blob)
+      }
+      if (active) setPreviewUrl(objectUrl)
     }
+    setPreviewUrl("")
+    void load().catch((cause) => {
+      if (active) {
+        setError(
+          cause instanceof Error ? cause.message : "Unable to load this CV.",
+        )
+      }
+    })
+    return () => {
+      active = false
+      if (objectUrl) URL.revokeObjectURL(objectUrl)
+    }
+  }, [result?.batchId, selectedCandidate, selectedFile])
 
-    const url = URL.createObjectURL(selectedFile)
+  const loadHistory = useCallback(async () => {
+    setHistoryLoading(true)
+    try {
+      setHistory(
+        await cvRankingApi.listBatches({
+          query: historyQuery.trim() || undefined,
+          status: historyStatus,
+          minScore: historyMinScore ? Number(historyMinScore) : undefined,
+          createdFrom: historyCreatedFrom || undefined,
+          createdTo: historyCreatedTo || undefined,
+        }),
+      )
+    } catch (cause) {
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : "Unable to load screening history.",
+      )
+    } finally {
+      setHistoryLoading(false)
+    }
+  }, [
+    historyCreatedFrom,
+    historyCreatedTo,
+    historyMinScore,
+    historyQuery,
+    historyStatus,
+  ])
 
-    setPreviewUrl(url)
-
-    return () => URL.revokeObjectURL(url)
-  }, [selectedFile])
+  useEffect(() => {
+    void loadHistory()
+  }, [loadHistory])
 
   const addFiles = (incoming: File[]) => {
     setFileError("")
@@ -205,9 +285,23 @@ export default function BulkCvRankingPanel() {
 
       setSelectedCandidate(response.candidates[0] ?? null)
 
-      setSelectedIds(new Set())
+      setSelectedIds(
+        new Set(
+          response.candidates
+            .filter((candidate) => candidate.isSelected)
+            .map((candidate) => candidate.id),
+        ),
+      )
 
-      setConfirmedIds(new Set())
+      setConfirmedIds(
+        new Set(
+          response.candidates
+            .filter((candidate) => candidate.isConfirmed)
+            .map((candidate) => candidate.id),
+        ),
+      )
+
+      void loadHistory()
     } catch (cause) {
       setResult(null)
 
@@ -219,31 +313,95 @@ export default function BulkCvRankingPanel() {
     }
   }
 
+  const persistSelection = (
+    nextSelected: Set<string>,
+    nextConfirmed: Set<string>,
+  ) => {
+    if (!result?.batchId) return
+    void cvRankingApi
+      .saveBatchSelection(
+        result.batchId,
+        Array.from(nextSelected),
+        Array.from(nextConfirmed),
+      )
+      .then(() => void loadHistory())
+      .catch((cause) =>
+        setError(
+          cause instanceof Error
+            ? cause.message
+            : "Unable to save screening selection.",
+        ),
+      )
+  }
+
   const toggleCandidate = (candidateId: string) => {
-    setSelectedIds((current) => {
-      const next = new Set(current)
+    const next = new Set(selectedIds)
 
-      if (next.has(candidateId)) next.delete(candidateId)
-      else next.add(candidateId)
+    if (next.has(candidateId)) next.delete(candidateId)
+    else next.add(candidateId)
 
-      return next
-    })
-
-    setConfirmedIds(new Set())
+    const nextConfirmed = new Set<string>()
+    setSelectedIds(next)
+    setConfirmedIds(nextConfirmed)
+    persistSelection(next, nextConfirmed)
   }
 
   const selectByThreshold = () => {
-    setSelectedIds(
-      new Set(
-        (result?.candidates ?? [])
+    const next = new Set(
+      (result?.candidates ?? [])
 
-          .filter((candidate) => candidate.score >= threshold)
+        .filter((candidate) => candidate.score >= threshold)
 
-          .map((candidate) => candidate.id),
-      ),
+        .map((candidate) => candidate.id),
     )
+    const nextConfirmed = new Set<string>()
+    setSelectedIds(next)
+    setConfirmedIds(nextConfirmed)
+    persistSelection(next, nextConfirmed)
+  }
 
-    setConfirmedIds(new Set())
+  const clearSelection = () => {
+    const empty = new Set<string>()
+    setSelectedIds(empty)
+    setConfirmedIds(empty)
+    persistSelection(empty, empty)
+  }
+
+  const confirmSelection = () => {
+    const confirmed = new Set(selectedIds)
+    setConfirmedIds(confirmed)
+    persistSelection(selectedIds, confirmed)
+  }
+
+  const openHistoryBatch = async (batchId: number) => {
+    setBusy(true)
+    setError("")
+    try {
+      const response = await cvRankingApi.getBatch(batchId)
+      setFiles([])
+      setResult(response)
+      setSelectedCandidate(response.candidates[0] ?? null)
+      setSelectedIds(
+        new Set(
+          response.candidates
+            .filter((candidate) => candidate.isSelected)
+            .map((candidate) => candidate.id),
+        ),
+      )
+      setConfirmedIds(
+        new Set(
+          response.candidates
+            .filter((candidate) => candidate.isConfirmed)
+            .map((candidate) => candidate.id),
+        ),
+      )
+    } catch (cause) {
+      setError(
+        cause instanceof Error ? cause.message : "Unable to open this batch.",
+      )
+    } finally {
+      setBusy(false)
+    }
   }
 
   const confirmedCandidates = useMemo(
@@ -271,6 +429,150 @@ export default function BulkCvRankingPanel() {
             Screen an uploaded candidate batch against the JD supplied by HR.
           </p>
         </div>
+      </div>
+
+      <div style={{ marginBottom: 18 }}>
+        <BezelCard>
+          <section aria-labelledby="screening-history-title">
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 12,
+                flexWrap: "wrap",
+                padding: "14px 18px",
+                borderBottom: "1px solid var(--border)",
+              }}
+            >
+              <div className="fc-section-title">
+                <ClockCounterClockwise size={17} />
+                <h2 id="screening-history-title" style={{ fontSize: 16 }}>
+                  Screening history
+                </h2>
+              </div>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <label style={{ position: "relative" }}>
+                  <MagnifyingGlass
+                    size={14}
+                    style={{ position: "absolute", left: 10, top: 11 }}
+                  />
+                  <input
+                    className="fc-input"
+                    aria-label="Search screening history"
+                    value={historyQuery}
+                    onChange={(event) => setHistoryQuery(event.target.value)}
+                    placeholder="Search JD or batch"
+                    style={{ width: 220, paddingLeft: 30 }}
+                  />
+                </label>
+                <select
+                  className="fc-input"
+                  aria-label="Filter screening status"
+                  value={historyStatus}
+                  onChange={(event) =>
+                    setHistoryStatus(
+                      event.target.value as ScreeningBatchStatus | "",
+                    )
+                  }
+                  style={{ width: 150 }}
+                >
+                  <option value="">All statuses</option>
+                  {[
+                    "Pending",
+                    "Processing",
+                    "Completed",
+                    "Partial",
+                    "Failed",
+                  ].map((value) => (
+                    <option key={value} value={value}>
+                      {value}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  className="fc-input"
+                  type="number"
+                  min={0}
+                  max={100}
+                  aria-label="Minimum screening score"
+                  value={historyMinScore}
+                  onChange={(event) => setHistoryMinScore(event.target.value)}
+                  placeholder="Min score"
+                  style={{ width: 112 }}
+                />
+                <input
+                  className="fc-input"
+                  type="date"
+                  aria-label="Screening history from date"
+                  value={historyCreatedFrom}
+                  onChange={(event) => setHistoryCreatedFrom(event.target.value)}
+                  style={{ width: 150 }}
+                />
+                <input
+                  className="fc-input"
+                  type="date"
+                  aria-label="Screening history to date"
+                  value={historyCreatedTo}
+                  onChange={(event) => setHistoryCreatedTo(event.target.value)}
+                  style={{ width: 150 }}
+                />
+              </div>
+            </div>
+            <div style={{ overflowX: "auto" }}>
+              <table className="fc-table" style={{ minWidth: 720 }}>
+                <thead>
+                  <tr>
+                    <th>Batch</th>
+                    <th>Status</th>
+                    <th>Processed</th>
+                    <th>Confirmed</th>
+                    <th>Created</th>
+                    <th aria-label="Open batch" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {history.map((batch) => (
+                    <tr key={batch.screeningBatchId}>
+                      <td>
+                        <strong>{batch.title}</strong>
+                      </td>
+                      <td>{batch.status}</td>
+                      <td>
+                        {batch.processedCount}/{batch.totalFiles}
+                      </td>
+                      <td>{batch.selectedCount}</td>
+                      <td>{new Date(batch.createdAt).toLocaleString()}</td>
+                      <td>
+                        <button
+                          type="button"
+                          className="fc-btn fc-btn--secondary"
+                          onClick={() =>
+                            void openHistoryBatch(batch.screeningBatchId)
+                          }
+                        >
+                          Open
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                  {!historyLoading && history.length === 0 && (
+                    <tr>
+                      <td colSpan={6} style={{ color: "var(--text-muted)" }}>
+                        No saved screening batches match these filters.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+            {historyLoading && (
+              <div style={{ padding: 14, color: "var(--text-muted)" }}>
+                Loading screening history...
+              </div>
+            )}
+          </section>
+        </BezelCard>
       </div>
 
       <div style={{ marginBottom: 18 }}>
@@ -675,11 +977,7 @@ export default function BulkCvRankingPanel() {
                   <button
                     type="button"
                     className="fc-btn fc-btn--secondary"
-                    onClick={() => {
-                      setSelectedIds(new Set())
-
-                      setConfirmedIds(new Set())
-                    }}
+                    onClick={clearSelection}
                     disabled={selectedIds.size === 0}
                   >
                     Clear
@@ -687,7 +985,7 @@ export default function BulkCvRankingPanel() {
                   <button
                     type="button"
                     className="fc-btn fc-btn--primary"
-                    onClick={() => setConfirmedIds(new Set(selectedIds))}
+                    onClick={confirmSelection}
                     disabled={selectedIds.size === 0}
                     style={{ marginLeft: "auto" }}
                   >

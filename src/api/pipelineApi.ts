@@ -1,6 +1,7 @@
 import { requestJson } from "./httpClient"
 import type {
   PipelineApplication,
+  PipelineBulkStageUpdateResult,
   PipelineNote,
   PipelineStage,
   PipelineStageHistory,
@@ -19,6 +20,18 @@ export const pipelineApi = {
         authenticated: true,
         method: "PATCH",
         body: JSON.stringify({ stage }),
+      },
+    ),
+  bulkMoveStage: (applicationIds: number[], stage: PipelineStage) =>
+    requestJson<PipelineBulkStageUpdateResult>(
+      "/api/hr/pipeline/applications/bulk-stage",
+      {
+        authenticated: true,
+        method: "PATCH",
+        body: JSON.stringify({
+          application_ids: applicationIds,
+          stage,
+        }),
       },
     ),
   listNotes: (applicationId: number) =>

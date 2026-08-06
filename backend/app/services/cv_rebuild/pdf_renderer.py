@@ -5,13 +5,14 @@ import threading
 from io import BytesIO
 
 from PIL import Image
+from pypdf import PdfReader
 
 THUMBNAIL_WIDTH = 300
 THUMBNAIL_JPEG_QUALITY = 80
 
 _PDF_KWARGS = {
     "format": "A4",
-    "margin": {"top": "0", "right": "0", "bottom": "0", "left": "0"},
+    "margin": {"top": "0.6in", "right": "0.65in", "bottom": "0.5in", "left": "0.65in"},
     "print_background": True,
 }
 
@@ -86,6 +87,7 @@ def render_pdf_with_thumbnail(html: str) -> tuple[bytes, bytes]:
         try:
             page = context.new_page()
             page.set_content(html, wait_until="load")
+            page.evaluate("document.fonts.ready.then(() => true)")
             pdf_bytes = page.pdf(**_PDF_KWARGS)
             screenshot = page.screenshot(full_page=False, type="png")
         finally:
@@ -95,3 +97,11 @@ def render_pdf_with_thumbnail(html: str) -> tuple[bytes, bytes]:
     except Exception as exc:
         raise PdfRenderError(f"PDF rendering failed: {exc}") from exc
     return pdf_bytes, resize_thumbnail(screenshot)
+
+
+def count_pdf_pages(pdf_bytes: bytes) -> int:
+    """Return the number of pages in a PDF, or 0 when it cannot be read."""
+    try:
+        return len(PdfReader(BytesIO(pdf_bytes)).pages)
+    except Exception:
+        return 0

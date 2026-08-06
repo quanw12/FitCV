@@ -1,5 +1,6 @@
 import type { CvRebuildData, CvRebuildResponse } from "@/types/cvRebuild"
 
+import { API_BASE_URL } from "./config"
 import { requestJson } from "./httpClient"
 
 export interface CvBuildPayload {
@@ -42,8 +43,12 @@ export async function profileAvatarDataUrl(
 
   if (avatarUrl.startsWith("data:image/")) return avatarUrl
 
+  const absoluteUrl = avatarUrl.startsWith("http")
+    ? avatarUrl
+    : `${API_BASE_URL}${avatarUrl}`
+
   try {
-    const response = await fetch(avatarUrl)
+    const response = await fetch(absoluteUrl)
 
     if (!response.ok) return null
 

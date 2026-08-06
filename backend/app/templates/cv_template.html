@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="{{ language }}">
 <head>
 <meta charset="utf-8" />
 <title>CV</title>
@@ -12,7 +12,7 @@
     color: #000;
     background: #fff;
   }
-  .page { padding: 0.6in 0.65in 0.5in; }
+  /* Print margins are set via Playwright _PDF_KWARGS; no .page padding. */
 
   header.cv-header {
     text-align: center;
@@ -45,7 +45,6 @@
 
   section.cv-section {
     margin-bottom: 12pt;
-    page-break-inside: avoid;
   }
   section.cv-section h2 {
     font-size: 11pt;
@@ -55,8 +54,11 @@
     border-bottom: 0.75pt solid #000;
     padding-bottom: 2pt;
     margin-bottom: 6pt;
+    break-after: avoid;
   }
   section.cv-section p { margin-bottom: 3pt; }
+
+  p, li { orphans: 3; widows: 3; }
 
   .entry {
     margin-bottom: 8pt;
@@ -79,7 +81,9 @@
     flex-shrink: 0;
     text-align: right;
     font-size: 10pt;
-    white-space: nowrap;
+    max-width: 40%;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
   }
 
   ul.bullets {
@@ -103,7 +107,7 @@
     font-size: 10pt;
   }
 
-  @page { size: A4; margin: 0; }
+  @page { size: A4; }
 </style>
 </head>
 <body>
@@ -130,14 +134,16 @@
   </header>
   {% endif %}
 
-  {% if data.summary %}
+  {% for section in section_order %}
+
+  {% if section == "profile" and data.summary %}
   <section class="cv-section">
     <h2>{{ headings.profile }}</h2>
     <p>{{ data.summary }}</p>
   </section>
   {% endif %}
 
-  {% if data.core_competencies %}
+  {% if section == "core_competencies" and data.core_competencies %}
   <section class="cv-section">
     <h2>{{ headings.core_competencies }}</h2>
     <ul class="bullets">
@@ -148,7 +154,7 @@
   </section>
   {% endif %}
 
-  {% if data.education %}
+  {% if section == "education" and data.education %}
   <section class="cv-section">
     <h2>{{ headings.education }}</h2>
     {% for education in data.education %}
@@ -165,7 +171,7 @@
   </section>
   {% endif %}
 
-  {% if data.experience %}
+  {% if section == "experience" and data.experience %}
   <section class="cv-section">
     <h2>{{ headings.experience }}</h2>
     {% for item in data.experience %}
@@ -187,7 +193,7 @@
   </section>
   {% endif %}
 
-  {% if data.projects %}
+  {% if section == "projects" and data.projects %}
   <section class="cv-section">
     <h2>{{ headings.projects }}</h2>
     {% for project in data.projects %}
@@ -198,6 +204,11 @@
         </div>
       </div>
       {% if project.description %}<p>{{ project.description | linkify }}</p>{% endif %}
+      {% if project.bullets %}
+      <ul class="bullets">
+        {% for bullet in project.bullets %}<li>{{ bullet }}</li>{% endfor %}
+      </ul>
+      {% endif %}
       {% if project.links %}
       <p class="project-links">
         {% for link in project.links %}
@@ -210,7 +221,7 @@
   </section>
   {% endif %}
 
-  {% if data.languages %}
+  {% if section == "languages" and data.languages %}
   <section class="cv-section">
     <h2>{{ headings.languages }}</h2>
     {% for language in data.languages %}
@@ -219,7 +230,7 @@
   </section>
   {% endif %}
 
-  {% if data.certifications %}
+  {% if section == "certifications" and data.certifications %}
   <section class="cv-section">
     <h2>{{ headings.certifications }}</h2>
     <ul class="bullets">
@@ -228,7 +239,7 @@
   </section>
   {% endif %}
 
-  {% if data.publications %}
+  {% if section == "publications" and data.publications %}
   <section class="cv-section">
     <h2>{{ headings.publications }}</h2>
     {% for publication in data.publications %}
@@ -245,7 +256,7 @@
   </section>
   {% endif %}
 
-  {% if data.awards %}
+  {% if section == "awards" and data.awards %}
   <section class="cv-section">
     <h2>{{ headings.awards }}</h2>
     <ul class="bullets">
@@ -254,6 +265,7 @@
   </section>
   {% endif %}
 
+  {% if section == "technical_skills" %}
   {% if data.skill_groups %}
   <section class="cv-section">
     <h2>{{ headings.technical_skills }}</h2>
@@ -269,6 +281,9 @@
     </ul>
   </section>
   {% endif %}
+  {% endif %}
+
+  {% endfor %}
 </div>
 </body>
 </html>

@@ -15,6 +15,8 @@ export interface CvRebuildProjectItem {
 
   description: string
 
+  bullets: string[]
+
   links: CvRebuildLinkItem[]
 }
 
@@ -98,4 +100,6 @@ export interface CvRebuildResponse {
   pdf_base64: string
 
   thumbnail_base64: string
+
+  warnings: string[]
 }

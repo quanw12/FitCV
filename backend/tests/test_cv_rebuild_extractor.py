@@ -2,6 +2,7 @@ import pytest
 
 from app.schemas.cv_rebuild import CVData
 from app.services.cv_rebuild.llm_extractor import CvExtractionError, CvExtractor
+from app.services.cv_rebuild.prompts import build_polish_prompt
 from app.services.gemini_client import GeminiClientError
 
 
@@ -40,7 +41,21 @@ ENTERED_CV = CVData(
     experience=[
         {"title": "Engineer", "company": "Acme", "date": "2020-2023", "bullets": ["Built APIs."]}
     ],
+    skills=["Python"],
 )
+
+
+class TestPolishPrompt:
+    def test_polish_prompt_includes_jd_when_provided(self) -> None:
+        prompt = build_polish_prompt(
+            '{"name": "A"}', "en", jd_text="Backend role with Redis"
+        )
+        assert "<jd_text>" in prompt
+        assert "Redis" in prompt
+
+    def test_polish_prompt_omits_jd_by_default(self) -> None:
+        prompt = build_polish_prompt('{"name": "A"}', "en")
+        assert "<jd_text>" not in prompt
 
 
 class TestExtract:
@@ -101,16 +116,17 @@ class TestExtract:
 class TestPolish:
     def test_polish_returns_cvdata_with_language_prompt(self) -> None:
         client = FakeGeminiClient([VALID_PAYLOAD])
-        cv = CvExtractor(client=client).polish(
+        cv, warnings = CvExtractor(client=client).polish(
             ENTERED_CV, language="vi"
         )
         assert cv.name == "Nguyen Van A"
+        assert warnings == []
         assert "Vietnamese" in client.prompts[0]
         assert '"name":"B"' in client.prompts[0]
 
     def test_polish_retries_on_invalid_payload(self) -> None:
         client = FakeGeminiClient([{"skills": "Python"}, VALID_PAYLOAD])
-        CvExtractor(client=client).polish(ENTERED_CV)
+        cv, warnings = CvExtractor(client=client).polish(ENTERED_CV)
         assert len(client.prompts) == 2
         assert "Previous attempt" in client.prompts[1]
 
@@ -134,7 +150,7 @@ class TestPolish:
         invented = copy.deepcopy(VALID_PAYLOAD)
         invented["experience"][0]["bullets"] = ["Cut API latency by 42%."]
         client = FakeGeminiClient([invented, VALID_PAYLOAD])
-        cv = CvExtractor(client=client).polish(ENTERED_CV)
+        cv, warnings = CvExtractor(client=client).polish(ENTERED_CV)
         assert cv.experience[0].bullets == ["Built APIs."]
         assert len(client.prompts) == 2
         assert "42" in client.prompts[1]
@@ -154,6 +170,7 @@ class TestPolish:
                 ],
                 "projects": [{"name": "FitCV", "description": "AI CV screening."}],
                 "awards": ["Dean's List 2024"],
+                "skills": ["Python"],
             }
         )
         dropped = dict(VALID_PAYLOAD)
@@ -163,7 +180,7 @@ class TestPolish:
         fixed["projects"] = [{"name": "FitCV", "description": "AI CV screening."}]
         fixed["awards"] = ["Dean's List 2024"]
         client = FakeGeminiClient([dropped, fixed])
-        CvExtractor(client=client).polish(entered)
+        cv, warnings = CvExtractor(client=client).polish(entered)
         assert len(client.prompts) == 2
         assert "projects" in client.prompts[1]
         assert "awards" in client.prompts[1]

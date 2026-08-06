@@ -6,6 +6,8 @@ import type {
   BatchParseCvResponse,
   ParsedCvCandidate,
   RankedApplication,
+  ScreeningBatchStatus,
+  ScreeningBatchSummary,
 } from "@/types/cvRanking"
 
 import { requestJson } from "./httpClient"
@@ -62,6 +64,12 @@ interface BackendParsedCandidate {
   weaknesses: string[]
 
   parse_notes: string[]
+
+  screening_candidate_id?: number | null
+
+  is_selected?: boolean
+
+  is_confirmed?: boolean
 }
 
 interface BackendBatchParseResponse {
@@ -72,6 +80,31 @@ interface BackendBatchParseResponse {
   candidates: BackendParsedCandidate[]
 
   warnings: string[]
+
+  screening_batch_id?: number | null
+
+  ai_task_id?: number | null
+
+  status?: ScreeningBatchStatus | null
+
+  title?: string | null
+
+  created_at?: string | null
+
+  total_files?: number | null
+
+  processed_count?: number | null
+}
+
+interface BackendScreeningBatchSummary {
+  screening_batch_id: number
+  title: string
+  status: ScreeningBatchStatus
+  total_files: number
+  processed_count: number
+  selected_count: number
+  created_at: string
+  completed_at?: string | null
 }
 
 async function requestBlob(path: string, fallback: string): Promise<Blob> {
@@ -80,6 +113,7 @@ async function requestBlob(path: string, fallback: string): Promise<Blob> {
   const token = authApi.getSession()?.accessToken
 
   const response = await fetch(`${API_BASE_URL}${path}`, {
+    credentials: "include",
     headers: token ? { Authorization: `Bearer ${token}` } : undefined,
   })
 
@@ -149,8 +183,33 @@ function normalizeCandidate(
     weaknesses: candidate.weaknesses,
 
     parseNotes: candidate.parse_notes,
+
+    screeningCandidateId: candidate.screening_candidate_id,
+
+    isSelected: candidate.is_selected ?? false,
+
+    isConfirmed: candidate.is_confirmed ?? false,
   }
 }
+
+function normalizeBatch(payload: BackendBatchParseResponse): BatchParseCvResponse {
+  return {
+    requiredSkills: payload.required_skills,
+    preferredSkills: payload.preferred_skills,
+    candidates: payload.candidates.map(normalizeCandidate),
+    warnings: payload.warnings,
+    batchId: payload.screening_batch_id,
+    taskId: payload.ai_task_id,
+    status: payload.status,
+    title: payload.title,
+    createdAt: payload.created_at,
+    totalFiles: payload.total_files,
+    processedCount: payload.processed_count,
+  }
+}
+
+const delay = (milliseconds: number) =>
+  new Promise((resolve) => window.setTimeout(resolve, milliseconds))
 
 export const cvRankingApi = {
   listApplications: (jobId: number) =>
@@ -174,6 +233,73 @@ export const cvRankingApi = {
       "Unable to download the job CV archive.",
     ),
 
+  async listBatches(filters?: {
+    query?: string
+    status?: ScreeningBatchStatus | ""
+    minScore?: number
+    createdFrom?: string
+    createdTo?: string
+  }): Promise<ScreeningBatchSummary[]> {
+    const params = new URLSearchParams()
+    if (filters?.query) params.set("q", filters.query)
+    if (filters?.status) params.set("status", filters.status)
+    if (filters?.minScore != null)
+      params.set("min_score", String(filters.minScore))
+    if (filters?.createdFrom)
+      params.set("created_from", `${filters.createdFrom}T00:00:00`)
+    if (filters?.createdTo)
+      params.set("created_to", `${filters.createdTo}T23:59:59`)
+    const suffix = params.size ? `?${params.toString()}` : ""
+    const rows = await requestJson<BackendScreeningBatchSummary[]>(
+      `/api/hr/cv-ranking/batches${suffix}`,
+      { authenticated: true },
+    )
+    return rows.map((row) => ({
+      screeningBatchId: row.screening_batch_id,
+      title: row.title,
+      status: row.status,
+      totalFiles: row.total_files,
+      processedCount: row.processed_count,
+      selectedCount: row.selected_count,
+      createdAt: row.created_at,
+      completedAt: row.completed_at,
+    }))
+  },
+
+  async getBatch(batchId: number): Promise<BatchParseCvResponse> {
+    const payload = await requestJson<BackendBatchParseResponse>(
+      `/api/hr/cv-ranking/batches/${batchId}`,
+      { authenticated: true },
+    )
+    return normalizeBatch(payload)
+  },
+
+  async saveBatchSelection(
+    batchId: number,
+    selectedIds: string[],
+    confirmedIds: string[],
+  ): Promise<BatchParseCvResponse> {
+    const payload = await requestJson<BackendBatchParseResponse>(
+      `/api/hr/cv-ranking/batches/${batchId}/selection`,
+      {
+        method: "PATCH",
+        authenticated: true,
+        body: JSON.stringify({
+          selected_candidate_keys: selectedIds,
+          confirmed_candidate_keys: confirmedIds,
+        }),
+      },
+    )
+    return normalizeBatch(payload)
+  },
+
+  getBatchCandidateCv(batchId: number, candidateId: number) {
+    return requestBlob(
+      `/api/hr/cv-ranking/batches/${batchId}/candidates/${candidateId}/cv`,
+      "Unable to load this screening CV.",
+    )
+  },
+
   async parseBatch(
     files: File[],
 
@@ -192,6 +318,8 @@ export const cvRankingApi = {
     const response = await fetch(`${API_BASE_URL}/api/hr/cv-ranking/parse`, {
       method: "POST",
 
+      credentials: "include",
+
       headers: token ? { Authorization: `Bearer ${token}` } : undefined,
 
       body: formData,
@@ -208,16 +336,24 @@ export const cvRankingApi = {
       )
     }
 
-    const payload = (await response.json()) as BackendBatchParseResponse
-
-    return {
-      requiredSkills: payload.required_skills,
-
-      preferredSkills: payload.preferred_skills,
-
-      candidates: payload.candidates.map(normalizeCandidate),
-
-      warnings: payload.warnings,
+    let payload = normalizeBatch(
+      (await response.json()) as BackendBatchParseResponse,
+    )
+    if (!payload.batchId) return payload
+    const batchId = payload.batchId
+    const deadline = Date.now() + 10 * 60 * 1000
+    while (
+      payload.status === "Pending" ||
+      payload.status === "Processing"
+    ) {
+      if (Date.now() >= deadline) {
+        throw new Error(
+          "Screening is still processing. Open it from screening history later.",
+        )
+      }
+      await delay(1200)
+      payload = await cvRankingApi.getBatch(batchId)
     }
+    return payload
   },
 }

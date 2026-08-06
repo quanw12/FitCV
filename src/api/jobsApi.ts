@@ -26,6 +26,11 @@ export const jobsApi = {
       authenticated: true,
     }),
 
+  preview: (jobId: number) =>
+    requestJson<JobPost>(`/api/jobs/${jobId}/preview`, {
+      authenticated: true,
+    }),
+
   create: (payload: JobWrite) =>
     requestJson<JobPost>("/api/jobs", {
       authenticated: true,
@@ -48,6 +53,18 @@ export const jobsApi = {
 
   close: (jobId: number) =>
     requestJson<JobPost>(`/api/jobs/${jobId}/close`, {
+      authenticated: true,
+      method: "POST",
+    }),
+
+  reopen: (jobId: number) =>
+    requestJson<JobPost>(`/api/jobs/${jobId}/reopen`, {
+      authenticated: true,
+      method: "POST",
+    }),
+
+  duplicate: (jobId: number) =>
+    requestJson<JobPost>(`/api/jobs/${jobId}/duplicate`, {
       authenticated: true,
       method: "POST",
     }),

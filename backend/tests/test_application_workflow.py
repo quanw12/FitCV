@@ -138,6 +138,31 @@ class ApplicationValidationTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(caught.exception.status_code, 404)
         upload.read.assert_not_awaited()
 
+    async def test_rejects_closed_job_before_reading_file(self):
+        account = SimpleNamespace(account_id=4)
+        upload = SimpleNamespace(filename="resume.pdf", read=AsyncMock())
+        with (
+            patch.object(application_service.applications, "lock_account"),
+            patch.object(
+                application_service.applications,
+                "job_for_apply",
+                return_value=job(status="Closed"),
+            ),
+        ):
+            with self.assertRaises(HTTPException) as caught:
+                await application_service.apply(
+                    MagicMock(),
+                    job_id=7,
+                    full_name="Student",
+                    email="s@example.com",
+                    phone="0900",
+                    file=upload,
+                    account=account,
+                )
+        self.assertEqual(caught.exception.status_code, 409)
+        self.assertIn("published jobs", caught.exception.detail)
+        upload.read.assert_not_awaited()
+
 
 class JobDocumentTests(unittest.TestCase):
     def test_job_text_contains_only_candidate_scoring_content(self):

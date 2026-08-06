@@ -14,6 +14,7 @@ from app.schemas.jobs import (
     JobUpdate,
 )
 from app.services import application_service, job_extraction_service, jobs_service
+from app.services import ai_task_service
 
 router = APIRouter()
 student = require_role(AccountRole.student)
@@ -62,7 +63,17 @@ async def apply_to_job(
         file=file,
         account=account,
     )
-    background_tasks.add_task(application_service.run_analysis, response.application_id)
+    ai_task_service.enqueue(
+        db,
+        task_type="ApplicationAnalysis",
+        resource_id=response.application_id,
+        account=account,
+        idempotency_key=f"application-analysis:{response.application_id}",
+    )
+    if ai_task_service.should_eager_execute():
+        background_tasks.add_task(
+            application_service.run_analysis, response.application_id
+        )
     return response
 
 
@@ -73,6 +84,15 @@ def list_manage(
     account: Account = Depends(manager),
 ):
     return jobs_service.list_managed(db, account, archived=archived)
+
+
+@router.get("/{job_id}/preview", response_model=JobResponse)
+def preview_job(
+    job_id: int,
+    db: Session = Depends(get_db),
+    account: Account = Depends(manager),
+):
+    return jobs_service.preview(db, account, job_id)
 
 
 @router.post("", response_model=JobResponse, status_code=201)
@@ -93,6 +113,16 @@ def publish_job(job_id: int, db: Session = Depends(get_db), account: Account = D
 @router.post("/{job_id}/close", response_model=JobResponse)
 def close_job(job_id: int, db: Session = Depends(get_db), account: Account = Depends(manager)):
     return jobs_service.close(db, account, job_id)
+
+
+@router.post("/{job_id}/reopen", response_model=JobResponse)
+def reopen_job(job_id: int, db: Session = Depends(get_db), account: Account = Depends(manager)):
+    return jobs_service.reopen(db, account, job_id)
+
+
+@router.post("/{job_id}/duplicate", response_model=JobResponse, status_code=201)
+def duplicate_job(job_id: int, db: Session = Depends(get_db), account: Account = Depends(manager)):
+    return jobs_service.duplicate(db, account, job_id)
 
 
 @router.post("/{job_id}/archive", response_model=JobResponse)

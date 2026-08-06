@@ -52,6 +52,8 @@ const stages: PipelineStage[] = [
   "Rejected",
 ]
 
+type ScoreFilter = "all" | "strong" | "moderate" | "weak" | "pending"
+
 const stageColors: Record<PipelineStage, {
   dot: string
   text: string
@@ -186,6 +188,10 @@ export default function PipelineScreen() {
   const [applications, setApplications] = useState<PipelineApplication[]>([])
   const [jobs, setJobs] = useState<JobPost[]>([])
   const [selectedJobId, setSelectedJobId] = useState<number | undefined>()
+  const [stageFilter, setStageFilter] = useState<PipelineStage | "all">("all")
+  const [scoreFilter, setScoreFilter] = useState<ScoreFilter>("all")
+  const [selectedIds, setSelectedIds] = useState<number[]>([])
+  const [bulkStage, setBulkStage] = useState<PipelineStage>("Screening")
   const [selected, setSelected] = useState<PipelineApplication | null>(null)
   const [activeCard, setActiveCard] = useState<PipelineApplication | null>(null)
   const [notes, setNotes] = useState<PipelineNote[]>([])
@@ -194,6 +200,7 @@ export default function PipelineScreen() {
   const [loading, setLoading] = useState(true)
   const [detailLoading, setDetailLoading] = useState(false)
   const [movingId, setMovingId] = useState<number | null>(null)
+  const [bulkMoving, setBulkMoving] = useState(false)
   const [savingNote, setSavingNote] = useState(false)
   const [error, setError] = useState("")
   const [detailError, setDetailError] = useState("")
@@ -225,15 +232,68 @@ export default function PipelineScreen() {
     void load()
   }, [load])
 
+  useEffect(() => {
+    const availableIds = new Set(applications.map((item) => item.application_id))
+    setSelectedIds((current) =>
+      current.filter((applicationId) => availableIds.has(applicationId)),
+    )
+  }, [applications])
+
+  const visibleApplications = useMemo(
+    () =>
+      applications.filter((application) => {
+        if (
+          stageFilter !== "all" &&
+          application.current_stage !== stageFilter
+        ) {
+          return false
+        }
+        if (scoreFilter === "pending") return application.overall_score == null
+        if (application.overall_score == null) return false
+        if (scoreFilter === "strong") return application.overall_score >= 80
+        if (scoreFilter === "moderate") {
+          return application.overall_score >= 50 && application.overall_score < 80
+        }
+        if (scoreFilter === "weak") return application.overall_score < 50
+        return true
+      }),
+    [applications, scoreFilter, stageFilter],
+  )
+
+  const visibleIds = useMemo(
+    () => visibleApplications.map((application) => application.application_id),
+    [visibleApplications],
+  )
+
+  const allVisibleSelected =
+    visibleIds.length > 0 && visibleIds.every((id) => selectedIds.includes(id))
+
+  const toggleSelection = (applicationId: number) => {
+    setSelectedIds((current) =>
+      current.includes(applicationId)
+        ? current.filter((id) => id !== applicationId)
+        : [...current, applicationId],
+    )
+  }
+
+  const toggleAllVisible = () => {
+    setSelectedIds((current) => {
+      if (allVisibleSelected) {
+        return current.filter((id) => !visibleIds.includes(id))
+      }
+      return [...new Set([...current, ...visibleIds])]
+    })
+  }
+
   const grouped = useMemo(
     () =>
       Object.fromEntries(
         stages.map((stage) => [
           stage,
-          applications.filter((item) => item.current_stage === stage),
+          visibleApplications.filter((item) => item.current_stage === stage),
         ]),
       ) as Record<PipelineStage, PipelineApplication[]>,
-    [applications],
+    [visibleApplications],
   )
 
   const openDetails = async (application: PipelineApplication) => {
@@ -300,6 +360,48 @@ export default function PipelineScreen() {
       }
     } finally {
       setMovingId(null)
+    }
+  }
+
+  const bulkMove = async () => {
+    if (selectedIds.length === 0 || bulkMoving) return
+    setBulkMoving(true)
+    setError("")
+    setSuccess("")
+
+    try {
+      const result = await pipelineApi.bulkMoveStage(selectedIds, bulkStage)
+      const updatedById = new Map(
+        result.updated.map((application) => [
+          application.application_id,
+          application,
+        ]),
+      )
+      setApplications((current) =>
+        current.map((application) =>
+          updatedById.get(application.application_id) ?? application,
+        ),
+      )
+      setSelected((current) =>
+        current ? updatedById.get(current.application_id) ?? current : current,
+      )
+      if (
+        selected &&
+        updatedById.has(selected.application_id)
+      ) {
+        setHistory(await pipelineApi.listHistory(selected.application_id))
+      }
+      setSelectedIds([])
+      const skippedMessage = result.skipped_application_ids.length
+        ? ` ${result.skipped_application_ids.length} already in ${bulkStage}.`
+        : ""
+      setSuccess(
+        `Moved ${result.updated.length} candidate${result.updated.length === 1 ? "" : "s"} to ${bulkStage}.${skippedMessage}`,
+      )
+    } catch (cause) {
+      setError(errorMessage(cause, "Could not move selected candidates."))
+    } finally {
+      setBulkMoving(false)
     }
   }
 
@@ -381,6 +483,15 @@ export default function PipelineScreen() {
             marginBottom: 8,
           }}
         >
+          <input
+            type="checkbox"
+            aria-label={`Select ${application.candidate_name}`}
+            checked={selectedIds.includes(application.application_id)}
+            onChange={() => toggleSelection(application.application_id)}
+            onClick={(event) => event.stopPropagation()}
+            onPointerDown={(event) => event.stopPropagation()}
+            style={{ flexShrink: 0 }}
+          />
           <div
             style={{
               width: 30,
@@ -493,6 +604,35 @@ export default function PipelineScreen() {
               </option>
             ))}
           </select>
+          <select
+            className="fc-input"
+            aria-label="Filter pipeline by stage"
+            value={stageFilter}
+            onChange={(event) =>
+              setStageFilter(event.target.value as PipelineStage | "all")
+            }
+          >
+            <option value="all">All stages</option>
+            {stages.map((stage) => (
+              <option value={stage} key={stage}>
+                {stage}
+              </option>
+            ))}
+          </select>
+          <select
+            className="fc-input"
+            aria-label="Filter pipeline by score"
+            value={scoreFilter}
+            onChange={(event) =>
+              setScoreFilter(event.target.value as ScoreFilter)
+            }
+          >
+            <option value="all">All scores</option>
+            <option value="strong">Strong match (80+)</option>
+            <option value="moderate">Moderate match (50–79)</option>
+            <option value="weak">Weak match (0–49)</option>
+            <option value="pending">Score pending</option>
+          </select>
           <button
             type="button"
             className="fc-btn fc-btn--secondary"
@@ -504,6 +644,67 @@ export default function PipelineScreen() {
           </button>
         </div>
       </div>
+
+      {!loading && applications.length > 0 && (
+        <div
+          className="fc-card fc-card--pad"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 12,
+            flexWrap: "wrap",
+            marginBottom: 16,
+          }}
+        >
+          <div>
+            <strong>Bulk selection</strong>
+            <div style={{ color: "var(--text-secondary)", fontSize: 12 }}>
+              {selectedIds.length} selected · {visibleApplications.length} shown
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <select
+              className="fc-input"
+              aria-label="Bulk target stage"
+              value={bulkStage}
+              onChange={(event) =>
+                setBulkStage(event.target.value as PipelineStage)
+              }
+            >
+              {stages.map((stage) => (
+                <option value={stage} key={stage}>
+                  Move to {stage}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              className="fc-btn fc-btn--primary"
+              onClick={() => void bulkMove()}
+              disabled={selectedIds.length === 0 || bulkMoving}
+            >
+              {bulkMoving ? "Moving..." : "Move selected"}
+            </button>
+            <button
+              type="button"
+              className="fc-btn fc-btn--secondary"
+              onClick={toggleAllVisible}
+              disabled={visibleIds.length === 0}
+            >
+              {allVisibleSelected ? "Clear visible" : "Select all visible"}
+            </button>
+            <button
+              type="button"
+              className="fc-btn fc-btn--secondary"
+              onClick={() => setSelectedIds([])}
+              disabled={selectedIds.length === 0}
+            >
+              Clear selection
+            </button>
+          </div>
+        </div>
+      )}
 
       {success && (
         <div className="job-alert job-alert--success" role="status">
@@ -570,6 +771,17 @@ export default function PipelineScreen() {
           <p>
             Applications submitted to a published FitCV job will appear here.
           </p>
+        </div>
+      ) : visibleApplications.length === 0 ? (
+        <div
+          className="fc-card fc-card--pad"
+          style={{ textAlign: "center", color: "var(--text-secondary)" }}
+        >
+          <UserCircle size={34} style={{ marginBottom: 8 }} />
+          <strong style={{ display: "block", color: "var(--text-primary)" }}>
+            No candidates match the current filters
+          </strong>
+          <p>Clear a filter to see more candidates.</p>
         </div>
       ) : (
         <DndContext

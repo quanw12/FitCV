@@ -14,6 +14,7 @@ import {
 import { toast } from "sonner"
 
 import { authApi } from "@/api"
+import { analyzerApi } from "@/api/analyzerApi"
 import {
   buildCv,
   pdfBase64ToBlob,
@@ -108,6 +109,7 @@ export default function CVReBuildScreen({ onNavigate }: CVReBuildScreenProps) {
   const [dragOver, setDragOver] = useState(false)
   const [modalOpen, setModalOpen] = useState(false)
   const [useAvatar, setUseAvatar] = useState(false)
+  const [saving, setSaving] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
   const profileAvatarUrl = authApi.getSession()?.user.avatarUrl ?? null
@@ -212,6 +214,33 @@ export default function CVReBuildScreen({ onNavigate }: CVReBuildScreenProps) {
     anchor.remove()
 
     URL.revokeObjectURL(url)
+  }
+
+  const handleSaveToHistory = async () => {
+    if (state.phase !== "done" || saving) return
+
+    setSaving(true)
+
+    try {
+      const blob = pdfBase64ToBlob(state.result.pdf_base64)
+
+      const file = new File([blob], state.result.filename, {
+        type: "application/pdf",
+      })
+
+      await analyzerApi.uploadCv(file)
+
+      toast.success("Saved to CV History")
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Unable to save this CV to history."
+
+      toast.error(message)
+    } finally {
+      setSaving(false)
+    }
   }
 
   const pdfDataUrl =
@@ -477,6 +506,28 @@ export default function CVReBuildScreen({ onNavigate }: CVReBuildScreenProps) {
         </div>
       )}
 
+      {state.phase === "done" && state.result.warnings.length > 0 && (
+        <div
+          role="alert"
+          style={{
+            border: "1px solid #FDE68A",
+            borderRadius: 12,
+            background: "#FFFBEB",
+            padding: "14px 18px",
+            marginBottom: 16,
+          }}
+        >
+          <p style={{ fontWeight: 600, color: "#92400E", fontSize: 14, marginBottom: 6 }}>
+            Some content may need your review:
+          </p>
+          <ul style={{ margin: 0, paddingLeft: 18, color: "#92400E", fontSize: 13 }}>
+            {state.result.warnings.map((w, i) => (
+              <li key={i}>{w}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {state.phase === "done" && (
         <div
           className="cv-stage"
@@ -556,6 +607,28 @@ export default function CVReBuildScreen({ onNavigate }: CVReBuildScreenProps) {
                   }}
                 >
                   <Download size={16} weight="light" /> Download PDF
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => void handleSaveToHistory()}
+                  disabled={saving}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 8,
+                    padding: "10px 18px",
+                    borderRadius: 10,
+                    border: "1px solid var(--border)",
+                    background: "white",
+                    color: "var(--text-primary)",
+                    fontWeight: 600,
+                    cursor: saving ? "wait" : "pointer",
+                    opacity: saving ? 0.7 : 1,
+                  }}
+                >
+                  <FloppyDisk size={16} weight="light" />
+                  {saving ? "Saving…" : "Save to History"}
                 </button>
               </div>
             </div>

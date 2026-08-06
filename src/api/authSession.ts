@@ -4,21 +4,57 @@ const SESSION_KEY = "fitcv.auth.session"
 
 function canUseStorage() {
   return (
-    typeof window !== "undefined" && typeof window.localStorage !== "undefined"
+    typeof window !== "undefined" && typeof window.sessionStorage !== "undefined"
   )
+}
+
+export interface BackendAuthSession {
+  access_token: string
+  token_type?: "bearer"
+  requires_role_selection: boolean
+  user: {
+    account_id: number
+    email: string
+    full_name: string
+    role: AuthSession["user"]["role"]
+    avatar_url?: string | null
+    auth_provider?: AuthSession["user"]["authProvider"]
+  }
+}
+
+export function normalizeBackendSession(payload: BackendAuthSession): AuthSession {
+  return {
+    accessToken: payload.access_token,
+    tokenType: payload.token_type ?? "bearer",
+    requiresRoleSelection: payload.requires_role_selection,
+    user: {
+      accountId: String(payload.user.account_id),
+      email: payload.user.email,
+      fullName: payload.user.full_name,
+      role: payload.user.role,
+      avatarUrl: payload.user.avatar_url,
+      authProvider: payload.user.auth_provider ?? "Password",
+    },
+  }
+}
+
+export function persistBackendSession(payload: BackendAuthSession): AuthSession {
+  const session = normalizeBackendSession(payload)
+  storeSession(session)
+  return session
 }
 
 export function getStoredSession(): AuthSession | null {
   if (!canUseStorage()) return null
 
-  const raw = window.localStorage.getItem(SESSION_KEY)
+  const raw = window.sessionStorage.getItem(SESSION_KEY)
 
   if (!raw) return null
 
   try {
     return JSON.parse(raw) as AuthSession
   } catch {
-    window.localStorage.removeItem(SESSION_KEY)
+    window.sessionStorage.removeItem(SESSION_KEY)
 
     return null
   }
@@ -27,11 +63,13 @@ export function getStoredSession(): AuthSession | null {
 export function storeSession(session: AuthSession): void {
   if (!canUseStorage()) return
 
-  window.localStorage.setItem(SESSION_KEY, JSON.stringify(session))
+  window.sessionStorage.setItem(SESSION_KEY, JSON.stringify(session))
+  window.localStorage.removeItem(SESSION_KEY)
 }
 
 export function clearStoredSession(): void {
   if (!canUseStorage()) return
 
+  window.sessionStorage.removeItem(SESSION_KEY)
   window.localStorage.removeItem(SESSION_KEY)
 }

@@ -63,6 +63,28 @@ _SECTION_HEADINGS = {
     },
 }
 
+_STANDARD_ORDER = [
+    "profile", "core_competencies", "education", "experience", "projects",
+    "languages", "certifications", "publications", "awards", "technical_skills",
+]
+
+_EXPERIENCE_LIGHT_ORDER = [
+    "profile", "education", "projects", "core_competencies", "experience",
+    "languages", "certifications", "publications", "awards", "technical_skills",
+]
+
+
+def _section_order(cv: CVData) -> list[str]:
+    """Return the section render order based on profile characteristics.
+
+    Experience-light profiles (few/no work experiences but has projects)
+    place Projects and Education above Experience so the candidate's
+    strongest content appears first.
+    """
+    has_projects = bool(cv.projects)
+    is_experience_light = has_projects and len(cv.experience) <= 1
+    return _EXPERIENCE_LIGHT_ORDER if is_experience_light else _STANDARD_ORDER
+
 
 def render_cv(
     cv: CVData, *, language: str = "en", avatar: str | None = None
@@ -70,4 +92,10 @@ def render_cv(
     template = _environment.get_template("cv_template.html")
     headings = _SECTION_HEADINGS.get(language, _SECTION_HEADINGS["en"])
     safe_avatar = avatar if avatar and avatar.startswith("data:image/") else None
-    return template.render(data=cv, headings=headings, avatar=safe_avatar)
+    return template.render(
+        data=cv,
+        headings=headings,
+        avatar=safe_avatar,
+        language=language,
+        section_order=_section_order(cv),
+    )

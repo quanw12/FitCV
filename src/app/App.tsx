@@ -42,6 +42,8 @@ const AppTrackerScreen = lazy(() => import("@/ui/screens/AppTrackerScreen"))
 
 const JDLibraryScreen = lazy(() => import("@/ui/screens/JDLibraryScreen"))
 
+const JobSearchScreen = lazy(() => import("@/ui/screens/JobSearchScreen"))
+
 const HRDashboard = lazy(() => import("@/ui/screens/HRDashboard"))
 
 const JobPostsScreen = lazy(() => import("@/ui/screens/JobPostsScreen"))
@@ -83,6 +85,8 @@ export default function App() {
     authApi.getSession(),
   )
 
+  const [authReady, setAuthReady] = useState(() => Boolean(authApi.getSession()))
+
   const [screen, setScreen] = useState<ScreenId | "">(() => {
     const currentSession = authApi.getSession()
 
@@ -114,6 +118,38 @@ export default function App() {
   const portal = session?.user.role
     ? portalFromAccountRole(session.user.role)
     : null
+
+  useEffect(() => {
+    if (session) {
+      setAuthReady(true)
+      return
+    }
+
+    if (publicJobId) {
+      setAuthReady(true)
+      return
+    }
+
+    let active = true
+    authApi
+      .refresh()
+      .then((restored) => {
+        if (!active) return
+        setSession(restored)
+        setShowLanding(false)
+        if (restored.user.role) {
+          setScreen(defaultScreen(portalFromAccountRole(restored.user.role)))
+        }
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        if (active) setAuthReady(true)
+      })
+
+    return () => {
+      active = false
+    }
+  }, [publicJobId])
 
   useEffect(() => {
     let active = true
@@ -175,10 +211,14 @@ export default function App() {
     }
   }
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     if (session) clearStoredImprovementMatchResultId(session.user.accountId)
 
-    authApi.logout()
+    try {
+      await authApi.logout()
+    } catch {
+      // Local sign-out still completes when the backend is unavailable.
+    }
 
     toast("Signed out successfully")
 
@@ -211,7 +251,9 @@ export default function App() {
 
   const handleUseJd = (title: string, text: string) => {
     setAnalyzerDraft((current) => ({ ...current, jdText: text, result: null }))
+
     setScreen("analyzer")
+
     toast.success(`Loaded “${title}” into Match Analyzer`)
   }
 
@@ -250,6 +292,8 @@ export default function App() {
       </>
     )
   }
+
+  if (!authReady) return <FullPageSkeleton />
 
   if (showLanding && !session) {
     return (
@@ -393,6 +437,10 @@ export default function App() {
             onUseJd={handleUseJd}
           />
         )
+
+      case "job-search":
+        return <JobSearchScreen />
+
       case "profile":
         return <ProfileScreen session={session} onSessionChange={setSession} />
 

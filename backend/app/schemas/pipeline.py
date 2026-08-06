@@ -32,6 +32,25 @@ class PipelineStageUpdate(BaseModel):
     stage: PipelineStage
 
 
+class PipelineBulkStageUpdate(BaseModel):
+    application_ids: list[int] = Field(min_length=1, max_length=100)
+    stage: PipelineStage
+
+    @field_validator("application_ids")
+    @classmethod
+    def validate_application_ids(cls, value: list[int]) -> list[int]:
+        unique_ids = list(dict.fromkeys(value))
+        if any(application_id <= 0 for application_id in unique_ids):
+            raise ValueError("Application IDs must be positive integers.")
+        return unique_ids
+
+
+class PipelineBulkStageUpdateResponse(BaseModel):
+    updated: list[PipelineApplicationResponse]
+    skipped_application_ids: list[int]
+    history_ids: list[int]
+
+
 class PipelineNoteCreate(BaseModel):
     content: str = Field(min_length=1, max_length=5_000)
 

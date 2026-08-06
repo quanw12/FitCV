@@ -722,6 +722,20 @@ export default function AutoEmailScreen() {
                     </div>
                   )}
 
+                  {activeDraft.delivery_status && (
+                    <p
+                      style={{
+                        marginTop: 10,
+                        color: "var(--text-muted)",
+                        fontSize: 12,
+                      }}
+                    >
+                      Provider delivery status: {activeDraft.delivery_status}
+                      {activeDraft.retry_count > 0 &&
+                        ` · attempt ${activeDraft.retry_count}`}
+                    </p>
+                  )}
+
                   <div
                     style={{
                       display: "flex",
@@ -760,7 +774,8 @@ export default function AutoEmailScreen() {
                       </>
                     )}
 
-                    {["Approved", "Failed"].includes(activeDraft.status) && (
+                    {(activeDraft.status === "Approved" ||
+                      (activeDraft.status === "Failed" && activeDraft.retryable)) && (
                       <button
                         type="button"
                         className="fc-btn fc-btn--primary"
@@ -867,7 +882,9 @@ export default function AutoEmailScreen() {
                 }}
               >
                 {drafts.map((draft) => {
-                  const eligible = ["Approved", "Failed"].includes(draft.status)
+                  const eligible =
+                    draft.status === "Approved" ||
+                    (draft.status === "Failed" && draft.retryable)
                   const active = activeDraft?.email_id === draft.email_id
 
                   return (
@@ -922,6 +939,11 @@ export default function AutoEmailScreen() {
                             {draft.status}
                           </span>
                         </div>
+                        {draft.delivery_status && (
+                          <small style={{ color: "var(--text-muted)" }}>
+                            Delivery: {draft.delivery_status}
+                          </small>
+                        )}
                         <p
                           style={{
                             fontSize: 12,

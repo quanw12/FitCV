@@ -5,7 +5,7 @@ from app.db.session import get_db
 from app.middleware.auth_guard import require_role
 from app.models.account import Account, AccountRole
 from app.schemas.improvement import GenerateImprovementResponse, ImprovementReportResponse
-from app.services import improvement_service
+from app.services import ai_task_service, improvement_service
 
 router = APIRouter()
 
@@ -25,8 +25,14 @@ def generate_improvement_report(
     response, should_start = improvement_service.request_generation(
         db, match_result_id=match_result_id, account=account, regenerate=regenerate
     )
-    if should_start and response.task_id is not None:
-        background_tasks.add_task(improvement_service.run_generation_task, response.task_id)
+    if (
+        should_start
+        and response.task_id is not None
+        and ai_task_service.should_eager_execute()
+    ):
+        background_tasks.add_task(
+            improvement_service.run_generation_task, response.task_id
+        )
     return response
 
 
