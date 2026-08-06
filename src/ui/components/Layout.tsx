@@ -7,6 +7,13 @@ import CommandPalette from "./CommandPalette"
 
 import { getPortalNavigation } from "@/data/navigation"
 
+import {
+  applyTheme,
+  persistTheme,
+  resolveTheme,
+  type Theme,
+} from "@/services/theme"
+
 import type { Portal, ScreenId } from "@/types/app"
 
 interface LayoutProps {
@@ -30,10 +37,7 @@ export default function Layout({
 }: LayoutProps) {
   const [showUserMenu, setShowUserMenu] = useState(false)
   const [paletteOpen, setPaletteOpen] = useState(false)
-  const [theme, setTheme] = useState<"light" | "dark">(() => {
-    const savedTheme = window.localStorage.getItem("fitcv-theme")
-    return savedTheme === "dark" ? "dark" : "light"
-  })
+  const [theme, setTheme] = useState<Theme>(resolveTheme)
 
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
@@ -48,9 +52,16 @@ export default function Layout({
   }, [])
 
   useEffect(() => {
-    document.documentElement.dataset.theme = theme
-    window.localStorage.setItem("fitcv-theme", theme)
+    applyTheme(theme)
   }, [theme])
+
+  const toggleTheme = () => {
+    setTheme((currentTheme) => {
+      const nextTheme = currentTheme === "light" ? "dark" : "light"
+      persistTheme(nextTheme)
+      return nextTheme
+    })
+  }
 
   const navItems = getPortalNavigation(portal)
   const portalLabel = portal === "seeker" ? "Job Seeker" : "HR Recruiter"
@@ -118,7 +129,7 @@ export default function Layout({
                 </button>
               )}
               <button
-                onClick={() => setTheme((currentTheme) => currentTheme === "light" ? "dark" : "light")}
+                onClick={toggleTheme}
                 style={{
                   width: "100%",
                   display: "flex",

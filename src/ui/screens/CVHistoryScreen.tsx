@@ -12,9 +12,9 @@ import {
 } from "@phosphor-icons/react"
 
 import {
+  Area,
+  AreaChart,
   CartesianGrid,
-  Line,
-  LineChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -28,6 +28,7 @@ import { analyzerApi } from "@/api/analyzerApi"
 import type {
   CvComparisonSeries,
   CvSemanticComparison,
+  CvScorePoint,
   CvVersion,
 } from "@/types/analyzer"
 
@@ -357,40 +358,79 @@ export default function CVHistoryScreen() {
                       }${activeComparison.latestDelta.toFixed(1)} points from previous`}
                 </span>
               </div>
-              <div
-                style={{ width: "100%", height: 260, marginTop: 18 }}
-                aria-label="CV score improvement chart"
-              >
-                <ResponsiveContainer>
-                  <LineChart
-                    data={activeComparison.versions}
-                    margin={{ top: 8, right: 18, left: -12, bottom: 4 }}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
-                    <XAxis
-                      dataKey="versionNumber"
-                      tickFormatter={(value) => `v${value}`}
-                    />
-                    <YAxis domain={[0, 100]} />
-                    <Tooltip
-                      formatter={(value) => [
-                        `${Number(value ?? 0).toFixed(1)}%`,
-
-                        "Match score",
-                      ]}
-                      labelFormatter={(value) => `CV version ${value}`}
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="overallScore"
-                      stroke="#2563EB"
-                      strokeWidth={3}
-                      dot={{ r: 5, fill: "#2563EB" }}
-                      activeDot={{ r: 7 }}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
+              {activeComparison.versions.length > 1 ? (
+                <div
+                  style={{ width: "100%", height: 250, marginTop: 18 }}
+                  aria-label="CV score improvement chart"
+                >
+                  <ResponsiveContainer>
+                    <AreaChart
+                      data={activeComparison.versions}
+                      margin={{ top: 12, right: 12, left: -12, bottom: 0 }}
+                    >
+                      <defs>
+                        <linearGradient
+                          id="cv-score-progress-fill"
+                          x1="0"
+                          x2="0"
+                          y1="0"
+                          y2="1"
+                        >
+                          <stop offset="0%" stopColor="#2563EB" stopOpacity={0.35} />
+                          <stop offset="100%" stopColor="#2563EB" stopOpacity={0.02} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid
+                        vertical={false}
+                        stroke="var(--border)"
+                        strokeDasharray="2 6"
+                      />
+                      <XAxis
+                        dataKey="versionNumber"
+                        axisLine={false}
+                        tickLine={false}
+                        tick={{ fill: "var(--text-muted)", fontSize: 12 }}
+                        tickFormatter={(value) => `Version ${value}`}
+                      />
+                      <YAxis
+                        domain={[0, 100]}
+                        axisLine={false}
+                        tickLine={false}
+                        tick={{ fill: "var(--text-muted)", fontSize: 12 }}
+                        tickFormatter={(value) => `${value}%`}
+                        width={42}
+                      />
+                      <Tooltip
+                        cursor={{ stroke: "var(--border-strong)", strokeWidth: 1 }}
+                        contentStyle={{
+                          background: "var(--surface)",
+                          border: "1px solid var(--border-strong)",
+                          borderRadius: 10,
+                          boxShadow: "var(--shadow-md)",
+                        }}
+                        itemStyle={{ color: "var(--text-primary)", fontWeight: 700 }}
+                        labelStyle={{ color: "var(--text-secondary)", marginBottom: 4 }}
+                        formatter={(value) => [
+                          `${Number(value ?? 0).toFixed(1)}%`,
+                          "Match score",
+                        ]}
+                        labelFormatter={(value) => `CV version ${value}`}
+                      />
+                      <Area
+                        type="monotone"
+                        dataKey="overallScore"
+                        stroke="#2563EB"
+                        strokeWidth={3}
+                        fill="url(#cv-score-progress-fill)"
+                        dot={{ r: 5, fill: "#2563EB", strokeWidth: 2, stroke: "var(--surface)" }}
+                        activeDot={{ r: 7, fill: "#2563EB", strokeWidth: 3, stroke: "var(--surface)" }}
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              ) : (
+                <ScoreBaseline point={activeComparison.versions[0]} />
+              )}
             </>
           )}
         </div>
@@ -746,6 +786,77 @@ function ChangeLine({
   return (
     <div style={{ color, fontSize: 11, lineHeight: 1.5, marginTop: 4 }}>
       <strong>{label}:</strong> {values.join(", ")}
+    </div>
+  )
+}
+
+function ScoreBaseline({ point }: { point: CvScorePoint }) {
+  return (
+    <div
+      aria-label={`CV version ${point.versionNumber} baseline score chart`}
+      role="img"
+      style={{
+        marginTop: 18,
+        padding: "20px 22px",
+        border: "1px solid var(--border)",
+        borderRadius: 14,
+        background: "linear-gradient(135deg, var(--accent-soft), var(--surface))",
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          alignItems: "baseline",
+          justifyContent: "space-between",
+          gap: 16,
+        }}
+      >
+        <div>
+          <div style={{ color: "var(--text-secondary)", fontSize: 12, fontWeight: 700 }}>
+            FIRST BENCHMARK · VERSION {point.versionNumber}
+          </div>
+          <strong style={{ color: "var(--text-primary)", fontSize: 28, lineHeight: 1.2 }}>
+            {point.overallScore.toFixed(1)}%
+          </strong>
+        </div>
+        <span className="fc-badge fc-badge--blue">{point.matchLabel ?? "Match score"}</span>
+      </div>
+      <div
+        style={{
+          height: 12,
+          overflow: "hidden",
+          borderRadius: 999,
+          background: "var(--surface-2)",
+          border: "1px solid var(--border)",
+          marginTop: 18,
+        }}
+      >
+        <div
+          style={{
+            width: `${Math.max(0, Math.min(point.overallScore, 100))}%`,
+            height: "100%",
+            borderRadius: "inherit",
+            background: "linear-gradient(90deg, #2563EB, #60A5FA)",
+          }}
+        />
+      </div>
+      <div
+        aria-hidden="true"
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          color: "var(--text-muted)",
+          fontSize: 11,
+          marginTop: 7,
+        }}
+      >
+        <span>0%</span>
+        <span>50%</span>
+        <span>100%</span>
+      </div>
+      <p style={{ color: "var(--text-secondary)", fontSize: 12.5, marginTop: 14 }}>
+        Analyze a second CV version against this same target to see your score trend.
+      </p>
     </div>
   )
 }
