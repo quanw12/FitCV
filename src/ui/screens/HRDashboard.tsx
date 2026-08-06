@@ -6,16 +6,16 @@ import {
 
 import {
   ArrowRight,
-  ArrowClockwise,
-  Briefcase,
-  ChartBar,
-  FileText,
+  BriefcaseBusiness,
+  ChartColumn,
+  FileCheck2,
   Plus,
-  Star,
-  TrendUp,
+  RefreshCw,
+  Sparkles,
+  TrendingUp,
+  TriangleAlert,
   Upload,
-  WarningCircle,
-} from "@phosphor-icons/react"
+} from "lucide-react"
 
 import BezelCard from "@/ui/components/BezelCard"
 import RevealStagger from "@/ui/components/RevealStagger"
@@ -38,29 +38,6 @@ const trailing30Days = () => {
   const from = new Date(to)
   from.setDate(from.getDate() - 29)
   return { from: dateInput(from), to: dateInput(to) }
-}
-
-function MiniBars({ values, color }: { values: number[]; color: string }) {
-  const max = Math.max(...values) || 1
-
-  return (
-    <div
-      style={{ display: "flex", alignItems: "flex-end", gap: 3, height: 34 }}
-    >
-      {values.map((v, i) => (
-        <div
-          key={i}
-          style={{
-            width: 7,
-            height: `${(v / max) * 100}%`,
-            borderRadius: 3,
-            background: color,
-            opacity: 0.45 + (i / values.length) * 0.55,
-          }}
-        />
-      ))}
-    </div>
-  )
 }
 
 const scoreColor = (score: number | null) =>
@@ -112,10 +89,9 @@ export default function HRDashboard({ onNavigate }: HRDashboardProps) {
       delta: kpis
         ? deltaText(kpis.active_job_posts, kpis.prev?.active_job_posts ?? null, " job")
         : "…",
-      icon: <Briefcase size={18} />,
+      icon: <BriefcaseBusiness size={19} aria-hidden="true" />,
       color: "#2563EB",
       soft: "var(--accent-soft)",
-      spark: [2, 3, 3, 4],
     },
     {
       label: "Total CVs Reviewed",
@@ -123,10 +99,9 @@ export default function HRDashboard({ onNavigate }: HRDashboardProps) {
       delta: kpis
         ? deltaText(kpis.total_cvs_reviewed, kpis.prev?.total_cvs_reviewed ?? null, " CVs")
         : "…",
-      icon: <FileText size={18} />,
+      icon: <FileCheck2 size={19} aria-hidden="true" />,
       color: "#16A34A",
       soft: "var(--success-soft)",
-      spark: [60, 78, 91, 119],
     },
     {
       label: "Avg. Candidate Score",
@@ -134,10 +109,9 @@ export default function HRDashboard({ onNavigate }: HRDashboardProps) {
       delta: kpis
         ? deltaText(kpis.avg_candidate_score, kpis.prev?.avg_candidate_score ?? null, "pts")
         : "…",
-      icon: <Star size={18} />,
+      icon: <Sparkles size={19} aria-hidden="true" />,
       color: "#D97706",
       soft: "var(--warning-soft)",
-      spark: [60, 62, 65, 68],
     },
     {
       label: "Review Progress",
@@ -145,15 +119,14 @@ export default function HRDashboard({ onNavigate }: HRDashboardProps) {
       delta: kpis
         ? deltaText(kpis.review_progress, kpis.prev?.review_progress ?? null, "%")
         : "…",
-      icon: <TrendUp size={18} />,
+      icon: <TrendingUp size={19} aria-hidden="true" />,
       color: "#64748B",
       soft: "var(--gray-soft)",
-      spark: [30, 42, 51, 58],
     },
   ]
 
   return (
-    <div className="fc-stagger">
+    <div className="fc-stagger hr-dashboard">
       <RevealStagger>
         <div className="fc-page-head">
           <div>
@@ -201,7 +174,7 @@ export default function HRDashboard({ onNavigate }: HRDashboardProps) {
                   justifyContent: "center",
                 }}
               >
-                <WarningCircle size={24} weight="light" color="var(--danger)" />
+                <TriangleAlert size={24} color="var(--danger)" aria-hidden="true" />
               </div>
               <strong style={{ fontSize: 16, color: "var(--text-primary)" }}>
                 Could not load the dashboard.
@@ -216,7 +189,7 @@ export default function HRDashboard({ onNavigate }: HRDashboardProps) {
                 {loadError}
               </span>
               <button className="fc-btn fc-btn--primary" onClick={() => void load()}>
-                <ArrowClockwise size={15} /> Retry
+                <RefreshCw size={15} aria-hidden="true" /> Retry
               </button>
             </div>
           </BezelCard>
@@ -224,17 +197,10 @@ export default function HRDashboard({ onNavigate }: HRDashboardProps) {
       ) : (
         <>
           {/* Stat cards */}
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(4, 1fr)",
-              gap: 16,
-              marginBottom: 16,
-            }}
-          >
+          <div className="hr-dashboard__stats">
             {statCards.map((s, i) => (
               <RevealStagger key={s.label} delay={i * 0.08}>
-                <BezelCard>
+                <BezelCard className="hr-dashboard__stat-card">
                   <div
                     className="fc-stat"
                     style={{
@@ -243,20 +209,13 @@ export default function HRDashboard({ onNavigate }: HRDashboardProps) {
                       justifyContent: "space-between",
                     }}
                   >
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                      }}
-                    >
+                    <div className="hr-dashboard__stat-top">
                       <div
                         className="fc-stat__icon"
                         style={{ background: s.soft, color: s.color }}
                       >
-                        {s.icon}
+                          {s.icon}
                       </div>
-                      <MiniBars values={s.spark} color={s.color} />
                     </div>
                     <div style={{ marginTop: 12 }}>
                       <div className="fc-stat__value" style={{ fontSize: 28 }}>
@@ -278,7 +237,7 @@ export default function HRDashboard({ onNavigate }: HRDashboardProps) {
 
           {/* Active job posts table */}
           <RevealStagger>
-            <div className="fc-card" style={{ overflow: "hidden" }}>
+            <div className="fc-card hr-dashboard__jobs-card">
               <div
                 style={{
                   padding: "18px 22px",
@@ -289,7 +248,7 @@ export default function HRDashboard({ onNavigate }: HRDashboardProps) {
                 }}
               >
                 <div className="fc-section-title">
-                  <ChartBar size={17} color="var(--accent)" />
+                  <ChartColumn size={17} color="var(--accent)" aria-hidden="true" />
                   <h3>Active Job Posts</h3>
                 </div>
                 <button
@@ -327,7 +286,16 @@ export default function HRDashboard({ onNavigate }: HRDashboardProps) {
                   </span>
                 </div>
               ) : (
-                <table className="fc-table">
+                <div className="hr-dashboard__table-wrap">
+                  <table className="fc-table hr-dashboard__table">
+                    <colgroup>
+                      <col className="hr-dashboard__title-col" />
+                      <col className="hr-dashboard__department-col" />
+                      <col className="hr-dashboard__count-col" />
+                      <col className="hr-dashboard__score-col" />
+                      <col className="hr-dashboard__progress-col" />
+                      <col className="hr-dashboard__action-col" />
+                    </colgroup>
                   <thead>
                     <tr>
                       {[
@@ -346,13 +314,7 @@ export default function HRDashboard({ onNavigate }: HRDashboardProps) {
                     {(summary?.jobs ?? []).map((job: ReportJobRow) => (
                       <tr key={job.job_id}>
                         <td>
-                          <div
-                            style={{
-                              fontWeight: 700,
-                              fontSize: 14,
-                              color: "var(--text-primary)",
-                            }}
-                          >
+                          <div className="hr-dashboard__job-title">
                             {job.title}
                           </div>
                         </td>
@@ -394,7 +356,7 @@ export default function HRDashboard({ onNavigate }: HRDashboardProps) {
                             {scoreDisplay(job.avg_score)}
                           </span>
                         </td>
-                        <td style={{ minWidth: 170 }}>
+                        <td>
                           <div
                             style={{ display: "flex", alignItems: "center", gap: 9 }}
                           >
@@ -440,7 +402,8 @@ export default function HRDashboard({ onNavigate }: HRDashboardProps) {
                       </tr>
                     ))}
                   </tbody>
-                </table>
+                  </table>
+                </div>
               )}
             </div>
           </RevealStagger>

@@ -4,7 +4,6 @@ import {
   AlertTriangle,
   Bot,
   CheckCircle2,
-  Inbox,
   Mail,
   RefreshCw,
   Save,
@@ -288,10 +287,7 @@ export default function SmartReplyPanel() {
       >
         <div>
           <div className="fc-eyebrow">Inbound conversations</div>
-          <h2 style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            <Inbox size={20} color="var(--accent)" />
-            Smart Reply Inbox
-          </h2>
+          <h2>Smart Reply Inbox</h2>
           <p style={{ color: "var(--text-muted)", fontSize: 13 }}>
             Candidate replies are routed to their Job Applicant thread. AI only
             drafts; HR reviews, approves, and sends.
@@ -336,7 +332,7 @@ export default function SmartReplyPanel() {
         </div>
       ) : (
         <div className="smart-reply-grid">
-          <div style={{ display: "grid", gap: 8 }}>
+          <div className="smart-reply-thread-list">
             {threads.map((thread) => (
               <button
                 key={thread.thread_id}
@@ -344,6 +340,8 @@ export default function SmartReplyPanel() {
                 onClick={() => setSelectedThreadId(thread.thread_id)}
                 className="fc-panel"
                 style={{
+                  width: "100%",
+                  minWidth: 0,
                   padding: 12,
                   textAlign: "left",
                   cursor: "pointer",
@@ -394,7 +392,7 @@ export default function SmartReplyPanel() {
             ))}
           </div>
 
-          <div style={{ display: "grid", gap: 14 }}>
+          <div className="smart-reply-detail">
             {detailLoading || !detail ? (
               <div className="fc-panel" style={{ padding: 24 }}>
                 Loading conversation...
@@ -511,8 +509,7 @@ export default function SmartReplyPanel() {
                 <div className="fc-panel" style={{ padding: 16 }}>
                   {!hasInbound ? (
                     <div style={{ textAlign: "center", padding: 14 }}>
-                      <Inbox size={26} />
-                      <strong style={{ display: "block", marginTop: 6 }}>
+                      <strong style={{ display: "block" }}>
                         Waiting for candidate reply
                       </strong>
                       <p>

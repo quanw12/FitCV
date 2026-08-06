@@ -1,13 +1,11 @@
 import { useRef, useState } from "react"
 
 import {
-  ArrowRight,
   CheckCircle,
   CloudArrowUp,
   Download,
   FileText,
-  Lightning,
-  MagnifyingGlass,
+  FloppyDisk,
   Sparkle,
   X,
 } from "@phosphor-icons/react"
@@ -104,7 +102,7 @@ interface CVReBuildScreenProps {
   onNavigate?: (screen: ScreenId) => void
 }
 
-export default function CVReBuildScreen({ onNavigate }: CVReBuildScreenProps) {
+export default function CVReBuildScreen(_: CVReBuildScreenProps) {
   const [state, setState] = useState<BuildState>(loadCachedResult)
   const [dragOver, setDragOver] = useState(false)
   const [modalOpen, setModalOpen] = useState(false)

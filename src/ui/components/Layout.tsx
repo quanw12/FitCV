@@ -79,7 +79,6 @@ export default function Layout({
             currentScreen={currentScreen}
             onNavigate={onNavigate}
             onUserMenuClick={() => setShowUserMenu((isOpen) => !isOpen)}
-            onNotificationClick={() => onNavigate("app-tracker")}
           />
 
           {showUserMenu && (
