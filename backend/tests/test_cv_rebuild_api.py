@@ -64,7 +64,7 @@ def test_rejects_oversized_file() -> None:
 
 
 def test_maps_extraction_error_to_422(monkeypatch) -> None:
-    def raise_extraction(content, filename, *, avatar=None):
+    async def raise_extraction(content, filename, *, avatar=None, jd_text=None):
         raise CvExtractionError("invalid structure after retries")
 
     monkeypatch.setattr(orchestrator, "rebuild_cv", raise_extraction)
@@ -75,7 +75,7 @@ def test_maps_extraction_error_to_422(monkeypatch) -> None:
 
 
 def test_maps_gemini_error_to_502(monkeypatch) -> None:
-    def raise_gemini(content, filename, *, avatar=None):
+    async def raise_gemini(content, filename, *, avatar=None, jd_text=None):
         raise GeminiClientError("busy")
 
     monkeypatch.setattr(orchestrator, "rebuild_cv", raise_gemini)
@@ -85,7 +85,7 @@ def test_maps_gemini_error_to_502(monkeypatch) -> None:
 
 
 def test_maps_render_error_to_502(monkeypatch) -> None:
-    def raise_render(content, filename, *, avatar=None):
+    async def raise_render(content, filename, *, avatar=None, jd_text=None):
         raise PdfRenderError("no chromium")
 
     monkeypatch.setattr(orchestrator, "rebuild_cv", raise_render)
@@ -95,7 +95,7 @@ def test_maps_render_error_to_502(monkeypatch) -> None:
 
 
 def test_success_shape(monkeypatch) -> None:
-    def fake_rebuild(content, filename, *, avatar=None):
+    async def fake_rebuild(content, filename, *, avatar=None, jd_text=None):
         return {
             "filename": "rebuilt_cv.pdf",
             "preview_json": CVData(name="A").model_dump(),
@@ -117,7 +117,7 @@ def test_success_shape(monkeypatch) -> None:
 def test_rebuild_forwards_avatar_form_field(monkeypatch) -> None:
     calls: list[dict] = []
 
-    def fake_rebuild(content, filename, *, avatar=None):
+    async def fake_rebuild(content, filename, *, avatar=None, jd_text=None):
         calls.append({"content": content, "filename": filename, "avatar": avatar})
         return {
             "filename": "rebuilt_cv.pdf",
@@ -138,7 +138,10 @@ def test_rebuild_forwards_avatar_form_field(monkeypatch) -> None:
 
 
 def test_rebuild_rejects_non_data_url_avatar(monkeypatch) -> None:
-    monkeypatch.setattr(orchestrator, "rebuild_cv", lambda *a, **k: None)
+    async def noop(*a, **k):
+        pass
+
+    monkeypatch.setattr(orchestrator, "rebuild_cv", noop)
     client = _make_client()
     response = client.post(
         "/api/cv/rebuild",
@@ -159,7 +162,7 @@ class TestBuildEndpoint:
     def test_accepts_valid_payload(self, monkeypatch) -> None:
         calls: list[dict] = []
 
-        def fake_build(cv, *, language="en", avatar=None):
+        async def fake_build(cv, *, language="en", avatar=None, jd_text=None):
             calls.append({"cv": cv, "language": language, "avatar": avatar})
             return {
                 "filename": "built_cv.pdf",
@@ -184,7 +187,7 @@ class TestBuildEndpoint:
         assert calls[0]["cv"].name == "B"
 
     def test_defaults_language_to_english(self, monkeypatch) -> None:
-        def fake_build(cv, *, language="en", avatar=None):
+        async def fake_build(cv, *, language="en", avatar=None, jd_text=None):
             return {
                 "filename": "built_cv.pdf",
                 "preview_json": CVData(name="B").model_dump(),
@@ -216,7 +219,7 @@ class TestBuildEndpoint:
         assert response.status_code == 422
 
     def test_maps_polish_error_to_422(self, monkeypatch) -> None:
-        def raise_polish(cv, *, language="en", avatar=None):
+        async def raise_polish(cv, *, language="en", avatar=None, jd_text=None):
             raise CvExtractionError("invalid structure after retries")
 
         monkeypatch.setattr(orchestrator, "build_cv", raise_polish)
@@ -226,7 +229,7 @@ class TestBuildEndpoint:
         assert "invalid structure" in response.json()["detail"]
 
     def test_maps_gemini_error_to_502(self, monkeypatch) -> None:
-        def raise_gemini(cv, *, language="en", avatar=None):
+        async def raise_gemini(cv, *, language="en", avatar=None, jd_text=None):
             raise GeminiClientError("busy")
 
         monkeypatch.setattr(orchestrator, "build_cv", raise_gemini)
@@ -235,7 +238,7 @@ class TestBuildEndpoint:
         assert response.status_code == 502
 
     def test_maps_render_error_to_502(self, monkeypatch) -> None:
-        def raise_render(cv, *, language="en", avatar=None):
+        async def raise_render(cv, *, language="en", avatar=None, jd_text=None):
             raise PdfRenderError("no chromium")
 
         monkeypatch.setattr(orchestrator, "build_cv", raise_render)
