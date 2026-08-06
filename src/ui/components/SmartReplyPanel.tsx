@@ -28,6 +28,7 @@ interface ReplyComposer {
   subject: string
   body: string
   deliveryStatus: string | null
+  retryable: boolean
 }
 
 const errorMessage = (cause: unknown, fallback: string) =>
@@ -49,6 +50,7 @@ const composerFromDraft = (draft: CandidateEmailDraft): ReplyComposer => ({
   subject: draft.subject,
   body: draft.body,
   deliveryStatus: draft.delivery_status,
+  retryable: draft.retryable,
 })
 
 const actionableReply = (
@@ -69,6 +71,7 @@ const actionableReply = (
     subject: message.subject,
     body: message.body,
     deliveryStatus: message.delivery_status,
+    retryable: message.retryable,
   }
 }
 
@@ -588,7 +591,8 @@ export default function SmartReplyPanel() {
                             </button>
                           </>
                         )}
-                        {["Approved", "Failed"].includes(composer.status) && (
+                        {(composer.status === "Approved" ||
+                          (composer.status === "Failed" && composer.retryable)) && (
                           <button
                             type="button"
                             className="fc-btn fc-btn--primary"

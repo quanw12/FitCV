@@ -6,6 +6,7 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     Index,
+    Integer,
     String,
     Text,
     UniqueConstraint,
@@ -118,6 +119,15 @@ class CandidateEmail(Base):
     )
     idempotency_key: Mapped[str | None] = mapped_column(
         String(256), nullable=True
+    )
+    retryable: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default="0", nullable=False
+    )
+    retry_count: Mapped[int] = mapped_column(
+        Integer, default=0, server_default="0", nullable=False
+    )
+    last_attempt_at: Mapped[datetime | None] = mapped_column(
+        DateTime, nullable=True
     )
     created_by_account_id: Mapped[int | None] = mapped_column(
         ID_TYPE,

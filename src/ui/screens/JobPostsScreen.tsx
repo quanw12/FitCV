@@ -13,6 +13,8 @@ import {
   Briefcase,
   CalendarBlank,
   CheckCircle,
+  CopySimple,
+  Eye,
   FloppyDisk,
   Link,
   MagicWand,
@@ -30,7 +32,13 @@ import { jobsApi } from "@/api/jobsApi"
 import type { JobPost, JobStatus, JobWrite } from "@/types/jobs"
 
 type JobListView = "active" | "archived"
-type JobAction = "publish" | "close" | "archive" | "unarchive"
+type JobAction =
+  | "publish"
+  | "close"
+  | "reopen"
+  | "duplicate"
+  | "archive"
+  | "unarchive"
 
 interface ManagedJobs {
   active: JobPost[]
@@ -113,6 +121,8 @@ const statusBadge = (status: JobStatus) => {
 const actionLabels: Record<JobAction, string> = {
   publish: "Publishing...",
   close: "Closing...",
+  reopen: "Reopening...",
+  duplicate: "Duplicating...",
   archive: "Archiving...",
   unarchive: "Restoring...",
 }
@@ -139,6 +149,8 @@ export default function JobPostsScreen() {
   const [formError, setFormError] = useState("")
   const [actionError, setActionError] = useState("")
   const [success, setSuccess] = useState("")
+  const [previewJob, setPreviewJob] = useState<JobPost | null>(null)
+  const [previewingId, setPreviewingId] = useState<number | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -347,7 +359,14 @@ export default function JobPostsScreen() {
     try {
       const updated = await jobsApi[action](job.job_id)
 
-      if (action === "archive") {
+      if (action === "duplicate") {
+        setManagedJobs((current) => ({
+          ...current,
+          active: [updated, ...current.active],
+        }))
+        setListView("active")
+        setSuccess(`Created draft copy “${updated.title}”. Applications were not copied.`)
+      } else if (action === "archive") {
         setManagedJobs((current) => ({
           active: current.active.filter(
             (item) => item.job_id !== updated.job_id,
@@ -374,13 +393,28 @@ export default function JobPostsScreen() {
         setSuccess(
           action === "publish"
             ? `Published “${updated.title}”.`
-            : `Closed “${updated.title}”.`,
+            : action === "reopen"
+              ? `Reopened “${updated.title}”.`
+              : `Closed “${updated.title}”.`,
         )
       }
     } catch (cause) {
       setActionError(errorMessage(cause, `Could not ${action} this job.`))
     } finally {
       setPendingAction(null)
+    }
+  }
+
+  const preview = async (job: JobPost) => {
+    if (previewingId !== null) return
+    setPreviewingId(job.job_id)
+    setActionError("")
+    try {
+      setPreviewJob(await jobsApi.preview(job.job_id))
+    } catch (cause) {
+      setActionError(errorMessage(cause, "Could not load this job preview."))
+    } finally {
+      setPreviewingId(null)
     }
   }
 
@@ -506,6 +540,47 @@ export default function JobPostsScreen() {
             <X size={16} />
           </button>
         </div>
+      )}
+
+      {previewJob && (
+        <section
+          className="fc-card fc-card--pad"
+          aria-label="Job post preview"
+          style={{ marginBottom: 28 }}
+        >
+          <div className="fc-section-title" style={{ marginBottom: 14 }}>
+            <Eye size={18} color="var(--accent)" />
+            <div style={{ flex: 1 }}>
+              <h2>{previewJob.title}</h2>
+              <p>
+                Candidate-facing preview · {previewJob.location || "Location pending"}
+                {previewJob.employment_type ? ` · ${previewJob.employment_type}` : ""}
+              </p>
+            </div>
+            <button
+              type="button"
+              className="fc-icon-btn"
+              onClick={() => setPreviewJob(null)}
+              aria-label="Close job preview"
+            >
+              <X size={18} />
+            </button>
+          </div>
+          <div style={{ display: "grid", gap: 14 }}>
+            {sections.map(([key, label]) => {
+              const value = previewJob[key]
+              return value ? (
+                <div key={key}>
+                  <strong style={{ fontSize: 13 }}>{label}</strong>
+                  <p style={{ whiteSpace: "pre-wrap", marginTop: 4 }}>{value}</p>
+                </div>
+              ) : null
+            })}
+          </div>
+          <p style={{ color: "var(--text-muted)", fontSize: 12, marginTop: 16 }}>
+            {previewJob.application_count} existing applications stay attached to this job.
+          </p>
+        </section>
       )}
 
       {editorOpen && (
@@ -1050,19 +1125,59 @@ export default function JobPostsScreen() {
                       }}
                     >
                       {listView === "archived" ? (
-                        <button
-                          type="button"
-                          className="fc-btn fc-btn--secondary"
-                          disabled={Boolean(busyAction)}
-                          onClick={() => void runAction(job, "unarchive")}
-                        >
-                          <ArrowCounterClockwise size={14} />
-                          {busyAction === "unarchive"
-                            ? actionLabels.unarchive
-                            : "Restore"}
-                        </button>
+                        <>
+                          <button
+                            type="button"
+                            className="fc-btn fc-btn--secondary"
+                            disabled={Boolean(busyAction) || previewingId !== null}
+                            onClick={() => void preview(job)}
+                          >
+                            <Eye size={14} />
+                            {previewingId === job.job_id ? "Loading..." : "Preview"}
+                          </button>
+                          <button
+                            type="button"
+                            className="fc-btn fc-btn--secondary"
+                            disabled={Boolean(busyAction)}
+                            onClick={() => void runAction(job, "duplicate")}
+                          >
+                            <CopySimple size={14} />
+                            {busyAction === "duplicate" ? actionLabels.duplicate : "Duplicate"}
+                          </button>
+                          <button
+                            type="button"
+                            className="fc-btn fc-btn--secondary"
+                            disabled={Boolean(busyAction)}
+                            onClick={() => void runAction(job, "unarchive")}
+                          >
+                            <ArrowCounterClockwise size={14} />
+                            {busyAction === "unarchive"
+                              ? actionLabels.unarchive
+                              : "Restore"}
+                          </button>
+                        </>
                       ) : (
                         <>
+                          <button
+                            type="button"
+                            className="fc-btn fc-btn--secondary"
+                            disabled={Boolean(busyAction) || previewingId !== null}
+                            onClick={() => void preview(job)}
+                          >
+                            <Eye size={14} />
+                            {previewingId === job.job_id ? "Loading..." : "Preview"}
+                          </button>
+
+                          <button
+                            type="button"
+                            className="fc-btn fc-btn--secondary"
+                            disabled={Boolean(busyAction)}
+                            onClick={() => void runAction(job, "duplicate")}
+                          >
+                            <CopySimple size={14} />
+                            {busyAction === "duplicate" ? actionLabels.duplicate : "Duplicate"}
+                          </button>
+
                           {job.status !== "Published" && (
                             <button
                               type="button"
@@ -1075,7 +1190,7 @@ export default function JobPostsScreen() {
                             </button>
                           )}
 
-                          {job.status !== "Published" && (
+                          {job.status === "Draft" && (
                             <button
                               type="button"
                               className="fc-btn fc-btn--primary"
@@ -1085,9 +1200,19 @@ export default function JobPostsScreen() {
                               <Plus size={14} />
                               {busyAction === "publish"
                                 ? actionLabels.publish
-                                : job.status === "Closed"
-                                  ? "Reopen"
-                                  : "Publish"}
+                                : "Publish"}
+                            </button>
+                          )}
+
+                          {job.status === "Closed" && (
+                            <button
+                              type="button"
+                              className="fc-btn fc-btn--primary"
+                              disabled={Boolean(busyAction)}
+                              onClick={() => void runAction(job, "reopen")}
+                            >
+                              <ArrowCounterClockwise size={14} />
+                              {busyAction === "reopen" ? actionLabels.reopen : "Reopen"}
                             </button>
                           )}
 

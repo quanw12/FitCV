@@ -9,6 +9,9 @@ const jobsMocks = vi.hoisted(() => ({
   update: vi.fn(),
   publish: vi.fn(),
   close: vi.fn(),
+  reopen: vi.fn(),
+  preview: vi.fn(),
+  duplicate: vi.fn(),
   archive: vi.fn(),
   unarchive: vi.fn(),
   extract: vi.fn(),
@@ -77,6 +80,19 @@ describe("JobPostsScreen", () => {
     jobsMocks.close.mockResolvedValue({
       ...activeJob,
       status: "Closed",
+    })
+    jobsMocks.reopen.mockResolvedValue({
+      ...activeJob,
+      status: "Published",
+    })
+    jobsMocks.preview.mockResolvedValue(activeJob)
+    jobsMocks.duplicate.mockResolvedValue({
+      ...activeJob,
+      job_id: 27,
+      title: "Copy of Backend Engineer",
+      status: "Draft",
+      deadline: null,
+      application_count: 0,
     })
     jobsMocks.archive.mockResolvedValue({
       ...activeJob,
@@ -208,6 +224,37 @@ describe("JobPostsScreen", () => {
       await screen.findByRole("button", { name: "Reopen" }),
     ).toBeInTheDocument()
     expect(jobsMocks.close).toHaveBeenCalledWith(activeJob.job_id)
+  })
+
+  it("previews a company job and duplicates it as a separate draft", async () => {
+    render(<JobPostsScreen />)
+    await screen.findByText("Backend Engineer")
+
+    fireEvent.click(screen.getByRole("button", { name: "Preview" }))
+    expect(await screen.findByLabelText("Job post preview")).toBeInTheDocument()
+    expect(jobsMocks.preview).toHaveBeenCalledWith(activeJob.job_id)
+
+    fireEvent.click(screen.getByRole("button", { name: "Duplicate" }))
+    expect(
+      await screen.findByText(
+        "Created draft copy “Copy of Backend Engineer”. Applications were not copied.",
+      ),
+    ).toBeInTheDocument()
+    expect(jobsMocks.duplicate).toHaveBeenCalledWith(activeJob.job_id)
+  })
+
+  it("uses the dedicated reopen action after a job is closed", async () => {
+    jobsMocks.listManaged.mockImplementation((archived = false) =>
+      Promise.resolve(
+        archived ? [] : [{ ...activeJob, status: "Closed" as const }],
+      ),
+    )
+    render(<JobPostsScreen />)
+    fireEvent.click(await screen.findByRole("button", { name: "Reopen" }))
+
+    await waitFor(() => {
+      expect(jobsMocks.reopen).toHaveBeenCalledWith(activeJob.job_id)
+    })
   })
 
   it("copies an anonymous public link for a published job", async () => {

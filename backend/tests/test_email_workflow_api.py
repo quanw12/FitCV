@@ -186,6 +186,25 @@ class EmailWorkflowApiIntegrationTests(unittest.TestCase):
             sent.json()["provider_message_id"], "resend-message-123"
         )
 
+    def test_generating_same_template_reuses_pending_draft(self) -> None:
+        first = self.generate_draft()
+        second_response = self.client.post(
+            "/api/hr/emails/drafts/generate",
+            json={
+                "application_id": self.application_id,
+                "template_key": "shortlist",
+            },
+        )
+        self.assertEqual(second_response.status_code, 201)
+        second = second_response.json()
+        self.assertEqual(second["email_id"], first["email_id"])
+        self.assertEqual(
+            self.db.query(CandidateEmail)
+            .filter_by(application_id=self.application_id)
+            .count(),
+            1,
+        )
+
     def test_failed_delivery_is_tracked_and_can_retry(self) -> None:
         draft = self.generate_draft()
         self.client.post(
@@ -206,6 +225,9 @@ class EmailWorkflowApiIntegrationTests(unittest.TestCase):
             listed.json()[0]["error_message"],
             "Provider temporarily unavailable.",
         )
+        self.assertTrue(listed.json()[0]["retryable"])
+        self.assertEqual(listed.json()[0]["retry_count"], 1)
+        self.assertIsNotNone(listed.json()[0]["last_attempt_at"])
 
         with patch(
             "app.services.email_workflow_service.send_candidate_email",
@@ -216,6 +238,90 @@ class EmailWorkflowApiIntegrationTests(unittest.TestCase):
             )
         self.assertEqual(retried.status_code, 200)
         self.assertEqual(retried.json()["status"], "Sent")
+        self.assertEqual(retried.json()["retry_count"], 2)
+
+    def test_permanent_provider_failure_requires_reopen(self) -> None:
+        draft = self.generate_draft()
+        self.client.post(
+            f"/api/hr/emails/drafts/{draft['email_id']}/approve"
+        )
+        with patch(
+            "app.services.email_workflow_service.send_candidate_email",
+            side_effect=EmailDeliveryError(
+                "Email provider rejected the request with status 403.",
+                retryable=False,
+                provider_status=403,
+            ),
+        ):
+            failed = self.client.post(
+                f"/api/hr/emails/drafts/{draft['email_id']}/send"
+            )
+        self.assertEqual(failed.status_code, 502)
+        blocked = self.client.post(
+            f"/api/hr/emails/drafts/{draft['email_id']}/send"
+        )
+        self.assertEqual(blocked.status_code, 409)
+        self.assertIn("not retryable", blocked.json()["detail"])
+        self.assertEqual(
+            self.client.post(
+                f"/api/hr/emails/drafts/{draft['email_id']}/reopen"
+            ).status_code,
+            200,
+        )
+
+    def test_recent_queued_attempt_blocks_duplicate_send(self) -> None:
+        draft = self.generate_draft()
+        self.client.post(
+            f"/api/hr/emails/drafts/{draft['email_id']}/approve"
+        )
+        queued = self.db.get(CandidateEmail, draft["email_id"])
+        assert queued is not None
+        queued.delivery_status = "Queued"
+        queued.last_attempt_at = datetime.now(timezone.utc).replace(tzinfo=None)
+        queued.idempotency_key = f"candidate-email/{queued.email_id}"
+        self.db.commit()
+        with patch(
+            "app.services.email_workflow_service.send_candidate_email"
+        ) as sender:
+            blocked = self.client.post(
+                f"/api/hr/emails/drafts/{draft['email_id']}/send"
+            )
+        self.assertEqual(blocked.status_code, 409)
+        sender.assert_not_called()
+
+    def test_failed_record_without_approval_cannot_be_sent(self) -> None:
+        draft = self.generate_draft()
+        failed = self.db.get(CandidateEmail, draft["email_id"])
+        assert failed is not None
+        failed.status = "Failed"
+        failed.delivery_status = "Failed"
+        failed.retryable = True
+        failed.approved_at = None
+        self.db.commit()
+        with patch(
+            "app.services.email_workflow_service.send_candidate_email"
+        ) as sender:
+            blocked = self.client.post(
+                f"/api/hr/emails/drafts/{draft['email_id']}/send"
+            )
+        self.assertEqual(blocked.status_code, 409)
+        self.assertIn("approve", blocked.json()["detail"].lower())
+        sender.assert_not_called()
+
+    def test_bulk_send_keeps_approval_gate_per_email(self) -> None:
+        draft = self.generate_draft()
+        with patch(
+            "app.services.email_workflow_service.send_candidate_email"
+        ) as sender:
+            response = self.client.post(
+                "/api/hr/emails/bulk-send",
+                json={"email_ids": [draft["email_id"], draft["email_id"]]},
+            )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["sent_count"], 0)
+        self.assertEqual(response.json()["failed_count"], 1)
+        self.assertIn("approve", response.json()["results"][0]["error_message"].lower())
+        sender.assert_not_called()
 
     def test_expired_retry_requires_reopen_and_fresh_approval(self) -> None:
         draft = self.generate_draft()

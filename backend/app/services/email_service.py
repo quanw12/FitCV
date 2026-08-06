@@ -9,7 +9,22 @@ from app.core.config import settings
 
 
 class EmailDeliveryError(RuntimeError):
-    pass
+    """Provider failure with an explicit retry classification.
+
+    Resend's idempotency key makes a retry safe, but only transient failures
+    should be retried without asking HR to review the message again.
+    """
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        retryable: bool = True,
+        provider_status: int | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.retryable = retryable
+        self.provider_status = provider_status
 
 
 class EmailWebhookVerificationError(RuntimeError):
@@ -69,29 +84,63 @@ def _resend_request(
                 parsed = json.loads(raw) if raw else {}
                 if not isinstance(parsed, dict):
                     raise EmailDeliveryError(
-                        "Email provider returned an invalid response."
+                        "Email provider returned an invalid response.",
+                        retryable=False,
                     )
                 return parsed
         except error.HTTPError as exc:
-            if (exc.code == 429 or exc.code >= 500) and attempt + 1 < attempts:
+            retryable = exc.code in {408, 409, 425, 429} or exc.code >= 500
+            if retryable and attempt + 1 < attempts:
                 time.sleep(0.25 * (2**attempt))
                 continue
+            provider_detail = _resend_http_error_detail(exc)
+            if provider_detail:
+                raise EmailDeliveryError(
+                    f"Email provider rejected the request with status {exc.code}: "
+                    f"{provider_detail}",
+                    retryable=retryable,
+                    provider_status=exc.code,
+                ) from exc
             raise EmailDeliveryError(
-                f"Email provider rejected the request with status {exc.code}."
+                f"Email provider rejected the request with status {exc.code}.",
+                retryable=retryable,
+                provider_status=exc.code,
             ) from exc
         except (error.URLError, TimeoutError) as exc:
             if attempt + 1 < attempts:
                 time.sleep(0.25 * (2**attempt))
                 continue
             raise EmailDeliveryError(
-                "Email provider is unavailable. Retry after checking the connection."
+                "Email provider is unavailable. Retry after checking the connection.",
+                retryable=True,
             ) from exc
         except (ValueError, TypeError) as exc:
             raise EmailDeliveryError(
-                "Email provider returned an invalid response."
+                "Email provider returned an invalid response.",
+                retryable=False,
             ) from exc
 
-    raise EmailDeliveryError("Email provider is unavailable.")
+    raise EmailDeliveryError("Email provider is unavailable.", retryable=True)
+
+
+def _resend_http_error_detail(exc: error.HTTPError) -> str | None:
+    """Extract a safe provider message without exposing response headers/secrets."""
+    try:
+        raw = exc.read().decode("utf-8", errors="replace")
+    except Exception:
+        return None
+    if not raw.strip():
+        return None
+    try:
+        payload = json.loads(raw)
+    except (TypeError, ValueError):
+        payload = None
+    if isinstance(payload, dict):
+        for key in ("message", "detail", "error"):
+            value = payload.get(key)
+            if isinstance(value, str) and value.strip():
+                return value.strip()[:600]
+    return raw.strip()[:600]
 
 
 def send_candidate_email(
@@ -106,7 +155,8 @@ def send_candidate_email(
 ) -> str:
     if not settings.resend_api_key or not settings.resend_from_email:
         raise EmailDeliveryError(
-            "Email delivery is not configured. Set RESEND_API_KEY and RESEND_FROM_EMAIL."
+            "Email delivery is not configured. Set RESEND_API_KEY and RESEND_FROM_EMAIL.",
+            retryable=False,
         )
     escaped_body = html.escape(body).replace("\n", "<br>")
     payload = {
@@ -136,7 +186,9 @@ def send_candidate_email(
     )
     message_id = response_payload.get("id")
     if not isinstance(message_id, str) or not message_id:
-        raise EmailDeliveryError("Email provider did not return a message ID.")
+        raise EmailDeliveryError(
+            "Email provider did not return a message ID.", retryable=False
+        )
     return message_id
 
 

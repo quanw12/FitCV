@@ -29,6 +29,7 @@ DELIVERY_STATUS_BY_EVENT = {
     "email.failed": "Failed",
 }
 REPLY_TOKEN_PATTERN = re.compile(r"^reply\+([0-9a-f-]{36})$", re.IGNORECASE)
+MAX_WEBHOOK_PAYLOAD_BYTES = 1_000_000
 
 
 class _TextExtractor(HTMLParser):
@@ -171,6 +172,8 @@ def _process_inbound(
         raise EmailWebhookVerificationError(
             "Inbound email webhook is missing email_id."
         )
+    if len(provider_email_id) > 200:
+        raise EmailWebhookVerificationError("Inbound email webhook email_id is too long.")
     if email_workflow.inbound_by_provider_email(db, provider_email_id):
         return EmailWebhookResponse(duplicate=True)
 
@@ -273,12 +276,16 @@ def process_resend_webhook(
     payload: bytes,
     headers: Mapping[str, str],
 ) -> EmailWebhookResponse:
+    if len(payload) > MAX_WEBHOOK_PAYLOAD_BYTES:
+        raise EmailWebhookVerificationError("Email webhook payload is too large.")
     event = verify_resend_webhook(payload, headers)
     provider_event_id = headers.get("svix-id", "").strip()
     if not provider_event_id:
         raise EmailWebhookVerificationError(
             "Email webhook is missing svix-id."
         )
+    if len(provider_event_id) > 200:
+        raise EmailWebhookVerificationError("Email webhook svix-id is too long.")
     if email_workflow.event_by_provider_id(db, provider_event_id):
         return EmailWebhookResponse(duplicate=True)
 
@@ -286,6 +293,8 @@ def process_resend_webhook(
     data = event.get("data")
     if not isinstance(event_type, str) or not isinstance(data, dict):
         raise EmailWebhookVerificationError("Invalid email webhook payload.")
+    if not event_type or len(event_type) > 50:
+        raise EmailWebhookVerificationError("Invalid email webhook event type.")
     occurred_at = _parse_timestamp(event.get("created_at"))
 
     try:
@@ -306,6 +315,10 @@ def process_resend_webhook(
                 event_type=event_type,
                 occurred_at=occurred_at,
                 detail="Webhook event is not associated with an email.",
+            )
+        if len(provider_email_id) > 200:
+            raise EmailWebhookVerificationError(
+                "Webhook event email_id is too long."
             )
         candidate_email = email_workflow.candidate_email_by_provider_id(
             db, provider_email_id
@@ -333,6 +346,13 @@ def process_resend_webhook(
     except IntegrityError:
         db.rollback()
         if email_workflow.event_by_provider_id(db, provider_event_id):
+            return EmailWebhookResponse(duplicate=True)
+        provider_email_id = data.get("email_id") if isinstance(data, dict) else None
+        if (
+            event_type == "email.received"
+            and isinstance(provider_email_id, str)
+            and email_workflow.inbound_by_provider_email(db, provider_email_id)
+        ):
             return EmailWebhookResponse(duplicate=True)
         raise
 
