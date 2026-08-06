@@ -75,6 +75,41 @@ def test_template_has_page_break_avoid() -> None:
     assert "page-break-inside: avoid" in html
 
 
+def _extract_block(html: str, selector: str) -> str:
+    import re
+
+    match = re.search(
+        rf"{re.escape(selector)}\s*\{{([^}}]*)\}}", html
+    )
+    return match.group(1) if match else ""
+
+
+def test_section_has_no_page_break_avoid() -> None:
+    html = render_cv(CVData(name="A"))
+    block = _extract_block(html, "section.cv-section")
+    assert "page-break-inside: avoid" not in block
+
+
+def test_entry_keeps_page_break_avoid() -> None:
+    html = render_cv(CVData(name="A"))
+    block = _extract_block(html, ".entry")
+    assert "page-break-inside: avoid" in block
+
+
+def test_entry_right_allows_wrap() -> None:
+    html = render_cv(CVData(name="A"))
+    block = _extract_block(html, ".entry-right")
+    assert "white-space: nowrap" not in block
+    assert "max-width" in block
+
+
+def test_uses_language_attribute() -> None:
+    html = render_cv(CVData(name="A"), language="vi")
+    assert '<html lang="vi">' in html
+    html = render_cv(CVData(name="A"), language="fr")
+    assert '<html lang="fr">' in html
+
+
 def test_template_uses_plain_harvard_font() -> None:
     html = render_cv(CVData(name="A"))
     assert "Times New Roman" in html
@@ -190,7 +225,14 @@ def test_template_uses_harvard_layout() -> None:
                 "location": "HCMC",
                 "date": "2020-2023",
                 "bullets": ["Built APIs."],
-            }
+            },
+            {
+                "title": "Senior Engineer",
+                "company": "TechCorp",
+                "location": "HCMC",
+                "date": "2023-present",
+                "bullets": ["Led team of 5."],
+            },
         ],
         skills=["Python"],
         core_competencies=[{"name": "Backend", "description": "4 years of APIs."}],
@@ -274,3 +316,34 @@ def test_avatar_data_url_is_embedded_in_header() -> None:
 def test_non_data_url_avatar_is_ignored() -> None:
     html = render_cv(CVData(name="Nguyen Van A"), avatar="https://example.com/x.jpg")
     assert 'class="cv-avatar"' not in html
+
+
+def test_experience_light_profile_orders_projects_before_experience() -> None:
+    """Projects + 0-1 experience entries → Education before Experience."""
+    cv = CVData(
+        name="Student A",
+        summary="CS student.",
+        education=[{"degree": "BSc", "institution": "HCMUS", "date": "2022-2026"}],
+        projects=[{"name": "FitCV", "description": "AI CV tool."}],
+        experience=[{"title": "Intern", "company": "Acme", "date": "Summer 2025"}],
+        skills=["Python"],
+    )
+    html = render_cv(cv)
+    assert html.index("<h2>Education</h2>") < html.index("<h2>Selected Projects</h2>")
+    assert html.index("<h2>Selected Projects</h2>") < html.index("<h2>Professional Experience</h2>")
+
+
+def test_standard_profile_orders_experience_before_projects() -> None:
+    """2+ experience entries → standard order: Experience before Projects."""
+    cv = CVData(
+        name="Engineer A",
+        summary="Backend engineer.",
+        experience=[
+            {"title": "Engineer", "company": "Acme", "date": "2020-2022"},
+            {"title": "Senior", "company": "Biz", "date": "2022-present"},
+        ],
+        projects=[{"name": "FitCV", "description": "AI CV tool."}],
+        skills=["Python"],
+    )
+    html = render_cv(cv)
+    assert html.index("<h2>Professional Experience</h2>") < html.index("<h2>Selected Projects</h2>")

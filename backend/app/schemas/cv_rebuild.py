@@ -43,6 +43,7 @@ class CvLinkItem(BaseModel):
 class CvProjectItem(BaseModel):
     name: str = ""
     description: str = ""
+    bullets: list[str] = Field(default_factory=list)
     links: list[CvLinkItem] = Field(default_factory=list)
 
 
@@ -96,9 +97,11 @@ class CvRebuildResponse(BaseModel):
     preview_json: CVData
     pdf_base64: str
     thumbnail_base64: str
+    warnings: list[str] = Field(default_factory=list)
 
 
 class CvBuildRequest(BaseModel):
     cv: CVData = Field(default_factory=CVData)
     language: Literal["en", "vi"] = "en"
     avatar: str | None = Field(default=None, max_length=_MAX_AVATAR_CHARS)
+    jd_text: str | None = None

@@ -51,6 +51,7 @@ const RESULT = {
   },
   pdf_base64: "cGRm",
   thumbnail_base64: "aW1n",
+  warnings: [],
 }
 
 describe("CVReBuildScreen", () => {
@@ -351,5 +352,38 @@ describe("CVReBuildScreen", () => {
     fireEvent.click(screen.getByTestId("cv-build-submit"))
 
     expect(await screen.findByText(/gemini timed out/i)).toBeInTheDocument()
+  })
+
+  it("does not show a warnings banner when warnings are empty", async () => {
+    apiMocks.rebuildCv.mockResolvedValue({ ...RESULT, warnings: [] })
+
+    render(<CVReBuildScreen />)
+
+    fireEvent.change(screen.getByTestId("cv-rebuild-input"), {
+      target: { files: [makeFile()] },
+    })
+
+    await screen.findByRole("img", { name: /built cv preview/i })
+
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument()
+  })
+
+  it("shows a warnings banner with content when warnings are present", async () => {
+    apiMocks.rebuildCv.mockResolvedValue({
+      ...RESULT,
+      warnings: ["The generated CV has 2 pages.", "Avatar could not be processed."],
+    })
+
+    render(<CVReBuildScreen />)
+
+    fireEvent.change(screen.getByTestId("cv-rebuild-input"), {
+      target: { files: [makeFile()] },
+    })
+
+    const alert = await screen.findByRole("alert")
+    expect(alert).toBeInTheDocument()
+    expect(alert).toHaveTextContent(/some content may need your review/i)
+    expect(alert).toHaveTextContent("The generated CV has 2 pages.")
+    expect(alert).toHaveTextContent("Avatar could not be processed.")
   })
 })

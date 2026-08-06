@@ -59,6 +59,7 @@ CV_DATA_JSON_SCHEMA: dict = {
                 "properties": {
                     "name": {"type": "string"},
                     "description": {"type": "string"},
+                    "bullets": {"type": "array", "items": {"type": "string"}},
                     "links": {
                         "type": "array",
                         "items": {
@@ -127,9 +128,36 @@ change facts, and do NOT add skills, responsibilities, numbers, or experiences
 that are not present in the extracted data.
 
 Rules:
+- CRITICAL — verb tense consistency: ALL verbs describing completed work —
+  in summary lines, bullets, project descriptions, and competency
+  descriptions — MUST use past tense (Built, Led, Implemented, Engineered,
+  Designed, Delivered, Contributed, Developed, Optimized, Deployed), NEVER
+  present tense (Build, Lead, Implement, Engineer, Design, Deliver,
+  Contribute, Develop, Optimize, Deploy). This applies uniformly within a
+  single entry: a project's one-line summary and its bullets must use the
+  same tense. If the work is ongoing, use present tense consistently
+  throughout that entry — but never mix tenses within one entry.
+- CRITICAL — do not fabricate experience titles: if the source does not
+  provide an explicit job title or role for an entry (for example a
+  collaboration, contribution, or project entry that only names the project
+  or topic without a role label), the "title" field MUST be left empty.
+  Do NOT invent professional titles like "Researcher", "Contributor",
+  "Collaborator", "Engineer", "Specialist", etc. When no title is present,
+  describe the work in the bullets and use the company/project name field
+  instead. A fabricated title from empty input is a defect.
 - Bullets: begin each bullet with a strong action verb, keep it to one or two
   concise lines, avoid personal pronouns (I, we, my), and keep concrete
   numbers or metrics when the source provides them.
+- CRITICAL — never collapse an enumerated or parenthetical list into a vague
+  summary phrase, regardless of bullet length. If the source text lists
+  specific items (separated by commas, listed in parentheses, or after a
+  colon — such as component names, feature names, tool names, or technology
+  names), EVERY listed item must appear in the output. A longer accurate
+  bullet that preserves the full list is always correct; a shorter bullet
+  that replaces the list with a generic phrase (e.g. "various components",
+  "multiple features", "hardware and system control") is a defect and must
+  never be produced. Only tighten grammar and connecting words around the
+  list — never remove or generalize list items themselves.
 - Preserve technical detail: NEVER drop technology keywords, product names,
   or acronyms that appear in the source (for example JWT, VNPay, Admin
   Dashboard, Redis, microservices). When polishing bullets and project
@@ -159,12 +187,19 @@ Rules:
 - "skills" is a compact list of short technology, framework, and tool names
   only (for example "Python", "React", "Docker"); keep the raw names exactly
   as written, without explanations.
-- "core_competencies" is a curated section: choose the 5-7 most important
-  competencies demonstrated in the CV. For each one, write a "name" (for
-  example "Backend Development" or "Python") and a "description" of one short
-  sentence explaining the depth or value, grounded strictly in the CV
-  (years of experience, scale, domain, or notable results). Do not invent
-  depth that the CV does not show.
+- "core_competencies" is a curated section: choose 5-7 capability themes
+  (for example "Computer Vision", "Edge AI", "Backend Architecture") that
+  represent the candidate's strongest domains. The "name" is a domain or
+  capability theme — NOT a single tool name (write "Backend Development"
+  not "Python"; the "skills" section lists tool names). The "description"
+  must emphasize proven capability and scale: what the candidate built or
+  delivered, at what scale, with what impact (for example "built 3
+  production computer vision pipelines deployed at city-level events" or
+  "designed microservices architecture serving 10K+ daily active users").
+  Do NOT repeat tool or technology names already listed in "skills" inside
+  the description — the description tells the story of what the candidate
+  can DO, not what tools they use. Ground strictly in the CV; do not invent
+  depth the CV does not show.
 - "skill_groups" organizes the technical "skills" into 2-4 categories (for
   example "Languages", "Frameworks & Libraries", "Tools & Platforms"); each
   item stays a short name. Only include this field when there are enough
@@ -188,9 +223,31 @@ Rules:
 - Each project may have its own "links" containing the repository or demo URL
   that appears in the raw text; give the link a short label (for example
   "GitHub" or "Demo") and the full URL as the "url".
+- For projects: use "description" as a one-line executive summary of the
+  project (what the project IS, in one sentence). Then put detailed
+  information in "bullets" — each bullet should be one concise line starting
+  with a strong action verb, covering features built, technologies used,
+  architecture decisions, or outcomes achieved.
+  CRITICAL — description and bullets must NOT overlap: the description is a
+  high-level summary (what it is), bullets describe WHAT WAS DONE (specific
+  actions, technologies, outcomes). Do NOT write the description first and
+  then expand the same sentence into bullet 1 — this creates redundant,
+  repetitive content and is a defect. Each bullet must cover DIFFERENT
+  information not already stated in the description.
+  CORRECT example:
+    description: "AI voice assistant running on ESP32 with zero cloud dependency."
+    bullets: ["Implemented streaming ASR pipeline using Whisper Tiny.", "Integrated LLM inference with Qwen 3 for on-device conversation.", "Engineered TTS output with Coqui TTS and I2S audio driver."]
+  WRONG example (description repeats in bullet 1):
+    description: "AI voice assistant on ESP32 with streaming ASR, LLM, and TTS."
+    bullets: ["Engineered an AI voice assistant on ESP32 with streaming ASR, LLM, and TTS."] ← DEFECT: same content as description
+  If the project has a simple one-line description with no further detail,
+  leave "bullets" empty.
 
 Raw CV text:
 <cv_text>
+
+Reminder: do not collapse any enumerated list from the source into a generic
+phrase. Every listed item must appear individually in the output.
 
 Output ONLY the JSON object matching the provided schema."""
 
@@ -211,6 +268,15 @@ Polish the entered information into a professional, ATS-friendly CV profile.
 Follow the schema exactly.
 
 Rules:
+- CRITICAL — verb tense consistency: ALL verbs describing completed work —
+  in summary lines, bullets, project descriptions, and competency
+  descriptions — MUST use past tense (Built, Led, Implemented, Engineered,
+  Designed, Delivered, Contributed, Developed, Optimized, Deployed), NEVER
+  present tense (Build, Lead, Implement, Engineer, Design, Deliver,
+  Contribute, Develop, Optimize, Deploy). This applies uniformly within a
+  single entry: a project's one-line summary and its bullets must use the
+  same tense. If the work is ongoing, use present tense consistently
+  throughout that entry — but never mix tenses within one entry.
 - Polish for impact: paraphrase the entered information into confident,
   impressive, results-oriented language with strong action verbs ("built",
   "led", "designed", "optimized", "delivered" instead of "did", "worked on",
@@ -222,6 +288,22 @@ Rules:
   percentages, counts, responsibilities, projects, or outcomes beyond what
   the candidate entered. Every number in your output must already exist in
   the entered information.
+- CRITICAL — do not fabricate experience titles: if the entered title is
+  empty for an entry, the polished "title" field MUST also be left empty.
+  Do NOT invent professional titles like "Researcher", "Contributor",
+  "Collaborator", "Engineer", "Specialist", etc. When no title is present,
+  describe the work in the bullets and use the company/project name field
+  instead. A fabricated title from empty input is a defect.
+- CRITICAL — never collapse an enumerated or parenthetical list into a vague
+  summary phrase, regardless of bullet length. If the entered data lists
+  specific items (separated by commas, listed in parentheses, or after a
+  colon — such as component names, feature names, tool names, or technology
+  names), EVERY listed item must appear in the output. A longer accurate
+  bullet that preserves the full list is always correct; a shorter bullet
+  that replaces the list with a generic phrase (e.g. "various components",
+  "multiple features", "hardware and system control") is a defect and must
+  never be produced. Only tighten grammar and connecting words around the
+  list — never remove or generalize list items themselves.
 - Completeness is MANDATORY: every entered section and every entered entry
   must survive the polish. Keep ALL sections — education, projects,
   certifications, publications, awards, languages, experience — even when a
@@ -249,18 +331,39 @@ Rules:
 - "skills": keep the short tool names exactly as entered. If there are
   enough skills, also organize them into "skill_groups" with 2-4 categories
   (for example Languages, Frameworks & Libraries, Tools & Platforms).
-- "core_competencies": derive 5-7 competencies from the entered experience
-  and skills. For each one write a "name" and a one-sentence "description"
-  explaining depth or value, grounded ONLY in the entered data. Do not invent
-  facts.
+- "core_competencies": derive 5-7 capability themes from the entered
+  experience and skills — domain-level strengths like "Computer Vision",
+  "Backend Architecture", or "Data Engineering", not individual tool names.
+  The "name" is a capability theme; the "description" must emphasize proven
+  capability and scale: what the candidate built or delivered, at what scale,
+  with what impact (e.g. "built 3 production pipelines deployed at
+  city-level events", "designed microservices serving 10K+ daily users").
+  Do NOT repeat tool or technology names already in "skills" inside the
+  description — the description tells the story of capability, not a tool
+  list. Ground ONLY in the entered data. Do not invent facts.
 - ATS-safe: do not output decorative symbols anywhere (★, ☆, ●, ✓, ▲...).
   Convert rating symbols in language proficiency into words ("Native",
   "Fluent", "Intermediate" or "Thành thạo", "Khá", "Cơ bản").
 - Empty arrays mean the candidate did not provide that section; leave them
   empty. Do not invent placeholder values.
+- Projects: keep "description" as a short one-line executive summary (what the
+  project IS). Put detailed information in "bullets" — each bullet one concise
+  line starting with a strong action verb. CRITICAL — description and bullets
+  must NOT overlap: the description is a high-level summary, bullets describe
+  WHAT WAS DONE (specific actions, technologies, outcomes). Do NOT write the
+  description first and then expand the same sentence into bullet 1 — this
+  creates redundant, repetitive content and is a defect. Each bullet must
+  cover DIFFERENT information not already stated in the description. If the
+  candidate entered a multi-sentence project description, split it into
+  separate bullets. If bullets already exist, keep them; if only a description
+  exists, split it into bullets when there is meaningful detail to separate.
+  The same "never collapse enumerated list" rule applies to project bullets.
 
 Entered CV JSON:
 <cv_json>
+
+Reminder: do not collapse any enumerated list from the source into a generic
+phrase. Every listed item must appear individually in the output.
 
 Output ONLY the JSON object matching the provided schema."""
 
@@ -275,11 +378,27 @@ def build_extraction_prompt(raw_text: str, validation_error: str | None = None) 
 
 
 def build_polish_prompt(
-    cv_json: str, language: str, validation_error: str | None = None
+    cv_json: str, language: str, validation_error: str | None = None, jd_text: str | None = None
 ) -> str:
     prompt = _BUILD_PROMPT.replace(
         "<language_label>", _LANGUAGE_LABELS.get(language, "English")
-    ).replace("<cv_json>", cv_json.strip())
+    )
+    if jd_text:
+        jd_block = (
+            "\n\nJob description for tailoring (optional):\n"
+            "<jd_text>\n"
+            f"{jd_text.strip()[:8000]}\n"
+            "</jd_text>\n"
+            "Tailor the CV to this job: prioritize and reorder skills, "
+            "core_competencies, and experience-bullet order by relevance to the "
+            "JD, and emphasize JD keyword overlaps already present in the entered "
+            "data. Keep every fact 100% grounded in the entered data and re-run "
+            "the number/skill/section grounding checks. Never invent skills, "
+            "technologies, or metrics that the entered data does not state, and "
+            "never add a skill just because it appears in the JD.\n"
+        )
+        prompt = prompt.replace("<cv_json>", jd_block + "<cv_json>")
+    prompt = prompt.replace("<cv_json>", cv_json.strip())
     if validation_error:
         prompt = prompt + _VALIDATION_SUFFIX.replace(
             "<validation_error>", validation_error.strip()
