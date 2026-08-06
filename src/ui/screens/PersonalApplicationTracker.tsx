@@ -6,7 +6,6 @@ import {
   Clock,
   ArrowSquareOut,
   Spinner,
-  ChatText,
   PencilSimpleLine,
   Plus,
   MagnifyingGlass,
@@ -14,6 +13,8 @@ import {
   TrashSimple,
   X,
 } from "@phosphor-icons/react"
+
+import chatBubbleIcon from "@/imports/navigation-icons/chat-bubble-left-right.svg"
 
 import {
   Bar,
@@ -723,7 +724,7 @@ export default function AppTrackerScreen() {
   }
 
   return (
-    <div>
+    <div className="tracker-workspace">
       <div className="fc-page-head">
         <div>
           <h1>Application Tracker</h1>
@@ -762,46 +763,51 @@ export default function AppTrackerScreen() {
               <span className="fc-eyebrow">Pipeline overview</span>
               <h2>{stats.total} applications</h2>
             </div>
-            <span className="fc-badge fc-badge--amber">
-              <Bell size={12} weight="light" /> {stats.remindersDue} due
+            <span className={`tracker-due-state ${stats.remindersDue > 0 ? "has-due" : ""}`}>
+              <Bell size={12} weight="light" />
+              {stats.remindersDue > 0 ? `${stats.remindersDue} follow-up${stats.remindersDue === 1 ? "" : "s"} due` : "No follow-ups due"}
             </span>
           </div>
-          <ResponsiveContainer width="100%" height={130}>
-            <BarChart
-              data={chartData}
-              layout="vertical"
-              margin={{ left: 0, right: 20, top: 12 }}
-            >
-              <XAxis type="number" allowDecimals={false} hide />
-              <YAxis
-                dataKey="stage"
-                type="category"
-                tick={{ fontSize: 12, fill: "#64748B" }}
-                axisLine={false}
-                tickLine={false}
-                width={75}
-              />
-              <Tooltip
-                contentStyle={{
-                  background: "white",
-
-                  border: "1px solid #E2E8F0",
-
-                  borderRadius: 8,
-
-                  fontSize: 13,
-                }}
-              />
-              <Bar dataKey="count" radius={[0, 6, 6, 0]} barSize={15}>
-                {chartData.map((_, index) => (
-                  <Cell
-                    key={APPLICATION_STATUSES[index]}
-                    fill={STAGE_COLORS[index]}
-                  />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
+          {stats.total === 0 ? (
+            <div className="tracker-zero-summary">
+              <strong>No applications yet</strong>
+              <span>Add an application to turn this into a live pipeline.</span>
+            </div>
+          ) : (
+            <ResponsiveContainer width="100%" height={130}>
+              <BarChart
+                data={chartData}
+                layout="vertical"
+                margin={{ left: 0, right: 20, top: 12 }}
+              >
+                <XAxis type="number" allowDecimals={false} hide />
+                <YAxis
+                  dataKey="stage"
+                  type="category"
+                  tick={{ fontSize: 12, fill: "#64748B" }}
+                  axisLine={false}
+                  tickLine={false}
+                  width={75}
+                />
+                <Tooltip
+                  contentStyle={{
+                    background: "var(--surface)",
+                    border: "1px solid var(--border)",
+                    borderRadius: 8,
+                    fontSize: 13,
+                  }}
+                />
+                <Bar dataKey="count" radius={[0, 6, 6, 0]} barSize={15}>
+                  {chartData.map((_, index) => (
+                    <Cell
+                      key={APPLICATION_STATUSES[index]}
+                      fill={STAGE_COLORS[index]}
+                    />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          )}
         </div>
       </div>
 
@@ -854,7 +860,7 @@ export default function AppTrackerScreen() {
           </div>
         ) : filtered.length === 0 ? (
           <div className="tracker-empty">
-            <ChatText size={28} weight="light" />
+            <img className="fc-empty-svg" src={chatBubbleIcon} alt="" aria-hidden="true" />
             <strong>
               {applications.length
                 ? "No applications match these filters."
@@ -959,7 +965,7 @@ export default function AppTrackerScreen() {
                           }
                           aria-label="Open notes"
                         >
-                          <ChatText size={14} weight="light" />
+                          <img className="fc-action-svg fc-action-svg--muted" src={chatBubbleIcon} alt="" aria-hidden="true" />
                           <span>{application.noteCount}</span>
                         </button>
                         {application.jobUrl && (

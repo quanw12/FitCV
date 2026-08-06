@@ -22,8 +22,9 @@ export default function AppTrackerScreen({
   }, [focusApplicationId])
 
   return (
-    <div>
+    <div className="app-tracker-screen">
       <div
+        className="tracker-view-tabs"
         role="tablist"
         aria-label="Application tracker views"
         style={{

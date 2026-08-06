@@ -134,17 +134,7 @@ function Field({
 }) {
   return (
     <label
-      style={{
-        display: "grid",
-
-        gap: 7,
-
-        fontSize: 13,
-
-        fontWeight: 600,
-
-        color: "var(--text-secondary)",
-      }}
+      className="fitcv-profile-field"
     >
       {label}
       <input
@@ -460,27 +450,30 @@ export default function ProfileScreen({
     )
 
   return (
-    <div style={{ maxWidth: 1040, margin: "0 auto" }}>
-      <style>{`.fitcv-profile-grid{display:grid;grid-template-columns:280px minmax(0,1fr);gap:20px}.fitcv-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}@keyframes fitcv-spin{to{transform:rotate(360deg)}}.fitcv-spin{animation:fitcv-spin 1s linear infinite}@media(max-width:760px){.fitcv-profile-grid,.fitcv-form-grid{grid-template-columns:1fr}}`}</style>
-      <div style={{ marginBottom: 22 }}>
-        <h1 style={{ margin: 0, fontSize: 26, color: "var(--text-primary)" }}>
-          {companyOnboarding
-            ? "Complete your company profile"
-            : "Profile settings"}
-        </h1>
-        <p
-          style={{
-            margin: "7px 0 0",
+    <div className="fitcv-profile-workspace">
+      <style>{`.fitcv-profile-workspace{max-width:1120px;margin:0 auto;padding:34px 28px 64px}.fitcv-profile-workspace *{box-sizing:border-box}.fitcv-profile-grid{display:grid;grid-template-columns:292px minmax(0,1fr);gap:30px;align-items:start}.fitcv-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}.fitcv-profile-sidebar{display:grid;align-content:start;gap:14px;position:sticky;top:18px}.fitcv-profile-card{border:1px solid var(--border);border-radius:16px;background:var(--surface);padding:22px;box-shadow:0 12px 36px -34px rgba(15,23,42,.32)}.fitcv-profile-main{display:grid;gap:16px}.fitcv-profile-section{border:1px solid var(--border);border-radius:16px;background:var(--surface);padding:22px;box-shadow:0 12px 36px -34px rgba(15,23,42,.24)}.fitcv-profile-section h2{margin:0 0 18px;font:700 16px/1.35 var(--font-body);letter-spacing:-.02em}.fitcv-profile-field{display:grid;gap:7px;font-size:12px;font-weight:650;color:var(--text-secondary)}.fitcv-profile-field input{border-radius:9px!important;padding:11px 12px!important;transition:border-color .16s ease,box-shadow .16s ease}.fitcv-profile-field input:focus{border-color:var(--accent)!important;box-shadow:0 0 0 3px var(--accent-soft)}.fitcv-profile-kicker{display:flex;align-items:center;gap:8px;margin-bottom:10px;color:var(--accent);font-size:11px;font-weight:750;letter-spacing:.11em;text-transform:uppercase}.fitcv-profile-heading h1{font-size:34px!important;letter-spacing:-.045em}.fitcv-profile-heading p{max-width:540px;font-size:14px!important;line-height:1.6}.fitcv-profile-account dt{margin-top:12px;color:var(--text-muted);font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}.fitcv-profile-account dd{margin:3px 0 0;color:var(--text-primary);font-size:13px;word-break:break-word}.fitcv-profile-actions{display:flex;justify-content:flex-end;padding-top:4px}.fitcv-profile-actions button{border-radius:10px!important;padding:11px 16px!important;box-shadow:none!important}.fitcv-avatar-shell{border:1px solid #dbeafe!important;border-radius:50%!important;background:linear-gradient(145deg,#2563eb,#0f172a)!important}.fitcv-upload-zone{border-radius:12px!important;background:#fbfdff!important}.fitcv-profile-empty{border-left:2px solid var(--accent)}@keyframes fitcv-spin{to{transform:rotate(360deg)}}.fitcv-spin{animation:fitcv-spin 1s linear infinite}@media(max-width:820px){.fitcv-profile-grid{grid-template-columns:1fr}.fitcv-profile-sidebar{position:static;grid-template-columns:1fr 1fr}.fitcv-profile-heading h1{font-size:29px!important}}@media(max-width:620px){.fitcv-profile-workspace{padding:24px 16px 48px}.fitcv-form-grid,.fitcv-profile-sidebar{grid-template-columns:1fr}.fitcv-profile-section,.fitcv-profile-card{padding:18px}}`}</style>
+      <div className="fitcv-profile-heading" style={{ marginBottom: 28 }}>
+        <div className="fitcv-profile-heading-copy">
+          <div className="fitcv-profile-kicker"><UserCircle size={14} weight="fill" /> Account workspace</div>
+          <h1 style={{ margin: 0, fontSize: 26, color: "var(--text-primary)" }}>
+            {companyOnboarding
+              ? "Complete your company profile"
+              : "Profile settings"}
+          </h1>
+          <p
+            style={{
+              margin: "7px 0 0",
 
-            color: "var(--text-muted)",
+              color: "var(--text-muted)",
 
-            fontSize: 14,
-          }}
-        >
-          {companyOnboarding
-            ? "Add your company details before entering the hiring workspace."
-            : "Keep your professional information accurate and ready for work."}
-        </p>
+              fontSize: 14,
+            }}
+          >
+            {companyOnboarding
+              ? "Add your company details before entering the hiring workspace."
+              : "Keep your professional information accurate and ready for work."}
+          </p>
+        </div>
       </div>
       {error && (
         <div
@@ -529,17 +522,10 @@ export default function ProfileScreen({
         </div>
       )}
       <form onSubmit={submit} className="fitcv-profile-grid">
-        <aside style={{ display: "grid", alignContent: "start", gap: 16 }}>
+        <aside className="fitcv-profile-sidebar">
           <section
+            className="fitcv-profile-card"
             style={{
-              background: "white",
-
-              border: "1px solid var(--border)",
-
-              borderRadius: 14,
-
-              padding: 20,
-
               textAlign: "center",
             }}
           >
@@ -549,7 +535,7 @@ export default function ProfileScreen({
 
                 height: 88,
 
-                borderRadius: 20,
+                borderRadius: "50%",
 
                 margin: "0 auto 14px",
 
@@ -569,6 +555,7 @@ export default function ProfileScreen({
 
                 fontWeight: 800,
               }}
+              className="fitcv-avatar-shell"
             >
               {initials}
               {avatarSrc && !avatarBroken && (
@@ -601,15 +588,7 @@ export default function ProfileScreen({
             </span>
           </section>
           <section
-            style={{
-              background: "white",
-
-              border: "1px solid var(--border)",
-
-              borderRadius: 14,
-
-              padding: 18,
-            }}
+            className="fitcv-profile-card fitcv-profile-account"
           >
             <div
               style={{
@@ -625,6 +604,7 @@ export default function ProfileScreen({
               <UserCircle size={17} weight="light" />
               <strong>Account</strong>
             </div>
+            <dl style={{ margin: 0 }}>
             {[
               ["Email", profile?.email],
 
@@ -640,38 +620,14 @@ export default function ProfileScreen({
                   : null,
               ],
             ].map(([label, value]) => (
-              <div key={label} style={{ marginTop: 11 }}>
-                <div
-                  style={{
-                    fontSize: 11,
-
-                    color: "var(--text-muted)",
-
-                    textTransform: "uppercase",
-                  }}
-                >
-                  {label}
-                </div>
-                <div
-                  style={{
-                    fontSize: 13,
-
-                    color: "var(--text-primary)",
-
-                    wordBreak: "break-word",
-                  }}
-                >
-                  {value ?? "Not available"}
-                </div>
-              </div>
+              <div key={label}><dt>{label}</dt><dd>{value ?? "Not available"}</dd></div>
             ))}
+            </dl>
           </section>
         </aside>
-        <div style={{ display: "grid", gap: 18 }}>
-          <section style={{ padding: "4px 2px" }}>
-            <h2 style={{ fontSize: 17, margin: "0 0 18px" }}>
-              Profile details
-            </h2>
+        <div className="fitcv-profile-main">
+          <section className="fitcv-profile-section">
+            <h2>Profile details</h2>
             <div className="fitcv-form-grid">
               <Field
                 label="Full name"
@@ -693,7 +649,7 @@ export default function ProfileScreen({
             </div>
           </section>
           {hasCompanyRole && (
-            <section style={{ padding: "4px 2px" }}>
+            <section className="fitcv-profile-section">
               <h2
                 style={{
                   fontSize: 17,
@@ -741,17 +697,7 @@ export default function ProfileScreen({
               </div>
             </section>
           )}
-          <section
-            style={{
-              background: "white",
-
-              border: "1px solid var(--border)",
-
-              borderRadius: 14,
-
-              padding: 22,
-            }}
-          >
+          <section className="fitcv-profile-section">
             <h2
               style={{
                 fontSize: 17,
@@ -768,6 +714,7 @@ export default function ProfileScreen({
               <Image size={18} weight="light" /> Profile photo
             </h2>
             <div
+              className="fitcv-upload-zone"
               onDragOver={(event) => {
                 event.preventDefault()
                 setDragging(true)
@@ -839,6 +786,7 @@ export default function ProfileScreen({
                   alignItems: "center",
                   cursor: avatarBusy ? "wait" : "pointer",
                   fontWeight: 650,
+                  color: "var(--text-primary)",
                 }}
               >
                 {avatarBusy ? (
@@ -871,7 +819,7 @@ export default function ProfileScreen({
               )}
             </div>
           </section>
-          <div style={{ display: "flex", justifyContent: "flex-end" }}>
+          <div className="fitcv-profile-actions">
             <button
               disabled={
                 saving ||

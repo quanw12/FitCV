@@ -1,0 +1,68 @@
+{
+  "input": "C:\\Studybase\\FitCV\\output\\sad_db_work\\rup_sad_reference.docx",
+  "fonts_by_char_count": {
+    "Arial": 11
+  },
+  "direct_run_formatting_runs": 13,
+  "direct_paragraph_formatting_paragraphs": 0,
+  "heading_like_paragraphs_not_heading_style": [
+    {
+      "para_index": 51,
+      "text": "Date",
+      "style": "Tabletext"
+    },
+    {
+      "para_index": 52,
+      "text": "Version",
+      "style": "Tabletext"
+    },
+    {
+      "para_index": 53,
+      "text": "Description",
+      "style": "Tabletext"
+    },
+    {
+      "para_index": 54,
+      "text": "Author",
+      "style": "Tabletext"
+    },
+    {
+      "para_index": 73,
+      "text": "<Team Name>",
+      "style": "Normal"
+    }
+  ],
+  "examples": {
+    "direct_run_formatting": [
+      {
+        "para_index": 4,
+        "run_text": "Version <1.0>",
+        "style": "Title"
+      },
+      {
+        "para_index": 15,
+        "run_text": "\t",
+        "style": "toc 1"
+      },
+      {
+        "para_index": 16,
+        "run_text": "\t",
+        "style": "toc 1"
+      },
+      {
+        "para_index": 17,
+        "run_text": "\t",
+        "style": "toc 1"
+      },
+      {
+        "para_index": 18,
+        "run_text": "\t",
+        "style": "toc 1"
+      }
+    ]
+  },
+  "notes": [
+    "Direct formatting is not always wrong, but it often causes inconsistent output when templates change.",
+    "Heading-like paragraphs not using Heading styles can break TOC and accessibility."
+  ]
+}

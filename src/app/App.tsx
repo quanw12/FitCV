@@ -406,7 +406,7 @@ export default function App() {
   const renderScreen = () => {
     switch (screen) {
       case "cv-rebuild":
-        return <CVReBuildScreen />
+        return <CVReBuildScreen onNavigate={handleNavigate} />
 
       case "analyzer":
         return (
@@ -467,7 +467,7 @@ export default function App() {
 
       default:
         return portal === "seeker" ? (
-          <CVReBuildScreen />
+          <CVReBuildScreen onNavigate={handleNavigate} />
         ) : (
           <HRDashboard onNavigate={handleNavigate} />
         )

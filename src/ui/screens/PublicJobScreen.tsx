@@ -11,6 +11,7 @@ import {
 import { useCallback, useEffect, useState } from "react"
 
 import { jobsApi } from "@/api/jobsApi"
+import BrandMark from "@/ui/components/BrandMark"
 import type { JobPost } from "@/types/jobs"
 
 interface PublicJobScreenProps {
@@ -74,7 +75,7 @@ export default function PublicJobScreen({
       <header className="public-job-header">
         <button className="public-job-brand" type="button" onClick={onBack}>
           <span>
-            <Briefcase size={19} aria-hidden="true" />
+            <BrandMark size={38} />
           </span>
           <strong>FitCV</strong>
         </button>

@@ -132,4 +132,43 @@ describe("CVHistoryScreen", () => {
     expect(screen.getByText("82.0%")).toBeInTheDocument()
     expect(screen.getByText("+27.0 points")).toBeInTheDocument()
   })
+
+  it("shows a useful baseline bar instead of an empty line chart for one scored version", async () => {
+    analyzerMocks.listCvComparisons.mockResolvedValueOnce([
+      {
+        jobDescriptionId: 10,
+        title: "Backend Developer",
+        createdAt: "2026-07-01T09:00:00Z",
+        bestScore: 55,
+        latestScore: 55,
+        latestDelta: null,
+        versions: [
+          {
+            cvId: 1,
+            versionNumber: 1,
+            fileName: "cv-v1.pdf",
+            uploadedAt: "2026-07-01T10:00:00Z",
+            matchResultId: 100,
+            overallScore: 55,
+            skillScore: 50,
+            experienceScore: 60,
+            educationScore: 100,
+            softSkillScore: 70,
+            matchLabel: "Moderate Match",
+            completedAt: "2026-07-01T10:05:00Z",
+            deltaFromPrevious: null,
+          },
+        ],
+      },
+    ])
+
+    render(<CVHistoryScreen />)
+
+    expect(
+      await screen.findByRole("img", {
+        name: "CV version 1 baseline score chart",
+      }),
+    ).toBeInTheDocument()
+    expect(screen.queryByLabelText("CV score improvement chart")).not.toBeInTheDocument()
+  })
 })

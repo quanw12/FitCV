@@ -1,75 +1,68 @@
-import { MagnifyingGlass, Bell } from "@phosphor-icons/react"
+import { Bell } from "@phosphor-icons/react"
+
+import BrandMark from "./BrandMark"
+
+import type { NavItem } from "@/data/navigation"
+import type { ScreenId } from "@/types/app"
 
 interface Props {
   userName: string
   userAvatarUrl?: string | null
-  onSearchFocus?: () => void
+  navItems: NavItem[]
+  currentScreen: ScreenId | ""
+  onNavigate: (screen: ScreenId) => void
   onUserMenuClick?: () => void
+  onNotificationClick?: () => void
 }
 
 export default function FloatingTopbar({
   userName,
   userAvatarUrl,
-  onSearchFocus,
+  navItems,
+  currentScreen,
+  onNavigate,
   onUserMenuClick,
+  onNotificationClick,
 }: Props) {
   const initials = userName
     .split(" ")
-    .map((n) => n[0])
+    .map((name) => name[0])
     .join("")
     .toUpperCase()
     .slice(0, 2)
-
   return (
-    <header
-      className="fc-glass"
-      style={{
-        margin: "8px 16px 0",
-        borderRadius: "var(--r-lg)",
-        height: "var(--topbar-h)",
-        display: "flex",
-        alignItems: "center",
-        gap: 16,
-        padding: "0 18px",
-        flexShrink: 0,
-        position: "relative",
-        zIndex: 20,
-      }}
-    >
-      <div
-        className="fc-search"
-        style={{ flex: 1, maxWidth: 360 }}
-        onClick={onSearchFocus}
+    <header className="fc-topbar-surface">
+      <button
+        type="button"
+        className="fc-topbar-brand"
+        aria-label="FitCV home"
+        onClick={() => onNavigate(navItems[0].screen)}
       >
-        <MagnifyingGlass size={16} weight="light" color="var(--text-muted)" />
-        <input
-          type="search"
-          placeholder="Search candidates, jobs, insights…"
-          style={{
-            border: "none",
-            outline: "none",
-            background: "transparent",
-            color: "var(--text-primary)",
-            fontFamily: "inherit",
-            fontSize: 14,
-            width: "100%",
-          }}
-          onFocus={onSearchFocus}
-        />
-      </div>
+        <BrandMark size={30} className="fc-topbar-brand-mark" />
+        <span>FitCV</span>
+      </button>
 
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 4,
-          marginLeft: "auto",
-        }}
-      >
+      <nav className="fc-topbar-nav" aria-label="Primary navigation">
+        {navItems.filter((item) => item.screen !== "profile" && item.screen !== "hr-settings").map((item) => (
+          <button
+            type="button"
+            key={item.screen}
+            onClick={() => onNavigate(item.screen)}
+            className={`fc-topbar-nav-item ${currentScreen === item.screen ? "is-active" : ""}`}
+          >
+            {item.icon}
+            <span>{item.label}</span>
+          </button>
+        ))}
+      </nav>
+
+      <div className="fc-topbar-actions">
         <button
           type="button"
           className="fc-icon-btn"
           aria-label="Notifications"
+          title="View application updates"
+          onClick={onNotificationClick}
         >
           <Bell size={18} weight="light" />
         </button>
@@ -77,38 +70,15 @@ export default function FloatingTopbar({
         <button
           type="button"
           className="fc-icon-btn"
-          style={{ display: "flex", alignItems: "center", gap: 8 }}
           aria-label="User menu"
           onClick={onUserMenuClick}
         >
           {userAvatarUrl ? (
-            <img
-              src={userAvatarUrl}
-              alt={userName}
-              style={{
-                width: 30,
-                height: 30,
-                borderRadius: 8,
-                objectFit: "cover",
-              }}
-            />
+            <img src={userAvatarUrl} alt={userName} className="fc-topbar-avatar" />
           ) : (
-            <span
-              className="fc-avatar"
-              style={{ width: 30, height: 30, fontSize: 11 }}
-            >
-              {initials}
-            </span>
+            <span className="fc-avatar fc-topbar-avatar">{initials}</span>
           )}
-          <span
-            style={{
-              fontSize: 13,
-              fontWeight: 600,
-              color: "var(--text-primary)",
-            }}
-          >
-            {userName}
-          </span>
+          <span className="fc-topbar-user-name">{userName}</span>
         </button>
       </div>
     </header>

@@ -19,7 +19,7 @@ export default function RevealStagger({
 
   delay = 0,
 
-  y = 40,
+  y = 12,
 }: Props) {
   const reduce = useReducedMotion()
 
@@ -34,7 +34,7 @@ export default function RevealStagger({
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, amount: 0.15 }}
       transition={{
-        duration: 0.7,
+        duration: 0.38,
 
         delay,
 
