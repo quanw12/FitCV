@@ -86,6 +86,15 @@ def list_manage(
     return jobs_service.list_managed(db, account, archived=archived)
 
 
+@router.get("/{job_id}/preview", response_model=JobResponse)
+def preview_job(
+    job_id: int,
+    db: Session = Depends(get_db),
+    account: Account = Depends(manager),
+):
+    return jobs_service.preview(db, account, job_id)
+
+
 @router.post("", response_model=JobResponse, status_code=201)
 def create_job(payload: JobCreate, db: Session = Depends(get_db), account: Account = Depends(manager)):
     return jobs_service.create(db, account, payload)
@@ -104,6 +113,16 @@ def publish_job(job_id: int, db: Session = Depends(get_db), account: Account = D
 @router.post("/{job_id}/close", response_model=JobResponse)
 def close_job(job_id: int, db: Session = Depends(get_db), account: Account = Depends(manager)):
     return jobs_service.close(db, account, job_id)
+
+
+@router.post("/{job_id}/reopen", response_model=JobResponse)
+def reopen_job(job_id: int, db: Session = Depends(get_db), account: Account = Depends(manager)):
+    return jobs_service.reopen(db, account, job_id)
+
+
+@router.post("/{job_id}/duplicate", response_model=JobResponse, status_code=201)
+def duplicate_job(job_id: int, db: Session = Depends(get_db), account: Account = Depends(manager)):
+    return jobs_service.duplicate(db, account, job_id)
 
 
 @router.post("/{job_id}/archive", response_model=JobResponse)

@@ -186,6 +186,11 @@ def list_managed(
     ]
 
 
+def preview(db: Session, account: Account, job_id: int) -> JobResponse:
+    """Return the company-scoped record even when it is archived or closed."""
+    return _managed_response(db, account, _managed(db, account, job_id).job_id)
+
+
 def _managed_response(
     db: Session,
     account: Account,
@@ -236,6 +241,11 @@ def publish(db: Session, account: Account, job_id: int) -> JobResponse:
     _require_not_archived(job, "publishing it")
     if job.status == "Published":
         raise HTTPException(status_code=409, detail="Job is already published.")
+    if job.status == "Closed":
+        raise HTTPException(
+            status_code=409,
+            detail="Use reopen to publish a closed job after reviewing its deadline.",
+        )
     virtual = _decode_description(job.description)
     publish_values = {
         **virtual,
@@ -259,6 +269,45 @@ def close(db: Session, account: Account, job_id: int) -> JobResponse:
         raise HTTPException(status_code=409, detail="Only a published job can be closed.")
     jobs.update_job(db, job, {"status": "Closed"})
     return _managed_response(db, account, job_id)
+
+
+def reopen(db: Session, account: Account, job_id: int) -> JobResponse:
+    job = _managed(db, account, job_id)
+    _require_not_archived(job, "reopening it")
+    if job.status != "Closed":
+        raise HTTPException(status_code=409, detail="Only a closed job can be reopened.")
+    if job.deadline is None or _utc_naive(job.deadline) <= _now():
+        raise HTTPException(
+            status_code=422,
+            detail="Set a future application deadline before reopening this job.",
+        )
+    jobs.update_job(db, job, {"status": "Published"})
+    return _managed_response(db, account, job_id)
+
+
+def duplicate(db: Session, account: Account, job_id: int) -> JobResponse:
+    source = _managed(db, account, job_id)
+    # Copy the recruitment content and rubric, but never carry over lifecycle
+    # state, deadlines, assignments, or candidate applications.
+    values = {
+        "title": f"Copy of {source.title}"[:200],
+        "description": source.description,
+        "requirements": source.requirements,
+        "location": source.location,
+        "employment_type": source.employment_type,
+        "skill_weight": source.skill_weight,
+        "experience_weight": source.experience_weight,
+        "education_weight": source.education_weight,
+        "soft_skill_weight": source.soft_skill_weight,
+        "deadline": None,
+    }
+    duplicated = jobs.create_job(
+        db,
+        company_id=_company(account),
+        account_id=account.account_id,
+        values=values,
+    )
+    return _managed_response(db, account, duplicated.job_id)
 
 
 def archive(
