@@ -166,6 +166,7 @@ export default function CVBuildForm({
           .map((entry) => ({
             name: entry.name.trim(),
             description: entry.description.trim(),
+            bullets: [],
             links: [],
           })),
         certifications: splitList(certificationsText),

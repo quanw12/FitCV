@@ -517,6 +517,28 @@ export default function CVReBuildScreen() {
         </div>
       )}
 
+      {state.phase === "done" && state.result.warnings.length > 0 && (
+        <div
+          role="alert"
+          style={{
+            border: "1px solid #FDE68A",
+            borderRadius: 12,
+            background: "#FFFBEB",
+            padding: "14px 18px",
+            marginBottom: 16,
+          }}
+        >
+          <p style={{ fontWeight: 600, color: "#92400E", fontSize: 14, marginBottom: 6 }}>
+            Some content may need your review:
+          </p>
+          <ul style={{ margin: 0, paddingLeft: 18, color: "#92400E", fontSize: 13 }}>
+            {state.result.warnings.map((w, i) => (
+              <li key={i}>{w}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {state.phase === "done" && (
         <div
           style={{
