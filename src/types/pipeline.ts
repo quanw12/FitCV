@@ -15,6 +15,12 @@ export interface PipelineApplication {
   note_count: number
 }
 
+export interface PipelineBulkStageUpdateResult {
+  updated: PipelineApplication[]
+  skipped_application_ids: number[]
+  history_ids: number[]
+}
+
 export interface PipelineNote {
   note_id: number
   application_id: number

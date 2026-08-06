@@ -5,6 +5,8 @@ from app.db.session import get_db
 from app.middleware.auth_guard import require_role
 from app.models.account import Account, AccountRole
 from app.schemas.pipeline import (
+    PipelineBulkStageUpdate,
+    PipelineBulkStageUpdateResponse,
     PipelineApplicationResponse,
     PipelineNoteCreate,
     PipelineNoteResponse,
@@ -42,6 +44,23 @@ def move_pipeline_stage(
 ):
     return pipeline_service.move_stage(
         db, account, application_id, payload.stage
+    )
+
+
+@router.patch(
+    "/applications/bulk-stage",
+    response_model=PipelineBulkStageUpdateResponse,
+)
+def bulk_move_pipeline_stage(
+    payload: PipelineBulkStageUpdate,
+    db: Session = Depends(get_db),
+    account: Account = Depends(manager),
+):
+    return pipeline_service.bulk_move_stage(
+        db,
+        account,
+        payload.application_ids,
+        payload.stage,
     )
 
 

@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from app.models.account import Account
 from app.repositories import pipeline
 from app.schemas.pipeline import (
+    PipelineBulkStageUpdateResponse,
     PipelineApplicationResponse,
     PipelineNoteResponse,
     PipelineStageHistoryResponse,
@@ -86,6 +87,71 @@ def move_stage(
         item
         for item in list_applications(db, account, job_id=application.job_id)
         if item.application_id == application_id
+    )
+
+
+def bulk_move_stage(
+    db: Session,
+    account: Account,
+    application_ids: list[int],
+    stage: str,
+) -> PipelineBulkStageUpdateResponse:
+    company_id = _company_id(account)
+    applications = pipeline.managed_applications(db, application_ids, company_id)
+    found_ids = {application.application_id for application in applications}
+    missing_ids = [
+        application_id
+        for application_id in application_ids
+        if application_id not in found_ids
+    ]
+    if missing_ids:
+        raise HTTPException(
+            status_code=404,
+            detail="One or more applications were not found for this company.",
+        )
+
+    withdrawn = [
+        application.application_id
+        for application in applications
+        if application.status == "Withdrawn"
+    ]
+    if withdrawn:
+        raise HTTPException(
+            status_code=409,
+            detail="A withdrawn application cannot move through the pipeline.",
+        )
+
+    by_id = {application.application_id: application for application in applications}
+    changed_ids = [
+        application_id
+        for application_id in application_ids
+        if by_id[application_id].current_stage != stage
+    ]
+    skipped_ids = [
+        application_id
+        for application_id in application_ids
+        if application_id not in changed_ids
+    ]
+
+    changed_applications = [by_id[application_id] for application_id in changed_ids]
+    histories = pipeline.update_stages(
+        db,
+        changed_applications,
+        stage=stage,
+        status=TERMINAL_STATUS.get(stage, "Active"),
+        account_id=account.account_id,
+    )
+
+    rows = list_applications(db, account)
+    updated_by_id = {
+        item.application_id: item
+        for item in rows
+        if item.application_id in changed_ids
+    }
+    return PipelineBulkStageUpdateResponse(
+        updated=[updated_by_id[application_id] for application_id in changed_ids],
+        skipped_application_ids=skipped_ids,
+        history_ids=[history.stage_history_id for history in histories],
     )
 
 

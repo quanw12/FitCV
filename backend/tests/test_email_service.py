@@ -1,13 +1,16 @@
 import base64
 from datetime import datetime, timezone
+from io import BytesIO
 import json
 import unittest
+from urllib.error import HTTPError
 from unittest.mock import patch
 
 from svix.webhooks import Webhook
 
 from app.core.config import settings
 from app.services.email_service import (
+    EmailDeliveryError,
     send_candidate_email,
     verify_resend_webhook,
 )
@@ -108,6 +111,39 @@ class EmailServiceTests(unittest.TestCase):
         headers = resend_request.call_args.kwargs["payload"]["headers"]
         self.assertNotIn("In-Reply-To", headers)
         self.assertEqual(headers["References"], "<first@example.com>")
+
+    def test_surfaces_provider_error_message(self) -> None:
+        provider_error = HTTPError(
+            "https://api.resend.com/emails",
+            403,
+            "Forbidden",
+            {},
+            BytesIO(
+                b'{"statusCode":403,"message":"Testing emails can only be sent to the account email."}'
+            ),
+        )
+        with (
+            patch.object(settings, "resend_api_key", "re_test"),
+            patch.object(
+                settings,
+                "resend_from_email",
+                "FitCV <onboarding@resend.dev>",
+            ),
+            patch.object(settings, "resend_max_retries", 0),
+            patch(
+                "app.services.email_service.request.urlopen",
+                side_effect=provider_error,
+            ),
+        ):
+            with self.assertRaisesRegex(
+                EmailDeliveryError,
+                "Testing emails can only be sent to the account email",
+            ):
+                send_candidate_email(
+                    to_email="candidate@example.com",
+                    subject="Test",
+                    body="Test",
+                )
 
 
 if __name__ == "__main__":

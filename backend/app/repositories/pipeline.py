@@ -25,6 +25,23 @@ def managed_application(
     )
 
 
+def managed_applications(
+    db: Session, application_ids: list[int], company_id: int
+) -> list[Application]:
+    if not application_ids:
+        return []
+    return list(
+        db.scalars(
+            select(Application)
+            .join(Job, Job.job_id == Application.job_id)
+            .where(
+                Application.application_id.in_(application_ids),
+                Job.company_id == company_id,
+            )
+        ).all()
+    )
+
+
 def application_rows(
     db: Session, company_id: int, job_id: int | None = None
 ):
@@ -97,6 +114,38 @@ def update_stage(
     db.commit()
     db.refresh(application)
     return application
+
+
+def update_stages(
+    db: Session,
+    applications: list[Application],
+    *,
+    stage: str,
+    status: str,
+    account_id: int,
+) -> list[ApplicationStageHistory]:
+    histories: list[ApplicationStageHistory] = []
+    try:
+        for application in applications:
+            previous_stage = application.current_stage
+            application.current_stage = stage
+            application.status = status
+            history = ApplicationStageHistory(
+                application_id=application.application_id,
+                previous_stage=previous_stage,
+                new_stage=stage,
+                changed_by_account_id=account_id,
+            )
+            db.add(history)
+            histories.append(history)
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+
+    for application in applications:
+        db.refresh(application)
+    return histories
 
 
 def create_note(

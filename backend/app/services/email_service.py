@@ -76,6 +76,12 @@ def _resend_request(
             if (exc.code == 429 or exc.code >= 500) and attempt + 1 < attempts:
                 time.sleep(0.25 * (2**attempt))
                 continue
+            provider_detail = _resend_http_error_detail(exc)
+            if provider_detail:
+                raise EmailDeliveryError(
+                    f"Email provider rejected the request with status {exc.code}: "
+                    f"{provider_detail}"
+                ) from exc
             raise EmailDeliveryError(
                 f"Email provider rejected the request with status {exc.code}."
             ) from exc
@@ -92,6 +98,26 @@ def _resend_request(
             ) from exc
 
     raise EmailDeliveryError("Email provider is unavailable.")
+
+
+def _resend_http_error_detail(exc: error.HTTPError) -> str | None:
+    """Extract a safe provider message without exposing response headers/secrets."""
+    try:
+        raw = exc.read().decode("utf-8", errors="replace")
+    except Exception:
+        return None
+    if not raw.strip():
+        return None
+    try:
+        payload = json.loads(raw)
+    except (TypeError, ValueError):
+        payload = None
+    if isinstance(payload, dict):
+        for key in ("message", "detail", "error"):
+            value = payload.get(key)
+            if isinstance(value, str) and value.strip():
+                return value.strip()[:600]
+    return raw.strip()[:600]
 
 
 def send_candidate_email(

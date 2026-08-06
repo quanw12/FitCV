@@ -6,6 +6,7 @@ import type { PipelineApplication } from "@/types/pipeline"
 const pipelineMocks = vi.hoisted(() => ({
   list: vi.fn(),
   moveStage: vi.fn(),
+  bulkMoveStage: vi.fn(),
   listNotes: vi.fn(),
   addNote: vi.fn(),
   listHistory: vi.fn(),
@@ -34,16 +35,35 @@ const application: PipelineApplication = {
   note_count: 0,
 }
 
+const secondApplication: PipelineApplication = {
+  ...application,
+  application_id: 5,
+  job_id: 3,
+  job_title: "Data Engineer",
+  candidate_name: "Tran An",
+  candidate_email: "an@example.com",
+  current_stage: "Interview",
+  overall_score: 42,
+}
+
 describe("PipelineScreen", () => {
   beforeEach(() => {
     vi.clearAllMocks()
     jobsMocks.listManaged.mockResolvedValue([])
-    pipelineMocks.list.mockResolvedValue([application])
+    pipelineMocks.list.mockResolvedValue([application, secondApplication])
     pipelineMocks.listNotes.mockResolvedValue([])
     pipelineMocks.listHistory.mockResolvedValue([])
     pipelineMocks.moveStage.mockImplementation((_id: number, stage: string) =>
       Promise.resolve({ ...application, current_stage: stage }),
     )
+    pipelineMocks.bulkMoveStage.mockResolvedValue({
+      updated: [
+        { ...application, current_stage: "Offer" },
+        { ...secondApplication, current_stage: "Offer" },
+      ],
+      skipped_application_ids: [],
+      history_ids: [10, 11],
+    })
     pipelineMocks.addNote.mockResolvedValue({
       note_id: 9,
       application_id: application.application_id,
@@ -88,6 +108,50 @@ describe("PipelineScreen", () => {
       4,
       "Schedule a technical interview.",
     )
+  })
+
+  it("selects visible candidates and filters by stage and score", async () => {
+    render(<PipelineScreen />)
+
+    fireEvent.click(
+      await screen.findByRole("checkbox", { name: "Select Nguyen Minh" }),
+    )
+    expect(screen.getByText("1 selected · 2 shown")).toBeInTheDocument()
+
+    fireEvent.change(screen.getByLabelText("Filter pipeline by stage"), {
+      target: { value: "Interview" },
+    })
+    expect(screen.getByText("1 selected · 1 shown")).toBeInTheDocument()
+    expect(
+      screen.queryByRole("checkbox", { name: "Select Nguyen Minh" }),
+    ).not.toBeInTheDocument()
+
+    fireEvent.change(screen.getByLabelText("Filter pipeline by score"), {
+      target: { value: "weak" },
+    })
+    expect(screen.getByText("1 selected · 1 shown")).toBeInTheDocument()
+    expect(
+      screen.getByRole("checkbox", { name: "Select Tran An" }),
+    ).toBeInTheDocument()
+  })
+
+  it("moves the selected candidates through the bulk stage action", async () => {
+    render(<PipelineScreen />)
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Select all visible" }),
+    )
+    fireEvent.change(screen.getByLabelText("Bulk target stage"), {
+      target: { value: "Offer" },
+    })
+    fireEvent.click(screen.getByRole("button", { name: "Move selected" }))
+
+    await waitFor(() => {
+      expect(pipelineMocks.bulkMoveStage).toHaveBeenCalledWith([4, 5], "Offer")
+    })
+    expect(
+      await screen.findByText("Moved 2 candidates to Offer."),
+    ).toBeInTheDocument()
   })
 
   it("shows the pipeline empty state", async () => {
