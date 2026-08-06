@@ -1,7 +1,8 @@
 from datetime import datetime
 from uuid import uuid4
 
-from sqlalchemy import func, select
+from sqlalchemy import and_, func, or_, select, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.models import (
@@ -96,6 +97,31 @@ def get_owned(
     )
 
 
+def pending_initial_draft(
+    db: Session,
+    *,
+    company_id: int,
+    application_id: int,
+    template_key: str,
+) -> CandidateEmail | None:
+    """Return the latest unsent initial draft for an application/template.
+
+    Generating twice from a double-click should not create two independent
+    messages that HR might accidentally approve and send.
+    """
+    return db.scalar(
+        select(CandidateEmail)
+        .where(
+            CandidateEmail.company_id == company_id,
+            CandidateEmail.application_id == application_id,
+            CandidateEmail.template_key == template_key,
+            CandidateEmail.message_kind == "Initial",
+            CandidateEmail.status.in_(("Draft", "Approved", "Failed")),
+        )
+        .order_by(CandidateEmail.created_at.desc(), CandidateEmail.email_id.desc())
+    )
+
+
 def rows(db: Session, company_id: int, job_id: int | None = None):
     statement = (
         select(CandidateEmail, Candidate, Job, CandidateEmailThread)
@@ -149,6 +175,51 @@ def save(db: Session, draft: CandidateEmail, values: dict) -> CandidateEmail:
     return draft
 
 
+def claim_send(
+    db: Session,
+    *,
+    email_id: int,
+    company_id: int,
+    idempotency_key: str,
+    attempt_at: datetime,
+    stale_before: datetime,
+    retry_count: int,
+) -> bool:
+    """Atomically claim a provider attempt for this draft.
+
+    A double-click or two browser tabs can otherwise both pass the approval
+    check before either one calls Resend. ``Queued`` is a short-lived lease;
+    a crashed worker can be reclaimed after ``stale_before``.
+    """
+    result = db.execute(
+        update(CandidateEmail)
+        .where(
+            CandidateEmail.email_id == email_id,
+            CandidateEmail.company_id == company_id,
+            or_(
+                CandidateEmail.delivery_status.is_(None),
+                CandidateEmail.delivery_status != "Queued",
+                and_(
+                    CandidateEmail.delivery_status == "Queued",
+                    or_(
+                        CandidateEmail.last_attempt_at.is_(None),
+                        CandidateEmail.last_attempt_at <= stale_before,
+                    ),
+                ),
+            ),
+        )
+        .values(
+            idempotency_key=idempotency_key,
+            delivery_status="Queued",
+            last_attempt_at=attempt_at,
+            retry_count=retry_count,
+            error_message=None,
+        )
+    )
+    db.commit()
+    return result.rowcount == 1
+
+
 def ensure_thread(
     db: Session,
     *,
@@ -176,7 +247,21 @@ def ensure_thread(
         subject=subject,
     )
     db.add(thread)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        # Two generate/reply requests can race on the company/application
+        # unique key. The winner is the canonical thread; reuse it instead of
+        # leaking a 500 to the recruiter.
+        db.rollback()
+        thread = db.scalar(
+            select(CandidateEmailThread).where(
+                CandidateEmailThread.company_id == company_id,
+                CandidateEmailThread.application_id == application_id,
+            )
+        )
+        if thread is None:
+            raise
     db.refresh(thread)
     return thread
 
@@ -377,6 +462,15 @@ def record_event(
 ) -> CandidateEmailEvent:
     latest_event_at = None
     if candidate_email is not None and delivery_status is not None:
+        # Serialize delivery-state transitions per email so an older webhook
+        # cannot overwrite a newer status when Resend retries concurrently.
+        locked_email = db.scalar(
+            select(CandidateEmail)
+            .where(CandidateEmail.email_id == candidate_email.email_id)
+            .with_for_update()
+        )
+        if locked_email is not None:
+            candidate_email = locked_email
         latest_event_at = db.scalar(
             select(func.max(CandidateEmailEvent.occurred_at)).where(
                 CandidateEmailEvent.candidate_email_id == candidate_email.email_id

@@ -42,6 +42,9 @@ class EmailDraftResponse(BaseModel):
     body: str
     status: str
     delivery_status: str | None
+    retryable: bool
+    retry_count: int
+    last_attempt_at: datetime | None
     ai_generated: bool
     in_reply_to: str | None
     approved_at: datetime | None
@@ -54,6 +57,13 @@ class EmailDraftResponse(BaseModel):
 
 class BulkEmailSendRequest(BaseModel):
     email_ids: list[int] = Field(min_length=1, max_length=50)
+
+    @field_validator("email_ids")
+    @classmethod
+    def validate_email_ids(cls, value: list[int]) -> list[int]:
+        if any(email_id <= 0 for email_id in value):
+            raise ValueError("Email IDs must be positive integers.")
+        return list(dict.fromkeys(value))
 
 
 class BulkEmailSendItem(BaseModel):
@@ -95,6 +105,7 @@ class EmailThreadMessageResponse(BaseModel):
     body: str
     status: str
     delivery_status: str | None
+    retryable: bool
     ai_generated: bool
     provider_message_id: str | None
     occurred_at: datetime

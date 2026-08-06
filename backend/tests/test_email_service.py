@@ -138,12 +138,14 @@ class EmailServiceTests(unittest.TestCase):
             with self.assertRaisesRegex(
                 EmailDeliveryError,
                 "Testing emails can only be sent to the account email",
-            ):
+            ) as raised:
                 send_candidate_email(
                     to_email="candidate@example.com",
                     subject="Test",
                     body="Test",
                 )
+        self.assertFalse(raised.exception.retryable)
+        self.assertEqual(raised.exception.provider_status, 403)
 
 
 if __name__ == "__main__":

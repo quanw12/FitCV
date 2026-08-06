@@ -20,6 +20,9 @@ export interface CandidateEmailDraft {
   body: string
   status: CandidateEmailStatus
   delivery_status: string | null
+  retryable: boolean
+  retry_count: number
+  last_attempt_at: string | null
   ai_generated: boolean
   in_reply_to: string | null
   approved_at: string | null
@@ -51,6 +54,7 @@ export interface EmailThreadMessage {
   body: string
   status: string
   delivery_status: string | null
+  retryable: boolean
   ai_generated: boolean
   provider_message_id: string | null
   occurred_at: string

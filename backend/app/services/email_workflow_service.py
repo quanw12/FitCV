@@ -49,6 +49,7 @@ TEMPLATES = {
 
 MESSAGE_ID_PATTERN = re.compile(r"<[^<>\r\n]{1,498}>")
 RESEND_IDEMPOTENCY_WINDOW = timedelta(hours=24)
+SEND_CLAIM_TIMEOUT = timedelta(minutes=15)
 EMAIL_PATTERN = re.compile(r"[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}")
 PHONE_PATTERN = re.compile(r"(?:\+?\d[\d\s().-]{7,}\d)")
 
@@ -123,6 +124,9 @@ def _draft_response(row) -> EmailDraftResponse:
         body=draft.body,
         status=draft.status,
         delivery_status=draft.delivery_status,
+        retryable=draft.retryable,
+        retry_count=draft.retry_count,
+        last_attempt_at=draft.last_attempt_at,
         ai_generated=draft.ai_generated,
         in_reply_to=draft.in_reply_to,
         approved_at=draft.approved_at,
@@ -167,6 +171,14 @@ def generate(
             status_code=422,
             detail="Candidate email is missing.",
         )
+    existing_draft = email_workflow.pending_initial_draft(
+        db,
+        company_id=company_id,
+        application_id=application_id,
+        template_key=template_key,
+    )
+    if existing_draft is not None:
+        return _draft_response(email_workflow.row(db, existing_draft.email_id, company_id))
     grounded_context = {
         "candidate_name": candidate.full_name or "Candidate",
         "job_title": job.title,
@@ -295,6 +307,9 @@ def reopen_failed_draft(
             "approved_at": None,
             "provider_message_id": None,
             "error_message": None,
+            "retryable": False,
+            "retry_count": 0,
+            "last_attempt_at": None,
         },
     )
     return _draft_response(email_workflow.row(db, email_id, company_id))
@@ -312,8 +327,19 @@ def send(db: Session, account: Account, email_id: int) -> EmailDraftResponse:
             status_code=409,
             detail="HR must review and approve the draft before sending.",
         )
+    if draft.status == "Failed":
+        if not draft.retryable:
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    "This delivery failure is not retryable. Reopen the draft, "
+                    "review the provider error, and approve it again before sending."
+                ),
+            )
     if draft.status == "Failed" and draft.idempotency_key:
-        attempted_at = draft.updated_at or draft.created_at
+        # `updated_at` remains the compatibility source for rows created before
+        # the retry metadata migration; new rows also update it on every attempt.
+        attempted_at = draft.updated_at or draft.last_attempt_at or draft.created_at
         if _now() - attempted_at >= RESEND_IDEMPOTENCY_WINDOW:
             raise HTTPException(
                 status_code=409,
@@ -325,11 +351,23 @@ def send(db: Session, account: Account, email_id: int) -> EmailDraftResponse:
     row = email_workflow.row(db, email_id, company_id)
     thread = row[3] if row is not None else None
     idempotency_key = draft.idempotency_key or f"candidate-email/{draft.email_id}"
-    if draft.idempotency_key is None:
-        email_workflow.save(
-            db,
-            draft,
-            {"idempotency_key": idempotency_key},
+    attempt_at = _now()
+    claimed = email_workflow.claim_send(
+        db,
+        email_id=draft.email_id,
+        company_id=company_id,
+        idempotency_key=idempotency_key,
+        attempt_at=attempt_at,
+        stale_before=attempt_at - SEND_CLAIM_TIMEOUT,
+        retry_count=(draft.retry_count or 0) + 1,
+    )
+    if not claimed:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "Another delivery attempt is already in progress. "
+                "Refresh the email record before trying again."
+            ),
         )
     try:
         message_id = send_candidate_email(
@@ -350,6 +388,7 @@ def send(db: Session, account: Account, email_id: int) -> EmailDraftResponse:
             {
                 "status": "Failed",
                 "delivery_status": "Failed",
+                "retryable": exc.retryable,
                 "error_message": str(exc)[:1000],
             },
         )
@@ -362,6 +401,7 @@ def send(db: Session, account: Account, email_id: int) -> EmailDraftResponse:
             "delivery_status": "Sent",
             "provider_message_id": message_id,
             "sent_at": _now(),
+            "retryable": False,
             "error_message": None,
         },
     )
@@ -409,6 +449,7 @@ def _thread_messages(
                 body=outbound.body,
                 status=outbound.status,
                 delivery_status=outbound.delivery_status,
+                retryable=outbound.retryable,
                 ai_generated=outbound.ai_generated,
                 provider_message_id=outbound.provider_message_id,
                 occurred_at=outbound.sent_at or outbound.created_at,
@@ -425,6 +466,7 @@ def _thread_messages(
                 body=inbound.body_text,
                 status="Received",
                 delivery_status=None,
+                retryable=False,
                 ai_generated=False,
                 provider_message_id=inbound.provider_message_id,
                 occurred_at=inbound.received_at,
