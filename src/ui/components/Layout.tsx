@@ -4,6 +4,7 @@ import { Moon, SignOut, Sun } from "@phosphor-icons/react"
 
 import FloatingTopbar from "./FloatingTopbar"
 import CommandPalette from "./CommandPalette"
+import ScrollMotion from "./ScrollMotion"
 
 import { getPortalNavigation } from "@/data/navigation"
 
@@ -174,7 +175,9 @@ export default function Layout({
           )}
         </div>
 
-        <main className="fc-app-content">{children}</main>
+        <main className="fc-app-content">
+          <ScrollMotion key={`${portal}-${currentScreen}`}>{children}</ScrollMotion>
+        </main>
       </div>
 
       <CommandPalette

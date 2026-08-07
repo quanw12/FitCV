@@ -250,6 +250,10 @@ h1, h2, h3, h4, h5, h6 {
 .fc-stagger > *:nth-child(9) { animation-delay: 0.385s; }
 .fc-stagger > *:nth-child(10) { animation-delay: 0.43s; }
 
+/* ScrollMotion owns authenticated portal reveals; don't play the old mount-only stagger there. */
+.fc-motion-scope { display: contents; }
+.fc-motion-scope .fc-stagger > * { animation: none; }
+
 /* ============================================================
    Cards & surfaces
    ============================================================ */
