@@ -438,7 +438,7 @@ export default function JobPostsScreen() {
   }
 
   return (
-    <div className="fc-stagger">
+    <div className="fc-stagger job-posts-page">
       <div className="fc-page-head">
         <div>
           <div className="fc-eyebrow" style={{ marginBottom: 6 }}>

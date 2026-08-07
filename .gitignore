@@ -25,6 +25,10 @@ __pycache__/
 venv/
 backend/.venv/
 backend/uploads/
+
+.agents/skills
+.claude 
+skills-lock.json
 # Added by code-review-graph
 .code-review-graph/
 testsprite_tests/tmp/

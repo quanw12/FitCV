@@ -589,19 +589,8 @@ export default function BulkCvRankingPanel() {
                 Screening input
               </h2>
             </div>
-            <div
-              style={{
-                display: "grid",
-
-                gridTemplateColumns:
-                  "repeat(auto-fit,minmax(min(100%,360px),1fr))",
-
-                gap: 18,
-
-                padding: 20,
-              }}
-            >
-              <label>
+            <div className="cv-ranking-screening-grid">
+              <label className="cv-ranking-screening-field">
                 <span className="fc-field-label">Job description</span>
                 <textarea
                   className="fc-input"
@@ -616,7 +605,8 @@ export default function BulkCvRankingPanel() {
                   placeholder="Paste responsibilities, required skills, experience, education and preferred qualifications..."
                   style={{
                     resize: "vertical",
-                    minHeight: 250,
+                    minHeight: 312,
+                    padding: 20,
                     lineHeight: 1.55,
                   }}
                 />
@@ -638,7 +628,7 @@ export default function BulkCvRankingPanel() {
                 </span>
               </label>
 
-              <div>
+              <div className="cv-ranking-screening-field">
                 <span className="fc-field-label">Candidate CVs</span>
                 <input
                   ref={fileInputRef}
@@ -673,7 +663,7 @@ export default function BulkCvRankingPanel() {
                   onDragLeave={() => setDragActive(false)}
                   onDrop={handleDrop}
                   style={{
-                    minHeight: 150,
+                    minHeight: 312,
 
                     border: `1px dashed ${
                       dragActive ? "var(--accent)" : "var(--border-strong)"
