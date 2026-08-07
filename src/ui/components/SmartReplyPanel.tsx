@@ -18,6 +18,7 @@ import type {
   CandidateEmailStatus,
   EmailThreadDetail,
   EmailThreadSummary,
+  SmartReplyIntent,
   SmartReplyTone,
 } from "@/types/emailWorkflow"
 
@@ -82,6 +83,7 @@ export default function SmartReplyPanel() {
   const [subject, setSubject] = useState("")
   const [body, setBody] = useState("")
   const [tone, setTone] = useState<SmartReplyTone>("professional")
+  const [intent, setIntent] = useState<SmartReplyIntent>("general")
   const [guidance, setGuidance] = useState("")
   const [loading, setLoading] = useState(true)
   const [detailLoading, setDetailLoading] = useState(false)
@@ -168,6 +170,7 @@ export default function SmartReplyPanel() {
       const draft = await emailWorkflowApi.generateSmartReply(
         selectedThreadId,
         tone,
+        intent,
         guidance,
       )
       replaceComposer(draft)
@@ -644,14 +647,36 @@ export default function SmartReplyPanel() {
                           </select>
                         </label>
                         <label>
+                          <span className="fc-field-label">Reply purpose</span>
+                          <select
+                            className="fc-input"
+                            value={intent}
+                            onChange={(event) =>
+                              setIntent(event.target.value as SmartReplyIntent)
+                            }
+                          >
+                            <option value="general">General reply</option>
+                            <option value="answer_question">Answer a question</option>
+                            <option value="interview_details">
+                              Share interview details
+                            </option>
+                            <option value="application_update">
+                              Application update
+                            </option>
+                            <option value="rejection_follow_up">
+                              Rejection follow-up
+                            </option>
+                          </select>
+                        </label>
+                        <label>
                           <span className="fc-field-label">
-                            HR guidance (optional)
+                            Candidate-visible details (optional)
                           </span>
                           <input
                             className="fc-input"
                             value={guidance}
                             maxLength={1000}
-                            placeholder="Example: Ask for availability next week"
+                            placeholder="Example: Interview Tue 19 Aug, 10:00 ICT; Google Meet link..."
                             onChange={(event) => setGuidance(event.target.value)}
                           />
                         </label>

@@ -140,6 +140,12 @@ describe("SmartReplyPanel", () => {
         "Smart Reply drafted. HR review is required before sending.",
       ),
     ).toBeInTheDocument()
+    expect(mocks.generateSmartReply).toHaveBeenCalledWith(
+      3,
+      "professional",
+      "general",
+      "",
+    )
     expect(mocks.send).not.toHaveBeenCalled()
 
     fireEvent.click(screen.getByRole("button", { name: "Approve reply" }))

@@ -102,6 +102,7 @@ def generate_draft(
         account,
         application_id=payload.application_id,
         template_key=payload.template_key,
+        guidance=payload.guidance,
     )
 
 

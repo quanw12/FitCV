@@ -103,6 +103,11 @@ def validate_cv_content(filename: str, content: bytes) -> str:
 
 
 def extract_document_text(file_path: Path, file_type: str) -> str:
+    if not file_path.is_file():
+        raise FileNotFoundError(
+            "The uploaded CV file is no longer available on the server. "
+            "Please upload the CV again."
+        )
     if file_type == "PDF":
         try:
             from pypdf import PdfReader

@@ -51,6 +51,7 @@ export default function AutoEmailScreen() {
   )
   const [subject, setSubject] = useState("")
   const [body, setBody] = useState("")
+  const [guidance, setGuidance] = useState("")
   const [bulkSelection, setBulkSelection] = useState<number[]>([])
   const [loading, setLoading] = useState(true)
   const [generating, setGenerating] = useState(false)
@@ -142,6 +143,7 @@ export default function AutoEmailScreen() {
       const created = await emailWorkflowApi.generate(
         applicationId,
         templateKey,
+        guidance,
       )
       replaceDraft(created)
       setSuccess("AI draft created. Review and edit it before approving.")
@@ -456,6 +458,32 @@ export default function AutoEmailScreen() {
                   {selectedApplication.current_stage}
                 </p>
               )}
+
+              <label style={{ display: "block", marginTop: 14 }}>
+                <span className="fc-field-label">
+                  Candidate-visible details for AI (optional)
+                </span>
+                <textarea
+                  className="fc-input"
+                  value={guidance}
+                  maxLength={2000}
+                  rows={6}
+                  placeholder="Interview: Tue 19 Aug, 10:00 ICT, Google Meet link, confirm by Fri. Rejection: role needs 3+ years of production Go experience."
+                  onChange={(event) => setGuidance(event.target.value)}
+                  style={{ lineHeight: 1.5, resize: "vertical" }}
+                />
+                <small
+                  style={{
+                    display: "block",
+                    color: "var(--text-muted)",
+                    marginTop: 6,
+                    lineHeight: 1.45,
+                  }}
+                >
+                  Provide only details you approve sharing. AI will not invent a
+                  reason, schedule, meeting link, or offer terms.
+                </small>
+              </label>
 
               <button
                 type="button"

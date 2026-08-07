@@ -4,6 +4,7 @@ import type {
   CandidateEmailDraft,
   EmailThreadDetail,
   EmailThreadSummary,
+  SmartReplyIntent,
   EmailTemplate,
   SmartReplyTone,
 } from "@/types/emailWorkflow"
@@ -18,13 +19,14 @@ export const emailWorkflowApi = {
       `/api/hr/emails/drafts${jobId ? `?job_id=${jobId}` : ""}`,
       { authenticated: true },
     ),
-  generate: (applicationId: number, templateKey: string) =>
+  generate: (applicationId: number, templateKey: string, guidance?: string) =>
     requestJson<CandidateEmailDraft>("/api/hr/emails/drafts/generate", {
       authenticated: true,
       method: "POST",
       body: JSON.stringify({
         application_id: applicationId,
         template_key: templateKey,
+        guidance: guidance?.trim() || null,
       }),
     }),
   update: (emailId: number, subject: string, body: string) =>
@@ -73,6 +75,7 @@ export const emailWorkflowApi = {
   generateSmartReply: (
     threadId: number,
     tone: SmartReplyTone,
+    intent: SmartReplyIntent,
     guidance?: string,
   ) =>
     requestJson<CandidateEmailDraft>(
@@ -82,6 +85,7 @@ export const emailWorkflowApi = {
         method: "POST",
         body: JSON.stringify({
           tone,
+          intent,
           guidance: guidance?.trim() || null,
         }),
       },
