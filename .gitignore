@@ -29,3 +29,7 @@ backend/uploads/
 .code-review-graph/
 testsprite_tests/tmp/
 testsprite_tests/tmp/config.json
+.agents/
+.claude/ 
+skills-lock.json
+
