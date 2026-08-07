@@ -40,13 +40,6 @@ const statusClass = (status: CandidateEmailDraft["status"]) => {
   return "fc-badge--amber"
 }
 
-const templatePalette = [
-  { icon: "✅", color: "#10B981" },
-  { icon: "⭐", color: "#4F46E5" },
-  { icon: "❌", color: "#EF4444" },
-  { icon: "📅", color: "#F59E0B" },
-]
-
 export default function AutoEmailScreen() {
   const [templates, setTemplates] = useState<EmailTemplate[]>([])
   const [applications, setApplications] = useState<PipelineApplication[]>([])
@@ -381,15 +374,11 @@ export default function AutoEmailScreen() {
           >
             <div className="fc-card fc-card--pad">
               <div className="fc-section-title" style={{ marginBottom: 14 }}>
-                <Envelope size={16} color="var(--accent)" />
                 <h3>Template library</h3>
               </div>
 
-              {templates.map((template, index) => {
+              {templates.map((template) => {
                 const active = templateKey === template.key
-                const palette =
-                  templatePalette[index % templatePalette.length] ??
-                  templatePalette[0]
 
                 return (
                   <button
@@ -404,16 +393,15 @@ export default function AutoEmailScreen() {
                       padding: "12px 14px",
                       marginBottom: 8,
                       border: active
-                        ? `1px solid ${palette.color}`
+                        ? "1px solid var(--accent)"
                         : "1px solid var(--border)",
                       background: active
-                        ? `${palette.color}1a`
+                        ? "var(--accent-soft)"
                         : "var(--surface)",
-                      color: active ? palette.color : "var(--text-secondary)",
+                      color: active ? "var(--accent-ink)" : "var(--text-secondary)",
                       fontWeight: active ? 700 : 500,
                     }}
                   >
-                    <span style={{ fontSize: 18 }}>{palette.icon}</span>
                     <span style={{ flex: 1, textAlign: "left" }}>
                       {template.name}
                     </span>

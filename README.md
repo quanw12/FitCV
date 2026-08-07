@@ -282,13 +282,14 @@ những nhóm thực sự có yêu cầu trong JD.
 
 ### Recruiter Pipeline And Candidate Email
 
-Database hiện hữu cần chạy tuần tự ba migration sau trước khi bật màn hình
+Database hiện hữu cần chạy tuần tự bốn migration sau trước khi bật màn hình
 Pipeline và Auto Email:
 
 ```text
 database/migrations/006_add_recruiter_pipeline.sql
 database/migrations/007_add_candidate_email_workflow.sql
 database/migrations/009_add_smart_reply_workflow.sql
+database/migrations/011_add_reliable_email_delivery.sql
 ```
 
 Migration 006 thêm notes và lịch sử cho sáu stage backend hiện tại:
@@ -296,9 +297,10 @@ Migration 006 thêm notes và lịch sử cho sáu stage backend hiện tại:
 lưu AI draft, bước HR approval, provider message ID, trạng thái `Failed` và thời
 điểm gửi. Migration 009 thêm application-scoped email thread, địa chỉ reply
 riêng, inbound message, delivery event, idempotency key và metadata chuẩn
-`In-Reply-To`/`References`. Các migration có preflight/postflight, có thể chạy
-lại, và có file rollback tương ứng; rollback sẽ xóa vĩnh viễn dữ liệu workflow
-được nêu trong file.
+`In-Reply-To`/`References`. Migration 011 thêm `retryable`, `retry_count` và
+`last_attempt_at`, các cột bắt buộc cho màn hình Auto Email hiện tại. Các
+migration có preflight/postflight, có thể chạy lại, và có file rollback tương
+ứng; rollback sẽ xóa vĩnh viễn dữ liệu workflow được nêu trong file.
 
 ```text
 GET   /api/hr/pipeline

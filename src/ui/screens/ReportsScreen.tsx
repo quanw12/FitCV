@@ -2,10 +2,13 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 
 import {
   ArrowClockwise,
+  Briefcase,
   Calendar,
   ChartBar,
   ChartPie as PieIcon,
+  Clock,
   Download,
+  FileText,
   TrendUp,
   WarningCircle,
 } from "@phosphor-icons/react"
@@ -185,7 +188,7 @@ export default function ReportsScreen() {
             " days",
           )
         : "…",
-      icon: "⚡",
+      icon: <Clock size={19} weight="light" />,
       color: "#4F46E5",
       bg: "#EEF2FF",
     },
@@ -198,7 +201,7 @@ export default function ReportsScreen() {
       delta: kpis
         ? deltaText(kpis.time_to_hire_days, kpis.prev?.time_to_hire_days ?? null, " days")
         : "…",
-      icon: "📅",
+      icon: <Calendar size={19} weight="light" />,
       color: "#10B981",
       bg: "#D1FAE5",
     },
@@ -215,7 +218,7 @@ export default function ReportsScreen() {
             "%",
           )
         : "…",
-      icon: "🤝",
+      icon: <TrendUp size={19} weight="light" />,
       color: "#F59E0B",
       bg: "#FEF3C7",
     },
@@ -225,7 +228,7 @@ export default function ReportsScreen() {
       delta: kpis
         ? deltaText(kpis.active_job_posts, kpis.prev?.active_job_posts ?? null, " job")
         : "…",
-      icon: "📋",
+      icon: <Briefcase size={19} weight="light" />,
       color: "#6B7280",
       bg: "#F3F4F6",
     },
@@ -235,14 +238,14 @@ export default function ReportsScreen() {
       delta: kpis
         ? deltaText(kpis.total_cvs_reviewed, kpis.prev?.total_cvs_reviewed ?? null, " CVs")
         : "…",
-      icon: "📄",
+      icon: <FileText size={19} weight="light" />,
       color: "#16A34A",
       bg: "#DCFCE7",
     },
   ]
 
   return (
-    <div className="fc-stagger">
+    <div className="fc-stagger reports-page">
       <div className="fc-page-head">
         <div>
           <div className="fc-eyebrow" style={{ marginBottom: 6 }}>
@@ -369,20 +372,10 @@ export default function ReportsScreen() {
       ) : (
         <>
           {/* KPI strip */}
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(5, 1fr)",
-              gap: 16,
-              marginBottom: 20,
-            }}
-          >
+          <div className="reports-kpi-grid">
             {kpiCards.map((k) => (
-              <div key={k.label} className="fc-stat">
-                <div
-                  className="fc-stat__icon"
-                  style={{ background: k.bg, color: k.color, fontSize: 18 }}
-                >
+              <div key={k.label} className="fc-stat reports-kpi-card">
+                <div className="fc-stat__icon" style={{ color: k.color }}>
                   {k.icon}
                 </div>
                 <div style={{ marginTop: 14 }}>
@@ -400,17 +393,9 @@ export default function ReportsScreen() {
           </div>
 
           {/* 2x2 chart grid */}
-          <div
-            className="fc-stagger"
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 1fr",
-              gap: 16,
-              alignItems: "stretch",
-            }}
-          >
+          <div className="fc-stagger reports-chart-grid">
             {/* Line — applications over time */}
-            <div className="fc-card fc-card--pad">
+            <div className="fc-card fc-card--pad reports-chart-card">
               <div className="fc-section-title" style={{ marginBottom: 16 }}>
                 <TrendUp size={17} color="var(--accent)" />
                 <h3>Applications Over Time</h3>
@@ -453,7 +438,7 @@ export default function ReportsScreen() {
 
             {/* Donut — pass rate */}
             <div
-              className="fc-card fc-card--pad"
+              className="fc-card fc-card--pad reports-chart-card"
               style={{ display: "flex", flexDirection: "column" }}
             >
               <div className="fc-section-title" style={{ marginBottom: 16 }}>
@@ -588,7 +573,7 @@ export default function ReportsScreen() {
             </div>
 
             {/* Bar — score distribution */}
-            <div className="fc-card fc-card--pad">
+            <div className="fc-card fc-card--pad reports-chart-card">
               <div className="fc-section-title" style={{ marginBottom: 16 }}>
                 <ChartBar size={17} color="var(--accent)" />
                 <h3>Score Distribution</h3>

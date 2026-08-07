@@ -116,8 +116,6 @@ export default function JobSearchScreen() {
     void loadCvs()
   }, [loadCvs])
 
-  const selectedCv = cvs.find((cv) => cv.cvId === selectedCvId) ?? null
-
   const runSearch = async () => {
     if (selectedCvId == null) return
 

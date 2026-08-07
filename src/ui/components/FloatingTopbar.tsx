@@ -1,5 +1,3 @@
-import { Bell } from "@phosphor-icons/react"
-
 import BrandMark from "./BrandMark"
 
 import type { NavItem } from "@/data/navigation"
@@ -12,7 +10,6 @@ interface Props {
   currentScreen: ScreenId | ""
   onNavigate: (screen: ScreenId) => void
   onUserMenuClick?: () => void
-  onNotificationClick?: () => void
 }
 
 export default function FloatingTopbar({
@@ -22,7 +19,6 @@ export default function FloatingTopbar({
   currentScreen,
   onNavigate,
   onUserMenuClick,
-  onNotificationClick,
 }: Props) {
   const initials = userName
     .split(" ")
@@ -57,16 +53,6 @@ export default function FloatingTopbar({
       </nav>
 
       <div className="fc-topbar-actions">
-        <button
-          type="button"
-          className="fc-icon-btn"
-          aria-label="Notifications"
-          title="View application updates"
-          onClick={onNotificationClick}
-        >
-          <Bell size={18} weight="light" />
-        </button>
-
         <button
           type="button"
           className="fc-icon-btn"
