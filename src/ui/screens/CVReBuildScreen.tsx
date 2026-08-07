@@ -1,4 +1,5 @@
 import { useRef, useState } from "react"
+import { createPortal } from "react-dom"
 
 import {
   ArrowRight,
@@ -6,6 +7,7 @@ import {
   CloudArrowUp,
   Download,
   FileText,
+  FloppyDisk,
   Lightning,
   MagnifyingGlass,
   Sparkle,
@@ -653,7 +655,7 @@ export default function CVReBuildScreen({ onNavigate }: CVReBuildScreenProps) {
         </div>
       )}
 
-      {modalOpen && state.phase === "done" && (
+      {modalOpen && state.phase === "done" && createPortal(
         <div
           role="dialog"
           aria-modal="true"
@@ -663,7 +665,7 @@ export default function CVReBuildScreen({ onNavigate }: CVReBuildScreenProps) {
           style={{
             position: "fixed",
             inset: 0,
-            zIndex: 50,
+            zIndex: 9999,
             background: "rgba(15, 23, 42, 0.6)",
             display: "flex",
             alignItems: "center",
@@ -744,7 +746,8 @@ export default function CVReBuildScreen({ onNavigate }: CVReBuildScreenProps) {
               style={{ flex: 1, border: "none", width: "100%" }}
             />
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
       </section>
     </div>

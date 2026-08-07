@@ -1,7 +1,6 @@
 """Render CV HTML to PDF bytes and a first-page JPEG thumbnail via Playwright."""
 
-import atexit
-import threading
+import asyncio
 from io import BytesIO
 
 from PIL import Image
@@ -16,9 +15,9 @@ _PDF_KWARGS = {
     "print_background": True,
 }
 
-_browser_lock = threading.Lock()
 _playwright = None
 _browser = None
+_lock = asyncio.Lock()
 
 
 class PdfRenderError(RuntimeError):
@@ -35,19 +34,19 @@ def resize_thumbnail(image_bytes: bytes, width: int = THUMBNAIL_WIDTH) -> bytes:
         return output.getvalue()
 
 
-def _ensure_browser():
+async def _ensure_browser():
     global _playwright, _browser
-    with _browser_lock:
+    async with _lock:
         if _browser is None or not _browser.is_connected():
             try:
-                from playwright.sync_api import sync_playwright
+                from playwright.async_api import async_playwright
             except ImportError as exc:
                 raise PdfRenderError(
                     "Playwright is not installed; run `pip install playwright`."
                 ) from exc
             if _playwright is None:
                 try:
-                    _playwright = sync_playwright().start()
+                    _playwright = await async_playwright().start()
                 except NotImplementedError as exc:
                     raise PdfRenderError(
                         "Playwright could not start the browser driver: asyncio "
@@ -56,7 +55,7 @@ def _ensure_browser():
                         "policy is applied."
                     ) from exc
             try:
-                _browser = _playwright.chromium.launch()
+                _browser = await _playwright.chromium.launch()
             except Exception as exc:
                 raise PdfRenderError(
                     "Headless Chromium is not installed; run "
@@ -65,33 +64,19 @@ def _ensure_browser():
         return _browser
 
 
-def stop_browser() -> None:
-    global _playwright, _browser
-    with _browser_lock:
-        if _browser is not None:
-            _browser.close()
-            _browser = None
-        if _playwright is not None:
-            _playwright.stop()
-            _playwright = None
-
-
-atexit.register(stop_browser)
-
-
-def render_pdf_with_thumbnail(html: str) -> tuple[bytes, bytes]:
+async def render_pdf_with_thumbnail(html: str) -> tuple[bytes, bytes]:
     """Render the HTML document to PDF bytes and a page-1 JPEG thumbnail."""
     try:
-        browser = _ensure_browser()
-        context = browser.new_context(viewport={"width": 794, "height": 1123})
+        browser = await _ensure_browser()
+        context = await browser.new_context(viewport={"width": 794, "height": 1123})
         try:
-            page = context.new_page()
-            page.set_content(html, wait_until="load")
-            page.evaluate("document.fonts.ready.then(() => true)")
-            pdf_bytes = page.pdf(**_PDF_KWARGS)
-            screenshot = page.screenshot(full_page=False, type="png")
+            page = await context.new_page()
+            await page.set_content(html, wait_until="load")
+            await page.evaluate("document.fonts.ready.then(() => true)")
+            pdf_bytes = await page.pdf(**_PDF_KWARGS)
+            screenshot = await page.screenshot(full_page=False, type="png")
         finally:
-            context.close()
+            await context.close()
     except PdfRenderError:
         raise
     except Exception as exc:
