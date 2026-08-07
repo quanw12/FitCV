@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 _MAX_MIXED_ATTEMPTS = 3
 
 
-def rebuild_cv(
+async def rebuild_cv(
     content: bytes,
     filename: str,
     *,
@@ -71,7 +71,7 @@ def rebuild_cv(
     cv = cv.model_copy(update={"name": name})
     avatar_data = maybe_downscale_avatar(avatar, warnings)
     html = render_cv(cv, language=language, avatar=avatar_data)
-    pdf_bytes, thumbnail_bytes = render_pdf_with_thumbnail(html)
+    pdf_bytes, thumbnail_bytes = await render_pdf_with_thumbnail(html)
 
     # Page count warning (A7)
     page_count = count_pdf_pages(pdf_bytes)
@@ -90,7 +90,7 @@ def rebuild_cv(
     )
 
 
-def build_cv(
+async def build_cv(
     cv: CVData,
     *,
     language: str = "en",
@@ -118,7 +118,7 @@ def build_cv(
     polished = polished.model_copy(update={"name": name})
     avatar_data = maybe_downscale_avatar(avatar, warnings)
     html = render_cv(polished, language=language, avatar=avatar_data)
-    pdf_bytes, thumbnail_bytes = render_pdf_with_thumbnail(html)
+    pdf_bytes, thumbnail_bytes = await render_pdf_with_thumbnail(html)
 
     # Page count warning (A7)
     page_count = count_pdf_pages(pdf_bytes)

@@ -29,3 +29,7 @@ backend/uploads/
 .agents/skills
 .claude 
 skills-lock.json
+# Added by code-review-graph
+.code-review-graph/
+testsprite_tests/tmp/
+testsprite_tests/tmp/config.json

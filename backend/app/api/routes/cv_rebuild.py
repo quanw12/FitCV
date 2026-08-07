@@ -18,7 +18,7 @@ router = APIRouter()
 
 
 @router.post("/rebuild", response_model=CvRebuildResponse)
-def rebuild_from_cv(
+async def rebuild_from_cv(
     file: UploadFile = File(...),
     avatar: str | None = Form(default=None),
     jd_text: str | None = Form(default=None),
@@ -34,7 +34,7 @@ def rebuild_from_cv(
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     try:
-        return orchestrator.rebuild_cv(
+        return await orchestrator.rebuild_cv(
             content, file.filename or "cv.pdf", avatar=safe_avatar, jd_text=jd_text
         )
     except ValueError as exc:
@@ -49,7 +49,7 @@ def rebuild_from_cv(
 
 
 @router.post("/build", response_model=CvRebuildResponse)
-def build_from_form(
+async def build_from_form(
     payload: CvBuildRequest,
     account: Account = Depends(get_current_account),
 ) -> CvRebuildResponse:
@@ -58,7 +58,7 @@ def build_from_form(
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     try:
-        return orchestrator.build_cv(
+        return await orchestrator.build_cv(
             payload.cv, language=payload.language, avatar=safe_avatar, jd_text=payload.jd_text
         )
     except CvExtractionError as exc:
