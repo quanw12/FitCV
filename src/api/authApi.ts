@@ -19,7 +19,7 @@ import {
   storeSession,
 } from "./authSession"
 
-import { requestJson } from "./httpClient"
+import { refreshSession, requestJson } from "./httpClient"
 
 export const authApi = {
   getSession: getStoredSession,
@@ -36,11 +36,11 @@ export const authApi = {
   },
 
   async refresh(): Promise<AuthSession> {
-    const response = await requestJson<BackendAuthSession>(
-      "/api/auth/refresh",
-      { method: "POST" },
-    )
-    return persistBackendSession(response)
+    const session = await refreshSession()
+
+    if (!session) throw new Error("Refresh session is missing.")
+
+    return session
   },
 
   updateCurrentUser(
