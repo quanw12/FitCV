@@ -1,5 +1,6 @@
 @import '@fontsource-variable/geist';
 @import '@fontsource-variable/jetbrains-mono';
+@import '@fontsource-variable/fraunces';
 @import 'tailwindcss';
 
 @font-face {
@@ -109,6 +110,7 @@
 
   --font-display: 'Cabinet Grotesk', 'Geist', system-ui, sans-serif;
   --font-body: 'Geist', system-ui, -apple-system, sans-serif;
+  --font-serif: 'Fraunces Variable', 'Fraunces', Georgia, 'Times New Roman', serif;
 }
 
 /* HR portal swaps the semantic accent to amber while keeping the
