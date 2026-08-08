@@ -15,6 +15,7 @@ from app.models.platform import (
 )
 from app.models.email_workflow import (
     CandidateEmail,
+    CandidateEmailCampaign,
     CandidateEmailEvent,
     CandidateEmailInbound,
     CandidateEmailThread,
@@ -40,6 +41,7 @@ __all__ = [
     "ApplicationStageHistory",
     "Candidate",
     "CandidateEmail",
+    "CandidateEmailCampaign",
     "CandidateEmailEvent",
     "CandidateEmailInbound",
     "CandidateEmailThread",

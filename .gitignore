@@ -33,3 +33,7 @@ skills-lock.json
 .code-review-graph/
 testsprite_tests/tmp/
 testsprite_tests/tmp/config.json
+.agents/
+.claude/ 
+skills-lock.json
+

@@ -24,6 +24,7 @@ def suggestions_to_report(rows: list[CvImprovementSuggestion]) -> ImprovementRep
         metadata = row.metadata_json or {}
         if row.suggestion_type == SuggestionType.skill_gap:
             payload["skill_gaps"].append({
+                "suggestion_id": row.suggestion_id,
                 "skill": row.suggested_text or "",
                 "priority": row.priority,
                 "reason": row.explanation or "",
@@ -31,6 +32,7 @@ def suggestions_to_report(rows: list[CvImprovementSuggestion]) -> ImprovementRep
             })
         elif row.suggestion_type == SuggestionType.section_feedback:
             payload["section_feedback"].append({
+                "suggestion_id": row.suggestion_id,
                 "section": row.section or "Other",
                 "issue": row.original_text or "",
                 "explanation": row.explanation or "",
@@ -39,6 +41,7 @@ def suggestions_to_report(rows: list[CvImprovementSuggestion]) -> ImprovementRep
             })
         elif row.suggestion_type == SuggestionType.rewrite:
             payload["rewrite_suggestions"].append({
+                "suggestion_id": row.suggestion_id,
                 "section": row.section or "Other",
                 "original_text": row.original_text or "",
                 "issue": row.explanation or "",
@@ -47,6 +50,7 @@ def suggestions_to_report(rows: list[CvImprovementSuggestion]) -> ImprovementRep
             })
         elif row.suggestion_type == SuggestionType.quick_win:
             payload["quick_wins"].append({
+                "suggestion_id": row.suggestion_id,
                 "title": row.suggested_text or "",
                 "category": metadata.get("category", row.category.value),
                 "priority": row.priority,

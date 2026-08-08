@@ -16,6 +16,8 @@ import { isCompanyProfileComplete, requiresCompanyProfile } from "@/services"
 
 import type { AnalyzerDraftState } from "@/types/analyzer"
 
+import type { CvRebuildResponse } from "@/types/cvRebuild"
+
 import type { Portal, ScreenId } from "@/types/app"
 
 import { portalFromAccountRole, type AuthSession } from "@/types/auth"
@@ -106,6 +108,9 @@ export default function App() {
 
   const [analyzerDraft, setAnalyzerDraft] =
     useState<AnalyzerDraftState>(emptyAnalyzerDraft)
+
+  const [rebuiltFromImprovement, setRebuiltFromImprovement] =
+    useState<CvRebuildResponse | null>(null)
 
   const [trackerFocusApplicationId, setTrackerFocusApplicationId] =
     useState<number | null>(null)
@@ -200,6 +205,8 @@ export default function App() {
 
     setAnalyzerDraft(emptyAnalyzerDraft())
 
+    setRebuiltFromImprovement(null)
+
     setImprovementMatchResultId(null)
 
     setTrackerFocusApplicationId(null)
@@ -232,6 +239,8 @@ export default function App() {
 
     setAnalyzerDraft(emptyAnalyzerDraft())
 
+    setRebuiltFromImprovement(null)
+
     setImprovementMatchResultId(null)
 
     setTrackerFocusApplicationId(null)
@@ -255,6 +264,19 @@ export default function App() {
     setScreen("analyzer")
 
     toast.success(`Loaded “${title}” into Match Analyzer`)
+  }
+
+  const handleAnalyzeBuiltCv = (file: File, jdText?: string) => {
+    setAnalyzerDraft({
+      cvFile: file,
+      uploadedCvId: null,
+      jdText: jdText ?? "",
+      result: null,
+    })
+
+    clearImprovementSelection()
+
+    setScreen("analyzer")
   }
 
   const clearImprovementSelection = () => {
@@ -406,7 +428,14 @@ export default function App() {
   const renderScreen = () => {
     switch (screen) {
       case "cv-rebuild":
-        return <CVReBuildScreen onNavigate={handleNavigate} />
+        return (
+          <CVReBuildScreen
+            onNavigate={handleNavigate}
+            onAnalyzeCv={handleAnalyzeBuiltCv}
+            incomingResult={rebuiltFromImprovement}
+            onIncomingResultConsumed={() => setRebuiltFromImprovement(null)}
+          />
+        )
 
       case "analyzer":
         return (
@@ -420,7 +449,15 @@ export default function App() {
         )
 
       case "improvement":
-        return <ImprovementScreen matchResultId={improvementMatchResultId} />
+        return (
+          <ImprovementScreen
+            matchResultId={improvementMatchResultId}
+            onRebuilt={(result) => {
+              setRebuiltFromImprovement(result)
+              setScreen("cv-rebuild")
+            }}
+          />
+        )
 
       case "cv-history":
         return <CVHistoryScreen />
@@ -467,7 +504,12 @@ export default function App() {
 
       default:
         return portal === "seeker" ? (
-          <CVReBuildScreen onNavigate={handleNavigate} />
+          <CVReBuildScreen
+            onNavigate={handleNavigate}
+            onAnalyzeCv={handleAnalyzeBuiltCv}
+            incomingResult={rebuiltFromImprovement}
+            onIncomingResultConsumed={() => setRebuiltFromImprovement(null)}
+          />
         ) : (
           <HRDashboard onNavigate={handleNavigate} />
         )

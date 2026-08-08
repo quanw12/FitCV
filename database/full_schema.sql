@@ -309,13 +309,40 @@ CREATE TABLE candidate_email_thread (
     INDEX idx_candidate_email_thread_company_activity (company_id, last_message_at)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
 
+CREATE TABLE candidate_email_campaign (
+    campaign_id           BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+    company_id            BIGINT UNSIGNED NOT NULL,
+    job_id                BIGINT UNSIGNED NULL,
+    created_by_account_id BIGINT UNSIGNED NULL,
+    template_key          VARCHAR(50) NOT NULL,
+    target_stage          VARCHAR(20) NOT NULL,
+    recipient_count       INT UNSIGNED NOT NULL DEFAULT 0,
+    interview_date        DATE NULL,
+    template_json         JSON NOT NULL,
+    ai_generated          BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at            DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_candidate_email_campaign_company
+        FOREIGN KEY (company_id) REFERENCES company(company_id)
+        ON DELETE CASCADE,
+    CONSTRAINT fk_candidate_email_campaign_job
+        FOREIGN KEY (job_id) REFERENCES job(job_id)
+        ON DELETE SET NULL,
+    CONSTRAINT fk_candidate_email_campaign_account
+        FOREIGN KEY (created_by_account_id) REFERENCES account(account_id)
+        ON DELETE SET NULL,
+    INDEX idx_candidate_email_campaign_company_created (company_id, created_at)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
+
 CREATE TABLE candidate_email (
     email_id                BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
     company_id              BIGINT UNSIGNED NOT NULL,
     application_id          BIGINT UNSIGNED NOT NULL,
     thread_id               BIGINT UNSIGNED NULL,
+    campaign_id             BIGINT UNSIGNED NULL,
     template_key            VARCHAR(50) NOT NULL,
     message_kind            ENUM('Initial', 'Reply') NOT NULL DEFAULT 'Initial',
+    stage_at_generation     VARCHAR(20) NULL,
     recipient_email         VARCHAR(150) NOT NULL,
     subject                 VARCHAR(300) NOT NULL,
     body                    LONGTEXT NOT NULL,
@@ -350,6 +377,9 @@ CREATE TABLE candidate_email (
     CONSTRAINT fk_candidate_email_thread
         FOREIGN KEY (thread_id) REFERENCES candidate_email_thread(thread_id)
         ON DELETE SET NULL,
+    CONSTRAINT fk_candidate_email_campaign
+        FOREIGN KEY (campaign_id) REFERENCES candidate_email_campaign(campaign_id)
+        ON DELETE SET NULL,
     CONSTRAINT fk_candidate_email_creator
         FOREIGN KEY (created_by_account_id) REFERENCES account(account_id)
         ON DELETE SET NULL,
@@ -361,6 +391,7 @@ CREATE TABLE candidate_email (
     INDEX idx_candidate_email_company_status (company_id, status),
     INDEX idx_candidate_email_application_created (application_id, created_at),
     INDEX idx_candidate_email_thread_created (thread_id, created_at),
+    INDEX idx_candidate_email_campaign (campaign_id),
     INDEX idx_candidate_email_provider (provider_message_id)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
 

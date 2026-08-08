@@ -155,6 +155,20 @@ class TestPolish:
         assert len(client.prompts) == 2
         assert "42" in client.prompts[1]
 
+    def test_polish_retries_when_an_applied_change_invents_a_skill(self) -> None:
+        invented = dict(VALID_PAYLOAD)
+        invented["skills"] = ["Python", "Kubernetes"]
+        client = FakeGeminiClient([invented, VALID_PAYLOAD])
+        cv, warnings = CvExtractor(client=client).polish(
+            ENTERED_CV,
+            applied_improvements="- [Skill gap] Highlight Kubernetes only if grounded.",
+        )
+        assert cv.skills == ["Python"]
+        assert warnings == []
+        assert len(client.prompts) == 2
+        assert "Kubernetes" in client.prompts[1]
+        assert "<approved_improvements>" in client.prompts[0]
+
     def test_polish_retries_when_entered_section_is_dropped(self) -> None:
         entered = CVData.model_validate(
             {

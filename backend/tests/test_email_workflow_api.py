@@ -22,6 +22,7 @@ from app.models import (
     MatchResult,
 )
 from app.models.account import Account, AccountRole, AuthProvider
+from app.repositories import email_workflow
 from app.services.email_service import EmailDeliveryError
 
 
@@ -32,11 +33,49 @@ class FakeGemini:
     def generate_structured(self, *, prompt: str, response_schema: dict) -> dict:
         self.prompts.append(prompt)
         return {
-            "subject": "Next steps for your Backend Engineer application",
-            "body": (
-                "Dear Nguyen Minh,\n\nThank you for your application. "
-                "We would like to continue with the next step."
+            "subject_template": "Next steps for your {{job_title}} application",
+            "greeting_template": "Dear {{candidate_name}},",
+            "paragraphs": [
+                (
+                    "Thank you for the time and care you invested in applying for "
+                    "the {{job_title}} position with {{company_name}}. We appreciate "
+                    "the opportunity to learn about your background, interests, and "
+                    "the experience you chose to share with our recruiting team."
+                ),
+                (
+                    "Your application is currently recorded at the "
+                    "{{application_stage}} screening stage, and our recruiting team is handling "
+                    "the process with care and consistency. We want you to have a "
+                    "clear written update so you know where the application stands and "
+                    "what communication to expect from us next."
+                ),
+                (
+                    "We will continue using only the information confirmed through the "
+                    "recruitment process and will avoid asking you to rely on unverified "
+                    "details. If any additional action or scheduling information is "
+                    "needed, our team will contact you directly through this email thread "
+                    "with enough context to respond confidently."
+                ),
+                (
+                    "Please keep this message for your records and reply in the same "
+                    "thread if there is relevant information you need us to consider. "
+                    "That helps our team keep the conversation connected to the correct "
+                    "application while providing a timely and accurate response."
+                ),
+            ],
+            "next_steps": [
+                "Review this update and keep this email thread available for future communication.",
+                "No action is required unless relevant application details have changed.",
+            ],
+            "closing": (
+                "Thank you again for your interest and for your patience while we "
+                "coordinate the next step."
             ),
+            "signature_lines": [
+                "Best regards,",
+                "{{hr_name}}",
+                "{{company_name}} Talent Acquisition Team",
+            ],
         }
 
 
@@ -145,7 +184,7 @@ class EmailWorkflowApiIntegrationTests(unittest.TestCase):
         self.assertEqual(response.status_code, 201)
         self.assertNotIn("overall_score", fake_gemini.prompts[0])
         self.assertNotIn("match_label", fake_gemini.prompts[0])
-        self.assertIn("Strong Python evidence.", fake_gemini.prompts[0])
+        self.assertNotIn("Strong Python evidence.", fake_gemini.prompts[0])
         return response.json()
 
     def test_review_approve_send_workflow(self) -> None:
@@ -176,7 +215,7 @@ class EmailWorkflowApiIntegrationTests(unittest.TestCase):
         with patch(
             "app.services.email_workflow_service.send_candidate_email",
             return_value="resend-message-123",
-        ):
+        ) as sender:
             sent = self.client.post(
                 f"/api/hr/emails/drafts/{draft['email_id']}/send"
             )
@@ -185,6 +224,7 @@ class EmailWorkflowApiIntegrationTests(unittest.TestCase):
         self.assertEqual(
             sent.json()["provider_message_id"], "resend-message-123"
         )
+        self.assertEqual(sender.call_args.kwargs["sender_name"], "FitCV Labs")
 
     def test_generating_same_template_reuses_pending_draft(self) -> None:
         first = self.generate_draft()
@@ -204,6 +244,66 @@ class EmailWorkflowApiIntegrationTests(unittest.TestCase):
             .count(),
             1,
         )
+
+    def test_concurrent_approval_prevents_unreviewed_edit(self) -> None:
+        draft = self.generate_draft()
+        stored = self.db.get(CandidateEmail, draft["email_id"])
+        assert stored is not None
+        original_subject = stored.subject
+        original_transition = email_workflow.compare_and_set_status
+
+        def approve_before_edit(db: Session, **kwargs) -> bool:
+            competing = db.get(CandidateEmail, draft["email_id"])
+            assert competing is not None
+            competing.status = "Approved"
+            competing.approved_by_account_id = self.manager.account_id
+            competing.approved_at = datetime.now(timezone.utc).replace(tzinfo=None)
+            db.commit()
+            return original_transition(db, **kwargs)
+
+        with patch(
+            "app.services.email_workflow_service.email_workflow.compare_and_set_status",
+            side_effect=approve_before_edit,
+        ):
+            response = self.client.patch(
+                f"/api/hr/emails/drafts/{draft['email_id']}",
+                json={
+                    "subject": "Unreviewed concurrent subject",
+                    "body": "Unreviewed concurrent body",
+                },
+            )
+
+        self.assertEqual(response.status_code, 409)
+        self.db.expire_all()
+        stored = self.db.get(CandidateEmail, draft["email_id"])
+        assert stored is not None
+        self.assertEqual(stored.status, "Approved")
+        self.assertEqual(stored.subject, original_subject)
+
+    def test_generation_uses_hr_candidate_visible_details(self) -> None:
+        fake_gemini = FakeGemini()
+        application = self.db.get(Application, self.application_id)
+        assert application is not None
+        application.current_stage = "Interview"
+        self.db.commit()
+        guidance = (
+            "Interview on 19 August at 10:00 ICT via Google Meet; "
+            "please confirm by 15 August."
+        )
+        with patch(
+            "app.services.email_workflow_service.GeminiClient",
+            return_value=fake_gemini,
+        ):
+            response = self.client.post(
+                "/api/hr/emails/drafts/generate",
+                json={
+                    "application_id": self.application_id,
+                    "template_key": "interview",
+                    "guidance": guidance,
+                },
+            )
+        self.assertEqual(response.status_code, 201)
+        self.assertIn(guidance, fake_gemini.prompts[0])
 
     def test_failed_delivery_is_tracked_and_can_retry(self) -> None:
         draft = self.generate_draft()
@@ -239,6 +339,55 @@ class EmailWorkflowApiIntegrationTests(unittest.TestCase):
         self.assertEqual(retried.status_code, 200)
         self.assertEqual(retried.json()["status"], "Sent")
         self.assertEqual(retried.json()["retry_count"], 2)
+
+    def test_reopen_race_cannot_send_a_draft_without_approval(self) -> None:
+        draft = self.generate_draft()
+        self.client.post(
+            f"/api/hr/emails/drafts/{draft['email_id']}/approve"
+        )
+        with patch(
+            "app.services.email_workflow_service.send_candidate_email",
+            side_effect=EmailDeliveryError("Provider temporarily unavailable."),
+        ):
+            self.client.post(f"/api/hr/emails/drafts/{draft['email_id']}/send")
+
+        def reopen_before_claim(db: Session, company_id: int) -> str:
+            changed = email_workflow.compare_and_set_status(
+                db,
+                email_id=draft["email_id"],
+                company_id=company_id,
+                expected_status="Failed",
+                require_not_queued=True,
+                values={
+                    "status": "Draft",
+                    "delivery_status": None,
+                    "approved_by_account_id": None,
+                    "approved_at": None,
+                    "retryable": False,
+                },
+            )
+            assert changed
+            return "FitCV Labs"
+
+        with (
+            patch(
+                "app.services.email_workflow_service.email_workflow.employer_name",
+                side_effect=reopen_before_claim,
+            ),
+            patch(
+                "app.services.email_workflow_service.send_candidate_email"
+            ) as sender,
+        ):
+            response = self.client.post(
+                f"/api/hr/emails/drafts/{draft['email_id']}/send"
+            )
+
+        self.assertEqual(response.status_code, 409)
+        sender.assert_not_called()
+        self.db.expire_all()
+        reopened = self.db.get(CandidateEmail, draft["email_id"])
+        assert reopened is not None
+        self.assertEqual(reopened.status, "Draft")
 
     def test_permanent_provider_failure_requires_reopen(self) -> None:
         draft = self.generate_draft()
@@ -392,7 +541,15 @@ class EmailWorkflowApiIntegrationTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(
             {template["key"] for template in response.json()},
-            {"confirmation", "shortlist", "interview", "rejection"},
+            {
+                "confirmation",
+                "shortlist",
+                "interview",
+                "rejection",
+                "follow_up",
+                "offer_discussion",
+                "onboarding_welcome",
+            },
         )
 
     def test_inbound_smart_reply_stays_review_first(self) -> None:
@@ -482,7 +639,7 @@ class EmailWorkflowApiIntegrationTests(unittest.TestCase):
                 "<candidate-message@example.com>",
             )
             self.assertNotIn("overall_score", smart_reply_gemini.prompts[0])
-            self.assertNotIn("Strong Python evidence.", smart_reply_gemini.prompts[0])
+            self.assertIn("Strong Python evidence.", smart_reply_gemini.prompts[0])
 
             blocked = self.client.post(
                 f"/api/hr/emails/drafts/{reply_draft['email_id']}/send"

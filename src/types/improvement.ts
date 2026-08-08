@@ -7,6 +7,8 @@ export type CvSection = "Summary" | "WorkExperience" | "Skills" | "Education" | 
 export interface SkillGap {
   id: string
 
+  suggestionId: number
+
   skill: string
 
   priority: SuggestionPriority
@@ -18,6 +20,8 @@ export interface SkillGap {
 
 export interface SectionFeedback {
   id: string
+
+  suggestionId: number
 
   section: CvSection
 
@@ -33,6 +37,8 @@ export interface SectionFeedback {
 export interface RewriteSuggestion {
   id: string
 
+  suggestionId: number
+
   section: CvSection
 
   originalText: string
@@ -46,6 +52,8 @@ export interface RewriteSuggestion {
 
 export interface QuickWin {
   id: string
+
+  suggestionId: number
 
   title: string
 

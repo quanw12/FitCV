@@ -90,6 +90,77 @@ async def rebuild_cv(
     )
 
 
+async def rebuild_with_improvements(
+    parsed_text: str,
+    *,
+    applied_improvements: str,
+    jd_text: str | None = None,
+    language: str | None = None,
+    avatar: str | None = None,
+    extractor: CvExtractor | None = None,
+) -> CvRebuildResponse:
+    """Rebuild a saved parsed CV after the owner chooses grounded improvements.
+
+    The saved parse is deliberately re-extracted and polished server-side.  This
+    avoids trusting browser-provided CV data and keeps the existing grounding
+    checks in :class:`CvExtractor` as the final guard against invented facts.
+    """
+    if not parsed_text or not parsed_text.strip():
+        raise ValueError("CV parse text unavailable. Re-upload the CV and analyse again.")
+    if not applied_improvements or not applied_improvements.strip():
+        raise ValueError("Select at least one improvement before rebuilding the CV.")
+
+    cv_extractor = extractor or CvExtractor()
+    cv = normalize_cv(cv_extractor.extract(parsed_text))
+    name = cv.name
+    output_language = language or detect_cv_language(cv)
+    warnings: list[str] = []
+
+    # Apply the approved instructions once even when the CV language is already
+    # uniform. Any follow-up mixed-language pass receives the same instructions.
+    cv, polish_warnings = cv_extractor.polish(
+        cv,
+        language=output_language,
+        jd_text=jd_text,
+        applied_improvements=applied_improvements,
+    )
+    cv = normalize_cv(cv)
+    warnings.extend(polish_warnings)
+    output_language = detect_cv_language(cv)
+
+    for _ in range(_MAX_MIXED_ATTEMPTS):
+        if not cv_is_mixed(cv):
+            break
+        cv, mixed_warnings = cv_extractor.polish(
+            cv,
+            language=output_language,
+            jd_text=jd_text,
+            applied_improvements=applied_improvements,
+        )
+        cv = normalize_cv(cv)
+        warnings.extend(mixed_warnings)
+        output_language = detect_cv_language(cv)
+
+    cv = cv.model_copy(update={"name": name})
+    avatar_data = maybe_downscale_avatar(avatar, warnings)
+    html = render_cv(cv, language=output_language, avatar=avatar_data)
+    pdf_bytes, thumbnail_bytes = await render_pdf_with_thumbnail(html)
+    page_count = count_pdf_pages(pdf_bytes)
+    if page_count > 1:
+        warnings.append(
+            f"The generated CV has {page_count} pages. "
+            "Review the content to ensure nothing was unexpectedly split."
+        )
+
+    return CvRebuildResponse(
+        filename="improved_cv.pdf",
+        preview_json=cv,
+        pdf_base64=base64.b64encode(pdf_bytes).decode("ascii"),
+        thumbnail_base64=base64.b64encode(thumbnail_bytes).decode("ascii"),
+        warnings=warnings,
+    )
+
+
 async def build_cv(
     cv: CVData,
     *,
