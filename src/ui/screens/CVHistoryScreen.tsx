@@ -98,23 +98,35 @@ export default function CVHistoryScreen() {
   useEffect(() => {
     if (selected.length !== 2) {
       setSemanticComparison(null)
+
       return
     }
+
     const orderedIds = [...selected].sort((left, right) => {
       const leftVersion = cvs.find((cv) => cv.cvId === left)?.versionNumber ?? 0
-      const rightVersion = cvs.find((cv) => cv.cvId === right)?.versionNumber ?? 0
+
+      const rightVersion =
+        cvs.find((cv) => cv.cvId === right)?.versionNumber ?? 0
+
       return leftVersion - rightVersion
     })
+
     let cancelled = false
+
     setComparisonLoading(true)
+
     void analyzerApi
+
       .compareCvVersions(orderedIds[0], orderedIds[1])
+
       .then((comparison) => {
         if (!cancelled) setSemanticComparison(comparison)
       })
+
       .catch((caught) => {
         if (!cancelled) {
           setSemanticComparison(null)
+
           setError(
             caught instanceof Error
               ? caught.message
@@ -122,9 +134,11 @@ export default function CVHistoryScreen() {
           )
         }
       })
+
       .finally(() => {
         if (!cancelled) setComparisonLoading(false)
       })
+
     return () => {
       cancelled = true
     }
@@ -376,8 +390,16 @@ export default function CVHistoryScreen() {
                           y1="0"
                           y2="1"
                         >
-                          <stop offset="0%" stopColor="#2563EB" stopOpacity={0.35} />
-                          <stop offset="100%" stopColor="#2563EB" stopOpacity={0.02} />
+                          <stop
+                            offset="0%"
+                            stopColor="#2563EB"
+                            stopOpacity={0.35}
+                          />
+                          <stop
+                            offset="100%"
+                            stopColor="#2563EB"
+                            stopOpacity={0.02}
+                          />
                         </linearGradient>
                       </defs>
                       <CartesianGrid
@@ -401,17 +423,30 @@ export default function CVHistoryScreen() {
                         width={42}
                       />
                       <Tooltip
-                        cursor={{ stroke: "var(--border-strong)", strokeWidth: 1 }}
+                        cursor={{
+                          stroke: "var(--border-strong)",
+                          strokeWidth: 1,
+                        }}
                         contentStyle={{
                           background: "var(--surface)",
+
                           border: "1px solid var(--border-strong)",
+
                           borderRadius: 10,
+
                           boxShadow: "var(--shadow-md)",
                         }}
-                        itemStyle={{ color: "var(--text-primary)", fontWeight: 700 }}
-                        labelStyle={{ color: "var(--text-secondary)", marginBottom: 4 }}
+                        itemStyle={{
+                          color: "var(--text-primary)",
+                          fontWeight: 700,
+                        }}
+                        labelStyle={{
+                          color: "var(--text-secondary)",
+                          marginBottom: 4,
+                        }}
                         formatter={(value) => [
                           `${Number(value ?? 0).toFixed(1)}%`,
+
                           "Match score",
                         ]}
                         labelFormatter={(value) => `CV version ${value}`}
@@ -422,8 +457,18 @@ export default function CVHistoryScreen() {
                         stroke="#2563EB"
                         strokeWidth={3}
                         fill="url(#cv-score-progress-fill)"
-                        dot={{ r: 5, fill: "#2563EB", strokeWidth: 2, stroke: "var(--surface)" }}
-                        activeDot={{ r: 7, fill: "#2563EB", strokeWidth: 3, stroke: "var(--surface)" }}
+                        dot={{
+                          r: 5,
+                          fill: "#2563EB",
+                          strokeWidth: 2,
+                          stroke: "var(--surface)",
+                        }}
+                        activeDot={{
+                          r: 7,
+                          fill: "#2563EB",
+                          strokeWidth: 3,
+                          stroke: "var(--surface)",
+                        }}
                       />
                     </AreaChart>
                   </ResponsiveContainer>
@@ -468,13 +513,17 @@ export default function CVHistoryScreen() {
             <div
               style={{
                 width: 56,
+
                 height: 56,
+
                 borderRadius: 16,
 
                 background: "var(--accent-soft)",
 
                 display: "flex",
+
                 alignItems: "center",
+
                 justifyContent: "center",
               }}
             >
@@ -486,7 +535,9 @@ export default function CVHistoryScreen() {
             <span
               style={{
                 fontSize: 13,
+
                 color: "var(--text-secondary)",
+
                 maxWidth: 280,
               }}
             >
@@ -529,7 +580,9 @@ export default function CVHistoryScreen() {
                     isSelected ? "var(--accent)" : "var(--border)"
                   }`,
 
-                  background: isSelected ? "var(--accent-soft)" : "var(--surface)",
+                  background: isSelected
+                    ? "var(--accent-soft)"
+                    : "var(--surface)",
 
                   position: "relative",
                 }}
@@ -679,9 +732,13 @@ export default function CVHistoryScreen() {
           <div
             style={{
               display: "flex",
+
               justifyContent: "space-between",
+
               alignItems: "baseline",
+
               gap: 12,
+
               flexWrap: "wrap",
             }}
           >
@@ -691,8 +748,17 @@ export default function CVHistoryScreen() {
                 What changed between these CV versions?
               </h3>
               {semanticComparison && (
-                <p style={{ color: "var(--text-secondary)", fontSize: 12, marginTop: 4 }}>
-                  v{semanticComparison.base.versionNumber} {semanticComparison.base.fileName} → v{semanticComparison.target.versionNumber} {semanticComparison.target.fileName}
+                <p
+                  style={{
+                    color: "var(--text-secondary)",
+                    fontSize: 12,
+                    marginTop: 4,
+                  }}
+                >
+                  v{semanticComparison.base.versionNumber}{" "}
+                  {semanticComparison.base.fileName} → v
+                  {semanticComparison.target.versionNumber}{" "}
+                  {semanticComparison.target.fileName}
                 </p>
               )}
             </div>
@@ -707,8 +773,11 @@ export default function CVHistoryScreen() {
               <div
                 style={{
                   display: "grid",
+
                   gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+
                   gap: 12,
+
                   marginTop: 16,
                 }}
               >
@@ -717,7 +786,9 @@ export default function CVHistoryScreen() {
                     key={change.category}
                     style={{
                       border: "1px solid var(--border)",
+
                       borderRadius: 10,
+
                       padding: 14,
                     }}
                   >
@@ -725,41 +796,69 @@ export default function CVHistoryScreen() {
                     <p
                       style={{
                         color: "var(--text-secondary)",
+
                         fontSize: 12,
+
                         margin: "6px 0 10px",
                       }}
                     >
                       {change.summary}
                     </p>
-                    <ChangeLine label="Added" values={change.added} color="#166534" />
-                    <ChangeLine label="Removed" values={change.removed} color="#B91C1C" />
-                    <ChangeLine label="Retained" values={change.retained} color="#475569" />
+                    <ChangeLine
+                      label="Added"
+                      values={change.added}
+                      color="var(--success)"
+                    />
+                    <ChangeLine
+                      label="Removed"
+                      values={change.removed}
+                      color="var(--danger)"
+                    />
+                    <ChangeLine
+                      label="Retained"
+                      values={change.retained}
+                      color="var(--text-secondary)"
+                    />
                   </div>
                 ))}
               </div>
               {semanticComparison.scoreDeltas.length > 0 && (
                 <div style={{ marginTop: 18 }}>
-                  <strong style={{ fontSize: 13 }}>Score impact by job description</strong>
+                  <strong style={{ fontSize: 13 }}>
+                    Score impact by job description
+                  </strong>
                   {semanticComparison.scoreDeltas.map((item) => (
                     <div
                       key={item.jobDescriptionId}
                       style={{
                         display: "flex",
+
                         justifyContent: "space-between",
+
                         gap: 12,
+
                         padding: "10px 0",
+
                         borderBottom: "1px solid var(--border)",
+
                         fontSize: 13,
                       }}
                     >
                       <span>{item.title}</span>
                       <span
                         style={{
-                          color: item.delta >= 0 ? "#166534" : "#B91C1C",
+                          color:
+                            item.delta >= 0
+                              ? "var(--success)"
+                              : "var(--danger)",
+
                           fontWeight: 700,
                         }}
                       >
-                        {item.baseScore.toFixed(1)} → {item.targetScore.toFixed(1)} ({item.delta >= 0 ? "+" : ""}{item.delta.toFixed(1)})
+                        {item.baseScore.toFixed(1)} →{" "}
+                        {item.targetScore.toFixed(1)} (
+                        {item.delta >= 0 ? "+" : ""}
+                        {item.delta.toFixed(1)})
                       </span>
                     </div>
                   ))}
@@ -775,14 +874,19 @@ export default function CVHistoryScreen() {
 
 function ChangeLine({
   label,
+
   values,
+
   color,
 }: {
   label: string
+
   values: string[]
+
   color: string
 }) {
   if (values.length === 0) return null
+
   return (
     <div style={{ color, fontSize: 11, lineHeight: 1.5, marginTop: 4 }}>
       <strong>{label}:</strong> {values.join(", ")}
@@ -797,45 +901,75 @@ function ScoreBaseline({ point }: { point: CvScorePoint }) {
       role="img"
       style={{
         marginTop: 18,
+
         padding: "20px 22px",
+
         border: "1px solid var(--border)",
+
         borderRadius: 14,
-        background: "linear-gradient(135deg, var(--accent-soft), var(--surface))",
+
+        background:
+          "linear-gradient(135deg, var(--accent-soft), var(--surface))",
       }}
     >
       <div
         style={{
           display: "flex",
+
           alignItems: "baseline",
+
           justifyContent: "space-between",
+
           gap: 16,
         }}
       >
         <div>
-          <div style={{ color: "var(--text-secondary)", fontSize: 12, fontWeight: 700 }}>
+          <div
+            style={{
+              color: "var(--text-secondary)",
+              fontSize: 12,
+              fontWeight: 700,
+            }}
+          >
             FIRST BENCHMARK · VERSION {point.versionNumber}
           </div>
-          <strong style={{ color: "var(--text-primary)", fontSize: 28, lineHeight: 1.2 }}>
+          <strong
+            style={{
+              color: "var(--text-primary)",
+              fontSize: 28,
+              lineHeight: 1.2,
+            }}
+          >
             {point.overallScore.toFixed(1)}%
           </strong>
         </div>
-        <span className="fc-badge fc-badge--blue">{point.matchLabel ?? "Match score"}</span>
+        <span className="fc-badge fc-badge--blue">
+          {point.matchLabel ?? "Match score"}
+        </span>
       </div>
       <div
         style={{
           height: 12,
+
           overflow: "hidden",
+
           borderRadius: 999,
+
           background: "var(--surface-2)",
+
           border: "1px solid var(--border)",
+
           marginTop: 18,
         }}
       >
         <div
           style={{
             width: `${Math.max(0, Math.min(point.overallScore, 100))}%`,
+
             height: "100%",
+
             borderRadius: "inherit",
+
             background: "linear-gradient(90deg, #2563EB, #60A5FA)",
           }}
         />
@@ -844,9 +978,13 @@ function ScoreBaseline({ point }: { point: CvScorePoint }) {
         aria-hidden="true"
         style={{
           display: "flex",
+
           justifyContent: "space-between",
+
           color: "var(--text-muted)",
+
           fontSize: 11,
+
           marginTop: 7,
         }}
       >
@@ -854,8 +992,15 @@ function ScoreBaseline({ point }: { point: CvScorePoint }) {
         <span>50%</span>
         <span>100%</span>
       </div>
-      <p style={{ color: "var(--text-secondary)", fontSize: 12.5, marginTop: 14 }}>
-        Analyze a second CV version against this same target to see your score trend.
+      <p
+        style={{
+          color: "var(--text-secondary)",
+          fontSize: 12.5,
+          marginTop: 14,
+        }}
+      >
+        Analyze a second CV version against this same target to see your score
+        trend.
       </p>
     </div>
   )
@@ -983,7 +1128,7 @@ const alertStyle: React.CSSProperties = {
 const selectionHintStyle: React.CSSProperties = {
   padding: "10px 16px",
 
-  background: "#EFF6FF",
+  background: "var(--accent-soft)",
 
   borderRadius: 10,
 
@@ -991,7 +1136,7 @@ const selectionHintStyle: React.CSSProperties = {
 
   fontSize: 13,
 
-  color: "#1D4ED8",
+  color: "var(--accent-ink)",
 
   fontWeight: 600,
 }

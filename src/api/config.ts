@@ -1,6 +1,6 @@
 export const DEFAULT_PRODUCTION_API_BASE_URL = "https://fitcv-0cab.onrender.com"
 
-const DEFAULT_DEVELOPMENT_API_BASE_URL = "http://127.0.0.1:8000"
+const DEFAULT_DEVELOPMENT_API_BASE_URL = ""
 
 export const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ??
@@ -9,5 +9,9 @@ export const API_BASE_URL =
     : DEFAULT_DEVELOPMENT_API_BASE_URL)
 
 export function apiConnectionErrorMessage(): string {
-  return `Unable to reach the FitCV API at ${API_BASE_URL}.`
+  const apiAddress =
+    API_BASE_URL ||
+    (typeof window !== "undefined" ? window.location.origin : "the current origin")
+
+  return `Unable to reach the FitCV API at ${apiAddress}.`
 }

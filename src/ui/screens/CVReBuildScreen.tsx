@@ -444,7 +444,7 @@ export default function CVReBuildScreen({
           style={{
             border: "1px solid var(--border)",
             borderRadius: 16,
-            background: "white",
+            background: "var(--surface)",
             padding: 24,
           }}
         >
@@ -542,7 +542,7 @@ export default function CVReBuildScreen({
               padding: "10px 18px",
               borderRadius: 10,
               border: "1px solid var(--border)",
-              background: "white",
+              background: "var(--surface)",
               color: "var(--text-primary)",
               fontWeight: 600,
               cursor: "pointer",
@@ -581,7 +581,7 @@ export default function CVReBuildScreen({
           style={{
             border: "1px solid var(--border)",
             borderRadius: 16,
-            background: "white",
+            background: "var(--surface)",
             padding: 24,
           }}
         >
@@ -647,7 +647,7 @@ export default function CVReBuildScreen({
                     padding: "10px 18px",
                     borderRadius: 10,
                     border: "1px solid var(--border)",
-                    background: "white",
+                    background: "var(--surface)",
                     color: "var(--text-primary)",
                     fontWeight: 600,
                     cursor: "pointer",
@@ -667,7 +667,7 @@ export default function CVReBuildScreen({
                     padding: "10px 18px",
                     borderRadius: 10,
                     border: "1px solid var(--border)",
-                    background: "white",
+                    background: "var(--surface)",
                     color: "var(--text-primary)",
                     fontWeight: 600,
                     cursor: saving ? "wait" : "pointer",
@@ -720,7 +720,7 @@ export default function CVReBuildScreen({
               padding: "8px 14px",
               borderRadius: 10,
               border: "1px solid var(--border)",
-              background: "white",
+              background: "var(--surface)",
               color: "var(--text-secondary)",
               fontWeight: 600,
               cursor: "pointer",
@@ -753,7 +753,7 @@ export default function CVReBuildScreen({
             style={{
               width: "min(880px, 100%)",
               height: "min(92vh, 100%)",
-              background: "white",
+              background: "var(--surface)",
               borderRadius: 16,
               display: "flex",
               flexDirection: "column",

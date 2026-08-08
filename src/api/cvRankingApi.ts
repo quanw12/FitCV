@@ -108,8 +108,6 @@ interface BackendScreeningBatchSummary {
 }
 
 async function requestBlob(path: string, fallback: string): Promise<Blob> {
-  if (!API_BASE_URL) throw new Error("API base URL is not configured.")
-
   const token = authApi.getSession()?.accessToken
 
   const response = await fetch(`${API_BASE_URL}${path}`, {
@@ -305,8 +303,6 @@ export const cvRankingApi = {
 
     jobDescription: string,
   ): Promise<BatchParseCvResponse> {
-    if (!API_BASE_URL) throw new Error("API base URL is not configured.")
-
     const formData = new FormData()
 
     formData.append("job_description", jobDescription)
