@@ -12,8 +12,10 @@ import {
   ArrowsClockwise,
   Square,
 } from "@phosphor-icons/react"
+import { toast } from "sonner"
 
 import { improvementApi } from "@/api/improvementApi"
+import type { CvRebuildResponse } from "@/types/cvRebuild"
 
 import {
   priorityBadge,
@@ -26,10 +28,13 @@ import type { ImprovementReportResponse } from "@/types/improvement"
 
 interface ImprovementScreenProps {
   matchResultId?: string | null
+
+  onRebuilt?: (result: CvRebuildResponse) => void
 }
 
 export default function ImprovementScreen({
   matchResultId = null,
+  onRebuilt,
 }: ImprovementScreenProps) {
   const [response, setResponse] = useState<ImprovementReportResponse | null>(
     null,
@@ -43,11 +48,21 @@ export default function ImprovementScreen({
 
   const [completedWins, setCompletedWins] = useState<Set<string>>(new Set())
 
+  const [selectedSuggestionIds, setSelectedSuggestionIds] = useState<Set<number>>(
+    new Set(),
+  )
+
+  const [applying, setApplying] = useState(false)
+
   const [copyMessage, setCopyMessage] = useState<Record<string, string>>({})
 
   const requestIdRef = useRef(0)
 
   const activeRequestRef = useRef<AbortController | null>(null)
+
+  const applyRequestRef = useRef(0)
+
+  const activeApplyRef = useRef<AbortController | null>(null)
 
   const loadReport = useCallback(
     async (regenerate = false) => {
@@ -85,6 +100,8 @@ export default function ImprovementScreen({
       setError(null)
 
       setCompletedWins(new Set())
+
+      setSelectedSuggestionIds(new Set())
 
       try {
         let current = await improvementApi.getReport(
@@ -148,7 +165,17 @@ export default function ImprovementScreen({
           )
         }
 
-        if (isCurrentRequest()) setResponse(current)
+        if (isCurrentRequest()) {
+          setResponse(current)
+
+          setSelectedSuggestionIds(
+            new Set(
+              current.report?.rewriteSuggestions.map(
+                (suggestion) => suggestion.suggestionId,
+              ) ?? [],
+            ),
+          )
+        }
       } catch (caught) {
         if (isAbortError(caught) || !isCurrentRequest()) return
 
@@ -173,6 +200,12 @@ export default function ImprovementScreen({
 
     return () => {
       requestIdRef.current += 1
+
+      applyRequestRef.current += 1
+
+      activeApplyRef.current?.abort()
+
+      activeApplyRef.current = null
 
       activeRequestRef.current?.abort()
 
@@ -226,6 +259,17 @@ export default function ImprovementScreen({
       return next
     })
 
+  const toggleSuggestion = (suggestionId: number) =>
+    setSelectedSuggestionIds((previous) => {
+      const next = new Set(previous)
+
+      next.has(suggestionId)
+        ? next.delete(suggestionId)
+        : next.add(suggestionId)
+
+      return next
+    })
+
   const copyRewrite = async (id: string, value: string) => {
     try {
       await navigator.clipboard.writeText(value)
@@ -239,6 +283,58 @@ export default function ImprovementScreen({
       () => setCopyMessage((previous) => ({ ...previous, [id]: "" })),
       1800,
     )
+  }
+
+  const handleApplyImprovements = async () => {
+    if (!matchResultId || applying || selectedSuggestionIds.size === 0) return
+
+    activeApplyRef.current?.abort()
+
+    const requestId = applyRequestRef.current + 1
+
+    applyRequestRef.current = requestId
+
+    const controller = new AbortController()
+
+    activeApplyRef.current = controller
+
+    const isCurrentApply = () =>
+      applyRequestRef.current === requestId &&
+      activeApplyRef.current === controller &&
+      !controller.signal.aborted
+
+    setApplying(true)
+
+    try {
+      const result = await improvementApi.applyImprovements(
+        matchResultId,
+        [...selectedSuggestionIds],
+        { signal: controller.signal },
+      )
+
+      if (!isCurrentApply()) return
+
+      activeApplyRef.current = null
+
+      setApplying(false)
+
+      toast.success("Your selected improvements were applied to a rebuilt CV.")
+
+      onRebuilt?.(result)
+    } catch (caught) {
+      if (isAbortError(caught) || !isCurrentApply()) return
+
+      const message =
+        caught instanceof Error
+          ? caught.message
+          : "Unable to rebuild the CV with those improvements."
+
+      toast.error(message)
+
+      activeApplyRef.current = null
+
+      setApplying(false)
+    }
   }
 
   const isProcessing =
@@ -361,6 +457,24 @@ export default function ImprovementScreen({
                       <blockquote>
                         <strong>JD evidence:</strong> {item.jdEvidence}
                       </blockquote>
+                      <label
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "flex-start",
+                          gap: 8,
+                          marginTop: 10,
+                          color: "var(--text-secondary)",
+                          fontSize: 13,
+                          cursor: "pointer",
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedSuggestionIds.has(item.suggestionId)}
+                          onChange={() => toggleSuggestion(item.suggestionId)}
+                        />
+                        Apply only if my CV already proves this skill.
+                      </label>
                     </article>
                   ))}
                 </div>
@@ -380,6 +494,24 @@ export default function ImprovementScreen({
               ) : (
                 feedback.map((item) => (
                   <article key={item.id} className="feedback-item">
+                    <label
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 8,
+                        margin: "10px 14px 0",
+                        fontSize: 13,
+                        color: "var(--text-secondary)",
+                        cursor: "pointer",
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedSuggestionIds.has(item.suggestionId)}
+                        onChange={() => toggleSuggestion(item.suggestionId)}
+                      />
+                      Apply this feedback
+                    </label>
                     <button
                       onClick={() => toggleExpanded(item.id)}
                       aria-expanded={expanded.has(item.id)}
@@ -440,6 +572,23 @@ export default function ImprovementScreen({
                       </div>
                     </div>
                     <div className="copy-row">
+                      <label
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 7,
+                          fontSize: 13,
+                          color: "var(--text-secondary)",
+                          cursor: "pointer",
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedSuggestionIds.has(item.suggestionId)}
+                          onChange={() => toggleSuggestion(item.suggestionId)}
+                        />
+                        Apply this rewrite
+                      </label>
                       <button
                         className="fc-btn fc-btn--secondary"
                         onClick={() =>
@@ -482,25 +631,64 @@ export default function ImprovementScreen({
                   const done = completedWins.has(item.id)
 
                   return (
-                    <button
-                      key={item.id}
-                      className={`quick-win ${done ? "done" : ""}`}
-                      onClick={() => toggleWin(item.id)}
-                      aria-pressed={done}
-                    >
-                      {done ? <CheckSquare size={19} /> : <Square size={19} />}
-                      <span>
-                        <strong>{item.title}</strong>
-                        <small>
-                          {item.category} · {item.priority} priority —{" "}
-                          {item.explanation}
-                        </small>
-                      </span>
-                    </button>
+                    <div key={item.id} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <label
+                        style={{ cursor: "pointer", display: "inline-flex", alignItems: "center" }}
+                        aria-label={`Apply ${item.title}`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedSuggestionIds.has(item.suggestionId)}
+                          onChange={() => toggleSuggestion(item.suggestionId)}
+                        />
+                      </label>
+                      <button
+                        className={`quick-win ${done ? "done" : ""}`}
+                        onClick={() => toggleWin(item.id)}
+                        aria-pressed={done}
+                      >
+                        {done ? <CheckSquare size={19} /> : <Square size={19} />}
+                        <span>
+                          <strong>{item.title}</strong>
+                          <small>
+                            {item.category} · {item.priority} priority —{" "}
+                            {item.explanation}
+                          </small>
+                        </span>
+                      </button>
+                    </div>
                   )
                 })
               )}
             </section>
+
+            <div
+              className="fc-card"
+              style={{
+                position: "sticky",
+                bottom: 16,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 16,
+                padding: "14px 16px",
+                boxShadow: "0 12px 30px rgba(15, 23, 42, 0.15)",
+              }}
+            >
+              <span style={{ color: "var(--text-secondary)", fontSize: 14 }}>
+                {selectedSuggestionIds.size} improvement{selectedSuggestionIds.size === 1 ? "" : "s"} selected
+              </span>
+              <button
+                type="button"
+                className="fc-btn fc-btn--primary"
+                disabled={selectedSuggestionIds.size === 0 || applying}
+                onClick={() => void handleApplyImprovements()}
+              >
+                {applying
+                  ? "Applying improvements…"
+                  : `Apply ${selectedSuggestionIds.size} improvement${selectedSuggestionIds.size === 1 ? "" : "s"} & rebuild CV`}
+              </button>
+            </div>
           </>
         )}
       </main>

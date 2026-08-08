@@ -118,6 +118,13 @@ Candidate email and Smart Reply rules:
   rows because those are not FitCV job applications.
 - Every outbound candidate email follows `Draft -> Approved -> Sent`; AI never
   sends automatically and backend authorization must enforce HR review.
+- Initial candidate-email templates are stage-aware; a draft becomes stale and
+  cannot be sent when the application moves to another pipeline stage.
+- A campaign generates one shared template for the whole batch and personalizes
+  only approved placeholders, so recipient wording stays deterministic.
+- The job's company is always the employer and sender. FitCV is only the
+  software platform and must not appear as the sender unless that is the actual
+  company name.
 - Each application has one company-scoped email thread and a unique inbound
   reply token. Inbound sender email must match the application candidate.
 - Resend webhooks must be verified from the raw request body, deduplicated by

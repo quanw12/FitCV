@@ -3,6 +3,7 @@ import html
 import re
 import time
 from collections.abc import Mapping
+from email.utils import formataddr, parseaddr
 from urllib import error, request
 
 from app.core.config import settings
@@ -47,6 +48,19 @@ def _safe_references(values: list[str] | None) -> list[str]:
         return []
     references = [_safe_message_id(value) for value in values]
     return list(dict.fromkeys(value for value in references if value))[-20:]
+
+
+def _sender_address(sender_name: str | None) -> str:
+    """Keep the verified mailbox while using the actual employer display name."""
+
+    configured = settings.resend_from_email.strip()
+    if not sender_name:
+        return configured
+    mailbox = parseaddr(configured)[1]
+    if not mailbox:
+        return configured
+    safe_name = " ".join(sender_name.split())[:200]
+    return formataddr((safe_name, mailbox)) if safe_name else configured
 
 
 def _resend_request(
@@ -156,6 +170,7 @@ def send_candidate_email(
     in_reply_to: str | None = None,
     references: list[str] | None = None,
     idempotency_key: str | None = None,
+    sender_name: str | None = None,
 ) -> str:
     if not settings.resend_api_key or not settings.resend_from_email:
         raise EmailDeliveryError(
@@ -164,7 +179,7 @@ def send_candidate_email(
         )
     escaped_body = html.escape(body).replace("\n", "<br>")
     payload = {
-        "from": settings.resend_from_email,
+        "from": _sender_address(sender_name),
         "to": [to_email],
         "subject": subject,
         "html": f"<div>{escaped_body}</div>",
@@ -245,20 +260,12 @@ def send_password_reset_code(*, to_email: str, code: str) -> None:
             f"<p>Your verification code is <strong>{code}</strong>.</p>"
             "<p>This code will expire soon. If you did not request this, you can ignore this email.</p>"
         ),
+        "text": (
+            "You requested a password reset for your FitCV account. "
+            f"Your verification code is {code}. This code will expire soon."
+        ),
     }
-    data = json.dumps(payload).encode("utf-8")
-    resend_request = request.Request(
-        "https://api.resend.com/emails",
-        data=data,
-        method="POST",
-        headers={
-            "Authorization": f"Bearer {settings.resend_api_key}",
-            "Content-Type": "application/json",
-        },
-    )
-
     try:
-        with request.urlopen(resend_request, timeout=10) as response:
-            response.read()
-    except error.URLError as exc:
+        _resend_request(path="/emails", method="POST", payload=payload)
+    except EmailDeliveryError as exc:
         print(f"PASSWORD_RESET_EMAIL_FAILED for {to_email}: {exc}")
