@@ -2139,6 +2139,239 @@ h1, h2, h3, h4, h5, h6 {
   color: var(--text-muted);
   white-space: nowrap;
 }
+.email-campaign-builder {
+  display: grid;
+  gap: 22px;
+}
+.email-campaign-heading,
+.email-audience-toolbar,
+.email-campaign-shared__head,
+.email-campaign-record-group__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+.email-campaign-job-filter { width: min(100%, 320px); }
+.email-campaign-step {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 14px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+}
+.email-campaign-step__number {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  color: var(--accent-ink);
+  background: var(--accent-soft);
+  font-size: 12px;
+  font-weight: 800;
+}
+.email-campaign-step__content {
+  display: grid;
+  min-width: 0;
+  gap: 10px;
+}
+.email-campaign-step__content > p,
+.email-audience-toolbar p {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.email-stage-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.email-stage-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 36px;
+  padding: 7px 11px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  cursor: pointer;
+  font: 700 12px/1 var(--font-body);
+}
+.email-stage-chip > span {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+.email-stage-chip > b {
+  min-width: 20px;
+  padding: 3px 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .72);
+  font-size: 10px;
+  text-align: center;
+}
+.email-audience-toolbar > div:last-child {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.email-audience-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+.email-audience-table {
+  width: 100%;
+  min-width: 720px;
+  border-collapse: collapse;
+}
+.email-audience-table th,
+.email-audience-table td {
+  padding: 11px 12px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: 12px;
+  text-align: left;
+  vertical-align: middle;
+}
+.email-audience-table th {
+  color: var(--text-muted);
+  background: var(--surface-2);
+  font-size: 10.5px;
+  font-weight: 750;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+.email-audience-table tr:last-child td { border-bottom: 0; }
+.email-audience-table tr.is-blocked { opacity: .58; }
+.email-audience-table td strong,
+.email-audience-table td small { display: block; }
+.email-audience-table td strong { color: var(--text-primary); }
+.email-audience-table td small {
+  margin-top: 2px;
+  color: var(--text-muted);
+}
+.email-audience-empty {
+  display: grid;
+  place-items: center;
+  min-height: 130px;
+  gap: 5px;
+  padding: 20px;
+  border: 1px dashed var(--border-strong);
+  border-radius: 12px;
+  color: var(--text-muted);
+  text-align: center;
+}
+.email-audience-empty strong { color: var(--text-primary); }
+.email-campaign-form {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+.email-campaign-guidance { grid-column: 1 / -1; }
+.email-campaign-guidance small {
+  display: block;
+  margin-top: 5px;
+  color: var(--text-muted);
+}
+.email-campaign-shared {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--accent-soft-2);
+  border-radius: 12px;
+  background: var(--accent-soft);
+}
+.email-campaign-shared pre {
+  max-height: 320px;
+  overflow: auto;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--text-secondary);
+  background: var(--surface);
+  font: 12px/1.6 var(--font-body);
+  white-space: pre-wrap;
+}
+.email-campaign-draft-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 8px;
+}
+.email-campaign-draft-list button {
+  display: grid;
+  gap: 3px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  color: var(--text-secondary);
+  background: var(--surface);
+  text-align: left;
+  cursor: pointer;
+}
+.email-campaign-draft-list strong { color: var(--text-primary); }
+.email-campaign-draft-list span {
+  overflow: hidden;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.email-campaign-records { display: grid; gap: 12px; }
+.email-campaign-record-group {
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+.email-campaign-record-group__head {
+  justify-content: flex-start;
+  padding: 11px 12px;
+  background: var(--surface-2);
+}
+.email-campaign-record-group__head > span {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+.email-campaign-record-group__head > small {
+  margin-left: auto;
+  color: var(--text-muted);
+}
+.email-campaign-record-list { display: grid; }
+.email-campaign-record-list article {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 9px;
+  padding: 9px 12px;
+  border-top: 1px solid var(--border);
+}
+.email-campaign-record-list article.is-active { background: var(--accent-soft); }
+.email-campaign-record-list article > button {
+  display: grid;
+  grid-template-columns: minmax(140px, 1fr) minmax(180px, 2fr) auto auto;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  color: var(--text-secondary);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+.email-campaign-record-list article > button > div {
+  display: grid;
+  min-width: 0;
+}
+.email-campaign-record-list strong,
+.email-campaign-record-list span,
+.email-campaign-record-list p {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.email-campaign-record-list strong { color: var(--text-primary); }
+.email-campaign-record-list p,
+.email-campaign-record-list article > button > div > span { font-size: 11px; }
 .smart-reply-grid {
   display: grid;
   grid-template-columns: minmax(230px, 290px) minmax(0, 1fr);
@@ -2148,6 +2381,61 @@ h1, h2, h3, h4, h5, h6 {
 .smart-reply-grid > * { min-width: 0; }
 .smart-reply-thread-list { display: grid; min-width: 0; gap: 8px; }
 .smart-reply-thread-list > .fc-panel { overflow: hidden; }
+.smart-reply-batch-bar {
+  display: grid;
+  gap: 9px;
+  padding: 11px;
+  border: 1px solid var(--accent-soft-2);
+  border-radius: 12px;
+  background: var(--accent-soft);
+}
+.smart-reply-batch-bar > div {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--accent-ink);
+  font-size: 12px;
+}
+.smart-reply-thread-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 9px;
+  padding: 11px;
+}
+.smart-reply-thread-row > input { margin-top: 3px; }
+.smart-reply-thread-row > button {
+  display: grid;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  color: inherit;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+.smart-reply-thread-row > button > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+.smart-reply-thread-row p {
+  overflow: hidden;
+  margin: 4px 0 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.smart-reply-thread-row p + p {
+  color: var(--text-muted);
+  font-size: 11.5px;
+}
+.smart-reply-thread-row time {
+  margin-top: 3px;
+  color: var(--text-muted);
+  font-size: 10.5px;
+}
 .smart-reply-detail { display: grid; min-width: 0; gap: 14px; }
 .smart-reply-options {
   display: grid;
@@ -2164,6 +2452,7 @@ h1, h2, h3, h4, h5, h6 {
   }
   .email-record-list article time { display: none; }
   .smart-reply-grid { grid-template-columns: 1fr; }
+  .email-campaign-form { grid-template-columns: 1fr 1fr; }
 }
 @media (max-width: 640px) {
   .email-template-list,
@@ -2178,6 +2467,18 @@ h1, h2, h3, h4, h5, h6 {
   }
   .email-record-list article > button > p { grid-column: 1 / -1; }
   .smart-reply-options { grid-template-columns: 1fr; }
+  .email-campaign-heading,
+  .email-audience-toolbar,
+  .email-campaign-shared__head { align-items: stretch; flex-direction: column; }
+  .email-campaign-job-filter { width: 100%; }
+  .email-campaign-form { grid-template-columns: 1fr; }
+  .email-campaign-guidance { grid-column: auto; }
+  .email-campaign-record-group__head { flex-wrap: wrap; }
+  .email-campaign-record-group__head > small { margin-left: 0; }
+  .email-campaign-record-list article > button {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .email-campaign-record-list article > button > p { grid-column: 1 / -1; }
 }
 
 /* Product-surface reset: dense, quiet primitives shared by every workspace.

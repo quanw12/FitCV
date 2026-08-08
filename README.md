@@ -282,7 +282,7 @@ những nhóm thực sự có yêu cầu trong JD.
 
 ### Recruiter Pipeline And Candidate Email
 
-Database hiện hữu cần chạy tuần tự bốn migration sau trước khi bật màn hình
+Database hiện hữu cần chạy tuần tự năm migration sau trước khi bật màn hình
 Pipeline và Auto Email:
 
 ```text
@@ -290,6 +290,7 @@ database/migrations/006_add_recruiter_pipeline.sql
 database/migrations/007_add_candidate_email_workflow.sql
 database/migrations/009_add_smart_reply_workflow.sql
 database/migrations/011_add_reliable_email_delivery.sql
+database/migrations/012_add_email_campaigns.sql
 ```
 
 Migration 006 thêm notes và lịch sử cho sáu stage backend hiện tại:
@@ -298,7 +299,9 @@ lưu AI draft, bước HR approval, provider message ID, trạng thái `Failed` 
 điểm gửi. Migration 009 thêm application-scoped email thread, địa chỉ reply
 riêng, inbound message, delivery event, idempotency key và metadata chuẩn
 `In-Reply-To`/`References`. Migration 011 thêm `retryable`, `retry_count` và
-`last_attempt_at`, các cột bắt buộc cho màn hình Auto Email hiện tại. Các
+`last_attempt_at`, các cột bắt buộc cho màn hình Auto Email hiện tại. Migration
+012 thêm campaign theo stage, template dùng chung cho cả lô và dấu stage tại
+thời điểm tạo draft để chặn gửi nhầm khi ứng viên đã chuyển pipeline. Các
 migration có preflight/postflight, có thể chạy lại, và có file rollback tương
 ứng; rollback sẽ xóa vĩnh viễn dữ liệu workflow được nêu trong file.
 
@@ -311,6 +314,8 @@ GET   /api/hr/pipeline/applications/{application_id}/history
 
 GET   /api/hr/emails/templates
 GET   /api/hr/emails/drafts
+GET   /api/hr/emails/audience?stage={stage}&job_id={job_id}
+POST  /api/hr/emails/campaigns
 POST  /api/hr/emails/drafts/generate
 PATCH /api/hr/emails/drafts/{email_id}
 POST  /api/hr/emails/drafts/{email_id}/approve
@@ -321,6 +326,7 @@ GET   /api/hr/emails/threads
 GET   /api/hr/emails/threads/{thread_id}
 PATCH /api/hr/emails/threads/{thread_id}/read
 POST  /api/hr/emails/threads/{thread_id}/smart-reply
+POST  /api/hr/emails/threads/smart-reply/batch
 
 POST  /api/webhooks/email/resend
 ```
@@ -328,11 +334,18 @@ POST  /api/webhooks/email/resend
 Email ứng viên luôn theo luồng `Draft -> Approved -> Sent`. Backend từ chối gửi
 Draft chưa được HR duyệt. Khác password-reset fallback, candidate email không
 giả lập thành công khi thiếu Resend; record chuyển `Failed`, hiển thị lỗi và cho
-Retry sau khi cấu hình `RESEND_API_KEY` cùng `RESEND_FROM_EMAIL`.
+Retry chỉ với lỗi tạm thời. Lỗi cấu hình/403 là non-retryable: cấu hình lại
+`RESEND_API_KEY` cùng `RESEND_FROM_EMAIL`, rồi `Reopen -> Approve -> Send`.
 
 Auto Email và Smart Reply chỉ áp dụng cho ứng viên thuộc `application` của
 company job post, tức `Job Applicants/Pipeline`. Không dùng `application` để gửi
 email cho CV từ `Upload CV Batch`.
+
+Auto Email lấy stage hiện tại làm nguồn sự thật và tạo đúng một template dùng
+chung cho cả campaign; chỉ các placeholder đã cho phép mới thay đổi theo người
+nhận. Nếu Gemini thiếu cấu hình hoặc trả nội dung sai/ngắn, backend dùng template
+chuẩn có sẵn. Display name trong header `From` được lấy từ công ty đăng job, còn
+mailbox vẫn là địa chỉ thuộc domain đã verify trong `RESEND_FROM_EMAIL`.
 
 Smart Reply là inbound email thật:
 
@@ -354,17 +367,29 @@ Cấu hình Smart Reply trong `backend/.env`:
 
 ```env
 RESEND_API_KEY=<server-side-key>
-RESEND_FROM_EMAIL=FitCV <recruiting@verified-sender-domain>
+RESEND_FROM_EMAIL=Recruiting <recruiting@verified-sender-domain>
 RESEND_WEBHOOK_SECRET=<whsec-from-resend-webhook>
 RESEND_INBOUND_DOMAIN=replies.example.com
 RESEND_TIMEOUT_SECONDS=15
 RESEND_MAX_RETRIES=2
 ```
 
-Tại Resend, verify sender domain, cấu hình MX cho inbound subdomain, rồi đăng ký
-webhook public `https://<backend-domain>/api/webhooks/email/resend` cho
-`email.received` cùng các event delivery cần theo dõi. Webhook verification phải
-dùng raw request body; không parse rồi serialize lại trước khi verify.
+`onboarding@resend.dev` chỉ dùng để test gửi tới đúng email của tài khoản/team
+Resend. Muốn gửi cho mọi Job Seeker, phải thêm domain riêng trong Resend, verify
+SPF/DKIM, chờ trạng thái `Verified`, rồi đổi `RESEND_FROM_EMAIL` sang mailbox của
+domain đó. Không thể verify `gmail.com` hoặc `*.vercel.app`.
+
+Để nhận reply, API key cần quyền `Full access` vì backend phải lấy nội dung email
+inbound. Cấu hình MX cho inbound subdomain (hoặc dùng receiving domain do Resend
+cấp), rồi đăng ký webhook public
+`https://<backend-domain>/api/webhooks/email/resend` cho `email.received` cùng các
+delivery event cần theo dõi. `localhost` không nhận webhook nếu không có tunnel.
+Copy signing secret vào đúng runtime `RESEND_WEBHOOK_SECRET`; webhook verification
+phải dùng raw request body, không parse rồi serialize lại trước khi verify.
+
+Sau mỗi lần đổi key/domain/webhook secret, restart backend local hoặc redeploy
+service. Record đã lỗi 403 là non-retryable: trong UI phải đi lại
+`Reopen for review -> Approve -> Send` sau khi cấu hình đúng.
 
 ## AI Improvement Suggestions
 

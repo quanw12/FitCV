@@ -7,13 +7,19 @@ from app.models.account import Account, AccountRole
 from app.schemas.email_workflow import (
     BulkEmailSendRequest,
     BulkEmailSendResponse,
+    CampaignGenerateRequest,
+    CampaignPreviewResponse,
+    EmailAudienceResponse,
     EmailDraftGenerate,
     EmailDraftResponse,
     EmailDraftUpdate,
+    EmailStage,
     EmailThreadDetailResponse,
     EmailThreadReadResponse,
     EmailThreadSummaryResponse,
     EmailTemplateResponse,
+    SmartReplyBatchRequest,
+    SmartReplyBatchResponse,
     SmartReplyGenerate,
 )
 from app.services import email_workflow_service
@@ -40,12 +46,57 @@ def list_drafts(
     return email_workflow_service.list_drafts(db, account, job_id)
 
 
+@router.get("/audience", response_model=EmailAudienceResponse)
+def list_audience(
+    stage: EmailStage,
+    job_id: int | None = None,
+    db: Session = Depends(get_db),
+    account: Account = Depends(manager),
+):
+    return email_workflow_service.audience(
+        db,
+        account,
+        stage=stage,
+        job_id=job_id,
+    )
+
+
+@router.post(
+    "/campaigns",
+    response_model=CampaignPreviewResponse,
+    status_code=201,
+)
+def generate_campaign(
+    payload: CampaignGenerateRequest,
+    db: Session = Depends(get_db),
+    account: Account = Depends(manager),
+):
+    return email_workflow_service.generate_campaign(db, account, payload)
+
+
 @router.get("/threads", response_model=list[EmailThreadSummaryResponse])
 def list_threads(
     db: Session = Depends(get_db),
     account: Account = Depends(manager),
 ):
     return email_workflow_service.list_threads(db, account)
+
+
+@router.post(
+    "/threads/smart-reply/batch",
+    response_model=SmartReplyBatchResponse,
+    status_code=201,
+)
+def generate_smart_reply_batch(
+    payload: SmartReplyBatchRequest,
+    db: Session = Depends(get_db),
+    account: Account = Depends(manager),
+):
+    return email_workflow_service.generate_smart_reply_batch(
+        db,
+        account,
+        payload,
+    )
 
 
 @router.get(

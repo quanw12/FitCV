@@ -66,11 +66,16 @@ class EmailServiceTests(unittest.TestCase):
                 in_reply_to="<candidate-message@example.com>",
                 references=["<first@example.com>", "<candidate-message@example.com>"],
                 idempotency_key="candidate-email/9",
+                sender_name="Saigon Fintech JSC",
             )
 
         self.assertEqual(message_id, "resend-email-123")
         call = resend_request.call_args.kwargs
         self.assertEqual(call["idempotency_key"], "candidate-email/9")
+        self.assertEqual(
+            call["payload"]["from"],
+            "Saigon Fintech JSC <recruiting@example.com>",
+        )
         self.assertEqual(
             call["payload"]["headers"]["In-Reply-To"],
             "<candidate-message@example.com>",

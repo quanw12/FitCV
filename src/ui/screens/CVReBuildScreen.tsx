@@ -7,7 +7,6 @@ import {
   Download,
   FileText,
   FloppyDisk,
-  Lightning,
   MagnifyingGlass,
   Sparkle,
   X,

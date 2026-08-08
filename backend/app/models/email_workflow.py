@@ -1,8 +1,9 @@
-from datetime import datetime
+from datetime import date, datetime
 
 from sqlalchemy import (
     JSON,
     Boolean,
+    Date,
     DateTime,
     ForeignKey,
     Index,
@@ -63,6 +64,49 @@ class CandidateEmailThread(Base):
     )
 
 
+class CandidateEmailCampaign(Base):
+    __tablename__ = "candidate_email_campaign"
+    __table_args__ = (
+        Index(
+            "idx_candidate_email_campaign_company_created",
+            "company_id",
+            "created_at",
+        ),
+    )
+
+    campaign_id: Mapped[int] = mapped_column(
+        ID_TYPE, primary_key=True, autoincrement=True
+    )
+    company_id: Mapped[int] = mapped_column(
+        ID_TYPE,
+        ForeignKey("company.company_id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    job_id: Mapped[int | None] = mapped_column(
+        ID_TYPE,
+        ForeignKey("job.job_id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    created_by_account_id: Mapped[int | None] = mapped_column(
+        ID_TYPE,
+        ForeignKey("account.account_id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    template_key: Mapped[str] = mapped_column(String(50), nullable=False)
+    target_stage: Mapped[str] = mapped_column(String(20), nullable=False)
+    recipient_count: Mapped[int] = mapped_column(
+        Integer, default=0, server_default="0", nullable=False
+    )
+    interview_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    template_json: Mapped[dict] = mapped_column(JSON, nullable=False)
+    ai_generated: Mapped[bool] = mapped_column(
+        Boolean, default=True, server_default="1", nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), nullable=False
+    )
+
+
 class CandidateEmail(Base):
     __tablename__ = "candidate_email"
     __table_args__ = (
@@ -73,6 +117,7 @@ class CandidateEmail(Base):
             "created_at",
         ),
         Index("idx_candidate_email_thread_created", "thread_id", "created_at"),
+        Index("idx_candidate_email_campaign", "campaign_id"),
         Index("idx_candidate_email_provider", "provider_message_id"),
         UniqueConstraint(
             "idempotency_key", name="uq_candidate_email_idempotency_key"
@@ -97,9 +142,17 @@ class CandidateEmail(Base):
         ForeignKey("candidate_email_thread.thread_id", ondelete="SET NULL"),
         nullable=True,
     )
+    campaign_id: Mapped[int | None] = mapped_column(
+        ID_TYPE,
+        ForeignKey("candidate_email_campaign.campaign_id", ondelete="SET NULL"),
+        nullable=True,
+    )
     template_key: Mapped[str] = mapped_column(String(50), nullable=False)
     message_kind: Mapped[str] = mapped_column(
         String(20), default="Initial", server_default="Initial", nullable=False
+    )
+    stage_at_generation: Mapped[str | None] = mapped_column(
+        String(20), nullable=True
     )
     recipient_email: Mapped[str] = mapped_column(String(150), nullable=False)
     subject: Mapped[str] = mapped_column(String(300), nullable=False)
