@@ -55,6 +55,8 @@ Business logic layer:
 - `job_extraction_service.py` - Job description parsing
 - `improvement_service.py` - CV improvement generation
 - `email_service.py` - Email sending and templating
+- `email_workflow_service.py` - Automated email campaign management
+- `document_parser.py` - Text extraction from PDF/DOCX
 - `ai_worker.py` - Background AI task processing
 - Additional services for pipeline, profiles, reports, etc.
 

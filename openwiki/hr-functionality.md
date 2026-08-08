@@ -151,11 +151,11 @@ FitCV provides specialized HR functionality for recruiters and hiring managers t
   - Business hours only options
   - Time zone awareness
 - **Tracking**: 
-  - Delivery status (queued, sent, delivered, opened, clicked)
-  - Engagement metrics (open rates, click-through rates)
-  - Bounce and complaint handling
-  - AI-generation flag for automated content
-
+    - Delivery status (queued, sent, delivered, opened, clicked) 
+    - Engagement metrics (open rates, click-through rates) 
+    - Bounce and complaint handling 
+    - AI-generation flag for automated content 
+    - Smart reply generation and usage tracking
 #### Email Webhooks
 - **Provider Integration**: Connects to email services (SendGrid, SES, etc.) for event tracking
 - **Event Processing**: 
