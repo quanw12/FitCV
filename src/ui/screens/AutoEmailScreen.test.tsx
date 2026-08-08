@@ -120,6 +120,7 @@ describe("AutoEmailScreen", () => {
       ),
     ).toBeInTheDocument()
     expect(screen.getByRole("button", { name: "Approve draft" })).toBeEnabled()
+    expect(emailMocks.generate).toHaveBeenCalledWith(4, "shortlist", "")
     expect(emailMocks.send).not.toHaveBeenCalled()
   })
 

@@ -32,6 +32,7 @@ class EmailWebhookVerificationError(RuntimeError):
 
 
 MESSAGE_ID_PATTERN = re.compile(r"^<[^<>\r\n]{1,498}>$")
+RESEND_USER_AGENT = "FitCV/0.1 (+https://fitcv.app)"
 
 
 def _safe_message_id(value: object) -> str | None:
@@ -63,6 +64,9 @@ def _resend_request(
     headers = {
         "Authorization": f"Bearer {settings.resend_api_key}",
         "Content-Type": "application/json",
+        # Resend blocks direct HTTP requests without this header with 403/1010
+        # before the API key or email payload can be evaluated.
+        "User-Agent": RESEND_USER_AGENT,
     }
     if idempotency_key:
         headers["Idempotency-Key"] = idempotency_key

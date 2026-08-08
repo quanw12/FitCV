@@ -205,6 +205,27 @@ class EmailWorkflowApiIntegrationTests(unittest.TestCase):
             1,
         )
 
+    def test_generation_uses_hr_candidate_visible_details(self) -> None:
+        fake_gemini = FakeGemini()
+        guidance = (
+            "Interview on 19 August at 10:00 ICT via Google Meet; "
+            "please confirm by 15 August."
+        )
+        with patch(
+            "app.services.email_workflow_service.GeminiClient",
+            return_value=fake_gemini,
+        ):
+            response = self.client.post(
+                "/api/hr/emails/drafts/generate",
+                json={
+                    "application_id": self.application_id,
+                    "template_key": "interview",
+                    "guidance": guidance,
+                },
+            )
+        self.assertEqual(response.status_code, 201)
+        self.assertIn(guidance, fake_gemini.prompts[0])
+
     def test_failed_delivery_is_tracked_and_can_retry(self) -> None:
         draft = self.generate_draft()
         self.client.post(
@@ -392,7 +413,14 @@ class EmailWorkflowApiIntegrationTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(
             {template["key"] for template in response.json()},
-            {"confirmation", "shortlist", "interview", "rejection"},
+            {
+                "confirmation",
+                "shortlist",
+                "interview",
+                "rejection",
+                "follow_up",
+                "offer_discussion",
+            },
         )
 
     def test_inbound_smart_reply_stays_review_first(self) -> None:

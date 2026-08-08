@@ -13,6 +13,15 @@ class EmailTemplateResponse(BaseModel):
 class EmailDraftGenerate(BaseModel):
     application_id: int
     template_key: str = Field(min_length=1, max_length=50)
+    guidance: str | None = Field(default=None, max_length=2000)
+
+    @field_validator("guidance")
+    @classmethod
+    def clean_guidance(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        cleaned = value.strip()
+        return cleaned or None
 
 
 class EmailDraftUpdate(BaseModel):
@@ -85,6 +94,13 @@ class GeneratedCandidateEmail(BaseModel):
 
 class SmartReplyGenerate(BaseModel):
     tone: Literal["professional", "warm", "concise"] = "professional"
+    intent: Literal[
+        "general",
+        "answer_question",
+        "interview_details",
+        "application_update",
+        "rejection_follow_up",
+    ] = "general"
     guidance: str | None = Field(default=None, max_length=1000)
 
     @field_validator("guidance")

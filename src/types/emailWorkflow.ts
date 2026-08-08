@@ -44,6 +44,12 @@ export interface BulkEmailSendResult {
 }
 
 export type SmartReplyTone = "professional" | "warm" | "concise"
+export type SmartReplyIntent =
+  | "general"
+  | "answer_question"
+  | "interview_details"
+  | "application_update"
+  | "rejection_follow_up"
 
 export interface EmailThreadMessage {
   message_id: string

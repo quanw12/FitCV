@@ -147,6 +147,36 @@ class EmailServiceTests(unittest.TestCase):
         self.assertFalse(raised.exception.retryable)
         self.assertEqual(raised.exception.provider_status, 403)
 
+    def test_includes_user_agent_required_by_resend(self) -> None:
+        with (
+            patch.object(settings, "resend_api_key", "re_test"),
+            patch.object(
+                settings,
+                "resend_from_email",
+                "FitCV <onboarding@resend.dev>",
+            ),
+            patch.object(settings, "resend_max_retries", 0),
+            patch(
+                "app.services.email_service.request.urlopen",
+                side_effect=HTTPError(
+                    "https://api.resend.com/emails",
+                    403,
+                    "Forbidden",
+                    {},
+                    BytesIO(b'{"message":"blocked"}'),
+                ),
+            ) as urlopen,
+        ):
+            with self.assertRaises(EmailDeliveryError):
+                send_candidate_email(
+                    to_email="candidate@example.com",
+                    subject="Test",
+                    body="Test",
+                )
+
+        resend_request = urlopen.call_args.args[0]
+        self.assertEqual(resend_request.get_header("User-agent"), "FitCV/0.1 (+https://fitcv.app)")
+
 
 if __name__ == "__main__":
     unittest.main()

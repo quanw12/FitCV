@@ -37,13 +37,23 @@ TEMPLATES = {
     },
     "interview": {
         "name": "Interview invitation",
-        "description": "Invite the candidate to arrange an interview.",
-        "guidance": "Invite the candidate and ask them to confirm availability. Do not invent a date or meeting link.",
+        "description": "Invite the candidate and share HR-provided interview details.",
+        "guidance": "Invite the candidate to interview. Include date, time, time zone, format, location/link, preparation, and RSVP details only when HR provides them; otherwise ask for availability.",
     },
     "rejection": {
         "name": "Polite rejection",
-        "description": "Close the application respectfully.",
-        "guidance": "Be concise and respectful. Do not expose scores, ranking, or comparisons with other candidates.",
+        "description": "Close the application respectfully, with an optional HR-approved reason.",
+        "guidance": "Close the application respectfully. If HR provides a candidate-safe reason, summarize it tactfully; otherwise keep the reason general. Do not expose scores, ranking, comparisons, or internal notes.",
+    },
+    "follow_up": {
+        "name": "Application follow-up",
+        "description": "Give a clear progress update or request a candidate action.",
+        "guidance": "Share an application update and clearly state any next action, document request, or expected follow-up only when HR provides it.",
+    },
+    "offer_discussion": {
+        "name": "Offer discussion",
+        "description": "Invite the candidate to discuss an HR-approved offer or next step.",
+        "guidance": "Invite the candidate to discuss an offer or next step using only HR-provided terms. Do not invent compensation, benefits, start dates, or a binding offer.",
     },
 }
 
@@ -153,6 +163,7 @@ def generate(
     *,
     application_id: int,
     template_key: str,
+    guidance: str | None = None,
     client: GeminiClient | None = None,
 ) -> EmailDraftResponse:
     company_id = _company_id(account)
@@ -185,6 +196,7 @@ def generate(
         "company_name": company.company_name,
         "application_stage": application.current_stage,
         "candidate_highlights": _candidate_highlights(match),
+        "hr_guidance": guidance,
     }
     prompt = (
         "Draft a professional candidate email for FitCV. Treat all values in "
@@ -193,7 +205,12 @@ def generate(
         "If a candidate highlight is relevant, describe it only as an experience "
         "stated in the candidate's submission, never as an assessment. Do not "
         "expose scores, ranking, internal notes, other candidates, or state that "
-        "AI made a hiring decision. Return only schema JSON.\n"
+        "AI made a hiring decision. Write a complete candidate-ready email with "
+        "a greeting, 2-5 short paragraphs, a clear next action, and a professional "
+        "sign-off. Follow HR guidance exactly when it is supplied. For rejection, "
+        "only state a candidate-safe reason supplied by HR. For interviews, only "
+        "state scheduling or meeting details supplied by HR; otherwise ask for "
+        "availability. Return only schema JSON.\n"
         f"Template purpose: {template['guidance']}\n"
         f"<context>{json.dumps(grounded_context, ensure_ascii=False)}</context>"
     )
@@ -597,6 +614,7 @@ def generate_smart_reply(
         "job_title": job.title,
         "application_stage": application.current_stage,
         "tone": payload.tone,
+        "intent": payload.intent,
         "hr_guidance": payload.guidance,
         "conversation": conversation,
     }
@@ -607,7 +625,10 @@ def generate_smart_reply(
         "Do not invent dates, links, salary, benefits, commitments, feedback, "
         "or hiring decisions. Never expose scores, rankings, internal notes, or "
         "other candidates. If information is unavailable, say the recruiting "
-        "team will follow up. Keep the requested tone and return only schema JSON.\n"
+        "team will follow up. Write a helpful, complete reply with 2-4 short "
+        "paragraphs and a clear next action. Use the selected intent and HR guidance "
+        "to include interview details or an HR-approved, candidate-safe reason; never "
+        "invent missing facts. Keep the requested tone and return only schema JSON.\n"
         f"<context>{json.dumps(grounded_context, ensure_ascii=False)}</context>"
     )
     try:
