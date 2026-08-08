@@ -378,11 +378,16 @@ def build_extraction_prompt(raw_text: str, validation_error: str | None = None) 
 
 
 def build_polish_prompt(
-    cv_json: str, language: str, validation_error: str | None = None, jd_text: str | None = None
+    cv_json: str,
+    language: str,
+    validation_error: str | None = None,
+    jd_text: str | None = None,
+    applied_improvements: str | None = None,
 ) -> str:
     prompt = _BUILD_PROMPT.replace(
         "<language_label>", _LANGUAGE_LABELS.get(language, "English")
     )
+    context_blocks = ""
     if jd_text:
         jd_block = (
             "\n\nJob description for tailoring (optional):\n"
@@ -397,7 +402,23 @@ def build_polish_prompt(
             "technologies, or metrics that the entered data does not state, and "
             "never add a skill just because it appears in the JD.\n"
         )
-        prompt = prompt.replace("<cv_json>", jd_block + "<cv_json>")
+        context_blocks += jd_block
+    if applied_improvements:
+        improvement_block = (
+            "\nSelected improvements to apply (reviewed by the candidate):\n"
+            "<approved_improvements>\n"
+            f"{applied_improvements.strip()[:8000]}\n"
+            "</approved_improvements>\n"
+            "Apply every instruction when the entered CV already provides the "
+            "necessary facts. If an instruction would require a new skill, "
+            "technology, employer, date, metric, or achievement, skip only that "
+            "unsupported part. Never invent or infer facts from the job description "
+            "or these instructions; the entered CV JSON remains the sole source of "
+            "truth. Re-run all number, skill, title, and section grounding checks.\n"
+        )
+        context_blocks += improvement_block
+    if context_blocks:
+        prompt = prompt.replace("<cv_json>", context_blocks + "<cv_json>")
     prompt = prompt.replace("<cv_json>", cv_json.strip())
     if validation_error:
         prompt = prompt + _VALIDATION_SUFFIX.replace(

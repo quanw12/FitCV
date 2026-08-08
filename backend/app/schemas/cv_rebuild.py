@@ -105,3 +105,9 @@ class CvBuildRequest(BaseModel):
     language: Literal["en", "vi"] = "en"
     avatar: str | None = Field(default=None, max_length=_MAX_AVATAR_CHARS)
     jd_text: str | None = None
+
+
+class ApplyImprovementsRequest(BaseModel):
+    suggestion_ids: list[int] = Field(min_length=1, max_length=40)
+    language: Literal["en", "vi"] | None = None
+    avatar: str | None = Field(default=None, max_length=_MAX_AVATAR_CHARS)

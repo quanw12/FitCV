@@ -20,6 +20,7 @@ class StrictSchema(BaseModel):
 
 
 class SkillGap(StrictSchema):
+    suggestion_id: int | None = None
     skill: str = Field(min_length=1, max_length=100)
     priority: SuggestionPriority
     reason: str = Field(min_length=1, max_length=1000)
@@ -27,6 +28,7 @@ class SkillGap(StrictSchema):
 
 
 class SectionFeedback(StrictSchema):
+    suggestion_id: int | None = None
     section: CvSection
     issue: str = Field(min_length=1, max_length=1000)
     explanation: str = Field(min_length=1, max_length=2000)
@@ -43,6 +45,7 @@ class SectionFeedback(StrictSchema):
 
 
 class RewriteSuggestion(StrictSchema):
+    suggestion_id: int | None = None
     section: CvSection
     original_text: str = Field(min_length=1, max_length=3000)
     issue: str = Field(min_length=1, max_length=1000)
@@ -56,6 +59,7 @@ class RewriteSuggestion(StrictSchema):
 
 
 class QuickWin(StrictSchema):
+    suggestion_id: int | None = None
     title: str = Field(min_length=1, max_length=200)
     category: str = Field(min_length=1, max_length=50)
     priority: SuggestionPriority

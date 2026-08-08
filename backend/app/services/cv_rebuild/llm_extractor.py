@@ -167,12 +167,23 @@ class CvExtractor:
         )
 
     def polish(
-        self, cv: CVData, *, language: str = "en", max_attempts: int = 3, jd_text: str | None = None
+        self,
+        cv: CVData,
+        *,
+        language: str = "en",
+        max_attempts: int = 3,
+        jd_text: str | None = None,
+        applied_improvements: str | None = None,
     ) -> tuple[CVData, list[str]]:
         last_error: str | None = None
         last_cv: CVData | None = None
         source_text = cv.model_dump_json()
-        prompt = build_polish_prompt(source_text, language, jd_text=jd_text)
+        prompt = build_polish_prompt(
+            source_text,
+            language,
+            jd_text=jd_text,
+            applied_improvements=applied_improvements,
+        )
         for _ in range(max_attempts):
             try:
                 payload = self._client.generate_structured(
@@ -185,7 +196,13 @@ class CvExtractor:
                 polished = CVData.model_validate(payload)
             except ValidationError as exc:
                 last_error = str(exc)
-                prompt = build_polish_prompt(source_text, language, last_error, jd_text=jd_text)
+                prompt = build_polish_prompt(
+                    source_text,
+                    language,
+                    last_error,
+                    jd_text=jd_text,
+                    applied_improvements=applied_improvements,
+                )
                 continue
             unfounded_nums = find_unfounded_numbers(source_text, polished)
             unfounded_skills = find_unfounded_skills(source_text, polished)
@@ -223,7 +240,13 @@ class CvExtractor:
                 if overlap_issues:
                     messages.append(_overlap_message(overlap_issues))
                 last_error = "\n".join(messages)
-                prompt = build_polish_prompt(source_text, language, last_error, jd_text=jd_text)
+                prompt = build_polish_prompt(
+                    source_text,
+                    language,
+                    last_error,
+                    jd_text=jd_text,
+                    applied_improvements=applied_improvements,
+                )
                 continue
             # Hard-override: restore original titles even on clean pass
             # (LLM may have silently fixed some titles but not others)
