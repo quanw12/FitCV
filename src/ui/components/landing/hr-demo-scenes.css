@@ -1,0 +1,1151 @@
+/* Recruiter scene choreography. Same contract as demo-scenes.css: every beat is
+   an animation delay in milliseconds, read top-to-bottom, and the last beat of a
+   scene lands well inside the duration declared in demo/hr-scenes.ts. Shared
+   primitives (lpd-rise, lpd-pop, lpd-draw, lpd-flip-*, lpd-drop, lpd-file,
+   lpd-bar, lpd-bar-track, lpd-tick) come from demo-scenes.css. */
+
+/* ---------- shared hr primitives ---------- */
+
+@keyframes lpd-hr-fade-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes lpd-hr-dim {
+  to {
+    opacity: 0.34;
+  }
+}
+
+/* Press and ring run as a second animation on an element that already rose, so
+   they use `forwards` — a backwards fill would clobber the rise's transform. */
+
+@keyframes lpd-hr-press {
+  0%,
+  100% {
+    transform: none;
+  }
+
+  38% {
+    transform: scale(0.955);
+  }
+}
+
+@keyframes lpd-hr-ring {
+  from {
+    opacity: 0.85;
+    transform: scale(0.94);
+  }
+
+  to {
+    opacity: 0;
+    transform: scale(1.14);
+  }
+}
+
+.lpd-hr-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid var(--lpd-line);
+  border-radius: var(--lp-radius);
+  background: var(--lpd-raised);
+  font-size: 12px;
+  white-space: nowrap;
+  color: var(--lp-muted);
+}
+
+.lpd-hr-btn.is-primary {
+  border-color: rgba(110, 231, 183, 0.34);
+  background: rgba(110, 231, 183, 0.12);
+  color: var(--lp-accent);
+}
+
+.lpd-hr-btn::after {
+  content: "";
+  position: absolute;
+  inset: -3px;
+  border-radius: inherit;
+  border: 1px solid rgba(110, 231, 183, 0.45);
+  opacity: 0;
+}
+
+.lpd-hr-note {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--lp-dim);
+  animation: lpd-rise 420ms var(--lpd-ease) both;
+}
+
+/* ---------- scene 1 · intake ---------- */
+
+.lpd-hr-intake {
+  gap: 18px;
+}
+
+.lpd-hr-intake .lpd-flips {
+  animation: lpd-rise 320ms var(--lpd-ease) 1600ms both;
+}
+
+.lpd-hr-intake .lpd-flip-a {
+  animation: lpd-flip-through 700ms var(--lpd-ease) 1640ms both;
+}
+
+.lpd-hr-intake .lpd-flip-b {
+  animation: lpd-flip-through 860ms var(--lpd-ease) 2260ms both;
+}
+
+.lpd-hr-intake .lpd-flip-c {
+  animation: lpd-flip-hold 380ms var(--lpd-ease) 3040ms both;
+}
+
+.lpd-hr-stats {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.lpd-hr-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid var(--lpd-line);
+  border-radius: var(--lp-radius);
+  background: var(--lpd-raised);
+  animation: lpd-rise 400ms var(--lpd-ease) calc(3400ms + var(--i) * 130ms) both;
+}
+
+.lpd-hr-stat-value {
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--lp-text);
+}
+
+.lpd-hr-stat.is-ok .lpd-hr-stat-value {
+  color: var(--lp-accent);
+}
+
+.lpd-hr-stat.is-warn .lpd-hr-stat-value {
+  color: var(--lp-warn);
+}
+
+.lpd-hr-stat-label {
+  font-family: "JetBrains Mono Variable", ui-monospace, monospace;
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  color: var(--lp-dim);
+}
+
+.lpd-hr-intake .lpd-hr-note {
+  margin-top: auto;
+  animation-delay: 4700ms;
+}
+
+/* ---------- scene 1 · intake · cv file list ---------- */
+
+.lpd-hr-cv-files {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.lpd-hr-cv-file-head {
+  font-family: "JetBrains Mono Variable", ui-monospace, monospace;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--lp-dim);
+  margin-bottom: 2px;
+  animation: lpd-rise 320ms var(--lpd-ease) 4900ms both;
+}
+
+.lpd-hr-cv-file {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 10px;
+  border: 1px solid var(--lpd-line);
+  border-radius: var(--lp-radius);
+  background: var(--lpd-raised);
+  animation: lpd-rise 320ms var(--lpd-ease) calc(5100ms + var(--i) * 140ms) both;
+}
+
+.lpd-hr-cv-file-icon {
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.lpd-hr-cv-file-name {
+  font-size: 11px;
+  color: var(--lp-text);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lpd-hr-cv-status {
+  font-family: "JetBrains Mono Variable", ui-monospace, monospace;
+  font-size: 10px;
+  color: var(--lp-dim);
+  flex-shrink: 0;
+}
+
+.lpd-hr-cv-status.is-done {
+  color: var(--lp-accent);
+}
+
+.lpd-hr-cv-status.is-active {
+  color: var(--lp-warn);
+  animation: lpd-hr-fade-in 600ms ease-in-out 0ms infinite alternate;
+}
+
+/* ---------- scene 2 · rank ---------- */
+
+.lpd-hr-rank {
+  gap: 14px;
+}
+
+.lpd-hr-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.lpd-hr-row {
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr) 104px 34px 16px;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border: 1px solid var(--lpd-line);
+  border-radius: var(--lp-radius);
+  background: var(--lpd-raised);
+  animation: lpd-rise 380ms var(--lpd-ease) calc(200ms + var(--i) * 150ms) both;
+}
+
+/* Beat 4a · everyone under the threshold recedes, everyone over it lights up. */
+
+.lpd-hr-row:not(.is-picked) {
+  animation:
+    lpd-rise 380ms var(--lpd-ease) calc(200ms + var(--i) * 150ms) both,
+    lpd-hr-dim 460ms var(--lpd-ease) 4560ms forwards;
+}
+
+.lpd-hr-row::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: rgba(110, 231, 183, 0.09);
+  box-shadow: inset 0 0 0 1px rgba(110, 231, 183, 0.3);
+  opacity: 0;
+}
+
+.lpd-hr-row.is-picked::before {
+  animation: lpd-hr-fade-in 460ms var(--lpd-ease) 4560ms both;
+}
+
+.lpd-hr-rank-no {
+  font-family: "JetBrains Mono Variable", ui-monospace, monospace;
+  font-size: 11px;
+  color: var(--lp-dim);
+}
+
+.lpd-hr-who {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.lpd-hr-who strong {
+  font-size: 13px;
+  font-weight: 550;
+  color: var(--lp-text);
+}
+
+.lpd-hr-who span {
+  font-family: "JetBrains Mono Variable", ui-monospace, monospace;
+  font-size: 11px;
+  color: var(--lp-dim);
+}
+
+.lpd-hr-who-skills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 2px;
+}
+
+.lpd-hr-who-chip {
+  padding: 1px 6px;
+  border-radius: 999px;
+  border: 1px solid rgba(110, 231, 183, 0.24);
+  background: rgba(110, 231, 183, 0.06);
+  font-size: 9px !important;
+  color: var(--lp-accent) !important;
+}
+
+/* The shared bar keeps its look but moves to this scene's beat, in step with
+   the CountUp delays in HrRankScene.tsx. */
+
+.lpd-hr-row .lpd-bar-value {
+  animation-delay: calc(700ms + var(--i) * 150ms);
+}
+
+.lpd-hr-row:nth-child(3) .lpd-bar-value {
+  background: linear-gradient(90deg, #b35a1c, var(--lp-warn));
+}
+
+.lpd-hr-row:nth-child(4) .lpd-bar-value {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.14),
+    rgba(255, 255, 255, 0.34)
+  );
+}
+
+.lpd-hr-score {
+  font-family: "JetBrains Mono Variable", ui-monospace, monospace;
+  font-size: 12px;
+  text-align: right;
+  color: var(--lp-text);
+}
+
+.lpd-hr-row-mark {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.lpd-hr-row-mark .lpd-tick-path {
+  animation-delay: calc(4640ms + var(--i) * 120ms);
+}
+
+.lpd-hr-threshold {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  animation: lpd-rise 400ms var(--lpd-ease) 2200ms both;
+}
+
+.lpd-hr-threshold-label {
+  flex-shrink: 0;
+  font-size: 12px;
+  color: var(--lp-muted);
+}
+
+.lpd-hr-slider {
+  position: relative;
+  flex: 1;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.09);
+}
+
+/* Beat 2 · the cut-off slides 50 → 80. The knob rides a full-width carrier so
+   its translate resolves against the track, not against the knob. */
+
+@keyframes lpd-hr-slide {
+  from {
+    transform: translate3d(50%, 0, 0);
+  }
+
+  to {
+    transform: translate3d(80%, 0, 0);
+  }
+}
+
+@keyframes lpd-hr-fill {
+  from {
+    transform: scaleX(0.5);
+  }
+
+  to {
+    transform: scaleX(0.8);
+  }
+}
+
+.lpd-hr-slider-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--lp-accent-deep), var(--lp-accent));
+  transform-origin: left center;
+  animation: lpd-hr-fill 900ms var(--lpd-ease) 2700ms both;
+}
+
+.lpd-hr-slider-carrier {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 100%;
+  animation: lpd-hr-slide 900ms var(--lpd-ease) 2700ms both;
+}
+
+.lpd-hr-slider-knob {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 12px;
+  height: 12px;
+  margin: -6px 0 0 -6px;
+  border-radius: 50%;
+  border: 1px solid rgba(110, 231, 183, 0.5);
+  background: var(--lp-accent);
+}
+
+.lpd-hr-threshold-value {
+  flex-shrink: 0;
+  width: 30px;
+}
+
+.lpd-hr-rank .lpd-hr-threshold-value .lpd-flip-a {
+  animation: lpd-flip-through 1100ms var(--lpd-ease) 2260ms both;
+}
+
+.lpd-hr-rank .lpd-hr-threshold-value .lpd-flip-c {
+  animation: lpd-flip-hold 340ms var(--lpd-ease) 3500ms both;
+}
+
+.lpd-hr-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: auto;
+}
+
+.lpd-hr-select {
+  animation:
+    lpd-rise 380ms var(--lpd-ease) 3800ms both,
+    lpd-hr-press 420ms var(--lpd-ease) 4180ms forwards;
+}
+
+.lpd-hr-select::after {
+  animation: lpd-hr-ring 520ms var(--lpd-ease) 4200ms both;
+}
+
+.lpd-hr-confirm {
+  animation:
+    lpd-rise 380ms var(--lpd-ease) 5060ms both,
+    lpd-hr-press 420ms var(--lpd-ease) 5560ms forwards;
+}
+
+.lpd-hr-confirm::after {
+  animation: lpd-hr-ring 520ms var(--lpd-ease) 5580ms both;
+}
+
+/* ---------- scene 3 · pipeline ---------- */
+
+.lpd-hr-pipeline {
+  gap: 16px;
+}
+
+.lpd-hr-funnel {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  align-items: end;
+  gap: 10px;
+}
+
+.lpd-hr-stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  animation: lpd-rise 380ms var(--lpd-ease) calc(150ms + var(--i) * 90ms) both;
+}
+
+.lpd-hr-stage-count {
+  font-family: "JetBrains Mono Variable", ui-monospace, monospace;
+  font-size: 13px;
+  color: var(--lp-text);
+}
+
+/* Grid-stacked so the box sizes to the wider of the two counts (7 → 10). */
+
+.lpd-hr-swap {
+  display: inline-grid;
+}
+
+.lpd-hr-swap > * {
+  grid-area: 1 / 1;
+  justify-self: center;
+}
+
+@keyframes lpd-hr-swap-out {
+  from {
+    opacity: 1;
+    transform: none;
+  }
+
+  to {
+    opacity: 0;
+    transform: translate3d(0, -8px, 0);
+  }
+}
+
+.lpd-hr-swap-out {
+  animation: lpd-hr-swap-out 320ms var(--lpd-ease) 3700ms both;
+}
+
+.lpd-hr-swap-in {
+  animation: lpd-flip-hold 320ms var(--lpd-ease) 3900ms both;
+}
+
+.lpd-hr-column {
+  display: block;
+  position: relative;
+  width: 100%;
+  height: 104px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.04);
+  overflow: hidden;
+}
+
+/* One timeline per bar: grow to the current headcount, hold, then trade height
+   as the bulk move lands. 22% ≈ 1494ms · 62% ≈ 3574ms · 78% ≈ 4406ms. */
+
+@keyframes lpd-hr-grow {
+  0% {
+    transform: scaleY(0.02);
+  }
+
+  22%,
+  62% {
+    transform: scaleY(var(--s1));
+  }
+
+  78%,
+  100% {
+    transform: scaleY(var(--s2));
+  }
+}
+
+.lpd-hr-column-fill {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(180deg, var(--lp-accent), var(--lp-accent-deep));
+  transform-origin: bottom center;
+  animation: lpd-hr-grow 5200ms var(--lpd-ease) 350ms both;
+}
+
+.lpd-hr-stage:last-child .lpd-hr-column-fill {
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.22),
+    rgba(255, 255, 255, 0.08)
+  );
+}
+
+.lpd-hr-stage-name {
+  font-family: "JetBrains Mono Variable", ui-monospace, monospace;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-align: center;
+  color: var(--lp-dim);
+}
+
+.lpd-hr-bulk {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  animation: lpd-rise 400ms var(--lpd-ease) 2700ms both;
+}
+
+.lpd-hr-bulk-count {
+  font-family: "JetBrains Mono Variable", ui-monospace, monospace;
+  font-size: 11px;
+  color: var(--lp-muted);
+}
+
+.lpd-hr-move {
+  animation: lpd-hr-press 420ms var(--lpd-ease) 3300ms both;
+}
+
+.lpd-hr-move::after {
+  animation: lpd-hr-ring 520ms var(--lpd-ease) 3320ms both;
+}
+
+.lpd-hr-moved {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--lp-accent);
+  animation: lpd-rise 400ms var(--lpd-ease) 4700ms both;
+}
+
+.lpd-hr-moved .lpd-tick-path {
+  animation-delay: 4900ms;
+}
+
+.lpd-hr-pipeline .lpd-hr-note {
+  margin-top: auto;
+  animation-delay: 5300ms;
+}
+
+/* ---------- scene 4 · outreach ---------- */
+
+.lpd-hr-outreach {
+  gap: 16px;
+}
+
+/* Workflow step indicator */
+
+.lpd-hr-workflow {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  animation: lpd-rise 400ms var(--lpd-ease) both;
+}
+
+.lpd-hr-wf-step {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.lpd-hr-wf-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: 1.5px solid var(--lpd-line);
+  background: transparent;
+  flex-shrink: 0;
+}
+
+.lpd-hr-wf-dot.is-done {
+  border-color: var(--lp-accent);
+  background: var(--lp-accent);
+  animation: lpd-hr-fade-in 320ms var(--lpd-ease) 800ms both;
+}
+
+.lpd-hr-wf-label {
+  font-family: "JetBrains Mono Variable", ui-monospace, monospace;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  color: var(--lp-dim);
+  white-space: nowrap;
+}
+
+.lpd-hr-wf-step:first-child .lpd-hr-wf-label {
+  color: var(--lp-accent);
+}
+
+.lpd-hr-wf-line {
+  width: 24px;
+  height: 1.5px;
+  margin: 0 6px;
+  background: var(--lpd-line);
+  flex-shrink: 0;
+}
+
+.lpd-hr-wf-step:first-child .lpd-hr-wf-line {
+  animation: lpd-hr-fill-line 400ms var(--lpd-ease) 3200ms both;
+}
+
+.lpd-hr-wf-step:nth-child(2) .lpd-hr-wf-line {
+  animation: lpd-hr-fill-line 400ms var(--lpd-ease) 4400ms both;
+}
+
+@keyframes lpd-hr-fill-line {
+  from {
+    background: var(--lpd-line);
+  }
+
+  to {
+    background: var(--lp-accent);
+  }
+}
+
+.lpd-hr-wf-step:nth-child(2) .lpd-hr-wf-dot {
+  animation: lpd-hr-review-dot 400ms var(--lpd-ease) 3200ms both;
+}
+
+@keyframes lpd-hr-review-dot {
+  from {
+    border-color: var(--lpd-line);
+    background: transparent;
+  }
+
+  to {
+    border-color: var(--lp-accent);
+    background: var(--lp-accent);
+  }
+}
+
+.lpd-hr-templates {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.lpd-hr-template {
+  position: relative;
+  isolation: isolate;
+  padding: 4px 11px;
+  border: 1px solid var(--lpd-line);
+  border-radius: 999px;
+  background: var(--lpd-raised);
+  font-size: 11px;
+  color: var(--lp-dim);
+  animation: lpd-pop 320ms var(--lpd-ease) calc(150ms + var(--i) * 110ms) both;
+}
+
+@keyframes lpd-hr-chip-pick {
+  to {
+    color: var(--lp-accent);
+  }
+}
+
+.lpd-hr-template.is-picked {
+  animation:
+    lpd-pop 320ms var(--lpd-ease) calc(150ms + var(--i) * 110ms) both,
+    lpd-hr-chip-pick 320ms var(--lpd-ease) 900ms forwards;
+}
+
+.lpd-hr-template::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: rgba(110, 231, 183, 0.12);
+  box-shadow: inset 0 0 0 1px rgba(110, 231, 183, 0.34);
+  opacity: 0;
+}
+
+.lpd-hr-template.is-picked::before {
+  animation: lpd-hr-fade-in 320ms var(--lpd-ease) 900ms both;
+}
+
+.lpd-hr-draft {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  padding: 13px 14px;
+  border: 1px solid var(--lpd-line);
+  border-radius: var(--lp-radius);
+  background: var(--lpd-raised);
+  animation: lpd-rise 420ms var(--lpd-ease) 1300ms both;
+}
+
+.lpd-hr-draft-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.lpd-hr-draft-to {
+  font-family: "JetBrains Mono Variable", ui-monospace, monospace;
+  font-size: 11px;
+  color: var(--lp-dim);
+}
+
+.lpd-hr-draft-to code {
+  font-family: inherit;
+  color: var(--lp-text);
+}
+
+.lpd-hr-draft-tag {
+  margin-left: auto;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(110, 231, 183, 0.3);
+  background: rgba(110, 231, 183, 0.1);
+  font-size: 10px;
+  color: var(--lp-accent);
+  animation: lpd-pop 300ms var(--lpd-ease) 2000ms both;
+}
+
+/* Beat 3 · the subject types itself. */
+
+@keyframes lpd-hr-type {
+  from {
+    clip-path: inset(0 100% 0 0);
+  }
+
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+.lpd-hr-subject {
+  font-size: 14px;
+  font-weight: 550;
+  color: var(--lp-text);
+  animation: lpd-hr-type 1000ms steps(30, end) 1700ms both;
+}
+
+.lpd-hr-body-line {
+  display: block;
+  width: calc(100% - var(--i) * 21%);
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.1);
+  transform-origin: left center;
+  animation: lpd-progress 380ms var(--lpd-ease) calc(2600ms + var(--i) * 160ms)
+    both;
+}
+
+.lpd-hr-approve {
+  align-self: flex-start;
+  margin-top: 2px;
+  animation:
+    lpd-rise 380ms var(--lpd-ease) 3400ms both,
+    lpd-hr-press 420ms var(--lpd-ease) 3900ms forwards;
+}
+
+.lpd-hr-approve::after {
+  animation: lpd-hr-ring 520ms var(--lpd-ease) 3920ms both;
+}
+
+.lpd-hr-send {
+  align-self: flex-start;
+  margin-top: 2px;
+  animation:
+    lpd-rise 380ms var(--lpd-ease) 4400ms both,
+    lpd-hr-press 420ms var(--lpd-ease) 5000ms forwards;
+}
+
+.lpd-hr-send::after {
+  animation: lpd-hr-ring 520ms var(--lpd-ease) 5020ms both;
+}
+
+.lpd-hr-sends {
+  list-style: none;
+  margin: auto 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.lpd-hr-send-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 6px 12px;
+  border: 1px solid var(--lpd-line);
+  border-radius: var(--lp-radius);
+  background: rgba(255, 255, 255, 0.02);
+  animation: lpd-rise 380ms var(--lpd-ease) calc(5500ms + var(--i) * 260ms) both;
+}
+
+.lpd-hr-send-row .lpd-tick-path {
+  animation-delay: calc(5620ms + var(--i) * 260ms);
+}
+
+.lpd-hr-send-name {
+  font-size: 12px;
+  color: var(--lp-text);
+}
+
+.lpd-hr-send-state {
+  margin-left: auto;
+  font-family: "JetBrains Mono Variable", ui-monospace, monospace;
+  font-size: 11px;
+  color: var(--lp-accent);
+}
+
+@media (max-width: 640px) {
+  .lpd-hr-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .lpd-hr-row {
+    grid-template-columns: 22px minmax(0, 1fr) 30px 15px;
+    gap: 9px;
+  }
+
+  .lpd-hr-row .lpd-bar-track {
+    display: none;
+  }
+
+  .lpd-hr-funnel {
+    gap: 6px;
+  }
+
+  .lpd-hr-column {
+    height: 84px;
+  }
+
+  .lpd-hr-stage-name {
+    font-size: 9px;
+    letter-spacing: 0;
+  }
+
+  .lpd-hr-bulk {
+    flex-wrap: wrap;
+  }
+
+  .lpd-hr-moved {
+    margin-left: 0;
+  }
+
+  .lpd-hr-subject {
+    font-size: 13px;
+  }
+}
+
+/* ---------- scene 5 · job-post ---------- */
+
+.lpd-hr-job-post {
+  gap: 16px;
+}
+
+.lpd-hr-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 13px 14px;
+  border: 1px solid var(--lpd-line);
+  border-radius: var(--lp-radius);
+  background: var(--lpd-raised);
+  animation: lpd-rise 420ms var(--lpd-ease) both;
+}
+
+.lpd-hr-editor-head {
+  font-family: "JetBrains Mono Variable", ui-monospace, monospace;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--lp-dim);
+}
+
+.lpd-hr-field-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.lpd-hr-field-label {
+  font-family: "JetBrains Mono Variable", ui-monospace, monospace;
+  font-size: 11px;
+  color: var(--lp-dim);
+  flex-shrink: 0;
+}
+
+.lpd-hr-field-value {
+  font-size: 14px;
+  font-weight: 550;
+  color: var(--lp-text);
+}
+
+.lpd-hr-field-type {
+  animation: lpd-rise 360ms var(--lpd-ease) 300ms both;
+}
+
+.lpd-hr-jd-box {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid var(--lpd-line);
+  border-radius: var(--lp-radius);
+  background: rgba(255, 255, 255, 0.015);
+  overflow: hidden;
+}
+
+.lpd-hr-jd-label {
+  font-family: "JetBrains Mono Variable", ui-monospace, monospace;
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--lp-dim);
+  margin-bottom: 2px;
+}
+
+.lpd-hr-jd-line {
+  display: block;
+  height: 5px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.08);
+  transform-origin: left center;
+  animation: lpd-progress 280ms var(--lpd-ease) calc(900ms + var(--i) * 120ms) both;
+}
+
+.lpd-hr-jd-line:nth-of-type(2) {
+  width: 94%;
+}
+
+.lpd-hr-jd-line:nth-of-type(3) {
+  width: 78%;
+}
+
+.lpd-hr-jd-line:nth-of-type(4) {
+  width: 60%;
+}
+
+.lpd-hr-jd-sweep {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 40%;
+  background: linear-gradient(90deg, transparent, rgba(110, 231, 183, 0.14), transparent);
+  animation: lpd-sweep 800ms var(--lpd-ease) 800ms both;
+}
+
+.lpd-hr-extract {
+  align-self: flex-start;
+  animation:
+    lpd-rise 360ms var(--lpd-ease) 2000ms both,
+    lpd-hr-press 420ms var(--lpd-ease) 2600ms forwards;
+}
+
+.lpd-hr-extract::after {
+  animation: lpd-hr-ring 520ms var(--lpd-ease) 2620ms both;
+}
+
+.lpd-hr-extracted {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.lpd-hr-extracted-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border: 1px solid rgba(110, 231, 183, 0.2);
+  border-radius: var(--lp-radius);
+  background: rgba(110, 231, 183, 0.04);
+  animation: lpd-rise 340ms var(--lpd-ease) calc(3200ms + var(--i) * 160ms) both;
+}
+
+.lpd-hr-extracted-row .lpd-tick-path {
+  animation-delay: calc(3320ms + var(--i) * 160ms);
+}
+
+.lpd-hr-extracted-name {
+  font-size: 12px;
+  color: var(--lp-text);
+}
+
+.lpd-hr-pub-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  animation: lpd-rise 400ms var(--lpd-ease) 4400ms both;
+}
+
+.lpd-hr-status-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--lpd-line);
+  background: var(--lpd-raised);
+  overflow: hidden;
+}
+
+.lpd-hr-status-flip {
+  position: relative;
+  display: inline-grid;
+  height: 18px;
+}
+
+.lpd-hr-status-flip > * {
+  grid-area: 1 / 1;
+  justify-self: center;
+  font-family: "JetBrains Mono Variable", ui-monospace, monospace;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.lpd-hr-status-a {
+  color: var(--lp-warn);
+  animation: lpd-flip-through 800ms var(--lpd-ease) 4600ms both;
+}
+
+.lpd-hr-status-b {
+  color: var(--lp-accent);
+  animation: lpd-flip-hold 380ms var(--lpd-ease) 5200ms both;
+}
+
+.lpd-hr-copy-link {
+  animation:
+    lpd-rise 360ms var(--lpd-ease) 5400ms both,
+    lpd-hr-press 420ms var(--lpd-ease) 6000ms forwards;
+}
+
+.lpd-hr-copy-link::after {
+  animation: lpd-hr-ring 520ms var(--lpd-ease) 6020ms both;
+}
+
+.lpd-hr-copied {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--lp-accent);
+  animation: lpd-rise 320ms var(--lpd-ease) 6400ms both;
+}
+
+.lpd-hr-copied .lpd-tick-path {
+  animation-delay: 6500ms;
+}
+
+.lpd-hr-published-card {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 11px 14px;
+  border: 1px solid rgba(110, 231, 183, 0.24);
+  border-radius: var(--lp-radius);
+  background: rgba(110, 231, 183, 0.04);
+  animation: lpd-rise 400ms var(--lpd-ease) 6800ms both;
+}
+
+.lpd-hr-pub-card-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.lpd-hr-pub-card-title {
+  font-size: 13px;
+  font-weight: 550;
+  color: var(--lp-text);
+}
+
+.lpd-hr-pub-badge {
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(110, 231, 183, 0.34);
+  background: rgba(110, 231, 183, 0.12);
+  font-family: "JetBrains Mono Variable", ui-monospace, monospace;
+  font-size: 10px;
+  color: var(--lp-accent);
+}
+
+.lpd-hr-pub-card-meta {
+  font-family: "JetBrains Mono Variable", ui-monospace, monospace;
+  font-size: 11px;
+  color: var(--lp-dim);
+}
