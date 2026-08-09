@@ -2,6 +2,7 @@ import { useEffect, useRef, type PointerEvent, type ReactNode } from "react"
 import {
   ArrowRight,
   Briefcase,
+  Buildings,
   ChartBar,
   FileText,
   MagnifyingGlass,
@@ -16,7 +17,7 @@ import BranchTimeline, {
 import HeroStage from "@/ui/components/landing/HeroStage"
 import HRDemo from "@/ui/components/landing/HRDemo"
 import InteractiveDemo from "@/ui/components/landing/InteractiveDemo"
-import ScoreChart, { type ScoreBar } from "@/ui/components/landing/ScoreChart"
+import BrandMark from "@/ui/components/BrandMark"
 
 import "./landing.css"
 
@@ -30,20 +31,10 @@ interface Feature {
   copy: string
 }
 
-interface Step {
-  title: string
-  copy: string
-}
-
-interface Fact {
-  value: string
-  label: string
-}
-
 const SEEKER_FEATURES: Feature[] = [
   {
     icon: <FileText size={18} weight="duotone" />,
-    title: "Rebuild from the CV you already have",
+    title: "Parse and version every CV",
     copy: "Upload a PDF or DOCX and FitCV parses it into structured sections. Every rebuild is saved as its own version, so drafts stack up instead of overwriting each other.",
   },
   {
@@ -61,9 +52,19 @@ const SEEKER_FEATURES: Feature[] = [
     title: "Track where each version went",
     copy: "An application keeps its job description and the CV version you sent, and moves through stages as you go. No side spreadsheet required.",
   },
+  {
+    icon: <MagnifyingGlass size={18} weight="duotone" />,
+    title: "Find matching jobs with AI",
+    copy: "Select a parsed CV and FitCV scans freehire.me and LinkedIn for jobs that match your skills, experience and location — no manual searching needed.",
+  },
 ]
 
 const HR_FEATURES: Feature[] = [
+  {
+    icon: <Buildings size={18} weight="duotone" />,
+    title: "Create and publish job posts",
+    copy: "Paste a raw job description and AI extracts structured fields. Review, tweak, and publish — then copy the public link for candidates.",
+  },
   {
     icon: <ChartBar size={18} weight="duotone" />,
     title: "Rank a candidate pool",
@@ -79,48 +80,11 @@ const HR_FEATURES: Feature[] = [
     title: "Separate workspaces per role",
     copy: "Job seekers and recruiters sign in to different portals. Which one you land in is decided at sign-up and enforced on every request.",
   },
-]
-
-const STEPS: Step[] = [
   {
-    title: "Upload your CV",
-    copy: "PDF or DOCX. Parsing runs in the background and reports its status instead of leaving you guessing.",
+    icon: <FileText size={18} weight="duotone" />,
+    title: "Upload external CVs and rank them",
+    copy: "Paste a job description, upload up to 20 CVs from your own sourcing, and FitCV parses, scores and ranks them side by side — no FitCV job post required.",
   },
-  {
-    title: "Add a job description",
-    copy: "Paste the posting you care about. It stays attached to the analysis and to any application you create from it.",
-  },
-  {
-    title: "Read the breakdown",
-    copy: "Four scored categories, the evidence behind each score, and an overall match label rather than one opaque number.",
-  },
-  {
-    title: "Rebuild and apply",
-    copy: "Accept the suggestions that matter, rebuild into a new version, then send that exact version and track it.",
-  },
-]
-
-const FACTS: Fact[] = [
-  { value: "PDF · DOCX", label: "Upload formats the parser accepts" },
-
-  {
-    value: "4",
-    label:
-      "Scored categories per analysis: skills, experience, education, soft skills",
-  },
-  { value: "Versioned", label: "Every rebuild is kept as its own CV version" },
-
-  {
-    value: "2 portals",
-    label: "Separate workspaces for job seekers and recruiters",
-  },
-]
-
-const SAMPLE_BARS: ScoreBar[] = [
-  { label: "Skills", score: 82 },
-  { label: "Experience", score: 68 },
-  { label: "Education", score: 91 },
-  { label: "Soft skills", score: 44 },
 ]
 
 /* Both flows share one shape: three stages on the main line, then a fork where
@@ -133,15 +97,15 @@ const SEEKER_FLOW: TimelineSpec = {
   stages: ["CV uploaded", "Parsed", "Scored vs JD"],
 
   pass: {
-    changed: "Changed · Skills",
+    changed: "Improved · Gaps closed",
     pill: "Rebuilt draft",
     first: "Score improved",
     second: "New version",
   },
 
   fail: {
-    changed: "Changed · Summary",
-    pill: "Reworded draft",
+    changed: "Changed · Weak areas",
+    pill: "Discarded draft",
     first: "Score dropped",
     second: "Not saved",
   },
@@ -157,17 +121,17 @@ const HR_FLOW: TimelineSpec = {
   pass: {
     changed: "Ranked · Top match",
     pill: "Shortlisted",
-    first: "Interviewed",
-    second: "Offer sent",
+    first: "Interview",
+    second: "Offer",
   },
 
   fail: {
     changed: "Ranked · Low match",
     pill: "Left in pool",
     first: "Below the bar",
-    second: "Not advanced",
+    second: "Rejected",
   },
-  outcome: "Role filled",
+  outcome: "Hired",
 }
 
 function handleCardPointerMove(event: PointerEvent<HTMLElement>) {
@@ -235,17 +199,12 @@ export default function LandingScreen({ onGetStarted }: LandingScreenProps) {
       <header className="lp-header" ref={headerRef}>
         <div className="lp-header-inner">
           <span className="lp-brand">
-            <span className="lp-brand-mark" aria-hidden="true">
-              F
-            </span>
+            <BrandMark size={26} className="lp-brand-mark" />
             FitCV
           </span>
 
           <nav className="lp-nav" aria-label="Landing navigation">
-            <a href="#product">Product</a>
-            <a href="#preview">Preview</a>
-            <a href="#scoring">Scoring</a>
-            <a href="#workflow">Workflow</a>
+            <a href="#seekers">Job seekers</a>
             <a href="#recruiters">Recruiters</a>
           </nav>
 
@@ -280,16 +239,16 @@ export default function LandingScreen({ onGetStarted }: LandingScreenProps) {
             </span>
 
             <h1 className="lp-hero-title">
-              Stop guessing why your CV
+              CV analysis that shows
               <br />
-              never <em>matches the role</em>
+              <em>the evidence</em>
             </h1>
 
             <p className="lp-hero-sub">
-              FitCV parses your CV, scores it against a specific job description
-              across four categories, and shows exactly which keywords it
-              matched and which it could not find. Then it helps you rebuild and
-              send the version that closes the gap.
+              FitCV parses resumes, scores them against a specific job
+              description across four categories, and shows exactly which
+              keywords matched and which were missing. Job seekers rebuild and
+              track; recruiters rank and manage the pipeline.
             </p>
           </div>
 
@@ -297,14 +256,15 @@ export default function LandingScreen({ onGetStarted }: LandingScreenProps) {
         </div>
       </section>
 
-      <section className="lp-section" id="product">
+      <section className="lp-section" id="seekers">
         <div className="lp-section-inner">
           <div className="lp-section-head lp-reveal">
             <span className="lp-mono">For job seekers</span>
-            <h2>Everything that happens between uploading and applying</h2>
+            <h2>Upload, score, rebuild — and track every version</h2>
             <p>
-              Four things you can do with one CV and one job description — each
-              feeding the next, so the work compounds instead of restarting.
+              Drop in a CV and a job description. The analyzer returns scored
+              categories with evidence, improvement suggestions, and a versioned
+              history — so the next edit closes the gap instead of restating it.
             </p>
           </div>
 
@@ -324,68 +284,8 @@ export default function LandingScreen({ onGetStarted }: LandingScreenProps) {
             ))}
           </div>
 
-          <div className="lp-stats lp-reveal">
-            {FACTS.map((fact) => (
-              <div key={fact.value} className="lp-stat">
-                <span className="lp-stat-value">{fact.value}</span>
-                <span className="lp-stat-label">{fact.label}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section className="lp-section" id="preview">
-        <div className="lp-section-inner">
-          <div className="lp-section-head lp-reveal">
-            <span className="lp-mono">Product preview</span>
-            <h2>The shape of the data you get back</h2>
-            <p>
-              Step through the four stages to see what each one actually
-              returns. These are the fields the product works with, not a
-              mock-up of a dashboard.
-            </p>
-          </div>
-
           <div className="lp-reveal">
             <InteractiveDemo />
-          </div>
-        </div>
-      </section>
-
-      <section className="lp-section" id="scoring">
-        <div className="lp-section-inner">
-          <div className="lp-split lp-reveal">
-            <div className="lp-section-head">
-              <span className="lp-mono">Scoring</span>
-              <h2>A score per category, never one blind number</h2>
-              <p>
-                Each category carries its own score plus the evidence behind it
-                — the skills it found, the ones it did not, and a short
-                explanation. A weak soft-skills score next to a strong education
-                score tells you where the next edit belongs.
-              </p>
-            </div>
-
-            <ScoreChart
-              bars={SAMPLE_BARS}
-              caption="Sample analyzer output — illustrative values, not aggregate statistics"
-            />
-          </div>
-        </div>
-      </section>
-
-      <section className="lp-section" id="workflow">
-        <div className="lp-section-inner">
-          <div className="lp-section-head lp-reveal">
-            <span className="lp-mono">Job seeker workflow</span>
-            <h2>Upload, score, rebuild — and only keep what scored better</h2>
-            <p>
-              Your CV moves along one line: uploaded, parsed, scored against the
-              job description. Every rebuild forks off that line as a draft.
-              Re-score it, and it either earns a version of its own or is
-              dropped — the CV you already sent never changes underneath you.
-            </p>
           </div>
 
           <div className="lp-reveal">
@@ -397,33 +297,15 @@ export default function LandingScreen({ onGetStarted }: LandingScreenProps) {
         </div>
       </section>
 
-      <section className="lp-section">
-        <div className="lp-section-inner">
-          <div className="lp-section-head lp-reveal">
-            <span className="lp-mono">How it works</span>
-            <h2>Four steps, in the order you would actually do them</h2>
-          </div>
-
-          <div className="lp-steps lp-reveal">
-            {STEPS.map((step) => (
-              <article key={step.title} className="lp-step">
-                <h3>{step.title}</h3>
-                <p>{step.copy}</p>
-              </article>
-            ))}
-          </div>
-        </div>
-      </section>
-
       <section className="lp-section" id="recruiters">
         <div className="lp-section-inner">
           <div className="lp-section-head lp-reveal">
             <span className="lp-mono">For recruiters</span>
-            <h2>The same scoring, pointed at a candidate pool</h2>
+            <h2>Rank, pipeline, and hire with the same scoring</h2>
             <p>
-              Recruiters get their own workspace built on the identical
-              analyzer, so the score a candidate sees and the score you rank by
-              come from the same place.
+              Post a role, receive CVs, and rank every candidate against the
+              same criteria job seekers see. The scoring engine is identical —
+              the workflow adapts to who you are.
             </p>
           </div>
 
@@ -464,11 +346,11 @@ export default function LandingScreen({ onGetStarted }: LandingScreenProps) {
             <div className="lp-close-body lp-reveal">
               <div className="lp-section-head lp-close-head">
                 <span className="lp-mono">Get started</span>
-                <h2>Run your CV against the job you actually want</h2>
+                <h2>Analyze a CV or rank a candidate pool</h2>
                 <p>
                   Upload once, score against a real posting, and keep every
-                  version you build along the way. Job seekers and recruiters
-                  each get their own workspace.
+                  version you build along the way. Recruiters get their own
+                  workspace with the same scoring engine.
                 </p>
               </div>
 
@@ -478,12 +360,12 @@ export default function LandingScreen({ onGetStarted }: LandingScreenProps) {
                   className="lp-btn lp-btn-primary"
                   onClick={onGetStarted}
                 >
-                  Analyze my CV
+                  Get started
                   <ArrowRight size={16} weight="bold" />
                 </button>
 
-                <a href="#product" className="lp-btn lp-btn-outline">
-                  Read what it does
+                <a href="#seekers" className="lp-btn lp-btn-outline">
+                  See what it does
                 </a>
               </div>
             </div>
@@ -494,9 +376,7 @@ export default function LandingScreen({ onGetStarted }: LandingScreenProps) {
       <footer className="lp-footer">
         <div className="lp-footer-inner">
           <span className="lp-brand">
-            <span className="lp-brand-mark" aria-hidden="true">
-              F
-            </span>
+            <BrandMark size={26} className="lp-brand-mark" />
             FitCV
           </span>
           <p>CV analysis, rebuilding and application tracking.</p>

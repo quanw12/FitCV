@@ -19,26 +19,36 @@ const MISSING = ["GraphQL", "Mentoring"]
 const BAR_STEP_MS = 150
 const BAR_START_MS = 1580
 
-/* Beat 1 the JD types itself in · beat 2 an analysing sweep crosses the panel ·
-   beat 3 bars fill while their numbers count · beat 4 keyword evidence lands. */
+/* Beat 1 the CV upload and JD inputs rise · beat 2 an analysing sweep crosses
+   the panel · beat 3 bars fill while their numbers count · beat 4 keyword
+   evidence lands. */
 
 export default function ScoreScene({ paused }: SceneProps) {
   return (
     <div className="lpd-scene lpd-score">
-      <div className="lpd-jd">
-        <span className="lpd-jd-head" aria-hidden="true">
-          job description
+      <div className="lpd-score-inputs">
+        <div className="lpd-score-upload">
+          <span className="lpd-score-upload-icon" aria-hidden="true" />
+          <span className="lpd-score-upload-text">
+            <strong>Upload CV</strong>
+            <span>PDF or DOCX · max 10 MB</span>
+          </span>
+        </div>
+
+        <div className="lpd-score-jd-input">
+          <span className="lpd-score-jd-label">Paste job description</span>
+          {[0, 1, 2].map((line) => (
+            <span
+              key={line}
+              className="lpd-jd-line"
+              style={cssVars({ "--i": line })}
+            />
+          ))}
+        </div>
+
+        <span className="lpd-hr-btn is-primary lpd-score-analyze" aria-hidden="true">
+          Analyze
         </span>
-
-        {[0, 1, 2, 3].map((line) => (
-          <span
-            key={line}
-            className="lpd-jd-line"
-            style={cssVars({ "--i": line })}
-          />
-        ))}
-
-        <span className="lpd-sweep" aria-hidden="true" />
       </div>
 
       <div className="lpd-bars">

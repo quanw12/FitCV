@@ -10,9 +10,9 @@ interface IntakeStat {
 
 const STATS: IntakeStat[] = [
   { label: "Processed", value: 24 },
-  { label: "Strong ≥ 80", value: 7, tone: "ok" },
-  { label: "Moderate", value: 11 },
-  { label: "Below bar", value: 6, tone: "warn" },
+  { label: "Strong Match", value: 7, tone: "ok" },
+  { label: "Moderate Match", value: 11 },
+  { label: "Weak Match", value: 6, tone: "warn" },
 ]
 
 const STAT_START_MS = 3500

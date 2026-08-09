@@ -3,6 +3,7 @@ import HrIntakeScene from "./demo/HrIntakeScene"
 import HrOutreachScene from "./demo/HrOutreachScene"
 import HrPipelineScene from "./demo/HrPipelineScene"
 import HrRankScene from "./demo/HrRankScene"
+import HrReportsScene from "./demo/HrReportsScene"
 import JobPostScene from "./demo/JobPostScene"
 import { HR_DEMO_SCENES } from "./demo/hr-scenes"
 
@@ -15,9 +16,10 @@ const SCENE_VIEWS: SceneViews = {
   rank: HrRankScene,
   pipeline: HrPipelineScene,
   outreach: HrOutreachScene,
+  reports: HrReportsScene,
 }
 
-/* Recruiter side of the reel: job post, batch intake, ranking, pipeline, outreach. */
+/* Recruiter side of the reel: job post, batch intake, ranking, pipeline, outreach, reports. */
 export default function HRDemo() {
   return (
     <DemoReel

@@ -45,4 +45,12 @@ export const HR_DEMO_SCENES: DemoScene[] = [
     status: "interview invite · 3 approved · sending",
     duration: 7000,
   },
+  {
+    key: "reports",
+    label: "Hiring dashboard",
+    copy: "Track total applicants, conversion funnel, and source breakdown across all open roles — so you know where candidates come from and how far they get.",
+    path: "reports",
+    status: "47 applicants · 2 hired · 30 days",
+    duration: 7400,
+  },
 ]

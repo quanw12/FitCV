@@ -1,88 +1,74 @@
-import Tick from "./Tick"
 import { cssVars } from "./vars"
 
-const TEMPLATES = ["Interview invite", "Request info", "Rejection", "Offer"]
-const BODY_LINES = [0, 1, 2]
-const RECIPIENTS = ["Mai Tran", "Le Quang", "Pham An"]
+const THREAD = [
+  { from: "HR", label: "You", text: "Hi Alex, we'd love to invite you for an interview for the Frontend Developer role.", status: "sent", time: "2d ago" },
+  { from: "Candidate", label: "Alex Nguyen", text: "Thanks! I'm available Thursday afternoon.", status: "received", time: "1d ago" },
+]
 
-const WORKFLOW_STEPS = ["AI Draft", "HR Review", "Approve & Send"]
+const STATUS_STEPS = ["AI Draft", "HR Review", "Approve & Send"]
 
-/* Beat 1 the templates land and one is picked · beat 2 the draft fills in from
-   the role · beat 3 the subject types itself · beat 4 the workflow advances to
-   HR Review · beat 5 the batch sends and each delivery reports back. */
+/* Beat 1 the thread appears · beat 2 the AI draft populates · beat 3 the
+   subject line types · beat 4 approve, then Send is pressed · beat 5 the
+   workflow reaches its last step and the header badge flips to Sent. */
 
 export default function HrOutreachScene() {
   return (
     <div className="lpd-scene lpd-hr-outreach">
+      <div className="lpd-hr-mail-head">
+        <span className="lpd-hr-mail-candidate">Alex Nguyen</span>
+        <span className="lpd-hr-mail-status">
+          <span className="lpd-hr-mail-flip">
+            <span className="lpd-hr-mail-a">Draft</span>
+            <span className="lpd-hr-mail-b">Sent</span>
+          </span>
+        </span>
+      </div>
+
       <div className="lpd-hr-workflow" aria-hidden="true">
-        {WORKFLOW_STEPS.map((step, index) => (
-          <span key={step} className="lpd-hr-wf-step" style={cssVars({ "--i": index })}>
-            <span className={index === 0 ? "lpd-hr-wf-dot is-done" : "lpd-hr-wf-dot"} />
+        {STATUS_STEPS.map((step, i) => (
+          <span key={step} className="lpd-hr-wf-step" style={cssVars({ "--i": i })}>
+            <span className={i === 0 ? "lpd-hr-wf-dot is-done" : "lpd-hr-wf-dot"} />
             <span className="lpd-hr-wf-label">{step}</span>
-            {index < WORKFLOW_STEPS.length - 1 && <span className="lpd-hr-wf-line" />}
+            {i < STATUS_STEPS.length - 1 && <span className="lpd-hr-wf-line" />}
           </span>
         ))}
       </div>
 
-      <div className="lpd-hr-templates">
-        {TEMPLATES.map((template, index) => (
-          <span
-            key={template}
-            className={
-              index === 0 ? "lpd-hr-template is-picked" : "lpd-hr-template"
-            }
-            style={cssVars({ "--i": index })}
-          >
-            {template}
-          </span>
+      <div className="lpd-hr-thread">
+        {THREAD.map((msg, i) => (
+          <div key={i} className={`lpd-hr-msg lpd-hr-msg--${msg.from.toLowerCase()}`} style={cssVars({ "--i": i })}>
+            <div className="lpd-hr-msg-top">
+              <span className="lpd-hr-msg-label">{msg.label}</span>
+              <span className="lpd-hr-msg-time">{msg.time}</span>
+            </div>
+            <span className="lpd-hr-msg-text">{msg.text}</span>
+          </div>
         ))}
       </div>
 
       <div className="lpd-hr-draft">
-        <span className="lpd-hr-draft-head">
-          <span className="lpd-hr-draft-to">
-            to <code>3 candidates</code>
-          </span>
-
+        <div className="lpd-hr-draft-head">
+          <span className="lpd-hr-draft-to">to <code>Alex Nguyen</code></span>
           <span className="lpd-hr-draft-tag">AI draft</span>
-        </span>
-
+        </div>
         <span className="lpd-hr-subject">
-          Interview — Senior Frontend at Acme
+          Re: Frontend Developer — Interview scheduling
         </span>
-
-        {BODY_LINES.map((line) => (
-          <span
-            key={line}
-            className="lpd-hr-body-line"
-            style={cssVars({ "--i": line })}
-            aria-hidden="true"
-          />
-        ))}
-
-        <span className="lpd-hr-btn is-primary lpd-hr-approve" aria-hidden="true">
-          Approve draft
-        </span>
-
-        <span className="lpd-hr-btn is-primary lpd-hr-send" aria-hidden="true">
-          Approve & Send 3
-        </span>
+        <div className="lpd-hr-body">
+          <span className="lpd-hr-body-line" style={cssVars({ "--i": 0 })} aria-hidden="true" />
+          <span className="lpd-hr-body-line" style={cssVars({ "--i": 1 })} aria-hidden="true" />
+          <span className="lpd-hr-body-line" style={cssVars({ "--i": 2 })} aria-hidden="true" />
+        </div>
+        <div className="lpd-hr-draft-actions">
+          <span className="lpd-hr-btn lpd-hr-approve-btn" aria-hidden="true">Approve draft</span>
+          <span className="lpd-hr-btn is-primary lpd-hr-send-btn" aria-hidden="true">Send</span>
+        </div>
       </div>
 
-      <ul className="lpd-hr-sends">
-        {RECIPIENTS.map((name, index) => (
-          <li
-            key={name}
-            className="lpd-hr-send-row"
-            style={cssVars({ "--i": index })}
-          >
-            <Tick />
-
-            <span className="lpd-hr-send-name">{name}</span>
-            <span className="lpd-hr-send-state">delivered</span>
-          </li>
-        ))}
-      </ul>
+      <p className="lpd-hr-note" style={{ animationDelay: "3200ms" }}>
+        Each application has its own thread. Inbound replies are verified against
+        the candidate's email. AI never sends without HR approval.
+      </p>
     </div>
   )
 }

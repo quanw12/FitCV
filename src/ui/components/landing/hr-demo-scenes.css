@@ -2,88 +2,8 @@
    an animation delay in milliseconds, read top-to-bottom, and the last beat of a
    scene lands well inside the duration declared in demo/hr-scenes.ts. Shared
    primitives (lpd-rise, lpd-pop, lpd-draw, lpd-flip-*, lpd-drop, lpd-file,
-   lpd-bar, lpd-bar-track, lpd-tick) come from demo-scenes.css. */
-
-/* ---------- shared hr primitives ---------- */
-
-@keyframes lpd-hr-fade-in {
-  from {
-    opacity: 0;
-  }
-
-  to {
-    opacity: 1;
-  }
-}
-
-@keyframes lpd-hr-dim {
-  to {
-    opacity: 0.34;
-  }
-}
-
-/* Press and ring run as a second animation on an element that already rose, so
-   they use `forwards` — a backwards fill would clobber the rise's transform. */
-
-@keyframes lpd-hr-press {
-  0%,
-  100% {
-    transform: none;
-  }
-
-  38% {
-    transform: scale(0.955);
-  }
-}
-
-@keyframes lpd-hr-ring {
-  from {
-    opacity: 0.85;
-    transform: scale(0.94);
-  }
-
-  to {
-    opacity: 0;
-    transform: scale(1.14);
-  }
-}
-
-.lpd-hr-btn {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-  border: 1px solid var(--lpd-line);
-  border-radius: var(--lp-radius);
-  background: var(--lpd-raised);
-  font-size: 12px;
-  white-space: nowrap;
-  color: var(--lp-muted);
-}
-
-.lpd-hr-btn.is-primary {
-  border-color: rgba(110, 231, 183, 0.34);
-  background: rgba(110, 231, 183, 0.12);
-  color: var(--lp-accent);
-}
-
-.lpd-hr-btn::after {
-  content: "";
-  position: absolute;
-  inset: -3px;
-  border-radius: inherit;
-  border: 1px solid rgba(110, 231, 183, 0.45);
-  opacity: 0;
-}
-
-.lpd-hr-note {
-  margin: 0;
-  font-size: 12px;
-  line-height: 1.55;
-  color: var(--lp-dim);
-  animation: lpd-rise 420ms var(--lpd-ease) both;
-}
+   lpd-bar, lpd-bar-track, lpd-tick, lpd-hr-btn, lpd-hr-fade-in, lpd-hr-press,
+   lpd-hr-ring, lpd-hr-note) come from demo-scenes.css. */
 
 /* ---------- scene 1 · intake ---------- */
 
@@ -217,7 +137,50 @@
 /* ---------- scene 2 · rank ---------- */
 
 .lpd-hr-rank {
-  gap: 14px;
+  gap: 10px;
+}
+
+.lpd-hr-rank-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  animation: lpd-rise 360ms var(--lpd-ease) both;
+}
+
+.lpd-hr-job-select {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 10px;
+  border: 1px solid var(--lpd-line);
+  border-radius: var(--lp-radius);
+  background: var(--lpd-raised);
+}
+
+.lpd-hr-job-select-label {
+  font-family: "JetBrains Mono Variable", ui-monospace, monospace;
+  font-size: 10px;
+  color: var(--lp-dim);
+}
+
+.lpd-hr-job-select-value {
+  font-size: 12px;
+  font-weight: 550;
+  color: var(--lp-text);
+}
+
+.lpd-hr-job-select-caret {
+  width: 0;
+  height: 0;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 4px solid var(--lp-dim);
+}
+
+.lpd-hr-rank-count {
+  font-family: "JetBrains Mono Variable", ui-monospace, monospace;
+  font-size: 11px;
+  color: var(--lp-muted);
 }
 
 .lpd-hr-rows {
@@ -236,7 +199,7 @@
   grid-template-columns: 26px minmax(0, 1fr) 104px 34px 16px;
   align-items: center;
   gap: 12px;
-  padding: 8px 12px;
+  padding: 6px 10px;
   border: 1px solid var(--lpd-line);
   border-radius: var(--lp-radius);
   background: var(--lpd-raised);
@@ -321,8 +284,8 @@
 .lpd-hr-row:nth-child(4) .lpd-bar-value {
   background: linear-gradient(
     90deg,
-    rgba(255, 255, 255, 0.14),
-    rgba(255, 255, 255, 0.34)
+    rgba(15, 23, 42, 0.14),
+    rgba(15, 23, 42, 0.34)
   );
 }
 
@@ -345,7 +308,7 @@
 .lpd-hr-threshold {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
   animation: lpd-rise 400ms var(--lpd-ease) 2200ms both;
 }
 
@@ -360,7 +323,7 @@
   flex: 1;
   height: 4px;
   border-radius: 2px;
-  background: rgba(255, 255, 255, 0.09);
+  background: rgba(15, 23, 42, 0.09);
 }
 
 /* Beat 2 · the cut-off slides 50 → 80. The knob rides a full-width carrier so
@@ -455,162 +418,309 @@
   animation: lpd-hr-ring 520ms var(--lpd-ease) 5580ms both;
 }
 
-/* ---------- scene 3 · pipeline ---------- */
+/* ---------- scene 3 · pipeline (kanban) ---------- */
 
 .lpd-hr-pipeline {
-  gap: 16px;
-}
-
-.lpd-hr-funnel {
-  display: grid;
-  grid-template-columns: repeat(6, 1fr);
-  align-items: end;
   gap: 10px;
 }
 
-.lpd-hr-stage {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 7px;
-  animation: lpd-rise 380ms var(--lpd-ease) calc(150ms + var(--i) * 90ms) both;
+.lpd-hr-kanban {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 5px;
+  flex: 1;
+  min-height: 0;
+  animation: lpd-hr-fade-in 320ms var(--lpd-ease) both;
 }
 
-.lpd-hr-stage-count {
+.lpd-hr-col {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  min-height: 0;
+  animation: lpd-rise 360ms var(--lpd-ease) calc(200ms + var(--ci) * 80ms) both;
+}
+
+.lpd-hr-col-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 3px 5px;
+  border-radius: var(--lp-radius);
+  background: rgba(15, 23, 42, 0.04);
+}
+
+.lpd-hr-col-name {
   font-family: "JetBrains Mono Variable", ui-monospace, monospace;
-  font-size: 13px;
+  font-size: 8px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--lp-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lpd-hr-col-count {
+  font-family: "JetBrains Mono Variable", ui-monospace, monospace;
+  font-size: 10px;
+  font-weight: 600;
   color: var(--lp-text);
 }
 
-/* Grid-stacked so the box sizes to the wider of the two counts (7 → 10). */
+.lpd-hr-col-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-height: 0;
+  padding: 3px;
+  border: 1px solid var(--lpd-line);
+  border-radius: var(--lp-radius);
+  background: rgba(15, 23, 42, 0.015);
+  overflow: hidden;
+  position: relative;
+}
 
-.lpd-hr-swap {
+/* Highlight Applied and Screening during the move. */
+
+.lpd-hr-col:nth-child(1) .lpd-hr-col-body::after,
+.lpd-hr-col:nth-child(2) .lpd-hr-col-body::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  border: 1px solid rgba(110, 231, 183, 0.4);
+  opacity: 0;
+}
+
+.lpd-hr-col:nth-child(1) .lpd-hr-col-body::after {
+  animation: lpd-hr-fade-in 400ms var(--lpd-ease) 2400ms forwards;
+}
+
+.lpd-hr-col:nth-child(2) .lpd-hr-col-body::after {
+  animation: lpd-hr-fade-in 400ms var(--lpd-ease) 4000ms forwards;
+}
+
+/* ---------- kanban cards ---------- */
+
+.lpd-hr-card {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 4px 5px;
+  border: 1px solid var(--lpd-line);
+  border-radius: var(--lp-radius);
+  background: var(--lpd-raised);
+  animation: lpd-rise 320ms var(--lpd-ease) calc(600ms + var(--col) * 100ms + var(--card) * 80ms) both;
+}
+
+.lpd-hr-card-name {
+  font-size: 9px;
+  font-weight: 550;
+  color: var(--lp-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lpd-hr-card-meta {
+  font-family: "JetBrains Mono Variable", ui-monospace, monospace;
+  font-size: 7px;
+  color: var(--lp-dim);
+}
+
+/* Cards that leave Applied: fade out when move happens. */
+
+.lpd-hr-card--leave {
+  animation:
+    lpd-rise 320ms var(--lpd-ease) calc(600ms + var(--card) * 80ms) both,
+    lpd-hr-card-leave 360ms var(--lpd-ease) 3600ms forwards;
+}
+
+@keyframes lpd-hr-card-leave {
+  to {
+    opacity: 0;
+    transform: translateX(-20px) scale(0.95);
+  }
+}
+
+/* Cards that enter Screening: hidden initially, slide in after leave finishes. */
+
+.lpd-hr-card--enter {
+  opacity: 0;
+  transform: translateX(-24px);
+  animation: none;
+}
+
+.lpd-hr-card--e1 {
+  animation: lpd-hr-card-enter 360ms var(--lpd-ease) 4000ms both;
+}
+
+.lpd-hr-card--e2 {
+  animation: lpd-hr-card-enter 360ms var(--lpd-ease) 4120ms both;
+}
+
+.lpd-hr-card--e3 {
+  animation: lpd-hr-card-enter 360ms var(--lpd-ease) 4240ms both;
+}
+
+@keyframes lpd-hr-card-enter {
+  0% {
+    opacity: 0;
+    transform: translateX(-24px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* Count swap: old number fades up, new number flips in. */
+
+.lpd-hr-count-swap {
+  position: relative;
   display: inline-grid;
 }
 
-.lpd-hr-swap > * {
+.lpd-hr-count-swap > * {
   grid-area: 1 / 1;
   justify-self: center;
 }
 
-@keyframes lpd-hr-swap-out {
+.lpd-hr-count-out {
+  animation: lpd-hr-count-leave 340ms var(--lpd-ease) 3600ms forwards;
+}
+
+.lpd-hr-count-in {
+  color: var(--lp-accent);
+  animation: lpd-flip-hold 320ms var(--lpd-ease) 4000ms both;
+}
+
+@keyframes lpd-hr-count-leave {
   from {
     opacity: 1;
     transform: none;
   }
-
   to {
     opacity: 0;
     transform: translate3d(0, -8px, 0);
   }
 }
 
-.lpd-hr-swap-out {
-  animation: lpd-hr-swap-out 320ms var(--lpd-ease) 3700ms both;
-}
+/* ---------- pipeline actions ---------- */
 
-.lpd-hr-swap-in {
-  animation: lpd-flip-hold 320ms var(--lpd-ease) 3900ms both;
-}
-
-.lpd-hr-column {
-  display: block;
-  position: relative;
-  width: 100%;
-  height: 104px;
-  border-radius: 3px;
-  background: rgba(255, 255, 255, 0.04);
-  overflow: hidden;
-}
-
-/* One timeline per bar: grow to the current headcount, hold, then trade height
-   as the bulk move lands. 22% ≈ 1494ms · 62% ≈ 3574ms · 78% ≈ 4406ms. */
-
-@keyframes lpd-hr-grow {
-  0% {
-    transform: scaleY(0.02);
-  }
-
-  22%,
-  62% {
-    transform: scaleY(var(--s1));
-  }
-
-  78%,
-  100% {
-    transform: scaleY(var(--s2));
-  }
-}
-
-.lpd-hr-column-fill {
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  background: linear-gradient(180deg, var(--lp-accent), var(--lp-accent-deep));
-  transform-origin: bottom center;
-  animation: lpd-hr-grow 5200ms var(--lpd-ease) 350ms both;
-}
-
-.lpd-hr-stage:last-child .lpd-hr-column-fill {
-  background: linear-gradient(
-    180deg,
-    rgba(255, 255, 255, 0.22),
-    rgba(255, 255, 255, 0.08)
-  );
-}
-
-.lpd-hr-stage-name {
-  font-family: "JetBrains Mono Variable", ui-monospace, monospace;
-  font-size: 10px;
-  letter-spacing: 0.04em;
-  text-align: center;
-  color: var(--lp-dim);
-}
-
-.lpd-hr-bulk {
+.lpd-hr-pipeline-actions {
   display: flex;
   align-items: center;
-  gap: 12px;
-  animation: lpd-rise 400ms var(--lpd-ease) 2700ms both;
+  gap: 8px;
+  animation: lpd-rise 380ms var(--lpd-ease) 1700ms both;
 }
 
-.lpd-hr-bulk-count {
-  font-family: "JetBrains Mono Variable", ui-monospace, monospace;
-  font-size: 11px;
-  color: var(--lp-muted);
-}
-
-.lpd-hr-move {
-  animation: lpd-hr-press 420ms var(--lpd-ease) 3300ms both;
-}
-
-.lpd-hr-move::after {
-  animation: lpd-hr-ring 520ms var(--lpd-ease) 3320ms both;
-}
-
-.lpd-hr-moved {
+.lpd-hr-pipeline-actions .lpd-hr-bulk-count {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
-  margin-left: auto;
-  font-size: 11px;
+  gap: 5px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(110, 231, 183, 0.34);
+  background: rgba(110, 231, 183, 0.1);
+  font-family: "JetBrains Mono Variable", ui-monospace, monospace;
+  font-size: 10px;
+  font-weight: 600;
   color: var(--lp-accent);
-  animation: lpd-rise 400ms var(--lpd-ease) 4700ms both;
+  animation: lpd-pop 340ms var(--lpd-ease) 2100ms both;
 }
 
-.lpd-hr-moved .lpd-tick-path {
+.lpd-hr-pipeline-actions .lpd-hr-bulk-count::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 2px;
+  background: var(--lp-accent);
+}
+
+.lpd-hr-pipeline-actions .lpd-hr-move {
+  animation: lpd-hr-press 420ms var(--lpd-ease) 3200ms forwards;
+}
+
+.lpd-hr-pipeline-actions .lpd-hr-move::after {
+  animation: lpd-hr-ring 520ms var(--lpd-ease) 3220ms forwards;
+}
+
+.lpd-hr-pipeline-actions .lpd-hr-moved {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: "JetBrains Mono Variable", ui-monospace, monospace;
+  font-size: 10px;
+  color: var(--lp-accent);
+  animation: lpd-hr-fade-in 360ms var(--lpd-ease) 4800ms both;
+}
+
+.lpd-hr-pipeline-actions .lpd-hr-moved .lpd-tick-path {
   animation-delay: 4900ms;
-}
-
-.lpd-hr-pipeline .lpd-hr-note {
-  margin-top: auto;
-  animation-delay: 5300ms;
 }
 
 /* ---------- scene 4 · outreach ---------- */
 
 .lpd-hr-outreach {
-  gap: 16px;
+  gap: 10px;
+}
+
+.lpd-hr-mail-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  animation: lpd-rise 360ms var(--lpd-ease) both;
+}
+
+.lpd-hr-mail-candidate {
+  font-size: 15px;
+  font-weight: 550;
+  color: var(--lp-text);
+}
+
+.lpd-hr-mail-status {
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--lpd-line);
+  background: var(--lpd-raised);
+  font-family: "JetBrains Mono Variable", ui-monospace, monospace;
+  font-size: 10px;
+  color: var(--lp-muted);
+  overflow: hidden;
+  animation: lpd-hr-mail-lit 400ms var(--lpd-ease) 4200ms both;
+}
+
+@keyframes lpd-hr-mail-lit {
+  from { border-color: var(--lpd-line); background: var(--lpd-raised); }
+  to { border-color: rgba(110, 231, 183, 0.3); background: rgba(110, 231, 183, 0.1); }
+}
+
+/* Draft holds until the Send press lands at 4000ms, then flips to Sent. */
+
+.lpd-hr-mail-flip {
+  position: relative;
+  display: inline-grid;
+  height: 14px;
+}
+
+.lpd-hr-mail-flip > * {
+  grid-area: 1 / 1;
+  justify-self: center;
+  white-space: nowrap;
+}
+
+.lpd-hr-mail-a {
+  animation: lpd-flip-through 800ms var(--lpd-ease) 4200ms both;
+}
+
+.lpd-hr-mail-b {
+  color: var(--lp-accent);
+  animation: lpd-flip-hold 380ms var(--lpd-ease) 4800ms both;
 }
 
 /* Workflow step indicator */
@@ -619,7 +729,7 @@
   display: flex;
   align-items: center;
   gap: 0;
-  animation: lpd-rise 400ms var(--lpd-ease) both;
+  animation: lpd-rise 400ms var(--lpd-ease) 200ms both;
 }
 
 .lpd-hr-wf-step {
@@ -656,101 +766,110 @@
 }
 
 .lpd-hr-wf-line {
-  width: 24px;
+  width: 20px;
   height: 1.5px;
-  margin: 0 6px;
+  margin: 0 5px;
   background: var(--lpd-line);
   flex-shrink: 0;
 }
 
 .lpd-hr-wf-step:first-child .lpd-hr-wf-line {
-  animation: lpd-hr-fill-line 400ms var(--lpd-ease) 3200ms both;
+  animation: lpd-hr-fill-line 400ms var(--lpd-ease) 2600ms both;
 }
 
+/* The last step owns no line, so the fill stops at step 2. Step 3 lights up
+   when the Send button is pressed at 4000ms. */
+
 .lpd-hr-wf-step:nth-child(2) .lpd-hr-wf-line {
-  animation: lpd-hr-fill-line 400ms var(--lpd-ease) 4400ms both;
+  animation: lpd-hr-fill-line 400ms var(--lpd-ease) 3400ms both;
 }
 
 @keyframes lpd-hr-fill-line {
-  from {
-    background: var(--lpd-line);
-  }
-
-  to {
-    background: var(--lp-accent);
-  }
+  from { background: var(--lpd-line); }
+  to { background: var(--lp-accent); }
 }
 
 .lpd-hr-wf-step:nth-child(2) .lpd-hr-wf-dot {
-  animation: lpd-hr-review-dot 400ms var(--lpd-ease) 3200ms both;
+  animation: lpd-hr-review-dot 400ms var(--lpd-ease) 3000ms both;
+}
+
+.lpd-hr-wf-step:nth-child(3) .lpd-hr-wf-dot {
+  animation: lpd-hr-review-dot 400ms var(--lpd-ease) 4100ms both;
+}
+
+.lpd-hr-wf-step:nth-child(2) .lpd-hr-wf-label {
+  animation: lpd-hr-wf-lit 400ms var(--lpd-ease) 3000ms both;
+}
+
+.lpd-hr-wf-step:nth-child(3) .lpd-hr-wf-label {
+  animation: lpd-hr-wf-lit 400ms var(--lpd-ease) 4100ms both;
+}
+
+@keyframes lpd-hr-wf-lit {
+  from { color: var(--lp-dim); }
+  to { color: var(--lp-accent); }
 }
 
 @keyframes lpd-hr-review-dot {
-  from {
-    border-color: var(--lpd-line);
-    background: transparent;
-  }
-
-  to {
-    border-color: var(--lp-accent);
-    background: var(--lp-accent);
-  }
+  from { border-color: var(--lpd-line); background: transparent; }
+  to { border-color: var(--lp-accent); background: var(--lp-accent); }
 }
 
-.lpd-hr-templates {
+.lpd-hr-thread {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
   gap: 6px;
 }
 
-.lpd-hr-template {
-  position: relative;
-  isolation: isolate;
-  padding: 4px 11px;
+.lpd-hr-msg {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 6px 10px;
   border: 1px solid var(--lpd-line);
-  border-radius: 999px;
+  border-radius: var(--lp-radius);
   background: var(--lpd-raised);
+  animation: lpd-rise 360ms var(--lpd-ease) calc(600ms + var(--i) * 300ms) both;
+}
+
+.lpd-hr-msg--candidate {
+  border-color: rgba(110, 231, 183, 0.2);
+  background: rgba(110, 231, 183, 0.04);
+}
+
+.lpd-hr-msg-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.lpd-hr-msg-label {
   font-size: 11px;
+  font-weight: 550;
+  color: var(--lp-text);
+}
+
+.lpd-hr-msg-time {
+  font-family: "JetBrains Mono Variable", ui-monospace, monospace;
+  font-size: 9px;
   color: var(--lp-dim);
-  animation: lpd-pop 320ms var(--lpd-ease) calc(150ms + var(--i) * 110ms) both;
 }
 
-@keyframes lpd-hr-chip-pick {
-  to {
-    color: var(--lp-accent);
-  }
-}
-
-.lpd-hr-template.is-picked {
-  animation:
-    lpd-pop 320ms var(--lpd-ease) calc(150ms + var(--i) * 110ms) both,
-    lpd-hr-chip-pick 320ms var(--lpd-ease) 900ms forwards;
-}
-
-.lpd-hr-template::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  border-radius: inherit;
-  background: rgba(110, 231, 183, 0.12);
-  box-shadow: inset 0 0 0 1px rgba(110, 231, 183, 0.34);
-  opacity: 0;
-}
-
-.lpd-hr-template.is-picked::before {
-  animation: lpd-hr-fade-in 320ms var(--lpd-ease) 900ms both;
+.lpd-hr-msg-text {
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--lp-muted);
 }
 
 .lpd-hr-draft {
   display: flex;
   flex-direction: column;
-  gap: 9px;
-  padding: 13px 14px;
+  gap: 7px;
+  padding: 10px 12px;
   border: 1px solid var(--lpd-line);
   border-radius: var(--lp-radius);
   background: var(--lpd-raised);
-  animation: lpd-rise 420ms var(--lpd-ease) 1300ms both;
+  animation: lpd-rise 420ms var(--lpd-ease) 1400ms both;
 }
 
 .lpd-hr-draft-head {
@@ -778,26 +897,25 @@
   background: rgba(110, 231, 183, 0.1);
   font-size: 10px;
   color: var(--lp-accent);
-  animation: lpd-pop 300ms var(--lpd-ease) 2000ms both;
+  animation: lpd-pop 300ms var(--lpd-ease) 2200ms both;
 }
 
-/* Beat 3 · the subject types itself. */
-
 @keyframes lpd-hr-type {
-  from {
-    clip-path: inset(0 100% 0 0);
-  }
-
-  to {
-    clip-path: inset(0 0 0 0);
-  }
+  from { clip-path: inset(0 100% 0 0); }
+  to { clip-path: inset(0 0 0 0); }
 }
 
 .lpd-hr-subject {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 550;
   color: var(--lp-text);
-  animation: lpd-hr-type 1000ms steps(30, end) 1700ms both;
+  animation: lpd-hr-type 800ms steps(24, end) 1800ms both;
+}
+
+.lpd-hr-body {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
 }
 
 .lpd-hr-body-line {
@@ -805,70 +923,29 @@
   width: calc(100% - var(--i) * 21%);
   height: 6px;
   border-radius: 3px;
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(15, 23, 42, 0.1);
   transform-origin: left center;
-  animation: lpd-progress 380ms var(--lpd-ease) calc(2600ms + var(--i) * 160ms)
-    both;
+  animation: lpd-progress 380ms var(--lpd-ease) calc(2400ms + var(--i) * 160ms) both;
 }
 
-.lpd-hr-approve {
-  align-self: flex-start;
+.lpd-hr-draft-actions {
+  display: flex;
+  gap: 8px;
   margin-top: 2px;
+}
+
+.lpd-hr-approve-btn {
+  animation: lpd-rise 380ms var(--lpd-ease) 3000ms both;
+}
+
+.lpd-hr-send-btn {
   animation:
     lpd-rise 380ms var(--lpd-ease) 3400ms both,
-    lpd-hr-press 420ms var(--lpd-ease) 3900ms forwards;
+    lpd-hr-press 420ms var(--lpd-ease) 4000ms forwards;
 }
 
-.lpd-hr-approve::after {
-  animation: lpd-hr-ring 520ms var(--lpd-ease) 3920ms both;
-}
-
-.lpd-hr-send {
-  align-self: flex-start;
-  margin-top: 2px;
-  animation:
-    lpd-rise 380ms var(--lpd-ease) 4400ms both,
-    lpd-hr-press 420ms var(--lpd-ease) 5000ms forwards;
-}
-
-.lpd-hr-send::after {
-  animation: lpd-hr-ring 520ms var(--lpd-ease) 5020ms both;
-}
-
-.lpd-hr-sends {
-  list-style: none;
-  margin: auto 0 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.lpd-hr-send-row {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  padding: 6px 12px;
-  border: 1px solid var(--lpd-line);
-  border-radius: var(--lp-radius);
-  background: rgba(255, 255, 255, 0.02);
-  animation: lpd-rise 380ms var(--lpd-ease) calc(5500ms + var(--i) * 260ms) both;
-}
-
-.lpd-hr-send-row .lpd-tick-path {
-  animation-delay: calc(5620ms + var(--i) * 260ms);
-}
-
-.lpd-hr-send-name {
-  font-size: 12px;
-  color: var(--lp-text);
-}
-
-.lpd-hr-send-state {
-  margin-left: auto;
-  font-family: "JetBrains Mono Variable", ui-monospace, monospace;
-  font-size: 11px;
-  color: var(--lp-accent);
+.lpd-hr-send-btn::after {
+  animation: lpd-hr-ring 520ms var(--lpd-ease) 4020ms both;
 }
 
 @media (max-width: 640px) {
@@ -885,25 +962,17 @@
     display: none;
   }
 
-  .lpd-hr-funnel {
+  .lpd-hr-kanban {
+    grid-template-columns: repeat(3, 1fr);
     gap: 6px;
   }
 
-  .lpd-hr-column {
-    height: 84px;
+  .lpd-hr-card-name {
+    font-size: 10px;
   }
 
-  .lpd-hr-stage-name {
+  .lpd-hr-card-score {
     font-size: 9px;
-    letter-spacing: 0;
-  }
-
-  .lpd-hr-bulk {
-    flex-wrap: wrap;
-  }
-
-  .lpd-hr-moved {
-    margin-left: 0;
   }
 
   .lpd-hr-subject {
@@ -914,14 +983,14 @@
 /* ---------- scene 5 · job-post ---------- */
 
 .lpd-hr-job-post {
-  gap: 16px;
+  gap: 6px;
 }
 
 .lpd-hr-editor {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 13px 14px;
+  gap: 4px;
+  padding: 6px 10px;
   border: 1px solid var(--lpd-line);
   border-radius: var(--lp-radius);
   background: var(--lpd-raised);
@@ -939,7 +1008,7 @@
 .lpd-hr-field-row {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
 }
 
 .lpd-hr-field-label {
@@ -950,7 +1019,7 @@
 }
 
 .lpd-hr-field-value {
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 550;
   color: var(--lp-text);
 }
@@ -963,11 +1032,11 @@
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: 10px 12px;
+  gap: 5px;
+  padding: 7px 10px;
   border: 1px solid var(--lpd-line);
   border-radius: var(--lp-radius);
-  background: rgba(255, 255, 255, 0.015);
+  background: rgba(15, 23, 42, 0.015);
   overflow: hidden;
 }
 
@@ -982,9 +1051,9 @@
 
 .lpd-hr-jd-line {
   display: block;
-  height: 5px;
+  height: 4px;
   border-radius: 3px;
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(15, 23, 42, 0.08);
   transform-origin: left center;
   animation: lpd-progress 280ms var(--lpd-ease) calc(900ms + var(--i) * 120ms) both;
 }
@@ -1021,16 +1090,16 @@
 }
 
 .lpd-hr-extracted {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
 }
 
 .lpd-hr-extracted-row {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 6px 12px;
+  gap: 6px;
+  padding: 3px 7px;
   border: 1px solid rgba(110, 231, 183, 0.2);
   border-radius: var(--lp-radius);
   background: rgba(110, 231, 183, 0.04);
@@ -1042,14 +1111,95 @@
 }
 
 .lpd-hr-extracted-name {
-  font-size: 12px;
+  font-size: 11px;
+  color: var(--lp-text);
+}
+
+.lpd-hr-weights {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px 10px;
+  border: 1px solid var(--lpd-line);
+  border-radius: var(--lp-radius);
+  background: var(--lpd-raised);
+  animation: lpd-rise 380ms var(--lpd-ease) 3800ms both;
+}
+
+.lpd-hr-weights-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-family: "JetBrains Mono Variable", ui-monospace, monospace;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--lp-dim);
+}
+
+/* The editor blocks publishing until the four weights total 100, so the demo
+   shows the same running total settling once the last bar lands. */
+
+.lpd-hr-weights-total {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  letter-spacing: 0.04em;
+  color: var(--lp-accent);
+  animation: lpd-hr-fade-in 320ms var(--lpd-ease) 4700ms both;
+}
+
+.lpd-hr-weights-total .lpd-tick {
+  width: 11px;
+  height: 11px;
+}
+
+.lpd-hr-weights-total .lpd-tick-path {
+  animation-delay: 4760ms;
+}
+
+.lpd-hr-weight-row {
+  display: grid;
+  grid-template-columns: 76px 1fr 30px;
+  align-items: center;
+  gap: 6px;
+  animation: lpd-rise 320ms var(--lpd-ease) calc(4000ms + var(--i) * 80ms) both;
+}
+
+.lpd-hr-weight-label {
+  font-size: 10px;
+  color: var(--lp-muted);
+}
+
+.lpd-hr-weight-bar {
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(15, 23, 42, 0.07);
+  overflow: hidden;
+}
+
+.lpd-hr-weight-fill {
+  display: block;
+  height: 100%;
+  width: var(--w);
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--lp-accent-deep), var(--lp-accent));
+  transform-origin: left center;
+  animation: lpd-progress 500ms var(--lpd-ease) calc(4200ms + var(--i) * 100ms) both;
+}
+
+.lpd-hr-weight-pct {
+  font-family: "JetBrains Mono Variable", ui-monospace, monospace;
+  font-size: 10px;
+  text-align: right;
   color: var(--lp-text);
 }
 
 .lpd-hr-pub-row {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 6px;
   animation: lpd-rise 400ms var(--lpd-ease) 4400ms both;
 }
 
@@ -1148,4 +1298,269 @@
   font-family: "JetBrains Mono Variable", ui-monospace, monospace;
   font-size: 11px;
   color: var(--lp-dim);
+}
+
+/* ---------- scene · reports ---------- */
+
+.lpd-hr-reports {
+  gap: 14px;
+}
+
+.lpd-hr-rep-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  animation: lpd-rise 360ms var(--lpd-ease) both;
+}
+
+.lpd-hr-rep-title {
+  font-family: "JetBrains Mono Variable", ui-monospace, monospace;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--lp-dim);
+}
+
+.lpd-hr-rep-period {
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--lpd-line);
+  background: var(--lpd-raised);
+  font-family: "JetBrains Mono Variable", ui-monospace, monospace;
+  font-size: 10px;
+  color: var(--lp-muted);
+}
+
+.lpd-hr-rep-metrics {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.lpd-hr-rep-metric {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid var(--lpd-line);
+  border-radius: var(--lp-radius);
+  background: var(--lpd-raised);
+  animation: lpd-rise 400ms var(--lpd-ease) calc(400ms + var(--i) * 100ms) both;
+}
+
+.lpd-hr-rep-metric-value {
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--lp-text);
+}
+
+.lpd-hr-rep-metric.is-ok .lpd-hr-rep-metric-value {
+  color: var(--lp-accent);
+}
+
+.lpd-hr-rep-metric.is-warn .lpd-hr-rep-metric-value {
+  color: var(--lp-warn);
+}
+
+.lpd-hr-rep-metric-label {
+  font-family: "JetBrains Mono Variable", ui-monospace, monospace;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  color: var(--lp-dim);
+}
+
+.lpd-hr-rep-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.lpd-hr-rep-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--lpd-line);
+  border-radius: var(--lp-radius);
+  background: var(--lpd-raised);
+  animation: lpd-rise 380ms var(--lpd-ease) calc(1800ms + var(--i) * 200ms) both;
+}
+
+.lpd-hr-rep-card-head {
+  font-family: "JetBrains Mono Variable", ui-monospace, monospace;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--lp-dim);
+}
+
+.lpd-hr-rep-pass {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.lpd-hr-rep-pass-score {
+  font-size: 28px;
+  font-weight: 600;
+  color: var(--lp-text);
+}
+
+.lpd-hr-rep-pass-detail {
+  font-size: 11px;
+  color: var(--lp-dim);
+}
+
+.lpd-hr-rep-pass-bar {
+  height: 8px;
+  border-radius: 4px;
+  background: rgba(15, 23, 42, 0.07);
+  overflow: hidden;
+}
+
+.lpd-hr-rep-pass-fill {
+  display: block;
+  height: 100%;
+  width: var(--w);
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--lp-accent-deep), var(--lp-accent));
+  transform-origin: left center;
+  animation: lpd-progress 800ms var(--lpd-ease) 2600ms both;
+}
+
+.lpd-hr-rep-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.lpd-hr-rep-bar-row {
+  display: grid;
+  grid-template-columns: 40px 1fr 24px;
+  align-items: center;
+  gap: 8px;
+  animation: lpd-rise 320ms var(--lpd-ease) calc(2200ms + var(--i) * 120ms) both;
+}
+
+.lpd-hr-rep-bar-label {
+  font-family: "JetBrains Mono Variable", ui-monospace, monospace;
+  font-size: 10px;
+  color: var(--lp-dim);
+}
+
+.lpd-hr-rep-bar-track {
+  height: 8px;
+  border-radius: 4px;
+  background: rgba(15, 23, 42, 0.07);
+  overflow: hidden;
+}
+
+.lpd-hr-rep-bar-fill {
+  display: block;
+  height: 100%;
+  width: var(--w);
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--lp-accent-deep), var(--lp-accent));
+  transform-origin: left center;
+  animation: lpd-progress 600ms var(--lpd-ease) calc(2600ms + var(--i) * 180ms) both;
+}
+
+.lpd-hr-rep-bar-count {
+  font-family: "JetBrains Mono Variable", ui-monospace, monospace;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--lp-text);
+  text-align: right;
+}
+
+.lpd-hr-rep-sources {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.lpd-hr-rep-src-row {
+  display: grid;
+  grid-template-columns: 90px 1fr 24px;
+  align-items: center;
+  gap: 8px;
+  animation: lpd-rise 320ms var(--lpd-ease) calc(2600ms + var(--i) * 100ms) both;
+}
+
+.lpd-hr-rep-src-name {
+  font-size: 11px;
+  color: var(--lp-muted);
+}
+
+.lpd-hr-rep-src-bar {
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(15, 23, 42, 0.07);
+  overflow: hidden;
+}
+
+.lpd-hr-rep-src-fill {
+  display: block;
+  height: 100%;
+  width: var(--w);
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--lp-accent-deep), var(--lp-accent));
+  transform-origin: left center;
+  animation: lpd-progress 600ms var(--lpd-ease) calc(3000ms + var(--i) * 120ms) both;
+}
+
+.lpd-hr-rep-src-count {
+  font-family: "JetBrains Mono Variable", ui-monospace, monospace;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--lp-text);
+  text-align: right;
+}
+
+.lpd-hr-rep-activity {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.lpd-hr-rep-act-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--lpd-line);
+  animation: lpd-rise 320ms var(--lpd-ease) calc(2800ms + var(--i) * 100ms) both;
+}
+
+.lpd-hr-rep-act-row:last-child {
+  border-bottom: none;
+}
+
+.lpd-hr-rep-act-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--lp-accent);
+  flex-shrink: 0;
+}
+
+.lpd-hr-rep-act-text {
+  font-size: 11px;
+  color: var(--lp-muted);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lpd-hr-rep-act-time {
+  font-family: "JetBrains Mono Variable", ui-monospace, monospace;
+  font-size: 9px;
+  color: var(--lp-dim);
+  flex-shrink: 0;
 }

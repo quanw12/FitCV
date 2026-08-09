@@ -8,11 +8,21 @@ const EXTRACTED_FIELDS = [
   "Requirements",
   "We offer",
 ]
+/* The four weights the job editor actually exposes, at their default split.
+   The editor refuses to publish unless they add up to 100. */
+
+const SCORING_WEIGHTS = [
+  { label: "Skills", pct: 45 },
+  { label: "Experience", pct: 30 },
+  { label: "Education", pct: 15 },
+  { label: "Soft skills", pct: 10 },
+]
+const WEIGHT_TOTAL = SCORING_WEIGHTS.reduce((sum, w) => sum + w.pct, 0)
 
 /* Beat 1 the editor rises · beat 2 JD text types in · beat 3 Extract with AI
-   is pressed · beat 4 form fields auto-fill with ticks · beat 5 the status
-   badge flips from Draft to Published · beat 6 Copy public link is pressed
-   and confirmed · beat 7 the published job card appears. */
+   is pressed · beat 4 form fields auto-fill with ticks · beat 5 scoring
+   weights appear · beat 6 location/type fields fill · beat 7 the status
+   badge flips from Draft to Published. */
 
 export default function JobPostScene() {
   return (
@@ -27,6 +37,16 @@ export default function JobPostScene() {
           <span className="lpd-hr-field-value lpd-hr-field-type">
             Senior Frontend Engineer
           </span>
+        </div>
+
+        <div className="lpd-hr-field-row">
+          <span className="lpd-hr-field-label">Location</span>
+          <span className="lpd-hr-field-value">Ho Chi Minh City · On-site</span>
+        </div>
+
+        <div className="lpd-hr-field-row">
+          <span className="lpd-hr-field-label">Type</span>
+          <span className="lpd-hr-field-value">Full-time · 3 openings</span>
         </div>
 
         <div className="lpd-hr-jd-box">
@@ -65,6 +85,25 @@ export default function JobPostScene() {
         ))}
       </div>
 
+      <div className="lpd-hr-weights">
+        <span className="lpd-hr-weights-head">
+          Scoring weights
+          <span className="lpd-hr-weights-total" aria-hidden="true">
+            <Tick />
+            {WEIGHT_TOTAL}% allocated
+          </span>
+        </span>
+        {SCORING_WEIGHTS.map((w, i) => (
+          <div key={w.label} className="lpd-hr-weight-row" style={cssVars({ "--i": i })}>
+            <span className="lpd-hr-weight-label">{w.label}</span>
+            <span className="lpd-hr-weight-bar">
+              <i className="lpd-hr-weight-fill" style={cssVars({ "--w": `${w.pct}%`, "--i": i })} />
+            </span>
+            <span className="lpd-hr-weight-pct">{w.pct}%</span>
+          </div>
+        ))}
+      </div>
+
       <div className="lpd-hr-pub-row">
         <span className="lpd-hr-status-badge">
           <span className="lpd-hr-status-flip">
@@ -83,18 +122,6 @@ export default function JobPostScene() {
         <span className="lpd-hr-copied" aria-hidden="true">
           <Tick />
           Copied
-        </span>
-      </div>
-
-      <div className="lpd-hr-published-card">
-        <span className="lpd-hr-pub-card-head">
-          <span className="lpd-hr-pub-card-title">
-            Senior Frontend Engineer
-          </span>
-          <span className="lpd-hr-pub-badge">Published</span>
-        </span>
-        <span className="lpd-hr-pub-card-meta">
-          Acme · Full-time · 3 openings
         </span>
       </div>
     </div>

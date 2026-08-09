@@ -97,7 +97,7 @@ export default function HeroStage({ onGetStarted }: HeroStageProps) {
 
             <a
               ref={secondaryRef}
-              href="#preview"
+              href="#seekers"
               className="lp-btn lp-btn-outline"
             >
               See how it works
@@ -105,7 +105,7 @@ export default function HeroStage({ onGetStarted }: HeroStageProps) {
           </div>
         </div>
 
-        <a className="lp-hs-note" href="#scoring">
+        <a className="lp-hs-note" href="#seekers">
           <ChartBar size={14} weight="bold" />
           See how the four category scores are built
         </a>

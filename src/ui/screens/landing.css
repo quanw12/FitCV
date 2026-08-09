@@ -1,15 +1,15 @@
 .fitcv-landing {
-  --lp-bg: #000;
-  --lp-surface: #0e0e0e;
-  --lp-surface-hi: #161616;
-  --lp-line: #262626;
-  --lp-line-soft: rgba(255, 255, 255, 0.09);
-  --lp-text: #fff;
-  --lp-muted: #a3a3a3;
-  --lp-dim: #6f6f6f;
-  --lp-accent: #6ee7b7;
-  --lp-accent-deep: #2f9d76;
-  --lp-warn: #ff8a3d;
+  --lp-bg: #f8fafc;
+  --lp-surface: #ffffff;
+  --lp-surface-hi: #f1f5f9;
+  --lp-line: #e2e8f0;
+  --lp-line-soft: rgba(15, 23, 42, 0.08);
+  --lp-text: #0f172a;
+  --lp-muted: #475569;
+  --lp-dim: #94a3b8;
+  --lp-accent: #059669;
+  --lp-accent-deep: #047857;
+  --lp-warn: #ea580c;
   --lp-radius: 4px;
   --lp-shell: 1220px;
   --lp-ease: cubic-bezier(0.16, 1, 0.3, 1);
@@ -61,7 +61,7 @@
 }
 
 .lp-header.is-scrolled {
-  background: rgba(0, 0, 0, 0.72);
+  background: rgba(15, 23, 42, 0.72);
   backdrop-filter: blur(12px);
   border-bottom-color: var(--lp-line);
 }
@@ -88,13 +88,8 @@
 .lp-brand-mark {
   width: 26px;
   height: 26px;
-  display: grid;
-  place-items: center;
   border-radius: var(--lp-radius);
-  background: var(--lp-accent);
-  color: #000;
-  font-size: 13px;
-  font-weight: 700;
+  object-fit: contain;
 }
 
 .lp-nav {
@@ -116,7 +111,7 @@
 
 .lp-nav a:hover {
   color: var(--lp-text);
-  background: rgba(255, 255, 255, 0.06);
+  background: rgba(15, 23, 42, 0.06);
 }
 
 .lp-header-actions {
@@ -151,7 +146,7 @@
 }
 
 .lp-btn-ghost:hover {
-  background: rgba(255, 255, 255, 0.07);
+  background: rgba(15, 23, 42, 0.07);
 }
 
 .lp-btn-primary {
@@ -166,11 +161,11 @@
 .lp-btn-outline {
   background: transparent;
   color: var(--lp-text);
-  border-color: rgba(255, 255, 255, 0.28);
+  border-color: rgba(15, 23, 42, 0.28);
 }
 
 .lp-btn-outline:hover {
-  background: rgba(255, 255, 255, 0.07);
+  background: rgba(15, 23, 42, 0.07);
   border-color: var(--lp-text);
 }
 
@@ -623,8 +618,20 @@
 
 .lp-cards {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  grid-template-columns: repeat(3, 1fr);
   gap: 16px;
+}
+
+@media (max-width: 768px) {
+  .lp-cards {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 520px) {
+  .lp-cards {
+    grid-template-columns: 1fr;
+  }
 }
 
 .lp-card {
@@ -735,7 +742,7 @@
 }
 
 .lp-chart-rail {
-  fill: rgba(255, 255, 255, 0.045);
+  fill: rgba(15, 23, 42, 0.045);
 }
 
 .lp-chart-bar {

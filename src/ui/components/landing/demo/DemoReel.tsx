@@ -2,7 +2,6 @@ import { useId, useRef, type KeyboardEvent, type ReactNode } from "react"
 import { Pause, Play } from "@phosphor-icons/react"
 
 import useDemoAutoplay from "./useDemoAutoplay"
-import SceneScaler from "./SceneScaler"
 import type { DemoScene, SceneProps } from "./scenes"
 import { cssVars } from "./vars"
 
@@ -142,9 +141,9 @@ export default function DemoReel({ scenes, views, label }: DemoReelProps) {
           <span className="lpd-stage-grid" aria-hidden="true" />
           <span className="lpd-stage-glow" aria-hidden="true" />
 
-          <SceneScaler className="lpd-scene-scaler">
+          <div className="lpd-scene-scaler">
             <Scene key={`${scene.key}-${runId}`} paused={isPaused} />
-          </SceneScaler>
+          </div>
         </div>
 
         <div className="lpd-foot">

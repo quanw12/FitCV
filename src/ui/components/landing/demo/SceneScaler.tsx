@@ -5,10 +5,14 @@ interface SceneScalerProps {
   className?: string
 }
 
+const MIN_SCALE = 0.52
+const MAX_SCALE = 1.6
+
 /**
  * Measures its child's natural size and applies `transform: scale()` so the
- * child fits inside the parent container. Scale is clamped to ≤ 1 — the
- * child is never放大, only scaled down when it overflows.
+ * child fits inside the parent container. Scale is clamped between MIN_SCALE
+ * and MAX_SCALE — small scenes scale up to fill the frame, large scenes scale
+ * down but never below MIN_SCALE so text stays readable.
  */
 export default function SceneScaler({ children, className }: SceneScalerProps) {
   const containerRef = useRef<HTMLDivElement>(null)
@@ -27,7 +31,12 @@ export default function SceneScaler({ children, className }: SceneScalerProps) {
 
     if (sceneW === 0 || sceneH === 0) return
 
-    const next = Math.min(containerW / sceneW, containerH / sceneH, 1)
+    const next = Math.min(
+      Math.max(containerW / sceneW, MIN_SCALE),
+      Math.max(containerH / sceneH, MIN_SCALE),
+      MAX_SCALE,
+    )
+
     setScale((prev) => (prev === next ? prev : next))
   }, [])
 

@@ -1,72 +1,125 @@
 import Tick from "./Tick"
 import { cssVars } from "./vars"
 
-interface FunnelStage {
-  name: string
-
-  /** Headcount before the bulk move, and after it. */
-  from: number
-  to: number
-}
-
-const STAGES: FunnelStage[] = [
-  { name: "Applied", from: 24, to: 21 },
-  { name: "Screening", from: 7, to: 10 },
-  { name: "Interview", from: 3, to: 3 },
-  { name: "Offer", from: 1, to: 1 },
-  { name: "Hired", from: 1, to: 1 },
-  { name: "Rejected", from: 12, to: 12 },
-]
-
-/** Floor keeps a count of one visible instead of collapsing the bar to nothing. */
-const SCALE_FLOOR = 0.12
-const SCALE_PEAK = 24
-
-function scaleFor(count: number): number {
-  const ratio = Math.min(1, count / SCALE_PEAK)
-
-  return Number((SCALE_FLOOR + (1 - SCALE_FLOOR) * ratio).toFixed(3))
-}
-
-/* Beat 1 the funnel grows to its current shape · beat 2 three screened
-   candidates are selected · beat 3 Move to Screening lands and the two affected
-   bars trade height · beat 4 the move is written to stage history. */
+/* Applied starts with 4 candidates. After "Move to Screening" is pressed,
+   An, Minh, Linh leave Applied and appear in Screening.
+   Final: Applied=1 (Hai), Screening=4 (Tuan + An, Minh, Linh). */
 
 export default function HrPipelineScene() {
   return (
     <div className="lpd-scene lpd-hr-pipeline">
-      <div className="lpd-hr-funnel">
-        {STAGES.map((stage, index) => (
-          <div
-            key={stage.name}
-            className="lpd-hr-stage"
-            style={cssVars({
-              "--i": index,
-              "--s1": scaleFor(stage.from),
-              "--s2": scaleFor(stage.to),
-            })}
-          >
-            <span className="lpd-hr-stage-count">
-              {stage.from === stage.to ? (
-                stage.from
-              ) : (
-                <span className="lpd-hr-swap">
-                  <span className="lpd-hr-swap-out">{stage.from}</span>
-                  <span className="lpd-hr-swap-in">{stage.to}</span>
-                </span>
-              )}
+      <div className="lpd-hr-kanban">
+        {/* ── Applied ── */}
+        <div className="lpd-hr-col" style={cssVars({ "--ci": 0 })}>
+          <span className="lpd-hr-col-head">
+            <span className="lpd-hr-col-name">Applied</span>
+            <span className="lpd-hr-col-count" aria-hidden="true">
+              <span className="lpd-hr-count-swap">
+                <span className="lpd-hr-count-out">4</span>
+                <span className="lpd-hr-count-in">1</span>
+              </span>
             </span>
+          </span>
 
-            <span className="lpd-hr-column" aria-hidden="true">
-              <i className="lpd-hr-column-fill" />
-            </span>
-
-            <span className="lpd-hr-stage-name">{stage.name}</span>
+          <div className="lpd-hr-col-body">
+            {/* stays */}
+            <div className="lpd-hr-card" style={cssVars({ "--col": 0, "--card": 0 })}>
+              <span className="lpd-hr-card-name">Hai Le</span>
+              <span className="lpd-hr-card-meta">DevOps · 71</span>
+            </div>
+            {/* leaves */}
+            <div className="lpd-hr-card lpd-hr-card--leave lpd-hr-card--l1" style={cssVars({ "--col": 0, "--card": 1 })}>
+              <span className="lpd-hr-card-name">An Nguyen</span>
+              <span className="lpd-hr-card-meta">Frontend · 82</span>
+            </div>
+            <div className="lpd-hr-card lpd-hr-card--leave lpd-hr-card--l2" style={cssVars({ "--col": 0, "--card": 2 })}>
+              <span className="lpd-hr-card-name">Minh Tran</span>
+              <span className="lpd-hr-card-meta">Backend · 74</span>
+            </div>
+            <div className="lpd-hr-card lpd-hr-card--leave lpd-hr-card--l3" style={cssVars({ "--col": 0, "--card": 3 })}>
+              <span className="lpd-hr-card-name">Linh Pham</span>
+              <span className="lpd-hr-card-meta">Full-stack · 68</span>
+            </div>
           </div>
-        ))}
+        </div>
+
+        {/* ── Screening ── */}
+        <div className="lpd-hr-col" style={cssVars({ "--ci": 1 })}>
+          <span className="lpd-hr-col-head">
+            <span className="lpd-hr-col-name">Screening</span>
+            <span className="lpd-hr-col-count" aria-hidden="true">
+              <span className="lpd-hr-count-swap">
+                <span className="lpd-hr-count-out">1</span>
+                <span className="lpd-hr-count-in">4</span>
+              </span>
+            </span>
+          </span>
+
+          <div className="lpd-hr-col-body">
+            {/* already here */}
+            <div className="lpd-hr-card" style={cssVars({ "--col": 1, "--card": 0 })}>
+              <span className="lpd-hr-card-name">Tuan Vo</span>
+              <span className="lpd-hr-card-meta">Frontend · 88</span>
+            </div>
+            {/* entering — hidden until move */}
+            <div className="lpd-hr-card lpd-hr-card--enter lpd-hr-card--e1" style={cssVars({ "--col": 1, "--card": 1 })}>
+              <span className="lpd-hr-card-name">An Nguyen</span>
+              <span className="lpd-hr-card-meta">Frontend · 82</span>
+            </div>
+            <div className="lpd-hr-card lpd-hr-card--enter lpd-hr-card--e2" style={cssVars({ "--col": 1, "--card": 2 })}>
+              <span className="lpd-hr-card-name">Minh Tran</span>
+              <span className="lpd-hr-card-meta">Backend · 74</span>
+            </div>
+            <div className="lpd-hr-card lpd-hr-card--enter lpd-hr-card--e3" style={cssVars({ "--col": 1, "--card": 3 })}>
+              <span className="lpd-hr-card-name">Linh Pham</span>
+              <span className="lpd-hr-card-meta">Full-stack · 68</span>
+            </div>
+          </div>
+        </div>
+
+        {/* ── Interview ── */}
+        <div className="lpd-hr-col" style={cssVars({ "--ci": 2 })}>
+          <span className="lpd-hr-col-head">
+            <span className="lpd-hr-col-name">Interview</span>
+            <span className="lpd-hr-col-count" aria-hidden="true">1</span>
+          </span>
+          <div className="lpd-hr-col-body">
+            <div className="lpd-hr-card" style={cssVars({ "--col": 2, "--card": 0 })}>
+              <span className="lpd-hr-card-name">Mai Hoang</span>
+              <span className="lpd-hr-card-meta">Backend · 91</span>
+            </div>
+          </div>
+        </div>
+
+        {/* ── Offer ── */}
+        <div className="lpd-hr-col" style={cssVars({ "--ci": 3 })}>
+          <span className="lpd-hr-col-head">
+            <span className="lpd-hr-col-name">Offer</span>
+            <span className="lpd-hr-col-count" aria-hidden="true">0</span>
+          </span>
+          <div className="lpd-hr-col-body" />
+        </div>
+
+        {/* ── Hired ── */}
+        <div className="lpd-hr-col" style={cssVars({ "--ci": 4 })}>
+          <span className="lpd-hr-col-head">
+            <span className="lpd-hr-col-name">Hired</span>
+            <span className="lpd-hr-col-count" aria-hidden="true">0</span>
+          </span>
+          <div className="lpd-hr-col-body" />
+        </div>
+
+        {/* ── Rejected ── */}
+        <div className="lpd-hr-col" style={cssVars({ "--ci": 5 })}>
+          <span className="lpd-hr-col-head">
+            <span className="lpd-hr-col-name">Rejected</span>
+            <span className="lpd-hr-col-count" aria-hidden="true">0</span>
+          </span>
+          <div className="lpd-hr-col-body" />
+        </div>
       </div>
 
-      <div className="lpd-hr-bulk">
+      <div className="lpd-hr-pipeline-actions">
         <span className="lpd-hr-bulk-count">3 selected</span>
 
         <span className="lpd-hr-btn is-primary lpd-hr-move" aria-hidden="true">
@@ -75,14 +128,9 @@ export default function HrPipelineScene() {
 
         <span className="lpd-hr-moved">
           <Tick />
-          logged to stage history
+          logged
         </span>
       </div>
-
-      <p className="lpd-hr-note">
-        Stage changes are recorded per candidate, so the board still explains
-        how someone got where they are a month later.
-      </p>
     </div>
   )
 }

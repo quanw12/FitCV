@@ -1,4 +1,4 @@
-import Tick from "./Tick"
+import CountUp from "./CountUp"
 import type { SceneProps } from "./scenes"
 import { cssVars } from "./vars"
 
@@ -33,22 +33,41 @@ const SAVED_JDS: SavedJd[] = [
     label: "Moderate",
   },
 ]
+const AVG_SCORE = Math.round(
+  SAVED_JDS.reduce((sum, jd) => sum + jd.score, 0) / SAVED_JDS.length,
+)
 
-const SKILL_STEP_MS = 100
-const CARD_STEP_MS = 200
-
-/* Beat 1 the library header rises · beat 2 JD cards stack in one by one ·
-   beat 3 skill chips appear on each card · beat 4 the first card highlights
-   and "Analyze this JD" is pressed · beat 5 the JD loads into the analyzer
-   context and a mini score appears. */
+/* Beat 1 the library header and search rise · beat 2 the insights card
+   appears · beat 3 JD cards stack in · beat 4 the first card highlights
+   with two actions. */
 
 export default function JdLibraryScene({ paused }: SceneProps) {
   return (
     <div className="lpd-scene lpd-jd-lib">
       <span className="lpd-jd-lib-head">
         Saved JDs
-        <span className="lpd-jd-lib-count">3 analyses</span>
+        <span className="lpd-jd-lib-count">{SAVED_JDS.length} saved</span>
       </span>
+
+      <div className="lpd-jd-search">
+        <span className="lpd-jd-search-icon" aria-hidden="true" />
+        <span className="lpd-jd-search-placeholder">Search by title, company, or skill...</span>
+      </div>
+
+      <div className="lpd-jd-insights">
+        <div className="lpd-jd-insight">
+          <span className="lpd-jd-insight-value">
+            <CountUp to={SAVED_JDS.length} delay={900} duration={600} paused={paused} />
+          </span>
+          <span className="lpd-jd-insight-label">Active opportunities</span>
+        </div>
+        <div className="lpd-jd-insight">
+          <span className="lpd-jd-insight-value">
+            <CountUp to={AVG_SCORE} delay={1050} duration={800} paused={paused} />
+          </span>
+          <span className="lpd-jd-insight-label">Avg match score</span>
+        </div>
+      </div>
 
       <div className="lpd-jd-cards">
         {SAVED_JDS.map((jd, cardIndex) => (
@@ -96,11 +115,19 @@ export default function JdLibraryScene({ paused }: SceneProps) {
             </span>
 
             {cardIndex === 0 && (
-              <span
-                className="lpd-hr-btn is-primary lpd-jd-analyze-btn"
-                aria-hidden="true"
-              >
-                Analyze this JD
+              <span className="lpd-jd-actions">
+                <span
+                  className="lpd-hr-btn is-primary lpd-jd-analyze-btn"
+                  aria-hidden="true"
+                >
+                  Analyze this JD
+                </span>
+                <span
+                  className="lpd-hr-btn lpd-jd-apply-btn"
+                  aria-hidden="true"
+                >
+                  View &amp; apply
+                </span>
               </span>
             )}
           </div>

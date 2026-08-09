@@ -21,13 +21,22 @@ const SHORTLIST_SIZE = 2
 const BAR_START_MS = 700
 const BAR_STEP_MS = 150
 
-/* Beat 1 the ranked pool draws itself · beat 2 the threshold slides 50 → 80 ·
-   beat 3 the selection lands on everyone above the bar · beat 4 the shortlist
-   is confirmed into the pipeline. */
+/* Beat 1 the job dropdown appears · beat 2 the ranked pool draws itself ·
+   beat 3 the threshold slides 50 → 80 · beat 4 the selection lands on
+   everyone above the bar. */
 
 export default function HrRankScene({ paused }: SceneProps) {
   return (
     <div className="lpd-scene lpd-hr-rank">
+      <div className="lpd-hr-rank-head">
+        <div className="lpd-hr-job-select">
+          <span className="lpd-hr-job-select-label">Ranking for</span>
+          <span className="lpd-hr-job-select-value">Senior Frontend Engineer</span>
+          <span className="lpd-hr-job-select-caret" aria-hidden="true" />
+        </div>
+        <span className="lpd-hr-rank-count">4 applicants</span>
+      </div>
+
       <ul className="lpd-hr-rows">
         {CANDIDATES.map((candidate, index) => {
           const isPicked = index < SHORTLIST_SIZE

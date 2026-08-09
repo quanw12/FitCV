@@ -10,7 +10,7 @@
   padding: 8px 0 20px;
   border: 1px solid var(--lp-line);
   border-radius: var(--lp-radius);
-  background: #050505;
+  background: var(--lp-surface);
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -21,8 +21,8 @@
   inset: 0;
   pointer-events: none;
   background-image:
-    linear-gradient(90deg, rgba(51, 51, 51, 0.55) 1px, transparent 0),
-    linear-gradient(180deg, rgba(51, 51, 51, 0.55) 1px, transparent 0);
+    linear-gradient(90deg, rgba(15, 23, 42, 0.05) 1px, transparent 0),
+    linear-gradient(180deg, rgba(15, 23, 42, 0.05) 1px, transparent 0);
   background-size: 40px 40px;
   background-position: 20px 20px;
 }
@@ -88,16 +88,16 @@
 /* ---------- rail ---------- */
 
 .bt-rail {
-  stroke: rgba(255, 255, 255, 0.18);
+  stroke: rgba(15, 23, 42, 0.18);
   stroke-width: 1.5;
 }
 
 .bt-rail-dot {
-  fill: rgba(255, 255, 255, 0.22);
+  fill: rgba(15, 23, 42, 0.22);
 }
 
 .bt-rail-ring {
-  fill: #050505;
+  fill: var(--lp-surface);
   stroke: var(--bt-pass);
   stroke-width: 2;
 }
@@ -123,8 +123,8 @@
 /* ---------- pills ---------- */
 
 .bt-pill {
-  fill: #0e0e0e;
-  stroke: rgba(255, 255, 255, 0.22);
+  fill: #f1f5f9;
+  stroke: rgba(15, 23, 42, 0.28);
   stroke-width: 1;
 }
 
@@ -134,7 +134,7 @@
 }
 
 .bt-badge {
-  fill: #fff;
+  fill: #e2e8f0;
 }
 
 .bt-badge-text {
@@ -147,13 +147,13 @@
 
 .bt-connector {
   fill: none;
-  stroke: rgba(255, 255, 255, 0.3);
+  stroke: rgba(15, 23, 42, 0.3);
   stroke-width: 1.4;
   stroke-dasharray: 5 5;
 }
 
 .bt-changed {
-  fill: #101010;
+  fill: var(--lp-surface);
   stroke: var(--lp-line);
   stroke-width: 1;
 }
