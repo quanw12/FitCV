@@ -516,11 +516,15 @@ Flow hiện tại dùng mã xác minh 6 số:
 5. Nếu mã đúng và chưa hết hạn, UI mới hiện Set new password.
 6. Reset thành công thì backend xóa mã khỏi DB.
 
-Nếu chưa cấu hình email provider, backend in mã trong terminal:
+Trong `ENVIRONMENT=dev`, nếu chưa cấu hình email provider, backend ghi mã vào
+terminal ở mức warning để hỗ trợ kiểm thử local:
 
 ```text
 PASSWORD_RESET_CODE for user@example.com: 123456
 ```
+
+Trong `ENVIRONMENT=prod`, backend yêu cầu cấu hình Resend và từ chối yêu cầu
+trước khi tra cứu account hoặc tạo reset token nếu cấu hình gửi mail bị thiếu.
 
 Nếu muốn gửi email thật bằng Resend:
 
@@ -892,7 +896,8 @@ Reset code đúng nhưng verify lỗi:
 
 - Restart backend sau khi pull code mới.
 - Bấm gửi mã mới.
-- Kiểm tra terminal backend có `PASSWORD_RESET_CODE`.
+- Với `ENVIRONMENT=dev`, kiểm tra terminal backend có warning `PASSWORD_RESET_CODE`.
+- Với `ENVIRONMENT=prod`, kiểm tra `RESEND_API_KEY` và `RESEND_FROM_EMAIL`; backend không ghi reset code vào log.
 - Mã hết hạn theo `RESET_TOKEN_EXPIRE_MINUTES` / `reset_token_expire_minutes`.
 
 Backend không connect DB:

@@ -62,7 +62,7 @@ Current auth behavior:
 - Frontend portals remain `seeker` and `hr`; `HR`, `HiringManager`, and `Admin` route to the HR portal.
 - Google sign-in uses Google Identity Services on the frontend and backend ID-token verification with `GOOGLE_CLIENT_ID`.
 - Forgot/reset password uses a 6-digit verification code. The backend stores only the hash in `account.reset_token_hash` and expiry in `account.reset_token_expires_at`.
-- If email sending is not configured, reset codes are printed in the backend terminal as `PASSWORD_RESET_CODE`.
+- In `ENVIRONMENT=dev`, if email sending is not configured, reset codes are logged in the backend terminal as a `PASSWORD_RESET_CODE` warning. In `prod`, Resend must be configured and the request fails before account lookup or reset-token mutation.
 - Do not reintroduce reset links or UI-exposed reset tokens unless the team explicitly changes the auth design.
 - Profile uses only existing `account`, `candidate`, `company`, and `industry` schema fields. Students edit phone; HR, HiringManager, and Admin edit linked company and industry data.
 
