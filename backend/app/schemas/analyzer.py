@@ -14,6 +14,7 @@ class CvVersionResponse(BaseModel):
     parse_status: str
     parser_version: str | None = None
     error_message: str | None = None
+    ai_task_id: int | None = None
 
 
 class AnalyzeCvRequest(BaseModel):

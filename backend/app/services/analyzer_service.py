@@ -43,6 +43,10 @@ from app.services.match_engine import (
 logger = logging.getLogger(__name__)
 
 
+class MatchTaskError(RuntimeError):
+    """A sanitized matching failure that is safe to persist and expose publicly."""
+
+
 async def upload_cv(
     db: Session, *, file: UploadFile, account: Account
 ) -> CvVersionResponse:
@@ -94,7 +98,12 @@ async def upload_cv(
     return _cv_response(cv, parsed)
 
 
-def run_cv_parse(cv_id: int) -> bool:
+def run_cv_parse(
+    cv_id: int,
+    *,
+    terminal_failure: bool = True,
+    raise_on_failure: bool = False,
+) -> bool:
     db = SessionLocal()
     try:
         cv = analyzer.get_cv_for_parse(db, cv_id)
@@ -123,7 +132,15 @@ def run_cv_parse(cv_id: int) -> bool:
         db.rollback()
         parsed = analyzer.get_latest_parse(db, cv_id)
         if parsed is not None:
-            analyzer.set_parse_failed(db, parsed, str(exc) or "CV parsing failed.")
+            if terminal_failure:
+                analyzer.set_parse_failed(
+                    db, parsed, str(exc) or "CV parsing failed."
+                )
+            else:
+                # Keep polling active while the durable queue waits for another try.
+                analyzer.set_parse_processing(db, parsed)
+        if raise_on_failure:
+            raise
         return False
     finally:
         db.close()
@@ -324,6 +341,29 @@ def get_cv(db: Session, *, cv_id: int, account: Account) -> CvVersionResponse:
     return _cv_response(*record)
 
 
+def prepare_cv_parse_retry(
+    db: Session, *, cv_id: int, account: Account
+) -> CvVersionResponse:
+    record = analyzer.get_cv_record(db, cv_id, account.account_id)
+    if record is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="CV not found."
+        )
+    cv, parsed = record
+    if parsed is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="CV parse record is missing.",
+        )
+    if parsed.parse_status == "Success":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="CV parsing has already completed.",
+        )
+    analyzer.set_parse_processing(db, parsed)
+    return _cv_response(cv, parsed)
+
+
 def delete_cv(db: Session, *, cv_id: int, account: Account) -> None:
     cv = analyzer.get_owned_cv(db, cv_id, account.account_id)
     if cv is None:
@@ -400,10 +440,14 @@ def request_analysis(
     return _match_response(db, match), should_start
 
 
-def run_match_task(match_result_id: int) -> bool:
+def run_match_task(
+    match_result_id: int, *, raise_on_failure: bool = False
+) -> bool:
     db = SessionLocal()
-    match = db.get(MatchResult, match_result_id)
+    match: MatchResult | None = None
+    safe_error_message: str | None = None
     try:
+        match = db.get(MatchResult, match_result_id)
         if match is None or match.status == "Success":
             return True
         analyzer.set_match_processing(db, match)
@@ -426,13 +470,30 @@ def run_match_task(match_result_id: int) -> bool:
         analyzer.set_match_success(db, match, result)
         return True
     except Exception as exc:
-        db.rollback()
-        match = db.get(MatchResult, match_result_id)
-        if match is not None:
-            analyzer.set_match_failed(db, match, str(exc) or "CV/JD matching failed.")
-        return False
+        safe_error_message = _safe_match_error_message(exc)
+        try:
+            db.rollback()
+            match = db.get(MatchResult, match_result_id)
+            if match is not None:
+                analyzer.set_match_failed(db, match, safe_error_message)
+        except Exception:
+            try:
+                db.rollback()
+            except Exception:
+                pass
+            safe_error_message = (
+                "The CV/JD matching failure could not be recorded. Please try again."
+            )
+        if not raise_on_failure:
+            return False
     finally:
-        db.close()
+        try:
+            db.close()
+        except Exception:
+            if safe_error_message is None:
+                raise
+    assert safe_error_message is not None
+    raise MatchTaskError(safe_error_message)
 
 
 def get_match_result(
@@ -577,3 +638,59 @@ def _stored_file_path(file_path: str) -> Path:
 
 def _selected_analyzer_config() -> tuple[str, str | None]:
     return selected_analyzer_config()
+
+
+def _safe_match_error_message(exc: Exception) -> str:
+    """Map private implementation failures to stable public-safe causes."""
+    message = str(exc).casefold()
+    if isinstance(exc, GeminiAnalyzerError):
+        if "timed out" in message or "timeout" in message:
+            return "The matching provider timed out. Please try again."
+        if any(token in message for token in ("busy", "quota", "rate limit", "429")):
+            return "The matching provider is busy. Please try again later."
+        if any(
+            token in message
+            for token in (
+                "api key",
+                "not configured",
+                "required when",
+                "rejected",
+                "401",
+                "403",
+                "unsupported analyzer_provider",
+                "gemini_model",
+            )
+        ):
+            return "The matching provider is not configured correctly."
+        if any(
+            token in message
+            for token in ("invalid", "unreadable", "did not contain", "did not complete")
+        ):
+            return "The matching provider returned an invalid response."
+        return "The matching provider is unavailable. Please try again later."
+    if isinstance(exc, LookupError):
+        return "Required CV/JD matching data was not found."
+    if isinstance(exc, ValueError):
+        if any(
+            token in message
+            for token in (
+                "data is missing",
+                "text is missing",
+                "no scorable",
+                "must contain skill names",
+            )
+        ):
+            return "Required CV/JD matching data is incomplete."
+        if any(token in message for token in ("weight", "analyzer version")):
+            return "The CV/JD matching configuration is invalid."
+        return "The CV/JD matching inputs are invalid."
+    exception_module = type(exc).__module__.casefold()
+    exception_name = type(exc).__name__.casefold()
+    if exception_module.startswith("sqlalchemy") or exception_name in {
+        "databaseerror",
+        "dbapierror",
+        "integrityerror",
+        "operationalerror",
+    }:
+        return "CV/JD matching data could not be accessed. Please try again."
+    return "CV/JD matching could not be completed. Please try again."

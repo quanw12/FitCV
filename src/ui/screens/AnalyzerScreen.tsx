@@ -207,6 +207,26 @@ export default function AnalyzerScreen({
 
       setProgress("Extracting JD requirements…")
 
+      if (uploadedCvId != null) {
+        let parsedCv = await analyzerApi.getCv(cvId, controller.signal)
+
+        if (parsedCv.parseStatus === "Failed") {
+          setProgress("Retrying CV parsing...")
+
+          parsedCv = await analyzerApi.retryCvParse(cvId, controller.signal)
+        }
+
+        if (parsedCv.parseStatus !== "Success") {
+          setProgress("Parsing CV...")
+
+          await waitForCv(cvId, controller.signal)
+
+          if (!isCurrentAnalysis(activeAnalysisRef, controller)) return
+        }
+
+        setProgress("Extracting JD requirements...")
+      }
+
       let analysis = await analyzerApi.analyzeCv(
         {
           cvId,

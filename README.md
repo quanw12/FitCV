@@ -194,17 +194,30 @@ Nếu tạo database mới:
 
 ### Platform Hardening: Screening, AI Queue, Auth Session
 
-Database hiện hữu phải backup rồi chạy migration sau đúng một lần trước khi
-deploy phiên bản backend này:
+Database MySQL hiện hữu phải backup rồi chạy tuần tự các migration sau trước khi
+deploy phiên bản backend dùng lịch sử lần thử của AI queue:
 
 ```text
 database/migrations/010_add_platform_hardening.sql
+database/migrations/013_add_ai_task_attempt_history.sql
 ```
 
 Migration thêm `hr_screening_batch`, `hr_screening_candidate`, `auth_session`,
-`auth_rate_limit` và mở rộng `ai_task` thành hàng đợi bền vững. Database mới tạo
-từ `database/full_schema.sql` đã có sẵn các bảng/cột này nên không chạy lại
-migration `010`.
+`auth_rate_limit` và mở rộng `ai_task` thành hàng đợi bền vững. Migration 013 phải
+chạy sau migration 010 vì nó tạo `ai_task_attempt_history` tham chiếu đến `ai_task`.
+Không deploy code đọc hoặc ghi lịch sử lần thử trước khi migration 013 hoàn tất;
+nếu thiếu bảng này, AI worker và API phụ thuộc lịch sử có thể lỗi khi runtime.
+Database mới tạo từ `database/full_schema.sql` đã có sẵn các bảng/cột này nên
+không chạy lại migration `010` hoặc `013`.
+
+Nếu cần rollback migration 013, rollback code phụ thuộc lịch sử trước rồi mới chạy:
+
+```text
+database/migrations/013_rollback_ai_task_attempt_history.sql
+```
+
+Rollback 013 xóa vĩnh viễn toàn bộ lịch sử lỗi theo từng lần thử trong
+`ai_task_attempt_history`; chỉ có thể khôi phục dữ liệu này từ bản backup.
 
 Mặc định API chạy một worker nền trong cùng process (`AI_WORKER_ENABLED=true`).
 Có thể tách worker thành Render Background Worker bằng lệnh sau và đặt

@@ -17,15 +17,41 @@ from app.core.config import settings
 from app.core.security import decode_access_token, hash_refresh_token
 from app.db.session import Base
 from app.models.account import Account, AccountRole, AuthProvider
-from app.models.improvement import AiTaskStatus
+from app.models.improvement import AiTask, AiTaskStatus
 from app.models.jobs import Company
 from app.models.platform import AuthSessionRecord, ScreeningBatchStatus
 from app.repositories import ai_tasks, auth_sessions
-from app.services import auth_rate_limit, auth_service, cv_ranking_service
+from app.services import ai_worker, auth_rate_limit, auth_service, cv_ranking_service
 
 
 def _utcnow_naive() -> datetime:
     return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
+def test_cv_parse_dispatch_only_marks_the_last_attempt_terminal() -> None:
+    task = AiTask(
+        ai_task_id=53,
+        task_type="CvParse",
+        resource_id=34,
+        attempt_count=2,
+        max_attempts=3,
+    )
+    with patch("app.services.analyzer_service.run_cv_parse") as run_cv_parse:
+        ai_worker._dispatch(task)
+        run_cv_parse.assert_called_once_with(
+            34,
+            terminal_failure=False,
+            raise_on_failure=True,
+        )
+
+        run_cv_parse.reset_mock()
+        task.attempt_count = 3
+        ai_worker._dispatch(task)
+        run_cv_parse.assert_called_once_with(
+            34,
+            terminal_failure=True,
+            raise_on_failure=True,
+        )
 
 
 @pytest.fixture

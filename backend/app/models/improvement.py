@@ -2,7 +2,7 @@ from datetime import datetime
 from enum import Enum
 
 from sqlalchemy import DateTime, Enum as SqlEnum, ForeignKey, Index, Integer, JSON, String, Text, UniqueConstraint, func
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.session import Base
 from app.models.account import enum_values
@@ -36,6 +36,12 @@ class AiTaskStatus(str, Enum):
     processing = "Processing"
     success = "Success"
     failed = "Failed"
+
+
+class AiTaskAttemptOutcome(str, Enum):
+    retry_scheduled = "RetryScheduled"
+    terminal_failure = "TerminalFailure"
+    stale_recovery = "StaleRecovery"
 
 
 class CvImprovementSuggestion(Base):
@@ -91,3 +97,39 @@ class AiTask(Base):
     updated_at: Mapped[datetime | None] = mapped_column(DateTime, onupdate=func.now(), nullable=True)
     started_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    attempt_history: Mapped[list["AiTaskAttemptHistory"]] = relationship(
+        back_populates="task",
+        passive_deletes=True,
+        order_by=lambda: (
+            AiTaskAttemptHistory.attempt_number,
+            AiTaskAttemptHistory.ai_task_attempt_id,
+        ),
+    )
+
+
+class AiTaskAttemptHistory(Base):
+    __tablename__ = "ai_task_attempt_history"
+    __table_args__ = (
+        UniqueConstraint(
+            "ai_task_id",
+            "attempt_number",
+            name="uq_ai_task_attempt_number",
+        ),
+    )
+
+    ai_task_attempt_id: Mapped[int] = mapped_column(
+        ID_TYPE, primary_key=True, autoincrement=True
+    )
+    ai_task_id: Mapped[int] = mapped_column(
+        ID_TYPE,
+        ForeignKey("ai_task.ai_task_id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    attempt_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    outcome: Mapped[AiTaskAttemptOutcome] = mapped_column(
+        SqlEnum(AiTaskAttemptOutcome, values_callable=enum_values),
+        nullable=False,
+    )
+    error_message: Mapped[str] = mapped_column(String(1000), nullable=False)
+    failed_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    task: Mapped[AiTask] = relationship(back_populates="attempt_history")
