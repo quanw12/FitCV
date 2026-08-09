@@ -192,7 +192,7 @@
 
 /* ---------- scene 1 · rebuild ---------- */
 
-.lpd-rebuild {
+.lpd-scene.lpd-rebuild {
   gap: 8px;
   min-height: 0;
 }
@@ -298,8 +298,7 @@
   border: 1px solid var(--lpd-line);
   border-radius: var(--lp-radius);
   overflow: hidden;
-  flex: 1;
-  min-height: 0;
+  flex-shrink: 0;
 }
 
 .lpd-section {
@@ -336,7 +335,6 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-top: auto;
 }
 
 .lpd-version {
@@ -374,7 +372,8 @@
   flex-direction: column;
   gap: 4px;
   animation: lpd-rise 420ms var(--lpd-ease) 5800ms both;
-  flex-shrink: 0;
+  flex: 1;
+  min-height: 0;
 }
 
 .lpd-preview-card {
@@ -382,6 +381,10 @@
   border: 1px solid var(--lpd-line);
   border-radius: var(--lp-radius);
   background: var(--lpd-raised);
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .lpd-preview-head {
@@ -398,6 +401,8 @@
   display: flex;
   flex-direction: column;
   gap: 3px;
+  flex: 1;
+  justify-content: space-between;
 }
 
 .lpd-preview-name {

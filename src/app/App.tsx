@@ -315,11 +315,9 @@ export default function App() {
     )
   }
 
-  if (!authReady) return <FullPageSkeleton />
-
   if (showLanding && !session) {
     return (
-      <Suspense fallback={<FullPageSkeleton />}>
+      <Suspense fallback={null}>
         <LandingScreen onGetStarted={() => setShowLanding(false)} />
       </Suspense>
     )
@@ -327,7 +325,7 @@ export default function App() {
 
   if (!session || session.requiresRoleSelection || !portal) {
     return (
-      <Suspense fallback={<FullPageSkeleton />}>
+      <Suspense fallback={null}>
         <AuthScreen
           onAuth={handleAuth}
           startInRoleSelection={Boolean(session?.requiresRoleSelection)}
