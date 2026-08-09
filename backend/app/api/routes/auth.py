@@ -30,7 +30,12 @@ def _cookie_samesite() -> str:
 
 def _require_allowed_origin(request: Request) -> None:
     origin = request.headers.get("origin")
-    if origin and origin.rstrip("/") not in {
+    if not origin:
+        if settings.environment == "prod":
+            raise HTTPException(status_code=403, detail="Request origin is not allowed.")
+        return
+
+    if origin.rstrip("/") not in {
         allowed.rstrip("/") for allowed in settings.cors_origins
     }:
         raise HTTPException(status_code=403, detail="Request origin is not allowed.")
