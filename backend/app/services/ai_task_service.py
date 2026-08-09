@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.models.account import Account
-from app.models.improvement import AiTask
+from app.models.improvement import AiTask, AiTaskStatus
 from app.repositories import ai_tasks
 from app.schemas.ai_tasks import AiTaskResponse
 
@@ -38,6 +38,28 @@ def enqueue(
         payload=payload,
         idempotency_key=idempotency_key,
         max_attempts=max_attempts or settings.ai_task_max_attempts,
+    )
+
+
+def get_active_for_resource(
+    db: Session, *, task_type: str, resource_id: int
+) -> AiTask | None:
+    task = ai_tasks.get_latest_for_resource(
+        db, task_type=task_type, resource_id=resource_id
+    )
+    if task is None or task.status not in {
+        AiTaskStatus.pending,
+        AiTaskStatus.processing,
+    }:
+        return None
+    return task
+
+
+def get_latest_for_resource(
+    db: Session, *, task_type: str, resource_id: int
+) -> AiTask | None:
+    return ai_tasks.get_latest_for_resource(
+        db, task_type=task_type, resource_id=resource_id
     )
 
 

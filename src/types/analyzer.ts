@@ -20,6 +20,8 @@ export interface CvVersion {
   parserVersion: string | null
 
   errorMessage: string | null
+
+  aiTaskId?: number | null
 }
 
 export interface AnalyzeCvRequest {

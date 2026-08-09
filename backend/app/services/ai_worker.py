@@ -27,14 +27,16 @@ def _dispatch(task: AiTask) -> None:
     if task.task_type == "CvParse":
         from app.services.analyzer_service import run_cv_parse
 
-        if not run_cv_parse(task.resource_id):
-            raise RuntimeError("CV parsing failed.")
+        run_cv_parse(
+            task.resource_id,
+            terminal_failure=task.attempt_count >= task.max_attempts,
+            raise_on_failure=True,
+        )
         return
     if task.task_type == "MatchAnalysis":
         from app.services.analyzer_service import run_match_task
 
-        if not run_match_task(task.resource_id):
-            raise RuntimeError("CV/JD matching failed.")
+        run_match_task(task.resource_id, raise_on_failure=True)
         return
     if task.task_type == "ApplicationAnalysis":
         from app.services.application_service import run_analysis
