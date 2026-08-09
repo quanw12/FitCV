@@ -121,9 +121,16 @@ def select_role(
     account: Account = Depends(get_current_account),
     db: Session = Depends(get_db),
 ) -> AuthSession:
+    _require_allowed_origin(request)
     session_id = getattr(request.state, "auth_session_id", None)
     if not session_id:
         raise HTTPException(status_code=401, detail="Authenticated session is missing.")
+    auth_rate_limit.consume(
+        db,
+        action="select_role",
+        request=request,
+        identifier=str(account.account_id),
+    )
     return auth_service.select_role(
         db, account=account, role=payload.role, session_id=session_id
     )

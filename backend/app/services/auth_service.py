@@ -16,9 +16,14 @@ from app.core.security import (
     verify_password,
 )
 from app.models.account import Account, AccountRole
-from app.repositories.accounts import create_oauth_account, create_password_account, get_account_by_email
+from app.repositories.accounts import (
+    create_oauth_account,
+    create_password_account,
+    get_account_by_email,
+    set_role_if_unset,
+)
 from app.repositories import auth_sessions
-from app.schemas.auth import AuthSession
+from app.schemas.auth import AuthSession, SelectableRole
 from app.services.email_service import send_password_reset_code
 
 
@@ -84,13 +89,28 @@ def oauth_login(db: Session, *, credential: str) -> IssuedAuthSession:
 
 
 def select_role(
-    db: Session, *, account: Account, role: AccountRole, session_id: str
+    db: Session, *, account: Account, role: SelectableRole, session_id: str
 ) -> AuthSession:
-    account.role = role
-    db.add(account)
-    db.commit()
-    db.refresh(account)
-    return _auth_payload(account, session_id)
+    try:
+        selected_role = AccountRole(SelectableRole(role).value)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Role must be Student or HR.",
+        ) from exc
+
+    selected_account = set_role_if_unset(
+        db,
+        account_id=account.account_id,
+        role=selected_role,
+    )
+    if selected_account is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Role has already been selected for this account.",
+        )
+
+    return _auth_payload(selected_account, session_id)
 
 
 def refresh(db: Session, *, refresh_token: str) -> IssuedAuthSession:
