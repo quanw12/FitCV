@@ -217,16 +217,18 @@ def _audience_item(
     last_sent=None,
     blocked_reason: str | None = None,
 ) -> EmailAudienceItem:
-    if blocked_reason is None:
-        if not candidate.email:
-            blocked_reason = "Missing candidate email."
-        elif pending is not None:
-            blocked_reason = "Draft already pending."
     already_emailed = bool(
         last_sent is not None
         and last_sent.template_key == template_key
         and last_sent.stage_at_generation in {None, application.current_stage}
     )
+    if blocked_reason is None:
+        if not candidate.email:
+            blocked_reason = "Missing candidate email."
+        elif pending is not None:
+            blocked_reason = "Draft already pending."
+        elif already_emailed:
+            blocked_reason = "Already emailed for this stage."
     return EmailAudienceItem(
         application_id=application.application_id,
         candidate_name=candidate.full_name or "Candidate",
@@ -342,13 +344,24 @@ def audience(
     *,
     stage: str,
     job_id: int | None = None,
+    template_key: str | None = None,
 ) -> EmailAudienceResponse:
     company_id = _company_id(account)
-    template_key = STAGE_TEMPLATES[stage]
+    selected_template_key = template_key or STAGE_TEMPLATES[stage]
+    selected_template = _template(selected_template_key)
+    if (
+        selected_template.allowed_stages is not None
+        and stage not in selected_template.allowed_stages
+    ):
+        raise HTTPException(
+            status_code=422,
+            detail=f"The {selected_template.name} template is not available for {stage}.",
+        )
     rows = email_workflow.audience_rows(
         db,
         company_id,
         stage=stage,
+        template_key=selected_template_key,
         job_id=job_id,
     )
     application_ids = [row[0].application_id for row in rows]
@@ -356,7 +369,7 @@ def audience(
         db,
         company_id=company_id,
         application_ids=application_ids,
-        template_key=template_key,
+        template_key=selected_template_key,
     )
     eligible: list[EmailAudienceItem] = []
     blocked: list[EmailAudienceItem] = []
@@ -366,14 +379,14 @@ def audience(
             candidate=candidate,
             job=job,
             match=match,
-            template_key=template_key,
+            template_key=selected_template_key,
             pending=pending.get(application.application_id),
             last_sent=last_sent,
         )
         (blocked if item.blocked_reason else eligible).append(item)
     return EmailAudienceResponse(
         stage=stage,
-        template_key=template_key,
+        template_key=selected_template_key,
         job_id=job_id,
         eligible=eligible,
         blocked=blocked,
@@ -434,13 +447,25 @@ def generate_campaign(
                 ),
             )
 
+    target_stage = (
+        next(iter(active_stages))
+        if active_stages
+        else rows[0][0].current_stage
+    )
+
     pending = email_workflow.pending_initial_drafts(
         db,
         company_id=company_id,
         application_ids=requested_ids,
         template_key=payload.template_key,
     )
-    sent = email_workflow.sent_email_summary(db, company_id, requested_ids)
+    sent = email_workflow.sent_email_summary(
+        db,
+        company_id,
+        requested_ids,
+        template_key=payload.template_key,
+        stage=target_stage,
+    )
     eligible_rows = []
     skipped: list[EmailAudienceItem] = []
     for row in rows:
@@ -452,6 +477,11 @@ def generate_campaign(
             blocked_reason = "Missing candidate email."
         elif application.application_id in pending:
             blocked_reason = "Draft already pending."
+        elif (
+            not payload.allow_resend
+            and application.application_id in sent
+        ):
+            blocked_reason = "Already emailed for this stage."
         if blocked_reason:
             skipped.append(
                 _audience_item(
@@ -469,14 +499,24 @@ def generate_campaign(
             eligible_rows.append(row)
 
     if not eligible_rows:
-        reason = skipped[0].blocked_reason if skipped else "No eligible recipients."
+        conflict_reasons = {
+            "Draft already pending.",
+            "Already emailed for this stage.",
+        }
+        reason = next(
+            (
+                item.blocked_reason
+                for item in skipped
+                if item.blocked_reason in conflict_reasons
+            ),
+            skipped[0].blocked_reason if skipped else "No eligible recipients.",
+        )
         raise HTTPException(
-            status_code=409 if pending else 422,
+            status_code=409 if reason in conflict_reasons else 422,
             detail=f"No eligible recipients. {reason}",
         )
 
     representative = eligible_rows[0] if eligible_rows else rows[0]
-    target_stage = representative[0].current_stage
     company_name = representative[3].company_name
     hr_name = account.full_name or "Recruiting Team"
     account_id = account.account_id
@@ -628,12 +668,20 @@ def generate_campaign(
         application_ids=list(locked_states),
         template_key=payload.template_key,
     )
+    raced_sent = email_workflow.sent_email_summary(
+        db,
+        company_id,
+        list(locked_states),
+        template_key=payload.template_key,
+        stage=target_stage,
+    )
     filtered_drafts: list[dict] = []
     for rendered_draft in rendered_drafts:
         application_id = int(rendered_draft["application_id"])
         expected_stage = str(rendered_draft["stage_at_generation"])
         state = locked_states.get(application_id)
         pending_draft = raced_pending.get(application_id)
+        sent_email = raced_sent.get(application_id)
         blocked_reason = None
         if state is None:
             blocked_reason = "Application is no longer available to this company."
@@ -646,12 +694,21 @@ def generate_campaign(
             )
         elif pending_draft is not None:
             blocked_reason = "Draft already pending."
+        elif not payload.allow_resend and sent_email is not None:
+            blocked_reason = "Already emailed for this stage."
         if blocked_reason is not None:
             skipped.append(
                 eligible_audience_items[application_id].model_copy(
                     update={
                         "pending_draft_email_id": (
                             pending_draft.email_id if pending_draft else None
+                        ),
+                        "already_emailed_for_stage": sent_email is not None,
+                        "last_email_template_key": (
+                            sent_email.template_key if sent_email else None
+                        ),
+                        "last_email_sent_at": (
+                            sent_email.sent_at if sent_email else None
                         ),
                         "blocked_reason": blocked_reason,
                     }

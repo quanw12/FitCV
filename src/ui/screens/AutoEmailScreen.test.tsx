@@ -10,10 +10,15 @@ import type {
 
 const emailMocks = vi.hoisted(() => ({
   listTemplates: vi.fn(),
+
   listDrafts: vi.fn(),
+
   listAudience: vi.fn(),
+
   createCampaign: vi.fn(),
+
   generate: vi.fn(),
+
   update: vi.fn(),
 
   approve: vi.fn(),
@@ -49,13 +54,21 @@ const draft: CandidateEmailDraft = {
   email_id: 7,
 
   application_id: 4,
+
   thread_id: 2,
+
   campaign_id: 11,
+
   template_key: "shortlist",
+
   message_kind: "Initial",
+
   stage_at_generation: "Screening",
+
   current_stage: "Screening",
+
   stage_changed_since_generation: false,
+
   candidate_name: "Nguyen Minh",
 
   job_title: "Backend Engineer",
@@ -99,31 +112,52 @@ const draft: CandidateEmailDraft = {
 
 const audienceItem: EmailAudienceItem = {
   application_id: 4,
+
   candidate_name: "Nguyen Minh",
+
   candidate_email: "minh@example.com",
+
   job_id: 2,
+
   job_title: "Backend Engineer",
+
   current_stage: "Screening",
+
   applied_at: "2026-07-23T08:00:00Z",
+
   overall_score: 88,
+
   match_label: "Strong Match",
+
   has_email_address: true,
+
   last_email_template_key: null,
+
   last_email_sent_at: null,
+
   already_emailed_for_stage: false,
+
   pending_draft_email_id: null,
+
   blocked_reason: null,
 }
 
 const audienceResponse = (
   stage: EmailStage,
+
   eligible: EmailAudienceItem[] = [{ ...audienceItem, current_stage: stage }],
+
+  blocked: EmailAudienceItem[] = [],
 ) => ({
   stage,
+
   template_key: stage === "Rejected" ? "rejection" : "shortlist",
+
   job_id: null,
+
   eligible,
-  blocked: [],
+
+  blocked,
 })
 
 describe("AutoEmailScreen", () => {
@@ -133,17 +167,38 @@ describe("AutoEmailScreen", () => {
     emailMocks.listTemplates.mockResolvedValue([
       {
         key: "shortlist",
+
         name: "Shortlist notification",
+
         description: "Invite a promising candidate to continue.",
+
         allowed_stages: ["Screening"],
+
         default_stage: "Screening",
       },
+
       {
         key: "rejection",
+
         name: "Rejection",
+
         description: "Close a candidate application respectfully.",
+
         allowed_stages: ["Rejected"],
+
         default_stage: "Rejected",
+      },
+
+      {
+        key: "follow_up",
+
+        name: "Follow-up",
+
+        description: "Send a general stage follow-up.",
+
+        allowed_stages: null,
+
+        default_stage: "Screening",
       },
     ])
 
@@ -176,22 +231,35 @@ describe("AutoEmailScreen", () => {
     ])
 
     emailMocks.listDrafts.mockResolvedValue([])
+
     emailMocks.listAudience.mockImplementation((stage: EmailStage) =>
       Promise.resolve(audienceResponse(stage)),
     )
+
     emailMocks.listThreads.mockResolvedValue([])
+
     emailMocks.generate.mockResolvedValue(draft)
+
     emailMocks.createCampaign.mockResolvedValue({
       campaign_id: 11,
+
       template_key: "shortlist",
+
       target_stage: "Screening",
+
       interview_date: null,
+
       ai_generated: true,
+
       recipient_count: 1,
+
       shared_body_skeleton: "Dear {{candidate_name}},\n\nShared campaign body",
+
       drafts: [draft],
+
       skipped: [],
     })
+
     emailMocks.update.mockImplementation(
       (_id: number, subject: string, body: string) =>
         Promise.resolve({ ...draft, subject, body }),
@@ -230,11 +298,15 @@ describe("AutoEmailScreen", () => {
 
   it("generates a draft but does not send before HR approval", async () => {
     render(<AutoEmailScreen />)
+
     const selectAll = await screen.findByRole("button", {
       name: "Select all eligible",
     })
+
     await waitFor(() => expect(selectAll).toBeEnabled())
+
     fireEvent.click(selectAll)
+
     fireEvent.click(
       screen.getByRole("button", { name: "Generate for 1 candidate" }),
     )
@@ -244,15 +316,103 @@ describe("AutoEmailScreen", () => {
         "AI draft created. Review and edit it before approving.",
       ),
     ).toBeInTheDocument()
+
     expect(screen.getByRole("button", { name: "Approve draft" })).toBeEnabled()
+
     expect(emailMocks.createCampaign).toHaveBeenCalledWith({
       application_ids: [4],
       template_key: "shortlist",
+      allow_resend: false,
       guidance: "",
       interview_lead_days: 3,
       interview_window: "09:00-17:00 ICT",
     })
+
     expect(emailMocks.send).not.toHaveBeenCalled()
+  })
+
+  it("only allows explicit same-stage resends and clears them when disabled", async () => {
+    const alreadySent: EmailAudienceItem = {
+      ...audienceItem,
+      application_id: 5,
+      candidate_name: "Already Sent",
+      last_email_template_key: "shortlist",
+      last_email_sent_at: "2026-07-22T08:00:00Z",
+      already_emailed_for_stage: true,
+      blocked_reason: "Already emailed for this stage.",
+    }
+    const missingEmail: EmailAudienceItem = {
+      ...audienceItem,
+      application_id: 6,
+      candidate_name: "Missing Email",
+      candidate_email: "",
+      has_email_address: false,
+      blocked_reason: "Missing candidate email.",
+    }
+    const pendingDraft: EmailAudienceItem = {
+      ...audienceItem,
+      application_id: 7,
+      candidate_name: "Pending Draft",
+      pending_draft_email_id: 77,
+      blocked_reason: "Draft already pending.",
+    }
+    emailMocks.listAudience.mockImplementation((stage: EmailStage) =>
+      Promise.resolve(
+        audienceResponse(
+          stage,
+          [{ ...audienceItem, current_stage: stage }],
+          [alreadySent, missingEmail, pendingDraft].map((item) => ({
+            ...item,
+            current_stage: stage,
+          })),
+        ),
+      ),
+    )
+
+    render(<AutoEmailScreen />)
+    const allowResend = await screen.findByRole("checkbox", {
+      name: "Allow resend to candidates already emailed for this stage",
+    })
+    const alreadySentCheckbox = await screen.findByRole("checkbox", {
+      name: "Select Already Sent",
+    })
+    const missingEmailCheckbox = screen.getByRole("checkbox", {
+      name: "Select Missing Email",
+    })
+    const pendingDraftCheckbox = screen.getByRole("checkbox", {
+      name: "Select Pending Draft",
+    })
+    expect(allowResend).not.toBeChecked()
+    expect(alreadySentCheckbox).toBeDisabled()
+    expect(missingEmailCheckbox).toBeDisabled()
+    expect(pendingDraftCheckbox).toBeDisabled()
+
+    fireEvent.click(allowResend)
+    expect(allowResend).toBeChecked()
+    expect(alreadySentCheckbox).toBeEnabled()
+    expect(missingEmailCheckbox).toBeDisabled()
+    expect(pendingDraftCheckbox).toBeDisabled()
+    fireEvent.click(alreadySentCheckbox)
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: "Select Nguyen Minh" }),
+    )
+    expect(alreadySentCheckbox).toBeChecked()
+
+    fireEvent.click(allowResend)
+    expect(allowResend).not.toBeChecked()
+    expect(alreadySentCheckbox).not.toBeChecked()
+    fireEvent.click(
+      screen.getByRole("button", { name: "Generate for 1 candidate" }),
+    )
+
+    await waitFor(() => {
+      expect(emailMocks.createCampaign).toHaveBeenCalledWith(
+        expect.objectContaining({
+          application_ids: [4],
+          allow_resend: false,
+        }),
+      )
+    })
   })
 
   it("warns when the active draft recipient email is invalid", async () => {
@@ -275,14 +435,19 @@ describe("AutoEmailScreen", () => {
 
   it("enforces approve then send and confirms delivery", async () => {
     render(<AutoEmailScreen />)
+
     const selectAll = await screen.findByRole("button", {
       name: "Select all eligible",
     })
+
     await waitFor(() => expect(selectAll).toBeEnabled())
+
     fireEvent.click(selectAll)
+
     fireEvent.click(
       screen.getByRole("button", { name: "Generate for 1 candidate" }),
     )
+
     fireEvent.click(
       await screen.findByRole("button", { name: "Approve draft" }),
     )
@@ -302,6 +467,7 @@ describe("AutoEmailScreen", () => {
 
   it("shows an empty tracking state", async () => {
     pipelineMocks.list.mockResolvedValue([])
+
     emailMocks.listAudience.mockImplementation((stage: EmailStage) =>
       Promise.resolve(audienceResponse(stage, [])),
     )
@@ -309,6 +475,7 @@ describe("AutoEmailScreen", () => {
     render(<AutoEmailScreen />)
 
     expect(await screen.findByText("No email records yet")).toBeInTheDocument()
+
     expect(
       screen.getByRole("button", { name: "Generate for 0 candidates" }),
     ).toBeDisabled()
@@ -322,9 +489,13 @@ describe("AutoEmailScreen", () => {
       .mockResolvedValueOnce([
         {
           key: "shortlist",
+
           name: "Shortlist notification",
+
           description: "Invite a candidate.",
+
           allowed_stages: ["Screening"],
+
           default_stage: "Screening",
         },
       ])
@@ -381,15 +552,21 @@ describe("AutoEmailScreen", () => {
   it("loads the Rejected audience when HR selects that stage", async () => {
     const second = {
       ...audienceItem,
+
       application_id: 5,
+
       candidate_name: "Tran Ha",
+
       candidate_email: "ha@example.com",
+
       current_stage: "Rejected" as const,
     }
+
     emailMocks.listAudience.mockImplementation((stage: EmailStage) =>
       Promise.resolve(
         audienceResponse(
           stage,
+
           stage === "Rejected"
             ? [{ ...audienceItem, current_stage: "Rejected" }, second]
             : [{ ...audienceItem, current_stage: stage }],
@@ -398,32 +575,61 @@ describe("AutoEmailScreen", () => {
     )
 
     render(<AutoEmailScreen />)
+
     fireEvent.click(await screen.findByRole("button", { name: /Rejected/ }))
 
     await waitFor(() => {
       expect(emailMocks.listAudience).toHaveBeenCalledWith(
         "Rejected",
+
         undefined,
+
+        "rejection",
       )
     })
+
     expect(await screen.findByText("Tran Ha")).toBeInTheDocument()
+  })
+
+  it("reloads the audience for the template currently selected", async () => {
+    render(<AutoEmailScreen />)
+
+    fireEvent.change(
+      await screen.findByRole("combobox", { name: "Template" }),
+      { target: { value: "follow_up" } },
+    )
+
+    await waitFor(() => {
+      expect(emailMocks.listAudience).toHaveBeenCalledWith(
+        "Screening",
+        undefined,
+        "follow_up",
+      )
+    })
   })
 
   it("selects the eligible audience and generates one rejection campaign", async () => {
     const recipients = [
       { ...audienceItem, current_stage: "Rejected" as const },
+
       {
         ...audienceItem,
+
         application_id: 5,
+
         candidate_name: "Tran Ha",
+
         candidate_email: "ha@example.com",
+
         current_stage: "Rejected" as const,
       },
     ]
+
     emailMocks.listAudience.mockImplementation((stage: EmailStage) =>
       Promise.resolve(
         audienceResponse(
           stage,
+
           stage === "Rejected"
             ? recipients
             : [{ ...audienceItem, current_stage: stage }],
@@ -432,12 +638,17 @@ describe("AutoEmailScreen", () => {
     )
 
     render(<AutoEmailScreen />)
+
     fireEvent.click(await screen.findByRole("button", { name: /Rejected/ }))
+
     const selectAll = await screen.findByRole("button", {
       name: "Select all eligible",
     })
+
     await waitFor(() => expect(selectAll).toBeEnabled())
+
     fireEvent.click(selectAll)
+
     fireEvent.click(
       screen.getByRole("button", { name: "Generate for 2 candidates" }),
     )
@@ -446,6 +657,7 @@ describe("AutoEmailScreen", () => {
       expect(emailMocks.createCampaign).toHaveBeenCalledWith(
         expect.objectContaining({
           application_ids: [4, 5],
+
           template_key: "rejection",
         }),
       )
@@ -462,6 +674,7 @@ describe("AutoEmailScreen", () => {
     expect(
       await screen.findByText("No candidates in Screening"),
     ).toBeInTheDocument()
+
     expect(
       screen.getByRole("button", { name: "Generate for 0 candidates" }),
     ).toBeDisabled()
@@ -471,9 +684,13 @@ describe("AutoEmailScreen", () => {
     emailMocks.listDrafts.mockResolvedValue([
       {
         ...draft,
+
         status: "Approved",
+
         stage_at_generation: "Rejected",
+
         current_stage: "Interview",
+
         stage_changed_since_generation: true,
       },
     ])
@@ -481,6 +698,7 @@ describe("AutoEmailScreen", () => {
     render(<AutoEmailScreen />)
 
     expect(await screen.findAllByText("Stage changed")).not.toHaveLength(0)
+
     expect(
       screen.getByRole("checkbox", {
         name: "Select email for Nguyen Minh",

@@ -250,6 +250,7 @@ class EmailAudienceResponse(BaseModel):
 class CampaignGenerateRequest(BaseModel):
     application_ids: list[int] = Field(min_length=1, max_length=50)
     template_key: str = Field(min_length=1, max_length=50)
+    allow_resend: bool = False
     guidance: str | None = Field(default=None, max_length=2000)
     interview_lead_days: int = Field(default=3, ge=1, le=30)
     interview_window: str | None = Field(default=None, max_length=120)

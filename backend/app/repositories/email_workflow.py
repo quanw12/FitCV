@@ -67,6 +67,7 @@ def audience_rows(
     company_id: int,
     *,
     stage: str,
+    template_key: str,
     job_id: int | None = None,
 ):
     """Return a stage audience with latest match and last sent email in one query."""
@@ -79,6 +80,11 @@ def audience_rows(
         .where(
             CandidateEmail.company_id == company_id,
             CandidateEmail.status == "Sent",
+            CandidateEmail.template_key == template_key,
+            or_(
+                CandidateEmail.stage_at_generation.is_(None),
+                CandidateEmail.stage_at_generation == stage,
+            ),
         )
         .group_by(CandidateEmail.application_id)
         .subquery()
@@ -449,6 +455,9 @@ def sent_email_summary(
     db: Session,
     company_id: int,
     application_ids: list[int],
+    *,
+    template_key: str,
+    stage: str,
 ) -> dict[int, CandidateEmail]:
     ids = list(dict.fromkeys(application_ids))
     if not ids:
@@ -462,6 +471,11 @@ def sent_email_summary(
             CandidateEmail.company_id == company_id,
             CandidateEmail.application_id.in_(ids),
             CandidateEmail.status == "Sent",
+            CandidateEmail.template_key == template_key,
+            or_(
+                CandidateEmail.stage_at_generation.is_(None),
+                CandidateEmail.stage_at_generation == stage,
+            ),
         )
         .group_by(CandidateEmail.application_id)
         .subquery()

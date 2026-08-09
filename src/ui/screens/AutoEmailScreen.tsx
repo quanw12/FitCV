@@ -14,68 +14,110 @@ import {
 } from "@phosphor-icons/react"
 
 import { emailWorkflowApi } from "@/api/emailWorkflowApi"
+
 import { pipelineApi } from "@/api/pipelineApi"
+
 import type {
   CampaignPreview,
   CandidateEmailDraft,
+  EmailAudienceItem,
   EmailAudienceResponse,
   EmailStage,
   EmailTemplate,
 } from "@/types/emailWorkflow"
+
 import type { PipelineApplication } from "@/types/pipeline"
+
 import SmartReplyPanel from "@/ui/components/SmartReplyPanel"
 
 const stages: EmailStage[] = [
   "Applied",
+
   "Screening",
+
   "Interview",
+
   "Offer",
+
   "Hired",
+
   "Rejected",
 ]
 
 const stageTemplates: Record<EmailStage, string> = {
   Applied: "confirmation",
+
   Screening: "shortlist",
+
   Interview: "interview",
+
   Offer: "offer_discussion",
+
   Hired: "onboarding_welcome",
+
   Rejected: "rejection",
 }
 
+const SAME_STAGE_RESEND_REASON = "Already emailed for this stage."
+
+const isResendableBlocked = (item: EmailAudienceItem) =>
+  item.already_emailed_for_stage &&
+  item.blocked_reason === SAME_STAGE_RESEND_REASON &&
+  item.pending_draft_email_id == null &&
+  item.has_email_address
+
 const stageColors: Record<EmailStage, {
   dot: string
+
   text: string
+
   soft: string
 }> = {
   Applied: {
     dot: "var(--text-muted)",
+
     text: "var(--text-secondary)",
+
     soft: "var(--gray-soft)",
   },
+
   Screening: {
     dot: "var(--accent)",
+
     text: "var(--accent-ink)",
+
     soft: "var(--accent-soft)",
   },
+
   Interview: {
     dot: "var(--warning)",
+
     text: "#92400e",
+
     soft: "var(--warning-soft)",
   },
+
   Offer: {
     dot: "var(--accent)",
+
     text: "var(--accent-ink)",
+
     soft: "var(--accent-soft)",
   },
+
   Hired: {
     dot: "var(--success)",
+
     text: "var(--success)",
+
     soft: "var(--success-soft)",
   },
+
   Rejected: {
     dot: "var(--danger)",
+
     text: "var(--danger)",
+
     soft: "var(--danger-soft)",
   },
 }
@@ -110,29 +152,44 @@ const statusClass = (status: CandidateEmailDraft["status"]) => {
 
 export default function AutoEmailScreen() {
   const audienceRequestRef = useRef(0)
+
   const [templates, setTemplates] = useState<EmailTemplate[]>([])
 
   const [applications, setApplications] = useState<PipelineApplication[]>([])
 
   const [drafts, setDrafts] = useState<CandidateEmailDraft[]>([])
+
   const [templateKey, setTemplateKey] = useState("")
+
   const [stage, setStage] = useState<EmailStage>("Applied")
+
   const [jobId, setJobId] = useState<number | undefined>()
+
   const [audience, setAudience] = useState<EmailAudienceResponse | null>(null)
+
   const [audienceSelection, setAudienceSelection] = useState<number[]>([])
+
   const [audienceLoading, setAudienceLoading] = useState(false)
+
   const [audienceError, setAudienceError] = useState("")
+
   const [campaignPreview, setCampaignPreview] =
     useState<CampaignPreview | null>(null)
+
   const [interviewLeadDays, setInterviewLeadDays] = useState(3)
+
   const [interviewWindow, setInterviewWindow] = useState("09:00-17:00 ICT")
+
   const [activeDraft, setActiveDraft] = useState<CandidateEmailDraft | null>(
     null,
   )
 
   const [subject, setSubject] = useState("")
+
   const [body, setBody] = useState("")
+
   const [guidance, setGuidance] = useState("")
+  const [allowResend, setAllowResend] = useState(false)
   const [bulkSelection, setBulkSelection] = useState<number[]>([])
 
   const [loading, setLoading] = useState(true)
@@ -175,16 +232,20 @@ export default function AutoEmailScreen() {
       setApplications(nextApplications)
 
       setDrafts(nextDrafts)
+
       const sendableIds = new Set(
         nextDrafts
+
           .filter(
             (draft) =>
               !draft.stage_changed_since_generation &&
               (draft.status === "Approved" ||
                 (draft.status === "Failed" && draft.retryable)),
           )
+
           .map((draft) => draft.email_id),
       )
+
       setBulkSelection((current) =>
         current.filter((emailId) => sendableIds.has(emailId)),
       )
@@ -194,8 +255,11 @@ export default function AutoEmailScreen() {
         (stages.includes(nextApplications[0]?.current_stage as EmailStage)
           ? nextApplications[0].current_stage as EmailStage
           : "Applied")
+
       setStage(firstStage)
+
       const mappedTemplate = stageTemplates[firstStage]
+
       setTemplateKey(
         nextTemplates.some((template) => template.key === mappedTemplate)
           ? mappedTemplate
@@ -229,29 +293,46 @@ export default function AutoEmailScreen() {
 
   const loadAudience = useCallback(async () => {
     if (loading) return
+
     const requestId = ++audienceRequestRef.current
+
     setAudienceLoading(true)
+
     setAudienceError("")
+
     try {
-      const nextAudience = await emailWorkflowApi.listAudience(stage, jobId)
+      const nextAudience = await emailWorkflowApi.listAudience(
+        stage,
+        jobId,
+        templateKey,
+      )
+
       if (requestId !== audienceRequestRef.current) return
+
       setAudience(nextAudience)
+
       setAudienceSelection((current) =>
         current.filter((id) =>
-          nextAudience.eligible.some((item) => item.application_id === id),
+          [
+            ...nextAudience.eligible,
+            ...nextAudience.blocked.filter(isResendableBlocked),
+          ].some((item) => item.application_id === id),
         ),
       )
     } catch (cause) {
       if (requestId !== audienceRequestRef.current) return
+
       setAudience(null)
+
       setAudienceSelection([])
+
       setAudienceError(errorMessage(cause, "Could not load this audience."))
     } finally {
       if (requestId === audienceRequestRef.current) {
         setAudienceLoading(false)
       }
     }
-  }, [jobId, loading, stage])
+  }, [jobId, loading, stage, templateKey])
 
   useEffect(() => {
     void loadAudience()
@@ -273,9 +354,11 @@ export default function AutoEmailScreen() {
 
   const jobOptions = useMemo(() => {
     const jobs = new Map<number, string>()
+
     applications.forEach((application) =>
       jobs.set(application.job_id, application.job_title),
     )
+
     return [...jobs.entries()].sort((left, right) =>
       left[1].localeCompare(right[1]),
     )
@@ -284,15 +367,28 @@ export default function AutoEmailScreen() {
   const selectedTemplate = templates.find(
     (template) => template.key === templateKey,
   )
+
   const requiresInterviewDate = templateKey === "interview"
+  const selectableAudience = [
+    ...(audience?.eligible ?? []),
+    ...(allowResend
+      ? (audience?.blocked.filter(isResendableBlocked) ?? [])
+      : []),
+  ]
 
   const chooseStage = (nextStage: EmailStage) => {
     audienceRequestRef.current += 1
+
     setStage(nextStage)
+
     setAudience(null)
+
     setAudienceSelection([])
+    setAllowResend(false)
     setCampaignPreview(null)
+
     const mappedTemplate = stageTemplates[nextStage]
+
     const nextTemplate =
       templates.find((template) => template.key === mappedTemplate) ??
       templates.find(
@@ -300,6 +396,7 @@ export default function AutoEmailScreen() {
           template.allowed_stages == null ||
           template.allowed_stages.includes(nextStage),
       )
+
     setTemplateKey(nextTemplate?.key ?? "")
   }
 
@@ -321,20 +418,29 @@ export default function AutoEmailScreen() {
 
   const generate = async () => {
     if (audienceSelection.length === 0 || !templateKey || generating) return
+
     setGenerating(true)
+
     setError("")
+
     setSuccess("")
+
     try {
       const created = await emailWorkflowApi.createCampaign({
         application_ids: audienceSelection,
         template_key: templateKey,
+        allow_resend: allowResend,
         guidance,
         interview_lead_days: interviewLeadDays,
+
         interview_window: interviewWindow,
       })
+
       setCampaignPreview(created)
+
       setDrafts((current) => [
         ...created.drafts,
+
         ...current.filter(
           (draft) =>
             !created.drafts.some(
@@ -342,9 +448,12 @@ export default function AutoEmailScreen() {
             ),
         ),
       ])
+
       selectDraft(created.drafts[0] ?? null)
       setAudienceSelection([])
+      setAllowResend(false)
       await loadAudience()
+
       setSuccess("AI draft created. Review and edit it before approving.")
     } catch (cause) {
       setError(errorMessage(cause, "Could not generate this email campaign."))
@@ -527,10 +636,12 @@ export default function AutoEmailScreen() {
   ).length
 
   const sentCount = drafts.filter((draft) => draft.status === "Sent").length
+
   const stageCounts = useMemo(() => {
     const counts = Object.fromEntries(
       stages.map((item) => [item, 0]),
     ) as Record<EmailStage, number>
+
     applications.forEach((application) => {
       if (
         stages.includes(application.current_stage as EmailStage) &&
@@ -539,25 +650,31 @@ export default function AutoEmailScreen() {
         counts[(application.current_stage as EmailStage)] += 1
       }
     })
+
     return counts
   }, [applications, jobId])
 
   const campaignGroups = useMemo(() => {
     const grouped = new Map<string, CandidateEmailDraft[]>()
+
     drafts.forEach((draft) => {
       const key =
         draft.campaign_id == null
           ? `individual-${draft.email_id}`
           : `campaign-${draft.campaign_id}`
+
       grouped.set(key, [...(grouped.get(key) ?? []), draft])
     })
+
     return [...grouped.entries()]
   }, [drafts])
 
   const templateName = (key: string) =>
     templates.find((template) => template.key === key)?.name ??
     key
+
       .replace(/_/g, " ")
+
       .replace(/^./, (letter: string) => letter.toUpperCase())
 
   return (
@@ -670,13 +787,16 @@ export default function AutoEmailScreen() {
                   value={jobId ?? ""}
                   onChange={(event) => {
                     audienceRequestRef.current += 1
+
                     setJobId(
                       event.target.value
                         ? Number(event.target.value)
                         : undefined,
                     )
+
                     setAudience(null)
                     setAudienceSelection([])
+                    setAllowResend(false)
                   }}
                 >
                   <option value="">All jobs</option>
@@ -701,7 +821,9 @@ export default function AutoEmailScreen() {
                 >
                   {stages.map((item) => {
                     const colors = stageColors[item]
+
                     const active = stage === item
+
                     return (
                       <button
                         key={item}
@@ -711,7 +833,9 @@ export default function AutoEmailScreen() {
                         onClick={() => chooseStage(item)}
                         style={{
                           color: colors.text,
+
                           background: active ? colors.soft : "var(--surface)",
+
                           borderColor: active ? colors.dot : "var(--border)",
                         }}
                       >
@@ -740,12 +864,10 @@ export default function AutoEmailScreen() {
                     <button
                       type="button"
                       className="fc-btn fc-btn--secondary"
-                      disabled={!audience?.eligible.length}
+                      disabled={selectableAudience.length === 0}
                       onClick={() =>
                         setAudienceSelection(
-                          audience?.eligible.map(
-                            (item) => item.application_id,
-                          ) ?? [],
+                          selectableAudience.map((item) => item.application_id),
                         )
                       }
                     >
@@ -837,34 +959,53 @@ export default function AutoEmailScreen() {
                             </td>
                           </tr>
                         ))}
-                        {audience?.blocked.map((item) => (
-                          <tr key={item.application_id} className="is-blocked">
-                            <td>
-                              <input
-                                type="checkbox"
-                                disabled
-                                aria-label={`Select ${item.candidate_name}`}
-                              />
-                            </td>
-                            <td>
-                              <strong>{item.candidate_name}</strong>
-                              <small>
-                                {item.candidate_email || "No email"}
-                              </small>
-                            </td>
-                            <td>{item.job_title}</td>
-                            <td>
-                              {item.overall_score == null
-                                ? "Pending"
-                                : Math.round(item.overall_score)}
-                            </td>
-                            <td>
-                              <span className="fc-badge fc-badge--red">
-                                {item.blocked_reason ?? "Unavailable"}
-                              </span>
-                            </td>
-                          </tr>
-                        ))}
+                        {audience?.blocked.map((item) => {
+                          const resendable =
+                            allowResend && isResendableBlocked(item)
+                          return (
+                            <tr
+                              key={item.application_id}
+                              className={resendable ? undefined : "is-blocked"}
+                            >
+                              <td>
+                                <input
+                                  type="checkbox"
+                                  disabled={!resendable}
+                                  aria-label={`Select ${item.candidate_name}`}
+                                  checked={audienceSelection.includes(
+                                    item.application_id,
+                                  )}
+                                  onChange={(event) =>
+                                    setAudienceSelection((current) =>
+                                      event.target.checked
+                                        ? [...current, item.application_id]
+                                        : current.filter(
+                                            (id) => id !== item.application_id,
+                                          ),
+                                    )
+                                  }
+                                />
+                              </td>
+                              <td>
+                                <strong>{item.candidate_name}</strong>
+                                <small>
+                                  {item.candidate_email || "No email"}
+                                </small>
+                              </td>
+                              <td>{item.job_title}</td>
+                              <td>
+                                {item.overall_score == null
+                                  ? "Pending"
+                                  : Math.round(item.overall_score)}
+                              </td>
+                              <td>
+                                <span className="fc-badge fc-badge--red">
+                                  {item.blocked_reason ?? "Unavailable"}
+                                </span>
+                              </td>
+                            </tr>
+                          )
+                        })}
                       </tbody>
                     </table>
                   </div>
@@ -886,12 +1027,18 @@ export default function AutoEmailScreen() {
                     <select
                       className="fc-input"
                       value={templateKey}
-                      onChange={(event) => setTemplateKey(event.target.value)}
+                      onChange={(event) => {
+                        setTemplateKey(event.target.value)
+                        setAudienceSelection([])
+                        setAllowResend(false)
+                        setCampaignPreview(null)
+                      }}
                     >
                       {templates.map((template) => {
                         const allowed =
                           template.allowed_stages == null ||
                           template.allowed_stages.includes(stage)
+
                         return (
                           <option
                             key={template.key}
@@ -940,6 +1087,36 @@ export default function AutoEmailScreen() {
                       </label>
                     </>
                   )}
+                  <label
+                    style={{
+                      display: "flex",
+                      alignItems: "flex-start",
+                      gap: 8,
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      aria-label="Allow resend to candidates already emailed for this stage"
+                      checked={allowResend}
+                      onChange={(event) => {
+                        const nextValue = event.target.checked
+                        setAllowResend(nextValue)
+                        if (!nextValue) {
+                          const overrideIds = new Set(
+                            (audience?.blocked ?? [])
+                              .filter(isResendableBlocked)
+                              .map((item) => item.application_id),
+                          )
+                          setAudienceSelection((current) =>
+                            current.filter((id) => !overrideIds.has(id)),
+                          )
+                        }
+                      }}
+                    />
+                    <span>
+                      Allow resend to candidates already emailed for this stage
+                    </span>
+                  </label>
                   <label className="email-campaign-guidance">
                     <span className="fc-field-label">
                       Candidate-visible guidance (optional)
@@ -1520,12 +1697,15 @@ export default function AutoEmailScreen() {
                       (draft.status === "Approved" ||
                         (draft.status === "Failed" && draft.retryable)),
                   )
+
                   const selectedCount = sendable.filter((draft) =>
                     bulkSelection.includes(draft.email_id),
                   ).length
+
                   const sent = groupDrafts.filter(
                     (draft) => draft.status === "Sent",
                   ).length
+
                   const firstDraft = groupDrafts[0]
 
                   return (
@@ -1544,6 +1724,7 @@ export default function AutoEmailScreen() {
                           aria-label={`Select ${templateName(firstDraft.template_key)} campaign`}
                           onChange={(event) => {
                             const ids = sendable.map((draft) => draft.email_id)
+
                             setBulkSelection((current) =>
                               event.target.checked
                                 ? [...new Set([...current, ...ids])]
@@ -1567,8 +1748,10 @@ export default function AutoEmailScreen() {
                             !draft.stage_changed_since_generation &&
                             (draft.status === "Approved" ||
                               (draft.status === "Failed" && draft.retryable))
+
                           const active =
                             activeDraft?.email_id === draft.email_id
+
                           return (
                             <article
                               className={active ? "is-active" : undefined}
@@ -1585,6 +1768,7 @@ export default function AutoEmailScreen() {
                                       ? [
                                           ...new Set([
                                             ...current,
+
                                             draft.email_id,
                                           ]),
                                         ]
