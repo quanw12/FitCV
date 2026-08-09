@@ -11,10 +11,10 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
-    func,
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
+from app.core.datetime_utils import utc_now_naive
 from app.db.session import Base
 from app.models.analyzer import ID_TYPE
 
@@ -51,16 +51,16 @@ class CandidateEmailThread(Base):
     reply_token: Mapped[str] = mapped_column(String(36), nullable=False)
     subject: Mapped[str | None] = mapped_column(String(300), nullable=True)
     last_message_at: Mapped[datetime] = mapped_column(
-        DateTime, server_default=func.now(), nullable=False
+        DateTime, default=utc_now_naive, nullable=False
     )
     last_inbound_at: Mapped[datetime | None] = mapped_column(
         DateTime, nullable=True
     )
     created_at: Mapped[datetime] = mapped_column(
-        DateTime, server_default=func.now(), nullable=False
+        DateTime, default=utc_now_naive, nullable=False
     )
     updated_at: Mapped[datetime | None] = mapped_column(
-        DateTime, onupdate=func.now(), nullable=True
+        DateTime, onupdate=utc_now_naive, nullable=True
     )
 
 
@@ -103,7 +103,7 @@ class CandidateEmailCampaign(Base):
         Boolean, default=True, server_default="1", nullable=False
     )
     created_at: Mapped[datetime] = mapped_column(
-        DateTime, server_default=func.now(), nullable=False
+        DateTime, default=utc_now_naive, nullable=False
     )
 
 
@@ -199,10 +199,10 @@ class CandidateEmail(Base):
     error_message: Mapped[str | None] = mapped_column(String(1000), nullable=True)
     sent_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime, server_default=func.now(), nullable=False
+        DateTime, default=utc_now_naive, nullable=False
     )
     updated_at: Mapped[datetime | None] = mapped_column(
-        DateTime, onupdate=func.now(), nullable=True
+        DateTime, onupdate=utc_now_naive, nullable=True
     )
 
 
@@ -253,7 +253,7 @@ class CandidateEmailInbound(Base):
     )
     received_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime, server_default=func.now(), nullable=False
+        DateTime, default=utc_now_naive, nullable=False
     )
 
 
@@ -291,5 +291,5 @@ class CandidateEmailEvent(Base):
     event_data_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     occurred_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime, server_default=func.now(), nullable=False
+        DateTime, default=utc_now_naive, nullable=False
     )

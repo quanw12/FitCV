@@ -30,7 +30,12 @@ def _cookie_samesite() -> str:
 
 def _require_allowed_origin(request: Request) -> None:
     origin = request.headers.get("origin")
-    if origin and origin.rstrip("/") not in {
+    if not origin:
+        if settings.environment == "prod":
+            raise HTTPException(status_code=403, detail="Request origin is not allowed.")
+        return
+
+    if origin.rstrip("/") not in {
         allowed.rstrip("/") for allowed in settings.cors_origins
     }:
         raise HTTPException(status_code=403, detail="Request origin is not allowed.")
@@ -121,9 +126,16 @@ def select_role(
     account: Account = Depends(get_current_account),
     db: Session = Depends(get_db),
 ) -> AuthSession:
+    _require_allowed_origin(request)
     session_id = getattr(request.state, "auth_session_id", None)
     if not session_id:
         raise HTTPException(status_code=401, detail="Authenticated session is missing.")
+    auth_rate_limit.consume(
+        db,
+        action="select_role",
+        request=request,
+        identifier=str(account.account_id),
+    )
     return auth_service.select_role(
         db, account=account, role=payload.role, session_id=session_id
     )

@@ -12,6 +12,7 @@ LIMITS: dict[str, tuple[int, int]] = {
     "login": (5, 15 * 60),
     "register": (5, 60 * 60),
     "google": (10, 15 * 60),
+    "select_role": (5, 60 * 60),
     "forgot-password": (5, 15 * 60),
     "verify-reset": (10, 15 * 60),
     "reset-password": (10, 15 * 60),

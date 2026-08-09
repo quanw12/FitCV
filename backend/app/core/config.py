@@ -1,9 +1,11 @@
 from pathlib import Path
-from typing import Literal
+from typing import Literal, Self
 
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 BACKEND_ROOT = Path(__file__).resolve().parents[2]
+INSECURE_JWT_SECRET = "change-me-before-production"
 
 
 class Settings(BaseSettings):
@@ -13,8 +15,9 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
+    environment: Literal["dev", "prod"] = "dev"
     database_url: str
-    jwt_secret_key: str = "change-me-before-production"
+    jwt_secret_key: str
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 15
     refresh_token_expire_days: int = 30
@@ -57,6 +60,25 @@ class Settings(BaseSettings):
         "http://127.0.0.1:5173",
         "https://fit-cv.vercel.app",
     ]
+
+    @model_validator(mode="after")
+    def validate_production_security(self) -> Self:
+        if self.environment != "prod":
+            return self
+
+        if not self.refresh_cookie_secure:
+            raise ValueError(
+                "REFRESH_COOKIE_SECURE must be true when ENVIRONMENT=prod."
+            )
+
+        jwt_secret = self.jwt_secret_key.strip()
+        if len(jwt_secret) < 32 or jwt_secret == INSECURE_JWT_SECRET:
+            raise ValueError(
+                "JWT_SECRET_KEY must be at least 32 characters and must not use "
+                "the default placeholder when ENVIRONMENT=prod."
+            )
+
+        return self
 
 
 settings = Settings()

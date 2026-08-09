@@ -8,6 +8,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
+from app.core.datetime_utils import utc_now_naive
 from app.repositories import email_workflow
 from app.schemas.email_workflow import EmailWebhookResponse
 from app.services.email_service import (
@@ -53,7 +54,7 @@ def _parse_timestamp(value: object) -> datetime:
             return parsed
         except ValueError:
             pass
-    return datetime.now(timezone.utc).replace(tzinfo=None)
+    return utc_now_naive()
 
 
 def _bare_email(value: object) -> str:

@@ -1,5 +1,6 @@
-import json
 import html
+import json
+import logging
 import re
 import time
 from collections.abc import Mapping
@@ -7,6 +8,8 @@ from email.utils import formataddr, parseaddr
 from urllib import error, request
 
 from app.core.config import settings
+
+logger = logging.getLogger(__name__)
 
 
 class EmailDeliveryError(RuntimeError):
@@ -246,9 +249,20 @@ def verify_resend_webhook(
     return verified
 
 
+def ensure_password_reset_email_configured() -> None:
+    if settings.environment == "prod" and (
+        not settings.resend_api_key or not settings.resend_from_email
+    ):
+        raise EmailDeliveryError(
+            "Password reset email delivery is not configured.",
+            retryable=False,
+        )
+
+
 def send_password_reset_code(*, to_email: str, code: str) -> None:
+    ensure_password_reset_email_configured()
     if not settings.resend_api_key or not settings.resend_from_email:
-        print(f"PASSWORD_RESET_CODE for {to_email}: {code}")
+        logger.warning("PASSWORD_RESET_CODE for %s: %s", to_email, code)
         return
 
     payload = {
@@ -267,5 +281,5 @@ def send_password_reset_code(*, to_email: str, code: str) -> None:
     }
     try:
         _resend_request(path="/emails", method="POST", payload=payload)
-    except EmailDeliveryError as exc:
-        print(f"PASSWORD_RESET_EMAIL_FAILED for {to_email}: {exc}")
+    except EmailDeliveryError:
+        logger.warning("Password reset email delivery failed.")
