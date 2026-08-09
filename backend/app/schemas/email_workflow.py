@@ -85,7 +85,8 @@ class EmailDraftResponse(BaseModel):
     stage_changed_since_generation: bool
     candidate_name: str
     job_title: str
-    recipient_email: EmailStr
+    recipient_email: str
+    recipient_email_valid: bool
     reply_to_email: EmailStr | None
     subject: str
     body: str
@@ -342,7 +343,8 @@ class EmailThreadSummaryResponse(BaseModel):
     thread_id: int
     application_id: int
     candidate_name: str
-    candidate_email: EmailStr
+    candidate_email: str
+    recipient_email_valid: bool
     job_title: str
     current_stage: str
     subject: str | None

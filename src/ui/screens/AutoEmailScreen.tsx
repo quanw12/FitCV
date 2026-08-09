@@ -1278,6 +1278,20 @@ export default function AutoEmailScreen() {
                     </div>
                   </div>
 
+                  {!activeDraft.recipient_email_valid && (
+                    <div
+                      className="job-alert job-alert--error"
+                      role="status"
+                      style={{ marginBottom: 14 }}
+                    >
+                      <WarningCircle size={16} />
+                      <span>
+                        Candidate email address is missing or invalid. Update it
+                        before sending.
+                      </span>
+                    </div>
+                  )}
+
                   <label style={{ display: "block", marginBottom: 14 }}>
                     <span className="fc-field-label">Subject</span>
                     <input

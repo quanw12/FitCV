@@ -2,7 +2,7 @@ from datetime import date, datetime, timedelta
 import re
 
 from fastapi import HTTPException
-from pydantic import ValidationError
+from pydantic import EmailStr, TypeAdapter, ValidationError
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -50,10 +50,21 @@ RESEND_IDEMPOTENCY_WINDOW = timedelta(hours=24)
 SEND_CLAIM_TIMEOUT = timedelta(minutes=15)
 EMAIL_PATTERN = re.compile(r"[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}")
 PHONE_PATTERN = re.compile(r"(?:\+?\d[\d\s().-]{7,}\d)")
+EMAIL_ADDRESS_ADAPTER = TypeAdapter(EmailStr)
 
 
 def _now() -> datetime:
     return utc_now_naive()
+
+
+def _is_valid_email(value: str | None) -> bool:
+    if not value:
+        return False
+    try:
+        EMAIL_ADDRESS_ADAPTER.validate_python(value)
+    except ValidationError:
+        return False
+    return True
 
 
 def _company_id(account: Account) -> int:
@@ -287,6 +298,7 @@ def _draft_response(row) -> EmailDraftResponse:
         candidate_name=candidate.full_name or "Candidate",
         job_title=job.title,
         recipient_email=draft.recipient_email,
+        recipient_email_valid=_is_valid_email(draft.recipient_email),
         reply_to_email=_reply_to_email(thread) if thread is not None else None,
         subject=draft.subject,
         body=draft.body,
@@ -1117,6 +1129,7 @@ def _thread_summary(
         application_id=thread.application_id,
         candidate_name=candidate.full_name or "Candidate",
         candidate_email=candidate.email or "",
+        recipient_email_valid=_is_valid_email(candidate.email),
         job_title=job.title,
         current_stage=application.current_stage,
         subject=thread.subject,

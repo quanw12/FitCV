@@ -586,6 +586,19 @@ export default function SmartReplyPanel() {
                   </div>
                 </div>
 
+                {!detail.recipient_email_valid && (
+                  <div
+                    className="job-alert job-alert--error"
+                    role="status"
+                  >
+                    <AlertTriangle size={16} />
+                    <span>
+                      Candidate email address is missing or invalid. Update it
+                      before sending.
+                    </span>
+                  </div>
+                )}
+
                 <div
                   className="fc-panel"
                   style={{

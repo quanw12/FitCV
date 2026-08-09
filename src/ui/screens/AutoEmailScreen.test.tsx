@@ -62,6 +62,8 @@ const draft: CandidateEmailDraft = {
 
   recipient_email: "minh@example.com",
 
+  recipient_email_valid: true,
+
   reply_to_email: "reply+token@inbound.example.com",
 
   subject: "Next steps for your application",
@@ -251,6 +253,24 @@ describe("AutoEmailScreen", () => {
       interview_window: "09:00-17:00 ICT",
     })
     expect(emailMocks.send).not.toHaveBeenCalled()
+  })
+
+  it("warns when the active draft recipient email is invalid", async () => {
+    emailMocks.listDrafts.mockResolvedValue([
+      {
+        ...draft,
+        recipient_email: "legacy-address",
+        recipient_email_valid: false,
+      },
+    ])
+
+    render(<AutoEmailScreen />)
+
+    expect(
+      await screen.findByText(
+        "Candidate email address is missing or invalid. Update it before sending.",
+      ),
+    ).toBeInTheDocument()
   })
 
   it("enforces approve then send and confirms delivery", async () => {
