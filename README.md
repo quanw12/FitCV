@@ -105,6 +105,7 @@ cd backend
 Tạo hoặc cập nhật `backend/.env`:
 
 ```env
+ENVIRONMENT=dev
 DATABASE_URL=mysql+pymysql://<db_user>:<url_encoded_password>@<db_host>:3306/fitcv
 JWT_SECRET_KEY=<local-secret>
 ACCESS_TOKEN_EXPIRE_MINUTES=15
@@ -146,8 +147,10 @@ http://127.0.0.1:8000/api/health
 Khi deploy backend lên Render, vào Render service > Environment và thêm các biến:
 
 ```env
+ENVIRONMENT=prod
 DATABASE_URL=mysql+pymysql://<db_user>:<url_encoded_password>@<db_host>:3306/fitcv
-JWT_SECRET_KEY=<strong-secret>
+# Generate a unique random value with at least 32 characters; this short placeholder is rejected.
+JWT_SECRET_KEY=<replace-me>
 ACCESS_TOKEN_EXPIRE_MINUTES=15
 REFRESH_TOKEN_EXPIRE_DAYS=30
 REFRESH_COOKIE_SECURE=true
@@ -225,10 +228,13 @@ AI_WORKER_HEARTBEAT_SECONDS=30
 AI_TASK_MAX_ATTEMPTS=3
 ```
 
-Local dùng `REFRESH_COOKIE_SECURE=false`. Render dùng
-`REFRESH_COOKIE_SECURE=true`; backend khi đó đặt cookie `SameSite=None; Secure`
-để frontend Vercel gọi `/api/auth/refresh` với `credentials: include`. Domain
-Vercel chính xác vẫn phải có trong `CORS_ORIGINS`.
+Local dùng `ENVIRONMENT=dev` và `REFRESH_COOKIE_SECURE=false`. Render dùng
+`ENVIRONMENT=prod`, `REFRESH_COOKIE_SECURE=true`, cùng `JWT_SECRET_KEY` ngẫu
+nhiên dài tối thiểu 32 ký tự. Backend sẽ dừng ngay khi khởi động nếu cấu hình
+production không đáp ứng các điều kiện này. Cookie khi đó dùng
+`SameSite=None; Secure` để frontend Vercel gọi `/api/auth/refresh` với
+`credentials: include`. Domain Vercel chính xác vẫn phải có trong
+`CORS_ORIGINS`.
 
 ### Job Post Archiving And Scoring Schema
 
