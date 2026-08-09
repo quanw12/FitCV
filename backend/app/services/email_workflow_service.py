@@ -1,4 +1,4 @@
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, timedelta
 import re
 
 from fastapi import HTTPException
@@ -6,6 +6,7 @@ from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
+from app.core.datetime_utils import utc_now_naive
 from app.models.account import Account
 from app.repositories import email_workflow
 from app.schemas.email_workflow import (
@@ -52,7 +53,7 @@ PHONE_PATTERN = re.compile(r"(?:\+?\d[\d\s().-]{7,}\d)")
 
 
 def _now() -> datetime:
-    return datetime.now(timezone.utc).replace(tzinfo=None)
+    return utc_now_naive()
 
 
 def _company_id(account: Account) -> int:
@@ -903,9 +904,9 @@ def send(db: Session, account: Account, email_id: int) -> EmailDraftResponse:
                 ),
             )
     if draft.status == "Failed" and draft.idempotency_key:
-        # `updated_at` remains the compatibility source for rows created before
-        # the retry metadata migration; new rows also update it on every attempt.
-        attempted_at = draft.updated_at or draft.last_attempt_at or draft.created_at
+        # `updated_at` is only a compatibility fallback for rows created before
+        # retry attempts were recorded explicitly in `last_attempt_at`.
+        attempted_at = draft.last_attempt_at or draft.updated_at or draft.created_at
         if _now() - attempted_at >= RESEND_IDEMPOTENCY_WINDOW:
             raise HTTPException(
                 status_code=409,

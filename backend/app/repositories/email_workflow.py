@@ -5,6 +5,7 @@ from sqlalchemy import and_, case, func, insert, or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, aliased
 
+from app.core.datetime_utils import utc_now_naive
 from app.models import (
     Application,
     Candidate,
@@ -279,7 +280,7 @@ def create_drafts(
                         ),
                         else_=CandidateEmailThread.subject,
                     ),
-                    last_message_at=func.now(),
+                    last_message_at=utc_now_naive(),
                 )
             )
         db.execute(insert(CandidateEmail), draft_values)
@@ -516,7 +517,7 @@ def create_draft(
         thread = db.get(CandidateEmailThread, thread_id)
         if thread is not None:
             thread.subject = thread.subject or subject
-            thread.last_message_at = func.now()
+            thread.last_message_at = utc_now_naive()
     db.commit()
     db.refresh(draft)
     return draft
@@ -617,7 +618,7 @@ def save(db: Session, draft: CandidateEmail, values: dict) -> CandidateEmail:
     if draft.thread_id is not None and values.get("status") == "Sent":
         thread = db.get(CandidateEmailThread, draft.thread_id)
         if thread is not None:
-            thread.last_message_at = func.now()
+            thread.last_message_at = values.get("sent_at") or utc_now_naive()
     db.commit()
     db.refresh(draft)
     return draft
