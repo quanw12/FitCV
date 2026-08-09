@@ -306,6 +306,15 @@ def _draft_response(row) -> EmailDraftResponse:
     )
 
 
+def _require_draft_response(
+    db: Session, email_id: int, company_id: int
+) -> EmailDraftResponse:
+    row = email_workflow.row(db, email_id, company_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Email draft not found.")
+    return _draft_response(row)
+
+
 def list_drafts(
     db: Session, account: Account, job_id: int | None = None
 ) -> list[EmailDraftResponse]:
@@ -784,7 +793,7 @@ def update_draft(
             status_code=409,
             detail="The draft changed in another request. Refresh before editing.",
         )
-    return _draft_response(email_workflow.row(db, email_id, company_id))
+    return _require_draft_response(db, email_id, company_id)
 
 
 def approve(
@@ -816,7 +825,7 @@ def approve(
             status_code=409,
             detail="The draft changed in another request. Refresh before approving.",
         )
-    return _draft_response(email_workflow.row(db, email_id, company_id))
+    return _require_draft_response(db, email_id, company_id)
 
 
 def reopen_failed_draft(
@@ -858,7 +867,7 @@ def reopen_failed_draft(
                 "Refresh before reopening it."
             ),
         )
-    return _draft_response(email_workflow.row(db, email_id, company_id))
+    return _require_draft_response(db, email_id, company_id)
 
 
 def send(db: Session, account: Account, email_id: int) -> EmailDraftResponse:
@@ -1002,7 +1011,7 @@ def send(db: Session, account: Account, email_id: int) -> EmailDraftResponse:
             "error_message": None,
         },
     )
-    return _draft_response(email_workflow.row(db, email_id, company_id))
+    return _require_draft_response(db, email_id, company_id)
 
 
 def bulk_send(
