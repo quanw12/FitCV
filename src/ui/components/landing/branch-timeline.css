@@ -1,0 +1,264 @@
+/* Branch timeline: every stroke draws itself in when scrolled into view. */
+
+.bt {
+  --bt-pass: var(--lp-accent);
+  --bt-fail: #ff6b6b;
+
+  position: relative;
+  margin: 0;
+  overflow: hidden;
+  padding: 8px 0 20px;
+  border: 1px solid var(--lp-line);
+  border-radius: var(--lp-radius);
+  background: var(--lp-surface);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.bt-grid {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(90deg, rgba(15, 23, 42, 0.05) 1px, transparent 0),
+    linear-gradient(180deg, rgba(15, 23, 42, 0.05) 1px, transparent 0);
+  background-size: 40px 40px;
+  background-position: 20px 20px;
+}
+
+.bt-svg {
+  position: relative;
+  width: 100%;
+  height: auto;
+  display: block;
+  overflow: visible;
+}
+
+.bt-figcaption {
+  position: relative;
+  padding: 0 20px;
+  font-family: "JetBrains Mono Variable", ui-monospace, monospace;
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  color: var(--lp-dim);
+}
+
+/* ---------- draw-in primitives ---------- */
+
+/* pathLength="1" normalises every path, so one rule drives all of them. */
+
+.bt-draw {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  transition: stroke-dashoffset 780ms var(--lp-ease);
+}
+
+.bt-svg.is-active .bt-draw {
+  stroke-dashoffset: 0;
+}
+
+.bt-fade {
+  opacity: 0;
+  transition: opacity 520ms var(--lp-ease);
+}
+
+.bt-svg.is-active .bt-fade {
+  opacity: 1;
+}
+
+.bt-pop {
+  opacity: 0;
+  transform: scale(0.4);
+  transform-box: fill-box;
+  transform-origin: center;
+  transition:
+    opacity 320ms var(--lp-ease),
+    transform 460ms var(--lp-ease);
+}
+
+.bt-svg.is-active .bt-pop {
+  opacity: 1;
+  transform: scale(1);
+}
+
+/* ---------- rail ---------- */
+
+.bt-rail {
+  stroke: rgba(15, 23, 42, 0.18);
+  stroke-width: 1.5;
+}
+
+.bt-rail-dot {
+  fill: rgba(15, 23, 42, 0.22);
+}
+
+.bt-rail-ring {
+  fill: var(--lp-surface);
+  stroke: var(--bt-pass);
+  stroke-width: 2;
+}
+
+.bt-rail-core {
+  fill: var(--bt-pass);
+}
+
+/* ---------- left marker ---------- */
+
+.bt-live {
+  fill: var(--bt-pass);
+}
+
+.bt-live-text {
+  font-family: "JetBrains Mono Variable", ui-monospace, monospace;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  fill: #04140d;
+}
+
+/* ---------- pills ---------- */
+
+.bt-pill {
+  fill: #f1f5f9;
+  stroke: rgba(15, 23, 42, 0.28);
+  stroke-width: 1;
+}
+
+.bt-pill-text {
+  font-size: 14px;
+  fill: var(--lp-text);
+}
+
+.bt-badge {
+  fill: #e2e8f0;
+}
+
+.bt-badge-text {
+  font-family: "JetBrains Mono Variable", ui-monospace, monospace;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  fill: #000;
+}
+
+.bt-connector {
+  fill: none;
+  stroke: rgba(15, 23, 42, 0.3);
+  stroke-width: 1.4;
+  stroke-dasharray: 5 5;
+}
+
+.bt-changed {
+  fill: var(--lp-surface);
+  stroke: var(--lp-line);
+  stroke-width: 1;
+}
+
+.bt-changed-dot.is-up {
+  fill: var(--bt-pass);
+}
+
+.bt-changed-dot.is-down {
+  fill: var(--lp-warn);
+}
+
+.bt-changed-text {
+  font-family: "JetBrains Mono Variable", ui-monospace, monospace;
+  font-size: 11px;
+  fill: var(--lp-muted);
+}
+
+/* ---------- status nodes ---------- */
+
+.bt-status-ring {
+  stroke-width: 2;
+}
+
+.bt-status-glyph {
+  fill: none;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.bt-pop.is-pass .bt-status-ring {
+  fill: rgba(110, 231, 183, 0.12);
+  stroke: var(--bt-pass);
+}
+
+.bt-pop.is-pass .bt-status-glyph {
+  stroke: var(--bt-pass);
+}
+
+.bt-pop.is-fail .bt-status-ring {
+  fill: rgba(255, 107, 107, 0.12);
+  stroke: var(--bt-fail);
+}
+
+.bt-pop.is-fail .bt-status-glyph {
+  stroke: var(--bt-fail);
+}
+
+.bt-pass {
+  stroke: var(--bt-pass);
+  stroke-width: 2;
+}
+
+.bt-fail {
+  stroke: var(--bt-fail);
+  stroke-width: 2;
+}
+
+/* ---------- labels ---------- */
+
+.bt-caption {
+  font-size: 12px;
+  fill: var(--lp-muted);
+}
+
+.bt-stamp {
+  font-family: "JetBrains Mono Variable", ui-monospace, monospace;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  fill: var(--lp-dim);
+}
+
+.bt-stamp.is-pass {
+  fill: var(--bt-pass);
+}
+
+/* The diagram is dense; below tablet it scrolls horizontally rather than
+   shrinking every label into illegibility. */
+
+@media (max-width: 900px) {
+  .bt {
+    overflow-x: auto;
+  }
+
+  .bt-svg {
+    width: 900px;
+  }
+
+  .bt-grid {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bt-draw {
+    stroke-dashoffset: 0;
+  }
+
+  .bt-fade {
+    opacity: 1;
+  }
+
+  .bt-pop {
+    opacity: 1;
+    transform: none;
+  }
+}

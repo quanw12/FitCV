@@ -1,0 +1,216 @@
+/* Hero stage: the mascot stands on the primary CTA, the tag strip recolours it. */
+
+.lp-hs {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 0 56px;
+}
+
+/* The mascot track and the button row share a width, so the sprite always
+   walks along the buttons and lands its hammer on one of them. */
+
+.lp-hs-stage {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  width: fit-content;
+  max-width: 100%;
+}
+
+.lp-hs-mount {
+  position: relative;
+}
+
+.lp-hs-buttons {
+  display: flex;
+  gap: 12px;
+}
+
+.lp-hs-buttons .lp-btn {
+  padding: 13px 26px;
+  font-size: 16px;
+}
+
+.lp-hs-buttons .lp-btn.is-hammered {
+  transform: translateY(4px);
+}
+
+.lp-hs-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 4px;
+  border-radius: var(--lp-radius);
+  color: var(--lp-muted);
+  font-size: 13px;
+  text-decoration: none;
+  transition: color 160ms var(--lp-ease);
+}
+
+.lp-hs-note:hover {
+  color: var(--lp-accent);
+}
+
+.lp-hs-note:focus-visible {
+  outline: 2px solid var(--lp-accent);
+  outline-offset: 2px;
+}
+
+/* ---------- tag marquee ---------- */
+
+/* The rule spans the full shell width, so the padding lives on the strip
+   itself rather than on the hero. */
+
+.lp-hero-foot {
+  position: relative;
+  z-index: 1;
+  margin-top: 40px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 20px 0 20px 56px;
+  border-top: 1px solid var(--lp-line);
+}
+
+.lp-tagline-label {
+  font-size: 13px;
+  color: var(--lp-dim);
+  white-space: nowrap;
+}
+
+.lp-tagline-rule {
+  width: 1px;
+  height: 18px;
+  background: var(--lp-line);
+  flex-shrink: 0;
+}
+
+/* Two identical sets ride the track, so translating it by half its width
+   lands the second set exactly where the first began — a seamless loop. */
+
+.lp-tagline {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(90deg, #d9d9d9 88%, rgba(217, 217, 217, 0));
+  mask-image: linear-gradient(90deg, #d9d9d9 88%, rgba(217, 217, 217, 0));
+}
+
+.lp-tagline-track {
+  display: flex;
+  width: max-content;
+  animation: lp-tag-slide 38s linear infinite;
+}
+
+.lp-tagline:hover .lp-tagline-track,
+.lp-tagline:focus-within .lp-tagline-track {
+  animation-play-state: paused;
+}
+
+.lp-tagline-set {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  padding: 0 5px;
+  list-style: none;
+}
+
+@keyframes lp-tag-slide {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    transform: translate3d(-50%, 0, 0);
+  }
+}
+
+.lp-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 13px;
+  border: 1px solid var(--lp-line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--lp-muted);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    color 180ms var(--lp-ease),
+    border-color 180ms var(--lp-ease),
+    background 180ms var(--lp-ease);
+}
+
+.lp-tag-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--lp-tag, var(--lp-accent));
+  opacity: 0.55;
+  transition:
+    opacity 180ms var(--lp-ease),
+    box-shadow 180ms var(--lp-ease);
+}
+
+/* .is-active is the latched pick: it survives the pointer leaving, and only
+   moves when another tag takes it. */
+
+.lp-tag:hover,
+.lp-tag:focus-visible,
+.lp-tag.is-active {
+  color: var(--lp-tag, var(--lp-accent));
+  border-color: color-mix(in srgb, var(--lp-tag, #6ee7b7) 46%, transparent);
+  background: color-mix(in srgb, var(--lp-tag, #6ee7b7) 10%, transparent);
+  outline: none;
+}
+
+.lp-tag:hover .lp-tag-dot,
+.lp-tag:focus-visible .lp-tag-dot,
+.lp-tag.is-active .lp-tag-dot {
+  opacity: 1;
+  box-shadow: 0 0 9px var(--lp-tag, var(--lp-accent));
+}
+
+.lp-tag:focus-visible {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--lp-tag, #6ee7b7) 55%, transparent);
+}
+
+@media (max-width: 768px) {
+  .lp-hs {
+    padding: 0 24px;
+  }
+
+  .lp-hs-stage {
+    width: 100%;
+  }
+
+  .lp-hs-buttons {
+    flex-direction: column;
+  }
+
+  .lp-hs-buttons .lp-btn {
+    width: 100%;
+  }
+
+  .lp-hero-foot {
+    margin-top: 32px;
+    padding: 18px 0 18px 24px;
+  }
+}
+
+/* The landing-wide reduced-motion rule collapses animation duration, which
+   would leave the marquee parked mid-loop. Stop it at the start instead. */
+
+@media (prefers-reduced-motion: reduce) {
+  .lp-tagline-track {
+    animation: none !important;
+  }
+}

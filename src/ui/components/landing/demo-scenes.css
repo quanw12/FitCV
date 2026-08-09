@@ -1,0 +1,2596 @@
+/* Scene choreography. Each scene is a fixed timeline expressed as animation
+   delays in milliseconds, so the beats can be read top-to-bottom and stay in
+   step with the scene duration declared in demo/scenes.ts. */
+
+/* ---------- shared primitives ---------- */
+
+@keyframes lpd-rise {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 10px, 0);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes lpd-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.82);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes lpd-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes lpd-flip-through {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 7px, 0);
+  }
+
+  16%,
+  84% {
+    opacity: 1;
+    transform: none;
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate3d(0, -7px, 0);
+  }
+}
+
+@keyframes lpd-flip-hold {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 7px, 0);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.lpd-tick {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+}
+
+.lpd-tick-path {
+  fill: none;
+  stroke: var(--lp-accent);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: lpd-draw 340ms var(--lpd-ease) both;
+}
+
+.lpd-flips {
+  position: relative;
+  height: 22px;
+}
+
+.lpd-flip {
+  position: absolute;
+  inset: 0 auto auto 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--lpd-line);
+  background: rgba(15, 23, 42, 0.04);
+  font-family: "JetBrains Mono Variable", ui-monospace, monospace;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--lp-muted);
+  opacity: 0;
+}
+
+.lpd-flip-c {
+  border-color: rgba(110, 231, 183, 0.32);
+  background: rgba(110, 231, 183, 0.12);
+  color: var(--lp-accent);
+}
+
+/* ---------- shared hr-style primitives ---------- */
+
+@keyframes lpd-hr-fade-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes lpd-hr-dim {
+  to {
+    opacity: 0.34;
+  }
+}
+
+/* Press and ring run as a second animation on an element that already rose, so
+   they use `forwards` — a backwards fill would clobber the rise's transform. */
+
+@keyframes lpd-hr-press {
+  0%,
+  100% {
+    transform: none;
+  }
+
+  38% {
+    transform: scale(0.955);
+  }
+}
+
+@keyframes lpd-hr-ring {
+  from {
+    opacity: 0.85;
+    transform: scale(0.94);
+  }
+
+  to {
+    opacity: 0;
+    transform: scale(1.14);
+  }
+}
+
+.lpd-hr-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid var(--lpd-line);
+  border-radius: var(--lp-radius);
+  background: var(--lpd-raised);
+  font-size: 12px;
+  white-space: nowrap;
+  color: var(--lp-muted);
+}
+
+.lpd-hr-btn.is-primary {
+  border-color: rgba(110, 231, 183, 0.34);
+  background: rgba(110, 231, 183, 0.12);
+  color: var(--lp-accent);
+}
+
+.lpd-hr-btn::after {
+  content: "";
+  position: absolute;
+  inset: -3px;
+  border-radius: inherit;
+  border: 1px solid rgba(110, 231, 183, 0.45);
+  opacity: 0;
+}
+
+.lpd-hr-note {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--lp-dim);
+  animation: lpd-rise 420ms var(--lpd-ease) both;
+}
+
+/* ---------- scene 1 · rebuild ---------- */
+
+.lpd-rebuild {
+  gap: 8px;
+  min-height: 0;
+}
+
+.lpd-drop {
+  padding: 8px;
+  border: 1px dashed rgba(15, 23, 42, 0.14);
+  border-radius: var(--lp-radius);
+  background: rgba(15, 23, 42, 0.015);
+  animation: lpd-rise 420ms var(--lpd-ease) both;
+  flex-shrink: 0;
+}
+
+.lpd-file {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  animation: lpd-rise 460ms var(--lpd-ease) 140ms both;
+}
+
+.lpd-file-glyph {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 40px;
+  border: 1px solid var(--lpd-line);
+  border-radius: 3px;
+  background: var(--lpd-raised);
+  font-family: "JetBrains Mono Variable", ui-monospace, monospace;
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  color: var(--lp-accent);
+}
+
+.lpd-file-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.lpd-file-meta strong {
+  font-size: 14px;
+  font-weight: 550;
+  color: var(--lp-text);
+}
+
+.lpd-file-meta span {
+  font-family: "JetBrains Mono Variable", ui-monospace, monospace;
+  font-size: 11px;
+  color: var(--lp-dim);
+}
+
+.lpd-file-pct {
+  margin-left: auto;
+  font-family: "JetBrains Mono Variable", ui-monospace, monospace;
+  font-size: 12px;
+  color: var(--lp-accent);
+  animation: lpd-pop 300ms var(--lpd-ease) 700ms both;
+}
+
+.lpd-bar {
+  display: block;
+  margin-top: 12px;
+  height: 3px;
+  border-radius: 3px;
+  background: rgba(15, 23, 42, 0.08);
+  overflow: hidden;
+}
+
+.lpd-bar-fill {
+  display: block;
+  height: 100%;
+  width: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--lp-accent-deep), var(--lp-accent));
+  transform-origin: left center;
+  animation: lpd-progress 1180ms var(--lpd-ease) 760ms both;
+}
+
+.lpd-rebuild .lpd-flips {
+  animation: lpd-rise 320ms var(--lpd-ease) 1560ms both;
+}
+
+.lpd-rebuild .lpd-flip-a {
+  animation: lpd-flip-through 700ms var(--lpd-ease) 1600ms both;
+}
+
+.lpd-rebuild .lpd-flip-b {
+  animation: lpd-flip-through 820ms var(--lpd-ease) 2220ms both;
+}
+
+.lpd-rebuild .lpd-flip-c {
+  animation: lpd-flip-hold 380ms var(--lpd-ease) 2960ms both;
+}
+
+.lpd-sections {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--lpd-line);
+  border-radius: var(--lp-radius);
+  overflow: hidden;
+  flex: 1;
+  min-height: 0;
+}
+
+.lpd-section {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  border-bottom: 1px solid var(--lpd-line);
+  background: var(--lpd-raised);
+  animation: lpd-rise 420ms var(--lpd-ease) calc(3200ms + var(--i) * 150ms) both;
+}
+
+.lpd-section:last-child {
+  border-bottom: none;
+}
+
+.lpd-section .lpd-tick-path {
+  animation-delay: calc(3400ms + var(--i) * 150ms);
+}
+
+.lpd-section-name {
+  font-size: 13px;
+  color: var(--lp-text);
+}
+
+.lpd-section-detail {
+  margin-left: auto;
+  font-family: "JetBrains Mono Variable", ui-monospace, monospace;
+  font-size: 11px;
+  color: var(--lp-dim);
+}
+
+.lpd-versions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: auto;
+}
+
+.lpd-version {
+  display: grid;
+  place-items: center;
+  min-width: 34px;
+  padding: 4px 8px;
+  border: 1px solid var(--lpd-line);
+  border-radius: 999px;
+  font-family: "JetBrains Mono Variable", ui-monospace, monospace;
+  font-size: 11px;
+  color: var(--lp-dim);
+  animation: lpd-pop 340ms var(--lpd-ease) calc(4700ms + var(--i) * 110ms) both;
+}
+
+.lpd-version.is-new {
+  border-color: rgba(110, 231, 183, 0.4);
+  background: rgba(110, 231, 183, 0.12);
+  color: var(--lp-accent);
+  box-shadow: 0 0 0 4px rgba(110, 231, 183, 0.07);
+}
+
+.lpd-version-tag {
+  font-family: "JetBrains Mono Variable", ui-monospace, monospace;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  color: var(--lp-accent);
+  animation: lpd-rise 360ms var(--lpd-ease) 5300ms both;
+}
+
+/* ---------- scene 1 · rebuild · PDF preview ---------- */
+
+.lpd-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  animation: lpd-rise 420ms var(--lpd-ease) 5800ms both;
+  flex-shrink: 0;
+}
+
+.lpd-preview-card {
+  padding: 6px;
+  border: 1px solid var(--lpd-line);
+  border-radius: var(--lp-radius);
+  background: var(--lpd-raised);
+}
+
+.lpd-preview-head {
+  display: block;
+  font-family: "JetBrains Mono Variable", ui-monospace, monospace;
+  font-size: 8px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--lp-dim);
+  margin-bottom: 4px;
+}
+
+.lpd-preview-body {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.lpd-preview-name {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--lp-text);
+  margin-bottom: 1px;
+}
+
+.lpd-preview-line {
+  height: 5px;
+  border-radius: 3px;
+  background: rgba(15, 23, 42, 0.08);
+}
+
+.lpd-preview-line--short {
+  width: 60%;
+}
+
+.lpd-preview-line--mid {
+  width: 80%;
+}
+
+.lpd-preview-section {
+  font-family: "JetBrains Mono Variable", ui-monospace, monospace;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--lp-muted);
+  margin-top: 4px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.lpd-preview-chips {
+  display: flex;
+  gap: 5px;
+  margin-top: 2px;
+}
+
+.lpd-preview-chip {
+  width: 32px;
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.06);
+}
+
+.lpd-preview-chip--short {
+  width: 22px;
+}
+
+.lpd-preview-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.lpd-preview-download {
+  animation: lpd-hr-press 420ms var(--lpd-ease) 6600ms both;
+}
+
+.lpd-preview-download::after {
+  animation: lpd-hr-ring 520ms var(--lpd-ease) 6620ms both;
+}
+
+/* ---------- scene 2 · score ---------- */
+
+.lpd-score {
+  gap: 8px;
+  min-height: 0;
+}
+
+.lpd-score-inputs {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  animation: lpd-rise 420ms var(--lpd-ease) both;
+}
+
+.lpd-score-upload {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px dashed rgba(15, 23, 42, 0.18);
+  border-radius: var(--lp-radius);
+  background: rgba(15, 23, 42, 0.02);
+  animation: lpd-rise 380ms var(--lpd-ease) 140ms both;
+}
+
+.lpd-score-upload-icon {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--lpd-line);
+  border-radius: 6px;
+  background: var(--lpd-raised);
+  flex-shrink: 0;
+}
+
+.lpd-score-upload-icon::after {
+  content: "";
+  display: block;
+  width: 12px;
+  height: 12px;
+  border: 1.5px solid var(--lp-accent);
+  border-radius: 2px;
+}
+
+.lpd-score-upload-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.lpd-score-upload-text strong {
+  font-size: 13px;
+  font-weight: 550;
+  color: var(--lp-text);
+}
+
+.lpd-score-upload-text span {
+  font-family: "JetBrains Mono Variable", ui-monospace, monospace;
+  font-size: 10px;
+  color: var(--lp-dim);
+}
+
+.lpd-score-jd-input {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 10px;
+  border: 1px solid var(--lpd-line);
+  border-radius: var(--lp-radius);
+  background: var(--lpd-raised);
+  animation: lpd-rise 380ms var(--lpd-ease) 260ms both;
+}
+
+.lpd-score-jd-label {
+  font-family: "JetBrains Mono Variable", ui-monospace, monospace;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--lp-dim);
+  margin-bottom: 2px;
+}
+
+.lpd-score-analyze {
+  align-self: flex-start;
+  animation:
+    lpd-rise 340ms var(--lpd-ease) 480ms both,
+    lpd-hr-press 420ms var(--lpd-ease) 1200ms forwards;
+}
+
+.lpd-score-analyze::after {
+  animation: lpd-hr-ring 520ms var(--lpd-ease) 1220ms both;
+}
+
+.lpd-jd {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 13px 14px;
+  border: 1px solid var(--lpd-line);
+  border-radius: var(--lp-radius);
+  background: var(--lpd-raised);
+  overflow: hidden;
+  animation: lpd-rise 420ms var(--lpd-ease) both;
+}
+
+.lpd-jd-head {
+  font-family: "JetBrains Mono Variable", ui-monospace, monospace;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--lp-dim);
+}
+
+.lpd-jd-line {
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(15, 23, 42, 0.1);
+  transform-origin: left center;
+  animation: lpd-progress 320ms var(--lpd-ease) calc(240ms + var(--i) * 130ms) both;
+}
+
+.lpd-jd-line:nth-of-type(3) {
+  width: 92%;
+}
+
+.lpd-jd-line:nth-of-type(4) {
+  width: 76%;
+}
+
+.lpd-jd-line:nth-of-type(5) {
+  width: 44%;
+}
+
+.lpd-sweep {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 46%;
+  background: linear-gradient(90deg, transparent, rgba(110, 231, 183, 0.16), transparent);
+  animation: lpd-sweep 900ms var(--lpd-ease) 920ms both;
+}
+
+@keyframes lpd-sweep {
+  from {
+    transform: translateX(-110%);
+  }
+
+  to {
+    transform: translateX(260%);
+  }
+}
+
+.lpd-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+  min-height: 0;
+}
+
+.lpd-bar-row {
+  display: grid;
+  grid-template-columns: 92px 1fr 34px;
+  align-items: center;
+  gap: 12px;
+  animation: lpd-rise 380ms var(--lpd-ease) calc(1400ms + var(--i) * 150ms) both;
+}
+
+.lpd-bar-label {
+  font-size: 12px;
+  color: var(--lp-muted);
+}
+
+.lpd-bar-track {
+  height: 8px;
+  border-radius: 4px;
+  background: rgba(15, 23, 42, 0.07);
+  overflow: hidden;
+}
+
+.lpd-bar-value {
+  display: block;
+  height: 100%;
+  width: var(--score);
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--lp-accent-deep), var(--lp-accent));
+  transform-origin: left center;
+  animation: lpd-progress 880ms var(--lpd-ease) calc(1580ms + var(--i) * 150ms) both;
+}
+
+.lpd-bar-row:nth-child(4) .lpd-bar-value {
+  background: linear-gradient(90deg, #b35a1c, var(--lp-warn));
+}
+
+.lpd-bar-score {
+  font-family: "JetBrains Mono Variable", ui-monospace, monospace;
+  font-size: 12px;
+  text-align: right;
+  color: var(--lp-text);
+}
+
+.lpd-evidence {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.lpd-key {
+  padding: 2px 7px;
+  border-radius: 999px;
+  border: 1px solid rgba(110, 231, 183, 0.3);
+  background: rgba(110, 231, 183, 0.1);
+  font-size: 10px;
+  color: var(--lp-accent);
+  animation: lpd-pop 320ms var(--lpd-ease) calc(3500ms + var(--i) * 110ms) both;
+}
+
+.lpd-key.is-missing {
+  border-color: rgba(255, 138, 61, 0.32);
+  background: rgba(255, 138, 61, 0.1);
+  color: var(--lp-warn);
+  text-decoration: line-through;
+  text-decoration-color: rgba(255, 138, 61, 0.5);
+}
+
+.lpd-overall {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-top: auto;
+  padding-top: 8px;
+  border-top: 1px solid var(--lpd-line);
+  animation: lpd-rise 420ms var(--lpd-ease) 4600ms both;
+  flex-shrink: 0;
+}
+
+.lpd-overall-label {
+  font-family: "JetBrains Mono Variable", ui-monospace, monospace;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--lp-dim);
+}
+
+.lpd-overall-value {
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--lp-text);
+}
+
+.lpd-overall-tag {
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid rgba(110, 231, 183, 0.3);
+  background: rgba(110, 231, 183, 0.1);
+  font-size: 11px;
+  color: var(--lp-accent);
+}
+
+/* ---------- scene 2 · pass probability gauge ---------- */
+
+.lpd-pass-prob {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px;
+  border: 1px solid rgba(253, 233, 207, 0.24);
+  border-radius: var(--lp-radius);
+  background: rgba(253, 233, 207, 0.04);
+  flex-shrink: 0;
+  animation: lpd-rise 420ms var(--lpd-ease) 5200ms both;
+}
+
+.lpd-pass-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.lpd-pass-icon {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  border: 1px solid rgba(253, 233, 207, 0.3);
+  background: rgba(253, 233, 207, 0.08);
+  flex-shrink: 0;
+}
+
+.lpd-pass-title {
+  font-size: 11px;
+  color: var(--lp-muted);
+}
+
+.lpd-pass-title strong {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--lp-text);
+}
+
+.lpd-pass-bar {
+  position: relative;
+  height: 8px;
+  border-radius: 4px;
+  background: linear-gradient(90deg, #ef4444, #f59e0b, #10b981);
+  overflow: visible;
+}
+
+.lpd-pass-fill {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  opacity: 0;
+}
+
+.lpd-pass-marker {
+  position: absolute;
+  top: -3px;
+  width: 4px;
+  height: 14px;
+  border-radius: 2px;
+  background: var(--lp-text);
+  box-shadow: 0 0 0 2px rgba(15, 23, 42, 0.14);
+  animation: lpd-pass-slide 780ms var(--lpd-ease) 5400ms both;
+}
+
+@keyframes lpd-pass-slide {
+  from {
+    left: 0;
+  }
+
+  to {
+    left: 64%;
+  }
+}
+
+.lpd-pass-disclaimer {
+  font-size: 10px;
+  color: var(--lp-dim);
+  line-height: 1.4;
+}
+
+/* ---------- scene 3 · improve ---------- */
+
+.lpd-improve {
+  gap: 10px;
+}
+
+.lpd-imp-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  animation: lpd-rise 420ms var(--lpd-ease) both;
+}
+
+.lpd-imp-title {
+  font-size: 14px;
+  font-weight: 550;
+  letter-spacing: -0.01em;
+  color: var(--lp-text);
+}
+
+.lpd-imp-regen {
+  padding: 4px 11px;
+  border: 1px solid var(--lpd-line);
+  border-radius: 999px;
+  background: var(--lpd-raised);
+  font-size: 11px;
+  color: var(--lp-muted);
+  animation: lpd-rise 380ms var(--lpd-ease) 200ms both;
+}
+
+.lpd-imp-layout {
+  display: grid;
+  grid-template-columns: 168px 1fr;
+  gap: 12px;
+  align-items: start;
+}
+
+/* ---------- scene 3 · improve · contents rail ---------- */
+
+.lpd-imp-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+  border: 1px solid var(--lpd-line);
+  border-radius: var(--lp-radius);
+  background: var(--lpd-raised);
+}
+
+/* The rail walks its four anchors in step with the section stack. `lpd-imp-nav-lit`
+   only touches colour, so it can carry `both` alongside the entrance rise without
+   clobbering it. */
+
+.lpd-imp-nav {
+  padding: 4px 8px;
+  border-radius: 5px;
+  font-size: 11px;
+  color: var(--lp-dim);
+  animation:
+    lpd-rise 360ms var(--lpd-ease) calc(300ms + var(--i) * 120ms) both,
+    lpd-imp-nav-lit 1900ms linear calc(900ms + var(--i) * 1900ms) both;
+}
+
+.lpd-imp-nav.is-last {
+  animation:
+    lpd-rise 360ms var(--lpd-ease) calc(300ms + var(--i) * 120ms) both,
+    lpd-imp-nav-hold 280ms linear calc(900ms + var(--i) * 1900ms) both;
+}
+
+@keyframes lpd-imp-nav-lit {
+  0%,
+  100% {
+    color: var(--lp-dim);
+    background: transparent;
+    box-shadow: inset 2px 0 0 transparent;
+  }
+
+  8%,
+  92% {
+    color: var(--lp-accent);
+    background: rgba(110, 231, 183, 0.1);
+    box-shadow: inset 2px 0 0 var(--lp-accent);
+  }
+}
+
+@keyframes lpd-imp-nav-hold {
+  from {
+    color: var(--lp-dim);
+    background: transparent;
+    box-shadow: inset 2px 0 0 transparent;
+  }
+
+  to {
+    color: var(--lp-accent);
+    background: rgba(110, 231, 183, 0.1);
+    box-shadow: inset 2px 0 0 var(--lp-accent);
+  }
+}
+
+.lpd-imp-overall {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin-top: 4px;
+  padding-top: 9px;
+  border-top: 1px solid var(--lpd-line);
+  animation: lpd-pop 420ms var(--lpd-ease) 400ms both;
+}
+
+.lpd-imp-overall-label {
+  font-family: "JetBrains Mono Variable", ui-monospace, monospace;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--lp-dim);
+}
+
+.lpd-imp-overall-value {
+  font-size: 21px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--lp-accent);
+}
+
+.lpd-imp-overall-word {
+  font-size: 11px;
+  color: var(--lp-muted);
+  animation: lpd-rise 400ms var(--lpd-ease) 1500ms both;
+}
+
+/* ---------- scene 3 · improve · section stack ---------- */
+
+/* All four sections share one grid cell and cross-fade, so the panel never
+   reflows as the rail advances. Child beats are absolute from scene start —
+   they keep running while their section is hidden, which is what keeps the
+   swap in sync. */
+
+.lpd-imp-stack {
+  display: grid;
+  min-height: 140px;
+}
+
+.lpd-imp-sec {
+  grid-area: 1 / 1;
+  align-self: start;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  animation: lpd-imp-sec-through 1900ms var(--lpd-ease) calc(900ms + var(--s) * 1900ms) both;
+}
+
+.lpd-imp-sec.is-last {
+  animation: lpd-imp-sec-hold 420ms var(--lpd-ease) calc(900ms + var(--s) * 1900ms) both;
+}
+
+@keyframes lpd-imp-sec-through {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 12px, 0);
+  }
+
+  12%,
+  90% {
+    opacity: 1;
+    transform: none;
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate3d(0, -12px, 0);
+  }
+}
+
+@keyframes lpd-imp-sec-hold {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 12px, 0);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.lpd-imp-sec-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 550;
+  color: var(--lp-text);
+  animation: lpd-rise 340ms var(--lpd-ease) calc(960ms + var(--s) * 1900ms) both;
+}
+
+.lpd-imp-sec-count {
+  padding: 1px 7px;
+  border: 1px solid var(--lpd-line);
+  border-radius: 999px;
+  font-family: "JetBrains Mono Variable", ui-monospace, monospace;
+  font-size: 10px;
+  color: var(--lp-dim);
+}
+
+.lpd-imp-priority {
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-family: "JetBrains Mono Variable", ui-monospace, monospace;
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.lpd-imp-priority.is-high {
+  background: rgba(248, 113, 113, 0.14);
+  color: #fca5a5;
+}
+
+.lpd-imp-priority.is-medium {
+  background: rgba(251, 191, 36, 0.13);
+  color: #fcd34d;
+}
+
+/* ---------- scene 3 · improve · skill gaps ---------- */
+
+.lpd-imp-gap {
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 11px;
+  border: 1px solid var(--lpd-line);
+  border-radius: var(--lp-radius);
+  background: var(--lpd-raised);
+  animation: lpd-rise 380ms var(--lpd-ease) calc(1080ms + var(--i) * 180ms) both;
+}
+
+.lpd-imp-gap-skill {
+  font-size: 12px;
+  font-weight: 550;
+  color: var(--lp-text);
+}
+
+.lpd-imp-gap .lpd-imp-priority {
+  animation: lpd-pop 340ms var(--lpd-ease) calc(1180ms + var(--i) * 180ms) both;
+}
+
+.lpd-imp-gap-reason {
+  grid-column: 1 / -1;
+  font-size: 11px;
+  color: var(--lp-dim);
+}
+
+.lpd-imp-evidence {
+  padding: 7px 11px;
+  border-left: 2px solid rgba(110, 231, 183, 0.34);
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--lp-muted);
+  animation: lpd-rise 380ms var(--lpd-ease) 1600ms both;
+}
+
+.lpd-imp-evidence strong {
+  font-weight: 550;
+  color: var(--lp-accent);
+}
+
+/* ---------- scene 3 · improve · section feedback ---------- */
+
+.lpd-imp-fb {
+  padding: 6px 11px;
+  border: 1px solid var(--lpd-line);
+  border-radius: var(--lp-radius);
+  background: var(--lpd-raised);
+  animation: lpd-rise 380ms var(--lpd-ease) calc(2980ms + var(--i) * 170ms) both;
+}
+
+.lpd-imp-fb-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+
+.lpd-imp-fb-sec {
+  font-size: 12px;
+  font-weight: 550;
+  color: var(--lp-text);
+}
+
+.lpd-imp-fb-issue {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 11px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--lp-dim);
+}
+
+.lpd-imp-fb-caret {
+  width: 0;
+  height: 0;
+  flex-shrink: 0;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 5px solid var(--lp-dim);
+}
+
+.lpd-imp-fb.is-open .lpd-imp-fb-caret {
+  animation: lpd-imp-caret 320ms var(--lpd-ease) 3700ms both;
+}
+
+@keyframes lpd-imp-caret {
+  to {
+    transform: rotate(180deg);
+  }
+}
+
+/* Scaled rather than grown: the 24px is reserved from the start, so opening the
+   row never shifts the rows under it. */
+
+.lpd-imp-fb-detail {
+  display: block;
+  height: 24px;
+  padding-top: 5px;
+  overflow: hidden;
+  font-size: 11px;
+  line-height: 1.5;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--lp-muted);
+  transform-origin: top;
+  animation: lpd-imp-fb-open 380ms var(--lpd-ease) 3700ms both;
+}
+
+.lpd-imp-fb-detail strong {
+  font-weight: 550;
+  color: var(--lp-text);
+}
+
+@keyframes lpd-imp-fb-open {
+  from {
+    opacity: 0;
+    transform: scaleY(0);
+  }
+
+  to {
+    opacity: 1;
+    transform: scaleY(1);
+  }
+}
+
+/* ---------- scene 3 · improve · rewrite suggestion ---------- */
+
+.lpd-imp-rw-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  animation: lpd-rise 360ms var(--lpd-ease) 4880ms both;
+}
+
+.lpd-imp-rw-section {
+  font-size: 12px;
+  font-weight: 550;
+  color: var(--lp-text);
+}
+
+.lpd-imp-rw-fw {
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: rgba(110, 231, 183, 0.12);
+  font-family: "JetBrains Mono Variable", ui-monospace, monospace;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  color: var(--lp-accent);
+}
+
+.lpd-imp-rw-issue {
+  font-size: 11px;
+  color: var(--lp-dim);
+  animation: lpd-rise 360ms var(--lpd-ease) 4990ms both;
+}
+
+.lpd-imp-rw-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.lpd-imp-rw-col {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+  animation: lpd-rise 400ms var(--lpd-ease) calc(5100ms + var(--i) * 230ms) both;
+}
+
+.lpd-imp-rw-tag {
+  font-family: "JetBrains Mono Variable", ui-monospace, monospace;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  color: var(--lp-dim);
+}
+
+.lpd-imp-rw-tag--new {
+  color: var(--lp-accent);
+}
+
+.lpd-imp-rw-text {
+  position: relative;
+  overflow: hidden;
+  padding: 8px 10px;
+  border: 1px solid var(--lpd-line);
+  border-radius: var(--lp-radius);
+  background: rgba(15, 23, 42, 0.015);
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--lp-muted);
+}
+
+.lpd-imp-rw-text--new {
+  border-color: rgba(110, 231, 183, 0.24);
+  background: rgba(110, 231, 183, 0.04);
+  color: var(--lp-text);
+}
+
+.lpd-imp-rw-sweep {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 46%;
+  background: linear-gradient(90deg, transparent, rgba(110, 231, 183, 0.18), transparent);
+  animation: lpd-sweep 900ms var(--lpd-ease) 5480ms both;
+}
+
+.lpd-imp-rw-foot {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  animation: lpd-rise 360ms var(--lpd-ease) 5620ms both;
+}
+
+.lpd-hr-btn.lpd-imp-rw-copy {
+  animation:
+    lpd-hr-press 420ms var(--lpd-ease) 5850ms forwards,
+    lpd-fade-out 240ms var(--lpd-ease) 6000ms forwards;
+}
+
+.lpd-imp-rw-copied {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--lp-accent);
+  animation: lpd-rise 320ms var(--lpd-ease) 6020ms both;
+}
+
+.lpd-imp-rw-copied .lpd-tick-path {
+  animation-delay: 6100ms;
+}
+
+/* ---------- scene 3 · improve · quick wins ---------- */
+
+.lpd-imp-qw {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 9px;
+  padding: 6px 11px;
+  border: 1px solid var(--lpd-line);
+  border-radius: var(--lp-radius);
+  background: var(--lpd-raised);
+  animation: lpd-rise 380ms var(--lpd-ease) calc(6780ms + var(--i) * 170ms) both;
+}
+
+.lpd-imp-qw-box {
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border: 1px solid rgba(110, 231, 183, 0.34);
+  border-radius: 4px;
+  background: rgba(110, 231, 183, 0.08);
+}
+
+.lpd-imp-qw-box .lpd-tick {
+  width: 12px;
+  height: 12px;
+}
+
+.lpd-imp-qw-box .lpd-tick-path {
+  animation-delay: calc(6860ms + var(--i) * 390ms);
+}
+
+.lpd-imp-qw-title {
+  font-size: 12px;
+  color: var(--lp-text);
+}
+
+.lpd-imp-qw-meta {
+  font-family: "JetBrains Mono Variable", ui-monospace, monospace;
+  font-size: 10px;
+  color: var(--lp-dim);
+}
+
+.lpd-imp-qw-bar {
+  display: block;
+  height: 4px;
+  margin-top: 2px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--lpd-line);
+}
+
+/* Two halves rather than one 0-to-1 ramp, so each step lands on the tick that
+   earned it. */
+
+.lpd-imp-qw-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--lp-accent);
+  transform: scaleX(0);
+  transform-origin: left;
+  animation:
+    lpd-imp-qw-half 420ms var(--lpd-ease) 6880ms both,
+    lpd-imp-qw-full 420ms var(--lpd-ease) 7280ms forwards;
+}
+
+@keyframes lpd-imp-qw-half {
+  from {
+    transform: scaleX(0);
+  }
+
+  to {
+    transform: scaleX(0.5);
+  }
+}
+
+@keyframes lpd-imp-qw-full {
+  from {
+    transform: scaleX(0.5);
+  }
+
+  to {
+    transform: scaleX(1);
+  }
+}
+
+.lpd-imp-qw-flips {
+  display: grid;
+  height: 15px;
+}
+
+.lpd-imp-qw-a,
+.lpd-imp-qw-b {
+  grid-area: 1 / 1;
+  font-family: "JetBrains Mono Variable", ui-monospace, monospace;
+  font-size: 10px;
+  color: var(--lp-dim);
+}
+
+.lpd-imp-qw-a {
+  animation:
+    lpd-rise 320ms var(--lpd-ease) 6900ms both,
+    lpd-fade-out 220ms var(--lpd-ease) 7280ms forwards;
+}
+
+.lpd-imp-qw-b {
+  color: var(--lp-accent);
+  animation: lpd-rise 320ms var(--lpd-ease) 7330ms both;
+}
+
+/* ---------- scene 3 · improve · rebuild handoff ---------- */
+
+/* The CTA is the seam between Improvement and CV Rebuild: it carries the
+   accepted rewrites forward instead of exporting anything itself. */
+
+.lpd-imp-rebuild {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: auto;
+  padding-top: 11px;
+  border-top: 1px solid var(--lpd-line);
+  animation: lpd-rise 420ms var(--lpd-ease) 7600ms both;
+}
+
+.lpd-hr-btn.lpd-imp-rebuild-btn {
+  font-weight: 550;
+  animation:
+    lpd-arm 1200ms var(--lpd-ease) 7800ms forwards,
+    lpd-hr-press 420ms var(--lpd-ease) 8250ms forwards;
+}
+
+.lpd-hr-btn.lpd-imp-rebuild-btn::after {
+  animation: lpd-hr-ring 520ms var(--lpd-ease) 8250ms forwards;
+}
+
+@keyframes lpd-arm {
+  0% {
+    box-shadow: 0 0 0 0 rgba(110, 231, 183, 0.45);
+  }
+
+  40% {
+    box-shadow: 0 0 0 9px rgba(110, 231, 183, 0);
+  }
+
+  60% {
+    box-shadow: 0 0 0 0 rgba(110, 231, 183, 0.4);
+  }
+
+  100% {
+    box-shadow: 0 0 0 9px rgba(110, 231, 183, 0);
+  }
+}
+
+@keyframes lpd-fade-out {
+  to {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+}
+
+.lpd-imp-handoff {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border: 1px solid rgba(110, 231, 183, 0.28);
+  border-radius: 999px;
+  background: rgba(110, 231, 183, 0.08);
+  font-size: 11px;
+  color: var(--lp-accent);
+  animation: lpd-rise 440ms var(--lpd-ease) 8450ms both;
+}
+
+.lpd-imp-handoff .lpd-tick-path {
+  animation-delay: 8560ms;
+}
+
+.lpd-imp-rebuild-note {
+  flex: 1 1 100%;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--lp-dim);
+}
+
+@media (max-width: 640px) {
+  .lpd-imp-layout {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .lpd-imp-sidebar {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  .lpd-imp-nav {
+    font-size: 10px;
+  }
+
+  .lpd-imp-overall {
+    flex-direction: row;
+    align-items: baseline;
+    gap: 6px;
+    margin: 0;
+    padding: 0;
+    border-top: 0;
+  }
+
+  .lpd-imp-overall-value {
+    font-size: 15px;
+  }
+
+  .lpd-imp-rw-pair {
+    grid-template-columns: 1fr;
+  }
+
+  .lpd-imp-stack {
+    min-height: 0;
+  }
+}
+
+/* ---------- scene 4 · track ---------- */
+
+.lpd-board {
+  position: relative;
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 6px;
+}
+
+.lpd-col {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px;
+  border: 1px solid var(--lpd-line);
+  border-radius: var(--lp-radius);
+  background: rgba(15, 23, 42, 0.015);
+  animation: lpd-rise 400ms var(--lpd-ease) calc(100ms + var(--i) * 90ms) both;
+}
+
+.lpd-col-head {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-family: "JetBrains Mono Variable", ui-monospace, monospace;
+  font-size: 8px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--lp-dim);
+}
+
+.lpd-col-dot {
+  width: 6px;
+  height: 5px;
+  border-radius: 50%;
+  background: #64748b;
+}
+
+.lpd-col-slot {
+  flex: 1;
+  min-height: 60px;
+  border: 1px dashed rgba(15, 23, 42, 0.08);
+  border-radius: 3px;
+}
+
+/* Column lights up as the card lands in it. */
+
+.lpd-col:nth-child(1) {
+  animation:
+    lpd-rise 400ms var(--lpd-ease) 100ms both,
+    lpd-col-hit 900ms var(--lpd-ease) 700ms both;
+}
+
+.lpd-col:nth-child(2) {
+  animation:
+    lpd-rise 400ms var(--lpd-ease) 190ms both,
+    lpd-col-hit 900ms var(--lpd-ease) 2100ms both;
+}
+
+.lpd-col:nth-child(3) {
+  animation:
+    lpd-rise 400ms var(--lpd-ease) 280ms both,
+    lpd-col-hit 1600ms var(--lpd-ease) 3900ms both;
+}
+
+.lpd-col:nth-child(4) {
+  animation:
+    lpd-rise 400ms var(--lpd-ease) 370ms both,
+    lpd-rise 400ms var(--lpd-ease) 370ms both;
+}
+
+.lpd-col:nth-child(5) {
+  animation:
+    lpd-rise 400ms var(--lpd-ease) 460ms both;
+}
+
+.lpd-col:nth-child(6) {
+  animation:
+    lpd-rise 400ms var(--lpd-ease) 550ms both,
+    lpd-col-hit 900ms var(--lpd-ease) 5200ms both;
+}
+
+@keyframes lpd-col-hit {
+  0%,
+  100% {
+    border-color: var(--lpd-line);
+  }
+
+  35% {
+    border-color: rgba(110, 231, 183, 0.42);
+  }
+}
+
+/* ---------- app cards ---------- */
+
+.lpd-app-card {
+  position: absolute;
+  left: 6px;
+  width: calc((100% - 30px) / 6 - 8px);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 5px 6px;
+  border: 1px solid rgba(110, 231, 183, 0.26);
+  border-radius: 3px;
+  background: var(--lpd-raised);
+  box-shadow: 0 8px 20px -12px rgba(15, 23, 42, 0.18);
+  z-index: 1;
+}
+
+.lpd-app-card strong {
+  font-size: 10px;
+  font-weight: 550;
+  color: var(--lp-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lpd-app-meta {
+  font-family: "JetBrains Mono Variable", ui-monospace, monospace;
+  font-size: 8px;
+  color: var(--lp-dim);
+}
+
+.lpd-app-stages {
+  position: relative;
+  height: 16px;
+}
+
+.lpd-track .lpd-flip {
+  padding: 1px 5px;
+  font-size: 8px;
+}
+
+.lpd-track .lpd-flip-a {
+  animation: lpd-flip-through 1400ms var(--lpd-ease) 800ms both;
+}
+
+.lpd-track .lpd-flip-b {
+  animation: lpd-flip-through 1200ms var(--lpd-ease) 2200ms both;
+}
+
+.lpd-track .lpd-flip-c {
+  animation: lpd-flip-through 1000ms var(--lpd-ease) 4000ms both;
+}
+
+.lpd-track .lpd-flip-d {
+  animation: lpd-flip-hold 380ms var(--lpd-ease) 5800ms both;
+}
+
+.lpd-track .lpd-flip-e {
+  color: var(--lp-warn);
+  animation: lpd-flip-hold 380ms var(--lpd-ease) 7200ms both;
+}
+
+/* Card A: Applied → Screening → Interview → Offer (full journey).
+   Columns are each ~16.67% wide. Travel distances:
+   Col1→Col2 = 1col, Col2→Col3 = 1col, Col3→Col4 = 1col = ~16.67% each */
+
+.lpd-app-card--a {
+  top: 70px;
+  animation: lpd-card-travel-a 4800ms var(--lpd-ease) 600ms both;
+}
+
+@keyframes lpd-card-travel-a {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 8px, 0) scale(0.94);
+  }
+
+  6%, 12% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+
+  /* Move to Screening (col 2) */
+  22% {
+    transform: translate3d(calc(100% + 14px), -3px, 0) scale(1.01);
+  }
+
+  28%, 34% {
+    transform: translate3d(calc(100% + 14px), 0, 0) scale(1);
+  }
+
+  /* Move to Interview (col 3) */
+  44% {
+    transform: translate3d(calc(200% + 28px), -3px, 0) scale(1.01);
+  }
+
+  50%, 62% {
+    transform: translate3d(calc(200% + 28px), 0, 0) scale(1);
+  }
+
+  /* Hold at Interview (col 3) */
+  70% {
+    transform: translate3d(calc(200% + 28px), -3px, 0) scale(1.01);
+  }
+
+  80%, 100% {
+    opacity: 1;
+    transform: translate3d(calc(200% + 28px), 0, 0) scale(1);
+  }
+}
+
+/* Card B: appears later, travels Applied → Screening. */
+
+.lpd-app-card--b {
+  top: 118px;
+  animation: lpd-card-travel-b 3600ms var(--lpd-ease) 1200ms both;
+}
+
+@keyframes lpd-card-travel-b {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 8px, 0) scale(0.94);
+  }
+
+  8%, 18% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+
+  40% {
+    transform: translate3d(calc(100% + 14px), -3px, 0) scale(1.01);
+  }
+
+  42%, 100% {
+    opacity: 1;
+    transform: translate3d(calc(100% + 14px), 0, 0) scale(1);
+  }
+}
+
+/* Card C: appears last, stays in Applied. */
+
+.lpd-app-card--c {
+  top: 22px;
+  animation: lpd-rise 460ms var(--lpd-ease) 600ms both;
+}
+
+/* Card D: travels Applied → Rejected (skips to col 6). */
+
+.lpd-app-card--d {
+  top: 166px;
+  animation: lpd-card-travel-d 3200ms var(--lpd-ease) 2600ms both;
+}
+
+@keyframes lpd-card-travel-d {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 8px, 0) scale(0.94);
+  }
+
+  12% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+
+  /* Jump to Rejected (col 6) */
+  55% {
+    transform: translate3d(calc(500% + 70px), -4px, 0) scale(1.02);
+    border-color: rgba(239, 68, 68, 0.45);
+  }
+
+  65%, 100% {
+    opacity: 1;
+    transform: translate3d(calc(500% + 70px), 0, 0) scale(1);
+    border-color: rgba(239, 68, 68, 0.32);
+  }
+}
+
+/* Per-stage column dots (mirror the product's stage palette) */
+
+.lpd-col:nth-child(2) .lpd-col-dot {
+  background: #3b82f6;
+}
+
+.lpd-col:nth-child(3) .lpd-col-dot {
+  background: #f59e0b;
+}
+
+.lpd-col:nth-child(4) .lpd-col-dot {
+  background: #22c55e;
+}
+
+.lpd-col:nth-child(5) .lpd-col-dot {
+  background: #14b8a6;
+}
+
+.lpd-col:nth-child(6) .lpd-col-dot {
+  background: #ef4444;
+}
+
+/* ---------- track · job-application cards ---------- */
+
+.lpd-track {
+  gap: 8px;
+}
+
+.lpd-track-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  animation: lpd-rise 360ms var(--lpd-ease) both;
+}
+
+.lpd-track-head strong {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--lp-text);
+}
+
+.lpd-track-head span {
+  font-family: "JetBrains Mono Variable", ui-monospace, monospace;
+  font-size: 10px;
+  letter-spacing: 0.02em;
+  color: var(--lp-dim);
+}
+
+.lpd-app-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  margin-top: 1px;
+}
+
+.lpd-app-cv {
+  font-family: "JetBrains Mono Variable", ui-monospace, monospace;
+  font-size: 8px;
+  padding: 1px 5px;
+  border-radius: 999px;
+  border: 1px solid var(--lpd-line);
+  color: var(--lp-dim);
+}
+
+.lpd-app-stage {
+  font-size: 8px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.lpd-app-stage--applied {
+  background: rgba(148, 163, 184, 0.16);
+  color: #cbd5e1;
+}
+
+.lpd-app-stage--screening {
+  background: rgba(59, 130, 246, 0.18);
+  color: #93c5fd;
+}
+
+.lpd-app-stage--interview {
+  background: rgba(245, 158, 11, 0.18);
+  color: #fcd34d;
+}
+
+.lpd-app-stage--offer {
+  background: rgba(34, 197, 94, 0.18);
+  color: #86efac;
+}
+
+.lpd-app-stage--rejected {
+  background: rgba(239, 68, 68, 0.18);
+  color: #fca5a5;
+}
+
+/* ---------- scene · jd-library ---------- */
+
+/* Two columns so the search field and the insight tiles share one row: the
+   stage clips at a fixed aspect ratio, and a third full-width row would push
+   the loaded-JD footer past the bottom edge. */
+
+.lpd-jd-lib {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 0;
+}
+
+.lpd-jd-lib-head,
+.lpd-jd-cards,
+.lpd-jd-loaded {
+  width: 100%;
+}
+
+.lpd-jd-lib-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: "JetBrains Mono Variable", ui-monospace, monospace;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--lp-dim);
+  flex-shrink: 0;
+  animation: lpd-rise 360ms var(--lpd-ease) both;
+}
+
+.lpd-jd-lib-count {
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--lpd-line);
+  background: var(--lpd-raised);
+  font-size: 10px;
+  color: var(--lp-muted);
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.lpd-jd-search {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  height: 24px;
+  padding: 0 9px;
+  border: 1px solid var(--lpd-line);
+  border-radius: var(--lp-radius);
+  background: rgba(15, 23, 42, 0.02);
+  flex-shrink: 0;
+  animation: lpd-rise 340ms var(--lpd-ease) 160ms both;
+}
+
+.lpd-jd-search-icon {
+  position: relative;
+  flex-shrink: 0;
+  width: 9px;
+  height: 9px;
+  border: 1.5px solid var(--lp-dim);
+  border-radius: 50%;
+}
+
+.lpd-jd-search-icon::after {
+  content: "";
+  position: absolute;
+  top: 6px;
+  left: 5px;
+  width: 4px;
+  height: 1.5px;
+  border-radius: 1px;
+  background: var(--lp-dim);
+  transform: rotate(45deg);
+  transform-origin: left center;
+}
+
+.lpd-jd-search-placeholder {
+  overflow: hidden;
+  font-size: 11px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--lp-dim);
+}
+
+.lpd-jd-insights {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.lpd-jd-insight {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 1px;
+  min-width: 78px;
+  padding: 2px 10px;
+  border: 1px solid var(--lpd-line);
+  border-radius: var(--lp-radius);
+  background: var(--lpd-raised);
+  animation: lpd-rise 340ms var(--lpd-ease) 560ms both;
+}
+
+.lpd-jd-insight:nth-child(2) {
+  animation-delay: 680ms;
+}
+
+.lpd-jd-insight-value {
+  font-family: "JetBrains Mono Variable", ui-monospace, monospace;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.15;
+  color: var(--lp-accent);
+}
+
+.lpd-jd-insight-label {
+  font-size: 8px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--lp-dim);
+}
+
+.lpd-jd-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.lpd-jd-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 5px 8px;
+  border: 1px solid var(--lpd-line);
+  border-radius: var(--lp-radius);
+  background: var(--lpd-raised);
+  animation: lpd-rise 380ms var(--lpd-ease) calc(400ms + var(--i) * 200ms) both;
+}
+
+.lpd-jd-card.is-picked {
+  border-color: rgba(110, 231, 183, 0.34);
+  animation:
+    lpd-rise 380ms var(--lpd-ease) calc(400ms + var(--i) * 200ms) both,
+    lpd-hr-fade-in 320ms var(--lpd-ease) 2200ms both;
+}
+
+.lpd-jd-card.is-picked::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: rgba(110, 231, 183, 0.04);
+  box-shadow: inset 0 0 0 1px rgba(110, 231, 183, 0.18);
+  opacity: 0;
+  pointer-events: none;
+  animation: lpd-hr-fade-in 320ms var(--lpd-ease) 2200ms both;
+}
+
+.lpd-jd-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.lpd-jd-card-title {
+  font-size: 12px;
+  font-weight: 550;
+  color: var(--lp-text);
+}
+
+.lpd-jd-score {
+  font-family: "JetBrains Mono Variable", ui-monospace, monospace;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--lp-muted);
+}
+
+.lpd-jd-score.is-strong {
+  color: var(--lp-accent);
+}
+
+.lpd-jd-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.lpd-jd-chip {
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--lpd-line);
+  background: rgba(15, 23, 42, 0.02);
+  font-family: "JetBrains Mono Variable", ui-monospace, monospace;
+  font-size: 10px;
+  color: var(--lp-muted);
+  animation: lpd-pop 280ms var(--lpd-ease) calc(1000ms + var(--i) * 100ms) both;
+}
+
+.lpd-jd-card-meta {
+  font-family: "JetBrains Mono Variable", ui-monospace, monospace;
+  font-size: 10px;
+  color: var(--lp-dim);
+}
+
+.lpd-jd-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+.lpd-jd-analyze-btn {
+  animation:
+    lpd-rise 340ms var(--lpd-ease) 2400ms both,
+    lpd-hr-press 420ms var(--lpd-ease) 3000ms forwards;
+}
+
+.lpd-jd-analyze-btn::after {
+  animation: lpd-hr-ring 520ms var(--lpd-ease) 3020ms forwards;
+}
+
+.lpd-jd-apply-btn {
+  animation: lpd-rise 340ms var(--lpd-ease) 2560ms both;
+}
+
+.lpd-jd-loaded {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 6px 10px;
+  border: 1px solid rgba(110, 231, 183, 0.24);
+  border-radius: var(--lp-radius);
+  background: rgba(110, 231, 183, 0.04);
+  margin-top: auto;
+  flex-shrink: 0;
+  animation: lpd-rise 380ms var(--lpd-ease) 3600ms both;
+}
+
+.lpd-jd-loaded-label {
+  font-family: "JetBrains Mono Variable", ui-monospace, monospace;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--lp-dim);
+}
+
+.lpd-jd-loaded-title {
+  font-size: 13px;
+  font-weight: 550;
+  color: var(--lp-accent);
+}
+
+/* ---------- scene · job-search ---------- */
+
+/* Beat 1 the search card rises and its six filters stagger in · beat 2 the CV
+   selector resolves to the latest parsed version · beat 3 the keyword and level
+   fields fill themselves from that CV, each with a sweep and a caret · beat 4
+   the button is armed, pressed, and holds a Searching state · beat 5 the result
+   header counts up beside its derived-level and AI badges · beat 6 job cards
+   stack in, unpacking source, seniority, company, location, date, matched
+   keywords and View job, then the top hit lights up. */
+
+.lpd-job-search {
+  gap: 8px;
+}
+
+.lpd-js-form {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 10px 12px;
+  border: 1px solid var(--lpd-line);
+  border-radius: var(--lp-radius);
+  background: var(--lpd-raised);
+  animation: lpd-rise 420ms var(--lpd-ease) both;
+}
+
+.lpd-js-form-head {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  font-family: "JetBrains Mono Variable", ui-monospace, monospace;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--lp-muted);
+  animation: lpd-rise 360ms var(--lpd-ease) 120ms both;
+}
+
+.lpd-js-form-sub {
+  font-size: 9px;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  color: var(--lp-dim);
+  animation: lpd-hr-fade-in 320ms var(--lpd-ease) 260ms both;
+}
+
+.lpd-js-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px 10px;
+}
+
+.lpd-js-field {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  animation: lpd-rise 340ms var(--lpd-ease) calc(300ms + var(--i) * 90ms) both;
+}
+
+.lpd-js-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--lp-dim);
+}
+
+.lpd-js-hint {
+  padding: 1px 5px;
+  border-radius: 999px;
+  border: 1px solid rgba(110, 231, 183, 0.28);
+  background: rgba(110, 231, 183, 0.08);
+  font-size: 8px;
+  font-style: normal;
+  letter-spacing: 0.04em;
+  color: var(--lp-accent);
+}
+
+.lpd-js-input,
+.lpd-js-select {
+  position: relative;
+  display: flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 9px;
+  overflow: hidden;
+  border: 1px solid var(--lpd-line);
+  border-radius: var(--lp-radius);
+  background: rgba(15, 23, 42, 0.02);
+  font-size: 11px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--lp-text);
+}
+
+.lpd-js-select::after {
+  content: "";
+  flex-shrink: 0;
+  width: 0;
+  height: 0;
+  margin-left: auto;
+  border-right: 4px solid transparent;
+  border-left: 4px solid transparent;
+  border-top: 5px solid var(--lp-dim);
+}
+
+.lpd-js-cv-a,
+.lpd-js-cv-b {
+  position: absolute;
+  inset: 0 22px 0 9px;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.lpd-js-cv-a {
+  color: var(--lp-dim);
+  animation: lpd-js-hide 220ms var(--lpd-ease) 880ms forwards;
+}
+
+.lpd-js-cv-b {
+  color: var(--lp-text);
+  animation: lpd-rise 320ms var(--lpd-ease) 900ms both;
+}
+
+.lpd-js-cv {
+  animation: lpd-arm 900ms var(--lpd-ease) 900ms both;
+}
+
+@keyframes lpd-js-hide {
+  from {
+    opacity: 1;
+  }
+
+  to {
+    opacity: 0;
+  }
+}
+
+/* The AI-derived fields settle from transparent to accent rather than using a
+   clip-path reveal: clipping the field would hide its border too, which reads as
+   a missing input while the sibling filters are already on screen. */
+
+.lpd-js-ai-fill {
+  animation:
+    lpd-js-fill 420ms var(--lpd-ease) calc(1500ms + var(--i) * 700ms) both,
+    lpd-arm 760ms var(--lpd-ease) calc(1500ms + var(--i) * 700ms) both;
+}
+
+.lpd-js-ai-fill::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 46%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(110, 231, 183, 0.2),
+    transparent
+  );
+  pointer-events: none;
+  animation: lpd-sweep 760ms var(--lpd-ease) calc(1420ms + var(--i) * 700ms) both;
+}
+
+.lpd-js-caret {
+  flex-shrink: 0;
+  width: 1px;
+  height: 11px;
+  margin-left: 3px;
+  background: var(--lp-accent);
+  opacity: 0;
+  animation: lpd-js-blink 520ms steps(2, jump-none)
+    calc(1500ms + var(--i) * 700ms) 3 both;
+}
+
+@keyframes lpd-js-fill {
+  from {
+    color: transparent;
+  }
+
+  to {
+    color: var(--lp-accent);
+  }
+}
+
+@keyframes lpd-js-blink {
+  from {
+    opacity: 1;
+  }
+
+  to {
+    opacity: 0;
+  }
+}
+
+.lpd-hr-btn.lpd-js-btn {
+  align-self: flex-start;
+  justify-content: center;
+  gap: 0;
+  min-width: 152px;
+  height: 26px;
+  padding: 0 14px;
+  animation:
+    lpd-rise 340ms var(--lpd-ease) 800ms both,
+    lpd-arm 900ms var(--lpd-ease) 2900ms forwards,
+    lpd-hr-press 420ms var(--lpd-ease) 3000ms forwards;
+}
+
+.lpd-hr-btn.lpd-js-btn::after {
+  animation: lpd-hr-ring 520ms var(--lpd-ease) 3020ms forwards;
+}
+
+.lpd-js-spin {
+  position: absolute;
+  left: 11px;
+  width: 10px;
+  height: 10px;
+  border: 1.5px solid rgba(110, 231, 183, 0.26);
+  border-top-color: var(--lp-accent);
+  border-radius: 50%;
+  opacity: 0;
+  animation:
+    lpd-js-spin 400ms linear 3000ms 1 both,
+    lpd-hr-fade-in 160ms var(--lpd-ease) 3000ms both,
+    lpd-js-hide 200ms var(--lpd-ease) 3400ms forwards;
+}
+
+@keyframes lpd-js-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.lpd-js-btn-a,
+.lpd-js-btn-b {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.lpd-js-btn-a {
+  animation:
+    lpd-js-hide 200ms var(--lpd-ease) 3000ms forwards,
+    lpd-hr-fade-in 220ms var(--lpd-ease) 3420ms forwards;
+}
+
+.lpd-js-btn-b {
+  opacity: 0;
+  animation:
+    lpd-hr-fade-in 200ms var(--lpd-ease) 3040ms both,
+    lpd-js-hide 200ms var(--lpd-ease) 3400ms forwards;
+}
+
+.lpd-js-results-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  animation: lpd-rise 360ms var(--lpd-ease) 3300ms both;
+}
+
+.lpd-js-results-count {
+  font-size: 11px;
+  color: var(--lp-muted);
+}
+
+.lpd-js-badge {
+  padding: 2px 7px;
+  border-radius: 999px;
+  border: 1px solid var(--lpd-line);
+  background: rgba(15, 23, 42, 0.03);
+  font-family: "JetBrains Mono Variable", ui-monospace, monospace;
+  font-size: 9px;
+  letter-spacing: 0.04em;
+  color: var(--lp-dim);
+  animation: lpd-pop 300ms var(--lpd-ease) 3400ms both;
+}
+
+.lpd-js-badge.is-ai {
+  border-color: rgba(110, 231, 183, 0.3);
+  background: rgba(110, 231, 183, 0.1);
+  color: var(--lp-accent);
+  animation-delay: 3560ms;
+}
+
+.lpd-js-cards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.lpd-js-card {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+  padding: 10px 11px;
+  border: 1px solid var(--lpd-line);
+  border-radius: var(--lp-radius);
+  background: var(--lpd-raised);
+  animation: lpd-rise 400ms var(--lpd-ease) calc(3700ms + var(--i) * 260ms) both;
+}
+
+/* The top hit lights up through its own border and background rather than an
+   overlay: the card paints an opaque background, so a stacked layer would have
+   to sit above the text to be visible. */
+
+.lpd-js-card.is-picked {
+  animation:
+    lpd-rise 400ms var(--lpd-ease) calc(3700ms + var(--i) * 260ms) both,
+    lpd-js-pick 520ms var(--lpd-ease) 6000ms forwards;
+}
+
+@keyframes lpd-js-pick {
+  to {
+    border-color: rgba(110, 231, 183, 0.34);
+    background: rgba(110, 231, 183, 0.06);
+  }
+}
+
+.lpd-js-card-title {
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--lp-text);
+  animation: lpd-hr-fade-in 320ms var(--lpd-ease) calc(3860ms + var(--i) * 260ms)
+    both;
+}
+
+.lpd-js-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  animation: lpd-rise 300ms var(--lpd-ease) calc(4000ms + var(--i) * 260ms) both;
+}
+
+.lpd-js-source,
+.lpd-js-seniority {
+  padding: 1px 6px;
+  border-radius: 999px;
+  border: 1px solid var(--lpd-line);
+  font-family: "JetBrains Mono Variable", ui-monospace, monospace;
+  font-size: 8px;
+  letter-spacing: 0.04em;
+  color: var(--lp-dim);
+}
+
+.lpd-js-source.is-linkedin {
+  border-color: rgba(125, 176, 245, 0.32);
+  background: rgba(125, 176, 245, 0.12);
+  color: rgb(158, 195, 247);
+}
+
+.lpd-js-source.is-freehire {
+  border-color: rgba(110, 231, 183, 0.32);
+  background: rgba(110, 231, 183, 0.12);
+  color: var(--lp-accent);
+}
+
+.lpd-js-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.lpd-js-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  overflow: hidden;
+  font-size: 10px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--lp-muted);
+  animation: lpd-rise 280ms var(--lpd-ease) calc(4180ms + var(--i) * 70ms) both;
+}
+
+.lpd-js-ico {
+  position: relative;
+  flex-shrink: 0;
+  width: 9px;
+  height: 9px;
+  border: 1px solid var(--lp-dim);
+}
+
+.lpd-js-ico.is-org {
+  border-bottom-width: 2px;
+}
+
+.lpd-js-ico.is-pin {
+  width: 8px;
+  height: 8px;
+  border-radius: 50% 50% 50% 0;
+  transform: rotate(-45deg);
+}
+
+.lpd-js-ico.is-cal {
+  border-top-width: 3px;
+  border-radius: 1px;
+}
+
+.lpd-js-keywords {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.lpd-js-kw {
+  padding: 1px 6px;
+  border-radius: var(--lp-radius);
+  border: 1px solid rgba(110, 231, 183, 0.22);
+  background: rgba(110, 231, 183, 0.08);
+  font-size: 9px;
+  color: var(--lp-accent);
+  animation: lpd-pop 300ms var(--lpd-ease) calc(4500ms + var(--ki) * 90ms) both;
+}
+
+.lpd-js-view {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-end;
+  gap: 4px;
+  margin-top: auto;
+  font-size: 10px;
+  color: var(--lp-accent);
+  animation: lpd-rise 300ms var(--lpd-ease) calc(5400ms + var(--i) * 160ms) both;
+}
+
+.lpd-js-out {
+  position: relative;
+  flex-shrink: 0;
+  width: 7px;
+  height: 7px;
+  border-top: 1px solid currentcolor;
+  border-right: 1px solid currentcolor;
+}
+
+.lpd-js-out::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  right: -1px;
+  width: 8px;
+  height: 1px;
+  background: currentcolor;
+  transform: rotate(-45deg);
+  transform-origin: right center;
+}
+
+@media (max-width: 640px) {
+  .lpd-bar-row {
+    grid-template-columns: 74px 1fr 30px;
+    gap: 9px;
+  }
+
+  .lpd-col-head {
+    font-size: 9px;
+  }
+
+  .lpd-app-card strong {
+    font-size: 11px;
+  }
+}
