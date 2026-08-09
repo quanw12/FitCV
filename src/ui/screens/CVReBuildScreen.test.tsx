@@ -261,6 +261,27 @@ describe("CVReBuildScreen", () => {
     expect(await screen.findByText(/saved to cv history/i)).toBeInTheDocument()
   })
 
+  it("passes the rebuilt PDF to Match Analyzer when requested", async () => {
+    const onAnalyzeCv = vi.fn()
+    apiMocks.rebuildCv.mockResolvedValue(RESULT)
+
+    render(<CVReBuildScreen onAnalyzeCv={onAnalyzeCv} />)
+
+    fireEvent.change(screen.getByTestId("cv-rebuild-input"), {
+      target: { files: [makeFile()] },
+    })
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: /analyze against a job/i }),
+    )
+
+    expect(apiMocks.pdfBase64ToBlob).toHaveBeenCalledWith("cGRm")
+    expect(onAnalyzeCv).toHaveBeenCalledTimes(1)
+    const file = onAnalyzeCv.mock.calls[0][0] as File
+    expect(file.name).toBe("rebuilt_cv.pdf")
+    expect(file.type).toBe("application/pdf")
+  })
+
   it("shows an error toast when saving to history fails", async () => {
     apiMocks.rebuildCv.mockResolvedValue(RESULT)
     apiMocks.uploadCv.mockRejectedValue(new Error("CV files must be 10 MB or smaller."))

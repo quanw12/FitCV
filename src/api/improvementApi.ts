@@ -6,11 +6,13 @@ import type {
   ImprovementReportResponse,
   SuggestionPriority,
 } from "@/types/improvement"
+import type { CvRebuildResponse } from "@/types/cvRebuild"
 
 import { requestJson } from "./httpClient"
 
 interface BackendReport {
   skill_gaps: Array<{
+    suggestion_id: number
     skill: string
     priority: SuggestionPriority
     reason: string
@@ -18,6 +20,7 @@ interface BackendReport {
   }>
 
   section_feedback: Array<{
+    suggestion_id: number
     section: string
     issue: string
     explanation: string
@@ -26,6 +29,7 @@ interface BackendReport {
   }>
 
   rewrite_suggestions: Array<{
+    suggestion_id: number
     section: string
     original_text: string
     issue: string
@@ -34,6 +38,7 @@ interface BackendReport {
   }>
 
   quick_wins: Array<{
+    suggestion_id: number
     title: string
     category: string
     priority: SuggestionPriority
@@ -91,26 +96,27 @@ function normalizeSection(
 function normalizeReport(report: BackendReport): ImprovementReport {
   return {
     skillGaps: report.skill_gaps.map((item) => ({
-      ...item,
-
       id: stableId("skill", [item.skill]),
-
+      suggestionId: item.suggestion_id,
+      skill: item.skill,
+      priority: item.priority,
+      reason: item.reason,
       jdEvidence: item.jd_evidence,
     })),
 
     sectionFeedback: report.section_feedback.map((item) => ({
-      ...item,
-
       id: stableId("feedback", [item.section, item.issue]),
-
+      suggestionId: item.suggestion_id,
       section: normalizeSection(item.section),
-
+      issue: item.issue,
+      explanation: item.explanation,
+      priority: item.priority,
       suggestedAction: item.suggested_action,
     })),
 
     rewriteSuggestions: report.rewrite_suggestions.map((item) => ({
       id: stableId("rewrite", [item.section, item.original_text]),
-
+      suggestionId: item.suggestion_id,
       section: normalizeSection(item.section),
 
       originalText: item.original_text,
@@ -123,9 +129,12 @@ function normalizeReport(report: BackendReport): ImprovementReport {
     })),
 
     quickWins: report.quick_wins.map((item) => ({
-      ...item,
-
       id: stableId("quick", [item.title]),
+      suggestionId: item.suggestion_id,
+      title: item.title,
+      category: item.category,
+      priority: item.priority,
+      explanation: item.explanation,
     })),
   }
 }
@@ -185,5 +194,25 @@ export const improvementApi = {
     )
 
     return normalizeResponse(payload)
+  },
+
+  async applyImprovements(
+    matchResultId: string,
+    suggestionIds: number[],
+    options?: { language?: "en" | "vi"; avatar?: string; signal?: AbortSignal },
+  ): Promise<CvRebuildResponse> {
+    return requestJson<CvRebuildResponse>(
+      `/api/match-results/${matchResultId}/apply-improvements`,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          suggestion_ids: suggestionIds,
+          language: options?.language,
+          avatar: options?.avatar,
+        }),
+        authenticated: true,
+        signal: options?.signal,
+      },
+    )
   },
 }

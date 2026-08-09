@@ -6,6 +6,7 @@ import type { ImprovementReportResponse } from "@/types/improvement"
 const improvementMocks = vi.hoisted(() => ({
   generateReport: vi.fn(),
   getReport: vi.fn(),
+  applyImprovements: vi.fn(),
 }))
 
 vi.mock("@/api/improvementApi", () => ({
@@ -18,6 +19,7 @@ const fullReport: NonNullable<ImprovementReportResponse["report"]> = {
   skillGaps: [
     {
       id: "skill-docker",
+      suggestionId: 101,
       skill: "Docker",
       priority: "High",
       reason: "The role requires container deployment experience.",
@@ -27,6 +29,7 @@ const fullReport: NonNullable<ImprovementReportResponse["report"]> = {
   sectionFeedback: [
     {
       id: "feedback-experience",
+      suggestionId: 102,
       section: "WorkExperience",
       issue: "Impact is unclear",
       explanation: "The bullet describes activity without a measurable result.",
@@ -37,6 +40,7 @@ const fullReport: NonNullable<ImprovementReportResponse["report"]> = {
   rewriteSuggestions: [
     {
       id: "rewrite-experience",
+      suggestionId: 103,
       section: "WorkExperience",
       originalText: "Built backend services.",
       issue: "The statement is too broad.",
@@ -47,6 +51,7 @@ const fullReport: NonNullable<ImprovementReportResponse["report"]> = {
   quickWins: [
     {
       id: "quick-proofread",
+      suggestionId: 104,
       title: "Proofread the summary",
       category: "Format",
       priority: "Low",
@@ -165,6 +170,9 @@ describe("ImprovementScreen acceptance states", () => {
     expect(
       screen.getByText("No quick wins are available for this report."),
     ).toBeInTheDocument()
+    expect(
+      screen.getByRole("button", { name: /apply 0 improvements & rebuild cv/i }),
+    ).toBeDisabled()
   })
 
   it("shows a failed state and recovers after Retry", async () => {
@@ -279,5 +287,55 @@ describe("ImprovementScreen acceptance states", () => {
 
     expect(screen.getByText("1/1 completed")).toBeInTheDocument()
     expect(quickWin).toHaveAttribute("aria-pressed", "true")
+  })
+
+  it("applies selected suggestions and hands the rebuilt CV to the app", async () => {
+    const onRebuilt = vi.fn()
+    const rebuilt = {
+      filename: "improved_cv.pdf",
+      preview_json: {
+        name: "Nguyen Van A",
+        email: "",
+        phone: "",
+        links: [],
+        summary: "Backend engineer.",
+        experience: [],
+        core_competencies: [],
+        skills: ["Python"],
+        skill_groups: [],
+        projects: [],
+        certifications: [],
+        education: [],
+        languages: [],
+        publications: [],
+        awards: [],
+      },
+      pdf_base64: "cGRm",
+      thumbnail_base64: "dGh1bWI=",
+      warnings: [],
+    }
+    improvementMocks.getReport.mockResolvedValueOnce(reportResponse())
+    improvementMocks.applyImprovements.mockResolvedValueOnce(rebuilt)
+
+    render(<ImprovementScreen matchResultId="28" onRebuilt={onRebuilt} />)
+
+    await screen.findByText("Docker")
+    fireEvent.click(
+      screen.getByLabelText("Apply only if my CV already proves this skill."),
+    )
+    fireEvent.click(
+      screen.getByRole("button", { name: /apply 2 improvements & rebuild cv/i }),
+    )
+
+    await act(async () => {
+      await Promise.resolve()
+    })
+
+    expect(improvementMocks.applyImprovements).toHaveBeenCalledWith(
+      "28",
+      expect.arrayContaining([101, 103]),
+      expect.objectContaining({ signal: expect.anything() }),
+    )
+    expect(onRebuilt).toHaveBeenCalledWith(rebuilt)
   })
 })

@@ -5,7 +5,11 @@ from pathlib import Path
 from app.schemas.cv_rebuild import CVData
 from app.services.cv_rebuild import orchestrator
 from app.services.cv_rebuild.llm_extractor import CvExtractionError
-from app.services.cv_rebuild.orchestrator import build_cv, rebuild_cv
+from app.services.cv_rebuild.orchestrator import (
+    build_cv,
+    rebuild_cv,
+    rebuild_with_improvements,
+)
 from app.services.cv_rebuild.pdf_renderer import PdfRenderError
 from app.services.gemini_client import GeminiClientError
 
@@ -38,20 +42,37 @@ _MINIMAL_PDF = (
 
 
 class FakeExtractor:
-    def __init__(self, result: CVData, *, polish_result: CVData | None = None) -> None:
+    def __init__(
+        self,
+        result: CVData,
+        *,
+        polish_result: CVData | None = None,
+        polish_warnings: list[str] | None = None,
+    ) -> None:
         self.result = result
         self.polish_result = polish_result if polish_result is not None else result
+        self.polish_warnings = polish_warnings or []
         self.last_polish_language: str | None = None
+        self.last_applied_improvements: str | None = None
         self.polish_calls = 0
 
     def extract(self, raw_text: str, *, max_attempts: int = 3) -> CVData:
         assert "Backend engineer" in raw_text
         return self.result
 
-    def polish(self, cv: CVData, *, language: str = "en", max_attempts: int = 3, jd_text: str | None = None) -> tuple[CVData, list[str]]:
+    def polish(
+        self,
+        cv: CVData,
+        *,
+        language: str = "en",
+        max_attempts: int = 3,
+        jd_text: str | None = None,
+        applied_improvements: str | None = None,
+    ) -> tuple[CVData, list[str]]:
         self.last_polish_language = language
+        self.last_applied_improvements = applied_improvements
         self.polish_calls += 1
-        return self.polish_result, []
+        return self.polish_result, self.polish_warnings
 
 
 class TestRebuildCv:
@@ -175,6 +196,28 @@ class TestRebuildCv:
         result = asyncio.run(rebuild_cv(_MINIMAL_PDF, "cv.pdf", extractor=extractor))
         assert extractor.polish_calls == 1
         assert result.preview_json.name == "Nguyễn Văn A"
+
+
+class TestRebuildWithImprovements:
+    def test_applies_instructions_even_when_cv_is_not_mixed(self, monkeypatch) -> None:
+        monkeypatch.setattr(orchestrator, "render_pdf_with_thumbnail", _fake_render)
+        extractor = FakeExtractor(
+            CVData(name="Nguyen Van A", summary="Backend engineer.", skills=["Python"]),
+            polish_warnings=["Skills not grounded in source: Kubernetes"],
+        )
+        result = asyncio.run(
+            rebuild_with_improvements(
+                "Backend engineer with Python experience.",
+                applied_improvements='- [Rewrite · Summary] Replace "Engineer" → "Backend engineer"',
+                jd_text="Backend role needs Python.",
+                extractor=extractor,
+            )
+        )
+        assert result.filename == "improved_cv.pdf"
+        assert extractor.polish_calls == 1
+        assert extractor.last_applied_improvements is not None
+        assert "[Rewrite · Summary]" in extractor.last_applied_improvements
+        assert any("Skills not grounded in source" in warning for warning in result.warnings)
 
 
 class TestBuildCv:

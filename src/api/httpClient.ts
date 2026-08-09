@@ -10,7 +10,7 @@ import { API_BASE_URL } from "./config"
 let refreshInFlight: Promise<ReturnType<typeof persistBackendSession> | null> | null =
   null
 
-function refreshSession() {
+export function refreshSession() {
   if (!refreshInFlight) {
     refreshInFlight = fetch(`${API_BASE_URL}/api/auth/refresh`, {
       method: "POST",

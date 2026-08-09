@@ -210,7 +210,7 @@ def _process_inbound(
             occurred_at=occurred_at,
             detail="Inbound email application was not found.",
         )
-    _, _, candidate, _ = context
+    candidate = context[2]
     sender_email = _bare_email(data.get("from"))
     if not candidate.email or sender_email != candidate.email.strip().lower():
         return _ignored_response(

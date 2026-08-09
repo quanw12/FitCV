@@ -26,9 +26,9 @@ const alertStyle: React.CSSProperties = {
   display: "flex",
   alignItems: "center",
   gap: 8,
-  color: "#B91C1C",
-  background: "#FEF2F2",
-  border: "1px solid #FECACA",
+  color: "var(--danger)",
+  background: "var(--danger-soft)",
+  border: "1px solid color-mix(in srgb, var(--danger) 34%, transparent)",
   borderRadius: 10,
   padding: "11px 14px",
   marginBottom: 16,
@@ -51,12 +51,26 @@ const cardIconStyle: React.CSSProperties = {
   width: 44,
   height: 44,
   borderRadius: 12,
-  background: "#EFF6FF",
-  color: "#2563EB",
+  background: "var(--accent-soft)",
+  color: "var(--accent-ink)",
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
   marginBottom: 14,
+}
+
+function formatPostedDate(value: string | null) {
+  if (!value) return "Date unknown"
+
+  const date = new Date(value)
+
+  if (Number.isNaN(date.getTime())) return value
+
+  return date.toLocaleDateString(undefined, {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  })
 }
 
 export default function JobSearchScreen() {
@@ -116,8 +130,6 @@ export default function JobSearchScreen() {
     void loadCvs()
   }, [loadCvs])
 
-  const selectedCv = cvs.find((cv) => cv.cvId === selectedCvId) ?? null
-
   const runSearch = async () => {
     if (selectedCvId == null) return
 
@@ -157,34 +169,16 @@ export default function JobSearchScreen() {
 
   return (
     <div>
-      <div
-        style={{
-          display: "flex",
-          alignItems: "flex-start",
-          justifyContent: "space-between",
-          gap: 16,
-          marginBottom: 24,
-          flexWrap: "wrap",
-        }}
-      >
+      <div className="fc-page-head">
         <div>
-          <h1
-            style={{
-              fontSize: 22,
-              fontWeight: 800,
-              color: "var(--text-primary)",
-              marginBottom: 4,
-            }}
-          >
-            Job Search
-          </h1>
+          <h1>Job Search</h1>
           <p style={{ color: "var(--text-secondary)", fontSize: 14 }}>
             Scan your CV, find a few matching tech job postings, and open them
             to apply. Nothing is saved.
           </p>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <Briefcase size={20} weight="light" color="#2563EB" />
+          <Briefcase size={20} weight="light" color="var(--accent)" />
           <span style={{ fontSize: 13, color: "var(--text-secondary)" }}>
             freehire.me + LinkedIn · tech-focused · best-effort
           </span>
@@ -201,13 +195,7 @@ export default function JobSearchScreen() {
         <div className="fc-eyebrow" style={{ marginBottom: 14 }}>
           Scan CV &amp; search
         </div>
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-            gap: 14,
-          }}
-        >
+        <div className="job-search-filters">
           <label>
             <span className="fc-field-label">CV to scan</span>
             <select
@@ -227,13 +215,12 @@ export default function JobSearchScreen() {
           </label>
 
           <label>
-            <span className="fc-field-label">
-              Keywords (leave empty to auto-derive from CV)
-            </span>
+            <span className="fc-field-label">Keywords</span>
             <input
               className="fc-input"
               type="text"
               placeholder="e.g. software engineer intern"
+              title="Leave empty to auto-derive keywords from your CV"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
             />
@@ -279,15 +266,13 @@ export default function JobSearchScreen() {
           </label>
 
           <label>
-            <span className="fc-field-label">
-              Experience level (leave empty to auto-detect)
-            </span>
+            <span className="fc-field-label">Experience level</span>
             <select
               className="fc-input"
               value={level}
               onChange={(event) => setLevel(event.target.value)}
             >
-              <option value="">Any</option>
+              <option value="">Any (auto-detect)</option>
               <option value="Intern">Intern</option>
               <option value="Entry">Entry</option>
               <option value="Fresher">Fresher</option>
@@ -299,22 +284,22 @@ export default function JobSearchScreen() {
             </select>
           </label>
 
-          <div style={{ display: "flex", alignItems: "flex-end" }}>
-            <button
-              type="button"
-              className="fitcv-btn-primary"
-              onClick={() => void runSearch()}
-              disabled={searching || selectedCvId == null || loading}
-              style={{ width: "100%" }}
-            >
-              {searching ? (
-                <Spinner size={15} weight="light" />
-              ) : (
-                <MagnifyingGlass size={15} weight="light" />
-              )}
-              {searching ? "Searching…" : "Find matching jobs"}
-            </button>
-          </div>
+        </div>
+
+        <div className="job-search-submit">
+          <button
+            type="button"
+            className="fitcv-btn-primary"
+            onClick={() => void runSearch()}
+            disabled={searching || selectedCvId == null || loading}
+          >
+            {searching ? (
+              <Spinner className="job-spin" size={15} weight="light" />
+            ) : (
+              <MagnifyingGlass size={15} weight="light" />
+            )}
+            {searching ? "Searching…" : "Find matching jobs"}
+          </button>
         </div>
 
         {cvs.length > 0 && parsedCvCount === 0 && (
@@ -334,7 +319,7 @@ export default function JobSearchScreen() {
       {loading && (
         <div className="fitcv-card" style={{ padding: 24 }}>
           <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-            <Spinner size={18} weight="light" /> Loading your CVs...
+            <Spinner className="job-spin" size={18} weight="light" /> Loading your CVs...
           </div>
         </div>
       )}
@@ -358,10 +343,26 @@ export default function JobSearchScreen() {
 
       {result && (
         <div
-          className="fc-eyebrow"
-          style={{ marginBottom: 10, display: "flex", alignItems: "center", gap: 8 }}
+          style={{
+            marginBottom: 12,
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            flexWrap: "wrap",
+            fontSize: 13,
+            color: "var(--text-secondary)",
+          }}
         >
-          {result.results.length} jobs for “{result.query}” in {result.location}
+          <span>
+            <span style={{ color: "var(--text-primary)", fontWeight: 650 }}>
+              {result.results.length}
+            </span>{" "}
+            jobs for{" "}
+            <span style={{ color: "var(--text-primary)", fontWeight: 650 }}>
+              “{result.query}”
+            </span>{" "}
+            in {result.location}
+          </span>
           {result.derivedLevel && (
             <span
               className="fc-badge"
@@ -401,52 +402,21 @@ export default function JobSearchScreen() {
       )}
 
       {result && result.results.length > 0 && (
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
-            gap: 14,
-          }}
-        >
+        <div className="job-result-grid">
           {result.results.map((job) => (
-            <BezelCard key={job.id}>
-              <div
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  minHeight: 190,
-                }}
-              >
-                <div
-                  style={{
-                    fontSize: 15,
-                    fontWeight: 700,
-                    color: "var(--text-primary)",
-                    lineHeight: 1.35,
-                  }}
-                >
+            <BezelCard key={job.id} className="job-result-card">
+              <div className="job-result-card__body">
+                <div className="job-result-card__title" title={job.title}>
                   {job.title}
                 </div>
                 <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
                   {job.source === "linkedin" && (
-                    <span
-                      style={{
-                        fontSize: 11, background: "#E8F0FE", color: "#0A66C2",
-                        borderRadius: 6, padding: "2px 8px", fontWeight: 600,
-                        display: "inline-flex", alignItems: "center", gap: 4,
-                      }}
-                    >
+                    <span className="fc-badge fc-badge--blue">
                       LinkedIn
                     </span>
                   )}
                   {job.source === "freehire" && (
-                    <span
-                      style={{
-                        fontSize: 11, background: "#E8F8EA", color: "#0D7A3F",
-                        borderRadius: 6, padding: "2px 8px", fontWeight: 600,
-                        display: "inline-flex", alignItems: "center", gap: 4,
-                      }}
-                    >
+                    <span className="fc-badge fc-badge--green">
                       freehire
                     </span>
                   )}
@@ -479,13 +449,13 @@ export default function JobSearchScreen() {
                     style={{ display: "flex", alignItems: "center", gap: 7 }}
                   >
                     <MapPin size={14} weight="light" />
-                    {job.location ?? "—"}
+                    {job.location ?? "Location not listed"}
                   </div>
                   <div
                     style={{ display: "flex", alignItems: "center", gap: 7 }}
                   >
                     <CalendarBlank size={14} weight="light" />
-                    {job.date ?? "Date unknown"}
+                    {formatPostedDate(job.date)}
                   </div>
                 </div>
                 {job.matchedKeywords.length > 0 && (

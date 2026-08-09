@@ -35,19 +35,20 @@ const STAGES: ApplicationStage[] = [
 
 const stageConfig: Record<ApplicationStage, {
   background: string
+
   color: string
 }> = {
-  Applied: { background: "#F1F5F9", color: "#475569" },
+  Applied: { background: "#F1F5F9", color: "var(--text-secondary)" },
 
-  Screening: { background: "#DBEAFE", color: "#1D4ED8" },
+  Screening: { background: "#DBEAFE", color: "var(--accent)" },
 
-  Interview: { background: "#FEF3C7", color: "#A16207" },
+  Interview: { background: "#FEF3C7", color: "var(--warning)" },
 
-  Offer: { background: "#DCFCE7", color: "#15803D" },
+  Offer: { background: "#DCFCE7", color: "var(--success)" },
 
-  Hired: { background: "#CCFBF1", color: "#0F766E" },
+  Hired: { background: "#CCFBF1", color: "var(--success)" },
 
-  Rejected: { background: "#FEE2E2", color: "#B91C1C" },
+  Rejected: { background: "#FEE2E2", color: "var(--danger)" },
 }
 
 interface AppTrackerScreenProps {
@@ -838,6 +839,7 @@ function ProcessingBadge({
 }) {
   const config: Record<ApplicationProcessingStatus, {
     background: string
+
     color: string
   }> = {
     Pending: { background: "#FEF3C7", color: "#92400E" },

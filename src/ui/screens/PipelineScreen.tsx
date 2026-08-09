@@ -586,56 +586,65 @@ export default function PipelineScreen() {
           <p>Drag candidates through your hiring stages.</p>
         </div>
 
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-          <select
-            className="fc-input"
-            aria-label="Filter pipeline by job"
-            value={selectedJobId ?? ""}
-            onChange={(event) =>
-              setSelectedJobId(
-                event.target.value ? Number(event.target.value) : undefined,
-              )
-            }
-          >
-            <option value="">All jobs</option>
-            {jobs.map((job) => (
-              <option value={job.job_id} key={job.job_id}>
-                {job.title}
-              </option>
-            ))}
-          </select>
-          <select
-            className="fc-input"
-            aria-label="Filter pipeline by stage"
-            value={stageFilter}
-            onChange={(event) =>
-              setStageFilter(event.target.value as PipelineStage | "all")
-            }
-          >
-            <option value="all">All stages</option>
-            {stages.map((stage) => (
-              <option value={stage} key={stage}>
-                {stage}
-              </option>
-            ))}
-          </select>
-          <select
-            className="fc-input"
-            aria-label="Filter pipeline by score"
-            value={scoreFilter}
-            onChange={(event) =>
-              setScoreFilter(event.target.value as ScoreFilter)
-            }
-          >
-            <option value="all">All scores</option>
-            <option value="strong">Strong match (80+)</option>
-            <option value="moderate">Moderate match (50–79)</option>
-            <option value="weak">Weak match (0–49)</option>
-            <option value="pending">Score pending</option>
-          </select>
+        <div className="pipeline-filter-bar">
+          <label className="pipeline-filter-field">
+            <span>Job</span>
+            <select
+              className="fc-input"
+              aria-label="Filter pipeline by job"
+              value={selectedJobId ?? ""}
+              onChange={(event) =>
+                setSelectedJobId(
+                  event.target.value ? Number(event.target.value) : undefined,
+                )
+              }
+            >
+              <option value="">All jobs</option>
+              {jobs.map((job) => (
+                <option value={job.job_id} key={job.job_id}>
+                  {job.title}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="pipeline-filter-field">
+            <span>Stage</span>
+            <select
+              className="fc-input"
+              aria-label="Filter pipeline by stage"
+              value={stageFilter}
+              onChange={(event) =>
+                setStageFilter(event.target.value as PipelineStage | "all")
+              }
+            >
+              <option value="all">All stages</option>
+              {stages.map((stage) => (
+                <option value={stage} key={stage}>
+                  {stage}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="pipeline-filter-field">
+            <span>Match score</span>
+            <select
+              className="fc-input"
+              aria-label="Filter pipeline by score"
+              value={scoreFilter}
+              onChange={(event) =>
+                setScoreFilter(event.target.value as ScoreFilter)
+              }
+            >
+              <option value="all">All scores</option>
+              <option value="strong">Strong match · 80+</option>
+              <option value="moderate">Moderate match · 50–79</option>
+              <option value="weak">Weak match · 0–49</option>
+              <option value="pending">Score pending</option>
+            </select>
+          </label>
           <button
             type="button"
-            className="fc-btn fc-btn--secondary"
+            className="fc-btn fc-btn--secondary pipeline-filter-refresh"
             disabled={loading}
             onClick={() => void load()}
           >

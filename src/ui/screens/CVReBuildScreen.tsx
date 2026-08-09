@@ -1,14 +1,12 @@
-import { useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { createPortal } from "react-dom"
 
 import {
-  ArrowRight,
   CheckCircle,
   CloudArrowUp,
   Download,
   FileText,
   FloppyDisk,
-  Lightning,
   MagnifyingGlass,
   Sparkle,
   X,
@@ -104,17 +102,46 @@ function isValidFile(file: File): string | null {
 
 interface CVReBuildScreenProps {
   onNavigate?: (screen: ScreenId) => void
+
+  onAnalyzeCv?: (file: File, jdText?: string) => void
+
+  incomingResult?: CvRebuildResponse | null
+
+  onIncomingResultConsumed?: () => void
 }
 
-export default function CVReBuildScreen({ onNavigate }: CVReBuildScreenProps) {
+export default function CVReBuildScreen({
+  onAnalyzeCv,
+  incomingResult = null,
+  onIncomingResultConsumed,
+}: CVReBuildScreenProps) {
   const [state, setState] = useState<BuildState>(loadCachedResult)
   const [dragOver, setDragOver] = useState(false)
   const [modalOpen, setModalOpen] = useState(false)
   const [useAvatar, setUseAvatar] = useState(false)
   const [saving, setSaving] = useState(false)
+
+  const [builtJdText, setBuiltJdText] = useState("")
   const inputRef = useRef<HTMLInputElement>(null)
 
   const profileAvatarUrl = authApi.getSession()?.user.avatarUrl ?? null
+
+  useEffect(() => {
+    if (!incomingResult) return
+
+    saveResult(null, incomingResult)
+
+    setBuiltJdText("")
+
+    setState({
+      phase: "done",
+      mode: "build",
+      file: null,
+      result: incomingResult,
+    })
+
+    onIncomingResultConsumed?.()
+  }, [incomingResult, onIncomingResultConsumed])
 
   const runRebuild = async (file: File) => {
     const validationError = isValidFile(file)
@@ -130,6 +157,8 @@ export default function CVReBuildScreen({ onNavigate }: CVReBuildScreenProps) {
     setState({ phase: "processing", mode: "rebuild", file })
 
     clearSavedResult()
+
+    setBuiltJdText("")
 
     try {
       const avatar = useAvatar
@@ -173,6 +202,8 @@ export default function CVReBuildScreen({ onNavigate }: CVReBuildScreenProps) {
 
       saveResult(null, result)
 
+      setBuiltJdText(payload.jdText ?? "")
+
       setState({ phase: "done", mode: "build", file: null, result })
     } catch (error) {
       const message =
@@ -186,6 +217,8 @@ export default function CVReBuildScreen({ onNavigate }: CVReBuildScreenProps) {
 
   const handleReset = () => {
     clearSavedResult()
+
+    setBuiltJdText("")
 
     setState({ phase: "idle", mode: "rebuild" })
   }
@@ -243,6 +276,18 @@ export default function CVReBuildScreen({ onNavigate }: CVReBuildScreenProps) {
     } finally {
       setSaving(false)
     }
+  }
+
+  const handleAnalyzeCv = () => {
+    if (state.phase !== "done" || !onAnalyzeCv) return
+
+    const file = new File(
+      [pdfBase64ToBlob(state.result.pdf_base64)],
+      state.result.filename,
+      { type: "application/pdf" },
+    )
+
+    onAnalyzeCv(file, builtJdText || undefined)
   }
 
   const pdfDataUrl =
@@ -399,7 +444,7 @@ export default function CVReBuildScreen({ onNavigate }: CVReBuildScreenProps) {
           style={{
             border: "1px solid var(--border)",
             borderRadius: 16,
-            background: "white",
+            background: "var(--surface)",
             padding: 24,
           }}
         >
@@ -497,7 +542,7 @@ export default function CVReBuildScreen({ onNavigate }: CVReBuildScreenProps) {
               padding: "10px 18px",
               borderRadius: 10,
               border: "1px solid var(--border)",
-              background: "white",
+              background: "var(--surface)",
               color: "var(--text-primary)",
               fontWeight: 600,
               cursor: "pointer",
@@ -536,7 +581,7 @@ export default function CVReBuildScreen({ onNavigate }: CVReBuildScreenProps) {
           style={{
             border: "1px solid var(--border)",
             borderRadius: 16,
-            background: "white",
+            background: "var(--surface)",
             padding: 24,
           }}
         >
@@ -602,7 +647,7 @@ export default function CVReBuildScreen({ onNavigate }: CVReBuildScreenProps) {
                     padding: "10px 18px",
                     borderRadius: 10,
                     border: "1px solid var(--border)",
-                    background: "white",
+                    background: "var(--surface)",
                     color: "var(--text-primary)",
                     fontWeight: 600,
                     cursor: "pointer",
@@ -622,7 +667,7 @@ export default function CVReBuildScreen({ onNavigate }: CVReBuildScreenProps) {
                     padding: "10px 18px",
                     borderRadius: 10,
                     border: "1px solid var(--border)",
-                    background: "white",
+                    background: "var(--surface)",
                     color: "var(--text-primary)",
                     fontWeight: 600,
                     cursor: saving ? "wait" : "pointer",
@@ -632,7 +677,38 @@ export default function CVReBuildScreen({ onNavigate }: CVReBuildScreenProps) {
                   <FloppyDisk size={16} weight="light" />
                   {saving ? "Saving…" : "Save to History"}
                 </button>
+
+                {onAnalyzeCv && (
+                  <button
+                    type="button"
+                    onClick={handleAnalyzeCv}
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 8,
+                      padding: "10px 18px",
+                      borderRadius: 10,
+                      border: "1px solid var(--accent)",
+                      background: "var(--accent-soft)",
+                      color: "var(--accent)",
+                      fontWeight: 700,
+                      cursor: "pointer",
+                    }}
+                  >
+                    <MagnifyingGlass size={16} weight="bold" /> Analyze against a job
+                  </button>
+                )}
               </div>
+
+              <p
+                style={{
+                  marginTop: 12,
+                  color: "var(--text-muted)",
+                  fontSize: 12,
+                }}
+              >
+                This new CV has not been scored yet. Analyze it again against a job description when you are ready.
+              </p>
             </div>
           </div>
 
@@ -644,7 +720,7 @@ export default function CVReBuildScreen({ onNavigate }: CVReBuildScreenProps) {
               padding: "8px 14px",
               borderRadius: 10,
               border: "1px solid var(--border)",
-              background: "white",
+              background: "var(--surface)",
               color: "var(--text-secondary)",
               fontWeight: 600,
               cursor: "pointer",
@@ -677,7 +753,7 @@ export default function CVReBuildScreen({ onNavigate }: CVReBuildScreenProps) {
             style={{
               width: "min(880px, 100%)",
               height: "min(92vh, 100%)",
-              background: "white",
+              background: "var(--surface)",
               borderRadius: 16,
               display: "flex",
               flexDirection: "column",

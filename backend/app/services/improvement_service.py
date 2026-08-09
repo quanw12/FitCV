@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.db.session import SessionLocal
 from app.models.account import Account
-from app.models.improvement import AiTask, AiTaskStatus, MatchResult
+from app.models.improvement import AiTask, AiTaskStatus, CvImprovementSuggestion, MatchResult
 from app.repositories import improvements
 from app.schemas.improvement import GenerateImprovementResponse, ImprovementReportResponse
 from app.services.improvement_provider import ImprovementProviderError, get_improvement_provider
@@ -36,6 +36,53 @@ def _owned_match_or_404(
     if match is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Match result not found.")
     return match
+
+
+def get_apply_context(
+    db: Session,
+    *,
+    match_result_id: int,
+    account: Account,
+    suggestion_ids: list[int],
+) -> tuple[str, str, list[CvImprovementSuggestion]]:
+    """Return only this student's saved parse, JD snapshot, and selected rows."""
+    _owned_match_or_404(db, match_result_id, account)
+    selected_ids = list(dict.fromkeys(suggestion_ids))
+    if not selected_ids:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Select at least one improvement before rebuilding the CV.",
+        )
+    if len(selected_ids) > 40:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Choose no more than 40 improvements at a time.",
+        )
+
+    try:
+        _, parsed, jd_text = improvements.get_generation_context(db, match_result_id)
+    except LookupError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="CV parse text unavailable. Re-upload the CV and analyse again.",
+        ) from exc
+    parsed_text = (parsed.parsed_text if parsed is not None else "") or ""
+    if not parsed_text.strip():
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="CV parse text unavailable. Re-upload the CV and analyse again.",
+        )
+
+    rows_by_id = {
+        row.suggestion_id: row
+        for row in improvements.get_suggestions(db, match_result_id)
+    }
+    if any(suggestion_id not in rows_by_id for suggestion_id in selected_ids):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="One or more selected improvements do not belong to this match result.",
+        )
+    return parsed_text, jd_text, [rows_by_id[suggestion_id] for suggestion_id in selected_ids]
 
 
 def _mark_stale_task_failed(db: Session, task: AiTask) -> bool:

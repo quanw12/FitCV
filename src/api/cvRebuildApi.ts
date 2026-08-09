@@ -9,17 +9,22 @@ export interface CvBuildPayload {
   language: "en" | "vi"
 
   avatar?: string
+
+  jdText?: string
 }
 
 export function rebuildCv(
   file: File,
   avatar?: string,
+  jdText?: string,
 ): Promise<CvRebuildResponse> {
   const form = new FormData()
 
   form.append("file", file)
 
   if (avatar) form.append("avatar", avatar)
+
+  if (jdText) form.append("jd_text", jdText)
 
   return requestJson<CvRebuildResponse>("/api/cv/rebuild", {
     method: "POST",
@@ -31,7 +36,12 @@ export function rebuildCv(
 export function buildCv(payload: CvBuildPayload): Promise<CvRebuildResponse> {
   return requestJson<CvRebuildResponse>("/api/cv/build", {
     method: "POST",
-    body: JSON.stringify(payload),
+    body: JSON.stringify({
+      cv: payload.cv,
+      language: payload.language,
+      avatar: payload.avatar,
+      jd_text: payload.jdText,
+    }),
     authenticated: true,
   })
 }

@@ -17,6 +17,9 @@ import {
   ArrowClockwise,
   User,
   Check,
+  ChartBar,
+  ShieldCheck,
+  Sparkle,
 } from "@phosphor-icons/react"
 import { authApi } from "@/api"
 import BrandMark from "@/ui/components/BrandMark"
@@ -97,15 +100,16 @@ const roleOptions: Array<{
 ]
 
 const authCss = `
-  .fitcv-auth { min-height: 100vh; background: #f8fafc; color: #101828; font-family: var(--font-body, Geist, system-ui, sans-serif); }
+  .fitcv-auth { min-height: 100dvh; background: #f8fafc; color: #101828; font-family: var(--font-body, Geist, system-ui, sans-serif); }
   .fitcv-auth *, .fitcv-auth *::before, .fitcv-auth *::after { box-sizing: border-box; }
-  .auth-shell { --auth-accent: #2563eb; --auth-accent-soft: #eff6ff; position: relative; display: grid; min-height: 100vh; place-items: center; overflow: hidden; isolation: isolate; background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%); }.auth-shell--register { --auth-accent: #c25a05; --auth-accent-soft: #fff7ed; }.auth-shell--forgot, .auth-shell--verify, .auth-shell--reset { --auth-accent: #7c3aed; --auth-accent-soft: #f5f3ff; }.auth-shell--role { --auth-accent: #047857; --auth-accent-soft: #ecfdf5; }
+  .auth-shell { --auth-accent: #2563eb; --auth-accent-soft: #eff6ff; position: relative; display: grid; grid-template-columns: minmax(0,1.05fr) minmax(430px,.95fr); min-height: 100dvh; overflow: hidden; isolation: isolate; background: #f8fafc; }.auth-shell--register { --auth-accent: #c25a05; --auth-accent-soft: #fff7ed; }.auth-shell--forgot, .auth-shell--verify, .auth-shell--reset { --auth-accent: #7c3aed; --auth-accent-soft: #f5f3ff; }.auth-shell--role { --auth-accent: #047857; --auth-accent-soft: #ecfdf5; }
   .auth-shell::before { position: absolute; z-index: -1; width: min(72vw, 760px); height: min(72vw, 760px); border: 1px solid rgba(148,163,184,.17); border-radius: 50%; content: ""; transform: translate(43vw, -42vh); }.auth-shell::after { position: absolute; z-index: -1; width: 42vw; height: 42vw; min-width: 440px; min-height: 440px; border-radius: 50%; background: var(--auth-accent-soft); content: ""; filter: blur(4px); opacity: .58; transform: translate(-42vw, 44vh); transition: background .32s ease; }
-  .auth-hero { display: none; }
-  .auth-panel { display: grid; width: 100%; min-height: 100vh; place-items: center; padding: 48px 24px; }.auth-content { width: min(100%, 438px); animation: auth-card-enter .28s cubic-bezier(.2,.8,.2,1) both; }.auth-brand { margin-bottom: 25px !important; text-align: center !important; }.auth-brand > div { margin-bottom: 7px !important; justify-content: center; }.auth-brand > div > span { letter-spacing: -.05em !important; }.auth-brand > div + div { color: #667085 !important; }
+  .auth-hero { position: relative; display: flex; align-items: stretch; overflow: hidden; background: #0f172a; color: #fff; padding: clamp(32px,5vw,76px); }.auth-hero::before { position: absolute; top: -18%; right: -16%; width: min(42vw,620px); aspect-ratio: 1; border: 1px solid rgba(147,197,253,.25); border-radius: 50%; content: ""; box-shadow: 0 0 0 70px rgba(96,165,250,.04), 0 0 0 140px rgba(96,165,250,.025); }.auth-hero::after { position: absolute; right: 8%; bottom: 8%; width: 180px; height: 180px; border-radius: 50%; background: radial-gradient(circle, rgba(37,99,235,.26), transparent 68%); content: ""; filter: blur(8px); }.auth-hero-inner { position: relative; z-index: 1; display: flex; width: min(100%, 590px); flex-direction: column; justify-content: space-between; }.auth-hero-brand { display: inline-flex; align-items: center; gap: 9px; color: #fff; font-family: var(--font-display); font-size: 22px; font-weight: 800; letter-spacing: -.05em; }.auth-hero-brand svg { flex: 0 0 auto; }.auth-hero-copy { max-width: 530px; margin: auto 0; padding: 56px 0; }.auth-hero-eyebrow { display: inline-flex; align-items: center; gap: 8px; color: #93c5fd; font-size: 11px; font-weight: 750; letter-spacing: .14em; text-transform: uppercase; }.auth-hero-copy h1 { max-width: 540px; margin: 20px 0 0; font-family: var(--font-display); font-size: clamp(42px,5vw,76px); font-weight: 750; line-height: .98; letter-spacing: -.075em; }.auth-hero-copy p { max-width: 470px; margin: 24px 0 0; color: #cbd5e1; font-size: 16px; line-height: 1.65; }.auth-hero-proof { display: grid; gap: 12px; margin-top: 31px; }.auth-proof-row { display: flex; align-items: center; gap: 10px; color: #e2e8f0; font-size: 13px; }.auth-proof-row svg { color: #60a5fa; }.auth-hero-footer { color: #94a3b8; font-size: 12px; }
+  .auth-panel { display: grid; width: 100%; min-height: 100dvh; place-items: center; padding: 48px 34px; background: #f8fafc; }.auth-content { width: min(100%, 438px); animation: auth-card-enter .28s cubic-bezier(.2,.8,.2,1) both; }.auth-brand { margin-bottom: 25px !important; text-align: center !important; }.auth-brand > div { margin-bottom: 7px !important; justify-content: center; }.auth-brand > div > span { letter-spacing: -.05em !important; }.auth-brand > div + div { color: #667085 !important; }
   .auth-card { position: relative; overflow: hidden; border: 1px solid #e4e7ec !important; border-radius: 20px !important; background: rgba(255,255,255,.94) !important; padding: 30px !important; box-shadow: 0 22px 54px -38px rgba(16,24,40,.28) !important; }.auth-card::before { position: absolute; inset: 0 0 auto; height: 2px; background: var(--auth-accent); content: ""; transition: background .28s ease; }.auth-card input { transition: border-color .16s ease, box-shadow .16s ease; }.auth-card input:focus { border-color: var(--auth-accent) !important; box-shadow: 0 0 0 3px color-mix(in srgb, var(--auth-accent) 14%, transparent); }.auth-card .fc-btn--primary { border-radius: 10px; background: var(--auth-accent) !important; box-shadow: none; transition: transform .18s ease, background .28s ease; }.auth-card .fc-btn--primary:hover:not(:disabled) { background: color-mix(in srgb, var(--auth-accent) 88%, #000) !important; transform: translateY(-1px); }.auth-card .fc-btn--primary:disabled { transform: none; }.auth-mode-tab.is-active.login { background: #eff6ff !important; color: #1d4ed8 !important; }.auth-mode-tab.is-active.register { background: #fff7ed !important; color: #b45309 !important; }
-  :root[data-theme='dark'] .fitcv-auth { background: var(--bg); }.fitcv-auth .auth-shell { background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%); }:root[data-theme='dark'] .fitcv-auth .auth-shell { background: radial-gradient(circle at 12% 88%, color-mix(in srgb, var(--auth-accent) 15%, transparent), transparent 30%), radial-gradient(circle at 88% 8%, rgba(124, 131, 255, .12), transparent 27%), var(--bg); }.fitcv-auth .auth-shell::after { opacity: .58; }:root[data-theme='dark'] .fitcv-auth .auth-shell::before { border-color: rgba(148, 163, 184, .18); }:root[data-theme='dark'] .fitcv-auth .auth-shell::after { opacity: .16; }.fitcv-auth .auth-brand > div + div { color: #667085 !important; }:root[data-theme='dark'] .fitcv-auth .auth-brand > div + div { color: var(--text-secondary) !important; }:root[data-theme='dark'] .fitcv-auth .auth-card { border-color: var(--border-strong) !important; background: color-mix(in srgb, var(--surface) 94%, #000) !important; box-shadow: 0 24px 62px -38px rgba(0, 0, 0, .82) !important; }:root[data-theme='dark'] .fitcv-auth .auth-mode-tab.is-active.login { background: rgba(37, 99, 235, .2) !important; color: #a5c7ff !important; }:root[data-theme='dark'] .fitcv-auth .auth-mode-tab.is-active.register { background: rgba(217, 119, 6, .19) !important; color: #f8c27d !important; }
+  :root[data-theme='dark'] .fitcv-auth { background: var(--bg); }:root[data-theme='dark'] .fitcv-auth .auth-panel { background: var(--bg); }.fitcv-auth .auth-shell { background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%); }:root[data-theme='dark'] .fitcv-auth .auth-shell { background: radial-gradient(circle at 12% 88%, color-mix(in srgb, var(--auth-accent) 15%, transparent), transparent 30%), radial-gradient(circle at 88% 8%, rgba(124, 131, 255, .12), transparent 27%), var(--bg); }.fitcv-auth .auth-shell::after { opacity: .58; }:root[data-theme='dark'] .fitcv-auth .auth-shell::before { border-color: rgba(148, 163, 184, .18); }:root[data-theme='dark'] .fitcv-auth .auth-shell::after { opacity: .16; }.fitcv-auth .auth-brand > div + div { color: #667085 !important; }:root[data-theme='dark'] .fitcv-auth .auth-brand > div + div { color: var(--text-secondary) !important; }:root[data-theme='dark'] .fitcv-auth .auth-card { border-color: var(--border-strong) !important; background: color-mix(in srgb, var(--surface) 94%, #000) !important; box-shadow: 0 24px 62px -38px rgba(0, 0, 0, .82) !important; }:root[data-theme='dark'] .fitcv-auth .auth-mode-tab.is-active.login { background: rgba(37, 99, 235, .2) !important; color: #a5c7ff !important; }:root[data-theme='dark'] .fitcv-auth .auth-mode-tab.is-active.register { background: rgba(217, 119, 6, .19) !important; color: #f8c27d !important; }
   @keyframes auth-card-enter { from { opacity: .18; transform: translateY(8px) scale(.985); } to { opacity: 1; transform: translateY(0) scale(1); } }
+  @media (max-width: 980px) { .auth-shell { display: block; }.auth-hero { display: none; }.auth-panel { min-height: 100dvh; } }
   @media (max-width: 480px) { .auth-panel { padding: 34px 16px; }.auth-card { padding: 23px !important; border-radius: 17px !important; }.auth-shell::after { min-width: 340px; min-height: 340px; } }
   @media (prefers-reduced-motion: reduce) { .fitcv-auth *, .fitcv-auth *::before, .fitcv-auth *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; } }
 `
@@ -386,6 +390,39 @@ export default function AuthScreen({
     <div className="fitcv-auth">
       <style>{authCss}</style>
       <div className={`auth-shell auth-shell--${screenPhase}`}>
+        <aside className="auth-hero" aria-label="About FitCV">
+          <div className="auth-hero-inner">
+            <div className="auth-hero-brand">
+              <BrandMark size={40} />
+              <span>FitCV</span>
+            </div>
+            <div className="auth-hero-copy">
+              <span className="auth-hero-eyebrow">
+                <Sparkle size={14} weight="fill" />
+                Evidence-first career intelligence
+              </span>
+              <h1>Make your next career decision clearer.</h1>
+              <p>
+                FitCV helps applicants understand their next step and helps
+                hiring teams review candidates with the evidence in view.
+              </p>
+              <div className="auth-hero-proof">
+                <span className="auth-proof-row">
+                  <Check size={18} weight="bold" /> Source-grounded CV and JD review
+                </span>
+                <span className="auth-proof-row">
+                  <ChartBar size={18} weight="bold" /> One clear matching language for both sides
+                </span>
+                <span className="auth-proof-row">
+                  <ShieldCheck size={18} weight="bold" /> Human judgment stays in control
+                </span>
+              </div>
+            </div>
+            <span className="auth-hero-footer">
+              Built for job seekers and hiring teams.
+            </span>
+          </div>
+        </aside>
         <main className="auth-panel">
           <div key={`${step}-${mode}`} className="auth-content">
         <div className="auth-brand" style={{ textAlign: "center", marginBottom: 28 }}>
@@ -546,7 +583,7 @@ export default function AuthScreen({
                     <>Enter the code sent to {email || "your email"}.</>
                   )}
                   {mode === "reset" && (
-                    <>Code verified — choose a new password.</>
+                    <>Code verified. Choose a new password.</>
                   )}
                 </p>
               </div>
@@ -1049,7 +1086,7 @@ const googleBtnStyle: CSSProperties = {
   padding: "10px 20px",
   borderRadius: 10,
   border: "1px solid var(--border-strong)",
-  background: "white",
+  background: "var(--surface)",
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
