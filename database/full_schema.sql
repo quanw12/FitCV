@@ -346,7 +346,7 @@ CREATE TABLE candidate_email (
     recipient_email         VARCHAR(150) NOT NULL,
     subject                 VARCHAR(300) NOT NULL,
     body                    LONGTEXT NOT NULL,
-    status                  ENUM('Draft', 'Approved', 'Sent', 'Failed') NOT NULL DEFAULT 'Draft',
+    status                  ENUM('Draft', 'Approved', 'Sent', 'Failed', 'Invalidated') NOT NULL DEFAULT 'Draft',
     delivery_status         ENUM(
                                 'Queued', 'Sent', 'Delivered', 'Delayed',
                                 'Bounced', 'Complained', 'Opened', 'Clicked',
@@ -403,10 +403,17 @@ CREATE TABLE candidate_email_inbound (
     sender_email        VARCHAR(150) NOT NULL,
     recipient_email     VARCHAR(150) NOT NULL,
     subject             VARCHAR(300) NOT NULL,
-    body_text           LONGTEXT NOT NULL,
+    body_text           LONGTEXT NULL,
     in_reply_to         VARCHAR(500) NULL,
     references_text     LONGTEXT NULL,
     attachments_json    JSON NULL,
+    fetch_status        VARCHAR(20) NOT NULL DEFAULT 'Fetched',
+    fetch_attempts      INT UNSIGNED NOT NULL DEFAULT 0,
+    fetch_available_at  DATETIME NULL,
+    fetch_locked_by     VARCHAR(120) NULL,
+    fetch_locked_at     DATETIME NULL,
+    fetch_error         VARCHAR(1000) NULL,
+    fetched_at          DATETIME NULL,
     is_read             BOOLEAN NOT NULL DEFAULT FALSE,
     received_at         DATETIME NOT NULL,
     created_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -417,7 +424,46 @@ CREATE TABLE candidate_email_inbound (
     CONSTRAINT uq_candidate_email_inbound_provider_email
         UNIQUE (provider_email_id),
     INDEX idx_candidate_email_inbound_thread_received (thread_id, received_at),
-    INDEX idx_candidate_email_inbound_thread_unread (thread_id, is_read)
+    INDEX idx_candidate_email_inbound_thread_unread (thread_id, is_read),
+    INDEX idx_candidate_email_inbound_fetch_queue (fetch_status, fetch_available_at)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
+
+CREATE TABLE candidate_email_send_job (
+    job_id                BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+    company_id            BIGINT UNSIGNED NOT NULL,
+    created_by_account_id BIGINT UNSIGNED NULL,
+    status                VARCHAR(20) NOT NULL DEFAULT 'Queued',
+    total_count           INT UNSIGNED NOT NULL DEFAULT 0,
+    sent_count            INT UNSIGNED NOT NULL DEFAULT 0,
+    failed_count          INT UNSIGNED NOT NULL DEFAULT 0,
+    lease_expires_at      DATETIME NULL,
+    created_at            DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    finished_at           DATETIME NULL,
+
+    CONSTRAINT fk_candidate_email_send_job_company
+        FOREIGN KEY (company_id) REFERENCES company(company_id)
+        ON DELETE CASCADE,
+    CONSTRAINT fk_candidate_email_send_job_account
+        FOREIGN KEY (created_by_account_id) REFERENCES account(account_id)
+        ON DELETE SET NULL,
+    INDEX idx_candidate_email_send_job_company_status (company_id, status)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
+
+CREATE TABLE candidate_email_send_job_item (
+    job_id        BIGINT UNSIGNED NOT NULL,
+    email_id      BIGINT UNSIGNED NOT NULL,
+    status        VARCHAR(20) NOT NULL DEFAULT 'Queued',
+    error_message VARCHAR(1000) NULL,
+    attempts      INT UNSIGNED NOT NULL DEFAULT 0,
+
+    PRIMARY KEY (job_id, email_id),
+    CONSTRAINT fk_candidate_email_send_job_item_job
+        FOREIGN KEY (job_id) REFERENCES candidate_email_send_job(job_id)
+        ON DELETE CASCADE,
+    CONSTRAINT fk_candidate_email_send_job_item_email
+        FOREIGN KEY (email_id) REFERENCES candidate_email(email_id)
+        ON DELETE CASCADE,
+    INDEX idx_candidate_email_send_job_item_status (job_id, status)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
 
 CREATE TABLE candidate_email_event (

@@ -9,6 +9,7 @@ from sqlalchemy.pool import StaticPool
 
 from app.api.deps import get_current_account
 from app.db.session import Base, get_db
+from app.core.config import settings
 from app.main import app
 from app.models import (
     Application,
@@ -124,6 +125,8 @@ class SequencedGemini:
 
 class EmailCampaignIntegrationTests(unittest.TestCase):
     def setUp(self) -> None:
+        self.previous_inbound_domain = settings.resend_inbound_domain
+        settings.resend_inbound_domain = "inbound.example.com"
         self.engine = create_engine(
             "sqlite+pysqlite:///:memory:",
             connect_args={"check_same_thread": False},
@@ -179,6 +182,7 @@ class EmailCampaignIntegrationTests(unittest.TestCase):
         self.client = TestClient(app)
 
     def tearDown(self) -> None:
+        settings.resend_inbound_domain = self.previous_inbound_domain
         self.client.close()
         app.dependency_overrides.clear()
         self.db.close()
@@ -384,9 +388,9 @@ class EmailCampaignIntegrationTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         payload = response.json()
         self.assertEqual(payload["template_key"], "follow_up")
-        blocked = {
-            item["application_id"]: item for item in payload["blocked"]
-        }
+        eligible_ids = {item["application_id"] for item in payload["eligible"]}
+        blocked = {item["application_id"]: item for item in payload["blocked"]}
+        self.assertNotIn(application_id, eligible_ids)
         self.assertEqual(
             blocked[application_id]["blocked_reason"],
             "Already emailed for this stage.",

@@ -43,11 +43,11 @@ export const emailWorkflowApi = {
   createCampaign: (payload: {
     application_ids: number[]
     template_key: string
-    allow_resend: boolean
     guidance?: string
     interview_lead_days?: number
 
     interview_window?: string
+    allow_resend?: boolean
   }) =>
     requestJson<CampaignPreview>("/api/hr/emails/campaigns", {
       authenticated: true,
@@ -116,6 +116,14 @@ export const emailWorkflowApi = {
 
       body: JSON.stringify({ email_ids: emailIds }),
     }),
+
+  bulkSendProgress: (jobId: number) =>
+    requestJson<BulkEmailSendResult>(
+      "/api/hr/emails/bulk-send/" + jobId,
+      {
+        authenticated: true,
+      },
+    ),
 
   listThreads: () =>
     requestJson<EmailThreadSummary[]>("/api/hr/emails/threads", {

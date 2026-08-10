@@ -1,5 +1,6 @@
 from pathlib import Path
 import asyncio
+import logging
 import sys
 from contextlib import asynccontextmanager
 
@@ -33,9 +34,16 @@ from app.api.routes import (
 from app.core.config import settings
 from app.services.ai_worker import run_worker
 
+logger = logging.getLogger(__name__)
+
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    if not settings.inbound_replies_enabled:
+        logger.warning(
+            "Inbound candidate replies are disabled: configure "
+            "RESEND_INBOUND_DOMAIN before enabling Smart Reply."
+        )
     stop = asyncio.Event()
     worker_task = (
         asyncio.create_task(run_worker(stop))

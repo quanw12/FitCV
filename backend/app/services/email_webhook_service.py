@@ -14,7 +14,6 @@ from app.schemas.email_workflow import EmailWebhookResponse
 from app.services.email_service import (
     EmailDeliveryError,
     EmailWebhookVerificationError,
-    retrieve_received_email,
     verify_resend_webhook,
 )
 
@@ -223,41 +222,27 @@ def _process_inbound(
             detail="Inbound sender does not match the application candidate.",
         )
 
-    content = retrieve_received_email(provider_email_id)
-    content_sender = _bare_email(content.get("from"))
-    if content_sender and content_sender != sender_email:
-        raise EmailWebhookVerificationError(
-            "Inbound email sender metadata does not match retrieved content."
-        )
-    body_text = _body_text(content)
-    if not body_text:
-        body_text = "(No plain-text email content was provided.)"
-    content_headers = content.get("headers")
     inbound = email_workflow.create_inbound(
         db,
         thread=thread,
         provider_email_id=provider_email_id,
         provider_message_id=(
-            str(content.get("message_id"))[:500]
-            if content.get("message_id")
-            else (
-                str(data.get("message_id"))[:500]
-                if data.get("message_id")
-                else None
-            )
+            str(data.get("message_id"))[:500]
+            if data.get("message_id")
+            else None
         ),
         sender_email=sender_email,
         recipient_email=recipient_email,
-        subject=str(content.get("subject") or data.get("subject") or "(No subject)")[
+        subject=str(data.get("subject") or "(No subject)")[
             :300
         ],
-        body_text=body_text,
-        in_reply_to=_header(content_headers, "in-reply-to"),
-        references_text=_header(content_headers, "references"),
-        attachments_json=_safe_attachments(content.get("attachments")),
-        received_at=_parse_timestamp(
-            content.get("created_at") or data.get("created_at")
-        ),
+        body_text=None,
+        in_reply_to=_header(data.get("headers"), "in-reply-to"),
+        references_text=_header(data.get("headers"), "references"),
+        attachments_json=_safe_attachments(data.get("attachments")),
+        received_at=_parse_timestamp(data.get("created_at")),
+        fetch_status="Pending",
+        fetch_available_at=occurred_at,
     )
     email_workflow.record_event(
         db,
@@ -265,7 +250,10 @@ def _process_inbound(
         provider_email_id=provider_email_id,
         event_type="email.received",
         occurred_at=occurred_at,
-        event_data_json={"inbound_id": inbound.inbound_id},
+        event_data_json={
+            "inbound_id": inbound.inbound_id,
+            "fetch_status": inbound.fetch_status,
+        },
         candidate_email=None,
     )
     return EmailWebhookResponse()

@@ -1,8 +1,9 @@
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
+from app.models import ApplicationStageHistory
 from app.models.account import Account
-from app.repositories import pipeline
+from app.repositories import email_workflow, pipeline
 from app.schemas.pipeline import (
     PipelineBulkStageUpdateResponse,
     PipelineApplicationResponse,
@@ -11,6 +12,14 @@ from app.schemas.pipeline import (
 )
 
 TERMINAL_STATUS = {"Hired": "Hired", "Rejected": "Rejected"}
+ALLOWED_TRANSITIONS: dict[str, set[str]] = {
+    "Applied": {"Screening", "Rejected"},
+    "Screening": {"Interview", "Rejected"},
+    "Interview": {"Offer", "Rejected"},
+    "Offer": {"Hired", "Rejected"},
+    "Hired": set(),
+    "Rejected": set(),
+}
 
 
 def _company_id(account: Account) -> int:
@@ -32,6 +41,23 @@ def _managed_application(db: Session, account: Account, application_id: int):
             detail="Application not found for this company.",
         )
     return application
+
+
+def _validate_transition(application, stage: str) -> None:
+    allowed = sorted(ALLOWED_TRANSITIONS.get(application.current_stage, set()))
+    if stage not in ALLOWED_TRANSITIONS.get(application.current_stage, set()):
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "message": (
+                    f"Cannot move application from {application.current_stage} "
+                    f"to {stage}."
+                ),
+                "current_stage": application.current_stage,
+                "requested_stage": stage,
+                "allowed_stages": allowed,
+            },
+        )
 
 
 def list_applications(
@@ -76,6 +102,7 @@ def move_stage(
             status_code=409,
             detail=f"Application is already in {stage}.",
         )
+    _validate_transition(application, stage)
     pipeline.update_stage(
         db,
         application,
@@ -133,6 +160,9 @@ def bulk_move_stage(
         if application_id not in changed_ids
     ]
 
+    for application_id in changed_ids:
+        _validate_transition(by_id[application_id], stage)
+
     changed_applications = [by_id[application_id] for application_id in changed_ids]
     histories = pipeline.update_stages(
         db,
@@ -152,6 +182,51 @@ def bulk_move_stage(
         updated=[updated_by_id[application_id] for application_id in changed_ids],
         skipped_application_ids=skipped_ids,
         history_ids=[history.stage_history_id for history in histories],
+    )
+
+
+def reopen_application(
+    db: Session,
+    account: Account,
+    application_id: int,
+    stage: str = "Applied",
+) -> PipelineApplicationResponse:
+    application = _managed_application(db, account, application_id)
+    if application.current_stage not in TERMINAL_STATUS:
+        raise HTTPException(
+            status_code=409,
+            detail="Only a Hired or Rejected application can be reopened.",
+        )
+    if stage not in {"Applied", "Screening", "Interview", "Offer"}:
+        raise HTTPException(
+            status_code=422,
+            detail="Reopen stage must be Applied, Screening, Interview, or Offer.",
+        )
+
+    previous_stage = application.current_stage
+    application.current_stage = stage
+    application.status = "Active"
+    db.add(
+        ApplicationStageHistory(
+            application_id=application.application_id,
+            previous_stage=previous_stage,
+            new_stage=stage,
+            changed_by_account_id=account.account_id,
+        )
+    )
+    email_workflow.invalidate_pending_drafts(
+        db,
+        company_id=_company_id(account),
+        application_id=application.application_id,
+        reason="Pipeline application was reopened; review and regenerate this draft.",
+        commit=False,
+    )
+    db.commit()
+    db.refresh(application)
+    return next(
+        item
+        for item in list_applications(db, account, job_id=application.job_id)
+        if item.application_id == application_id
     )
 
 

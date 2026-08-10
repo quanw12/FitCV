@@ -10,6 +10,7 @@ from app.schemas.pipeline import (
     PipelineApplicationResponse,
     PipelineNoteCreate,
     PipelineNoteResponse,
+    PipelineReopenRequest,
     PipelineStageHistoryResponse,
     PipelineStageUpdate,
 )
@@ -61,6 +62,24 @@ def bulk_move_pipeline_stage(
         account,
         payload.application_ids,
         payload.stage,
+    )
+
+
+@router.post(
+    "/applications/{application_id}/reopen",
+    response_model=PipelineApplicationResponse,
+)
+def reopen_pipeline_application(
+    application_id: int,
+    payload: PipelineReopenRequest | None = None,
+    db: Session = Depends(get_db),
+    account: Account = Depends(manager),
+):
+    return pipeline_service.reopen_application(
+        db,
+        account,
+        application_id,
+        stage=payload.stage if payload is not None else "Applied",
     )
 
 

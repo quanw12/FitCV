@@ -61,6 +61,11 @@ class Settings(BaseSettings):
         "https://fit-cv.vercel.app",
     ]
 
+    @property
+    def inbound_replies_enabled(self) -> bool:
+        domain = (self.resend_inbound_domain or "").strip().lstrip("@")
+        return bool(domain and "." in domain)
+
     @model_validator(mode="after")
     def validate_production_security(self) -> Self:
         if self.environment != "prod":

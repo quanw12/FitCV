@@ -11,6 +11,7 @@ PipelineStage = Literal[
     "Hired",
     "Rejected",
 ]
+PipelineReopenStage = Literal["Applied", "Screening", "Interview", "Offer"]
 
 
 class PipelineApplicationResponse(BaseModel):
@@ -30,6 +31,10 @@ class PipelineApplicationResponse(BaseModel):
 
 class PipelineStageUpdate(BaseModel):
     stage: PipelineStage
+
+
+class PipelineReopenRequest(BaseModel):
+    stage: PipelineReopenStage = "Applied"
 
 
 class PipelineBulkStageUpdate(BaseModel):

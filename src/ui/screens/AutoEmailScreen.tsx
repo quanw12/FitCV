@@ -19,6 +19,7 @@ import { pipelineApi } from "@/api/pipelineApi"
 
 import type {
   CampaignPreview,
+  BulkEmailSendResult,
   CandidateEmailDraft,
   EmailAudienceItem,
   EmailAudienceResponse,
@@ -191,6 +192,9 @@ export default function AutoEmailScreen() {
   const [guidance, setGuidance] = useState("")
   const [allowResend, setAllowResend] = useState(false)
   const [bulkSelection, setBulkSelection] = useState<number[]>([])
+  const [bulkProgress, setBulkProgress] = useState<BulkEmailSendResult | null>(
+    null,
+  )
 
   const [loading, setLoading] = useState(true)
 
@@ -615,10 +619,20 @@ export default function AutoEmailScreen() {
     setSuccess("")
 
     try {
-      const result = await emailWorkflowApi.bulkSend(bulkSelection)
+      let result = await emailWorkflowApi.bulkSend(bulkSelection)
+      setBulkProgress(result)
+      while (result.status === "Queued" || result.status === "Running") {
+        await new Promise((resolve) => window.setTimeout(resolve, 1000))
+        result = await emailWorkflowApi.bulkSendProgress(result.job_id)
+        setBulkProgress(result)
+      }
 
       setSuccess(
-        `Bulk delivery finished: ${result.sent_count} sent, ${result.failed_count} failed.`,
+        "Bulk delivery finished: " +
+          result.sent_count +
+          " sent, " +
+          result.failed_count +
+          " failed.",
       )
 
       setBulkSelection([])
@@ -1133,6 +1147,27 @@ export default function AutoEmailScreen() {
                       The draft will not invent reasons, links, compensation, or
                       offer terms.
                     </small>
+                  </label>
+                  <label
+                    style={{
+                      display: "flex",
+                      alignItems: "flex-start",
+                      gap: 8,
+                      gridColumn: "1 / -1",
+                      fontSize: 12,
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={allowResend}
+                      onChange={(event) =>
+                        setAllowResend(event.target.checked)
+                      }
+                    />
+                    <span>
+                      Allow intentional resend for candidates already emailed
+                      at this stage.
+                    </span>
                   </label>
                 </div>
                 <button
@@ -1678,6 +1713,43 @@ export default function AutoEmailScreen() {
                   : `Send selected (${bulkSelection.length})`}
               </button>
             </div>
+
+            {bulkProgress && (
+              <div
+                role="status"
+                style={{
+                  display: "grid",
+                  gap: 6,
+                  marginBottom: 14,
+                  padding: 10,
+                  border: "1px solid var(--border)",
+                  borderRadius: 10,
+                  background: "var(--surface-2)",
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    gap: 12,
+                    fontSize: 12,
+                  }}
+                >
+                  <span>Bulk delivery: {bulkProgress.status}</span>
+                  <strong>
+                    {bulkProgress.sent_count + bulkProgress.failed_count}/
+                    {bulkProgress.total_count}
+                  </strong>
+                </div>
+                <progress
+                  max={Math.max(1, bulkProgress.total_count)}
+                  value={
+                    bulkProgress.sent_count + bulkProgress.failed_count
+                  }
+                  style={{ width: "100%" }}
+                />
+              </div>
+            )}
 
             {drafts.length === 0 ? (
               <div style={{ color: "var(--text-muted)" }}>

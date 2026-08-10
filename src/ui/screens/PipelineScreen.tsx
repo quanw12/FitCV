@@ -405,6 +405,36 @@ export default function PipelineScreen() {
     }
   }
 
+  const reopen = async () => {
+    if (
+      !selected ||
+      !["Hired", "Rejected"].includes(selected.current_stage) ||
+      movingId
+    ) {
+      return
+    }
+    setMovingId(selected.application_id)
+    setDetailError("")
+    setSuccess("")
+    try {
+      const updated = await pipelineApi.reopen(selected.application_id)
+      setApplications((current) =>
+        current.map((item) =>
+          item.application_id === updated.application_id ? updated : item,
+        ),
+      )
+      setSelected(updated)
+      setHistory(await pipelineApi.listHistory(updated.application_id))
+      setSuccess(
+        "Reopened " + updated.candidate_name + " at " + updated.current_stage + ".",
+      )
+    } catch (cause) {
+      setDetailError(errorMessage(cause, "Could not reopen this application."))
+    } finally {
+      setMovingId(null)
+    }
+  }
+
   const addNote = async () => {
     if (!selected || !note.trim() || savingNote) return
     setSavingNote(true)
@@ -1011,6 +1041,19 @@ export default function PipelineScreen() {
                   : `${Math.round(selected.overall_score)}%`}
               </strong>
             </div>
+            {["Hired", "Rejected"].includes(selected.current_stage) && (
+              <button
+                type="button"
+                className="fc-btn fc-btn--secondary"
+                disabled={movingId === selected.application_id}
+                onClick={() => void reopen()}
+              >
+                <ArrowClockwise size={15} />
+                {movingId === selected.application_id
+                  ? "Reopening..."
+                  : "Reopen application"}
+              </button>
+            )}
 
             <section style={{ marginBottom: 20 }}>
               <h3 style={{ fontSize: 14, marginBottom: 10 }}>

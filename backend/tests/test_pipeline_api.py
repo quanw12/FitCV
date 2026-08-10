@@ -148,6 +148,11 @@ class PipelineApiIntegrationTests(unittest.TestCase):
         )
         self.assertEqual(listed_by_id[self.application_id]["overall_score"], 88.0)
 
+        moved_to_screening = self.client.patch(
+            f"/api/hr/pipeline/applications/{self.application_id}/stage",
+            json={"stage": "Screening"},
+        )
+        self.assertEqual(moved_to_screening.status_code, 200)
         moved = self.client.patch(
             f"/api/hr/pipeline/applications/{self.application_id}/stage",
             json={"stage": "Interview"},
@@ -160,7 +165,7 @@ class PipelineApiIntegrationTests(unittest.TestCase):
             f"/api/hr/pipeline/applications/{self.application_id}/history"
         )
         self.assertEqual(history.status_code, 200)
-        self.assertEqual(history.json()[0]["previous_stage"], "Applied")
+        self.assertEqual(history.json()[0]["previous_stage"], "Screening")
         self.assertEqual(history.json()[0]["new_stage"], "Interview")
 
     def test_adds_notes_and_updates_note_count(self) -> None:
@@ -196,6 +201,17 @@ class PipelineApiIntegrationTests(unittest.TestCase):
         self.assertEqual(moved.status_code, 404)
 
     def test_bulk_stage_update_changes_selected_applications(self) -> None:
+        first_step = self.client.patch(
+            "/api/hr/pipeline/applications/bulk-stage",
+            json={
+                "application_ids": [
+                    self.application_id,
+                    self.second_application_id,
+                ],
+                "stage": "Screening",
+            },
+        )
+        self.assertEqual(first_step.status_code, 200)
         updated = self.client.patch(
             "/api/hr/pipeline/applications/bulk-stage",
             json={
@@ -245,12 +261,61 @@ class PipelineApiIntegrationTests(unittest.TestCase):
         )
 
     def test_terminal_stage_updates_recruitment_status(self) -> None:
+        for stage in ("Screening", "Interview", "Offer"):
+            response = self.client.patch(
+                f"/api/hr/pipeline/applications/{self.application_id}/stage",
+                json={"stage": stage},
+            )
+            self.assertEqual(response.status_code, 200)
         hired = self.client.patch(
             f"/api/hr/pipeline/applications/{self.application_id}/stage",
             json={"stage": "Hired"},
         )
         self.assertEqual(hired.status_code, 200)
         self.assertEqual(hired.json()["status"], "Hired")
+
+    def test_invalid_transition_returns_allowed_stages(self) -> None:
+        response = self.client.patch(
+            f"/api/hr/pipeline/applications/{self.application_id}/stage",
+            json={"stage": "Offer"},
+        )
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(
+            response.json()["detail"]["allowed_stages"],
+            ["Rejected", "Screening"],
+        )
+
+    def test_reopen_invalidates_pending_email_draft(self) -> None:
+        from app.models import CandidateEmail
+
+        application = self.db.get(Application, self.application_id)
+        assert application is not None
+        application.current_stage = "Rejected"
+        application.status = "Rejected"
+        self.db.add(
+            CandidateEmail(
+                company_id=self.manager.company_id,
+                application_id=self.application_id,
+                template_key="rejection",
+                message_kind="Initial",
+                stage_at_generation="Rejected",
+                recipient_email="minh@example.com",
+                subject="Review",
+                body="Review",
+                status="Approved",
+                created_by_account_id=self.manager.account_id,
+            )
+        )
+        self.db.commit()
+
+        reopened = self.client.post(
+            f"/api/hr/pipeline/applications/{self.application_id}/reopen"
+        )
+        self.assertEqual(reopened.status_code, 200)
+        self.assertEqual(reopened.json()["current_stage"], "Applied")
+        self.assertEqual(reopened.json()["status"], "Active")
+        draft = self.db.query(CandidateEmail).one()
+        self.assertEqual(draft.status, "Invalidated")
 
 
 if __name__ == "__main__":

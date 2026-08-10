@@ -139,7 +139,9 @@ export default function SmartReplyPanel() {
         current.filter((threadId) =>
           nextThreads.some(
             (thread) =>
-              thread.thread_id === threadId && thread.last_inbound_at != null,
+              thread.thread_id === threadId &&
+              thread.last_inbound_at != null &&
+              thread.has_fetched_inbound !== false,
           ),
         ),
       )
@@ -200,10 +202,20 @@ export default function SmartReplyPanel() {
   }, [loadDetail, selectedThreadId])
 
   const hasInbound = useMemo(
-    () => detail?.messages.some((message) => message.direction === "Inbound"),
+    () =>
+      detail?.messages.some(
+        (message) =>
+          message.direction === "Inbound" &&
+          message.fetch_status !== "Pending" &&
+          message.fetch_status !== "Fetching" &&
+          message.fetch_status !== "FetchFailed",
+      ),
 
     [detail],
   )
+  const inboundRepliesEnabled =
+    detail?.inbound_replies_enabled !== false &&
+    !threads.some((thread) => thread.inbound_replies_enabled === false)
 
   const dirty =
     composer?.status === "Draft" &&
@@ -220,7 +232,8 @@ export default function SmartReplyPanel() {
   }
 
   const generate = async () => {
-    if (!selectedThreadId || !hasInbound || action) return
+    if (!selectedThreadId || !hasInbound || !inboundRepliesEnabled || action)
+      return
 
     setAction("generate")
 
@@ -249,7 +262,7 @@ export default function SmartReplyPanel() {
   }
 
   const generateBatch = async () => {
-    if (batchSelection.length < 2 || action) return
+    if (batchSelection.length < 2 || !inboundRepliesEnabled || action) return
     setAction("batch")
     setError("")
     setSuccess("")
@@ -442,6 +455,16 @@ export default function SmartReplyPanel() {
         </button>
       </div>
 
+      {!inboundRepliesEnabled && (
+        <div className="job-alert job-alert--error" role="alert">
+          <AlertTriangle size={16} />
+          <span>
+            Inbound reply routing is disabled. Configure
+            RESEND_INBOUND_DOMAIN before using Smart Reply.
+          </span>
+        </div>
+      )}
+
       {error && (
         <div className="job-alert job-alert--error" role="alert">
           <AlertTriangle size={16} />
@@ -493,7 +516,10 @@ export default function SmartReplyPanel() {
               </div>
             )}
             {threads.map((thread) => {
-              const canBatch = thread.last_inbound_at != null
+              const canBatch =
+                inboundRepliesEnabled &&
+                thread.last_inbound_at != null &&
+                thread.has_fetched_inbound !== false
               return (
                 <article
                   key={thread.thread_id}
@@ -688,6 +714,18 @@ export default function SmartReplyPanel() {
                         >
                           {message.body}
                         </p>
+                        {message.direction === "Inbound" &&
+                          message.fetch_error && (
+                            <p
+                              style={{
+                                color: "var(--danger)",
+                                fontSize: 11,
+                                marginTop: 6,
+                              }}
+                            >
+                              Fetch failed: {message.fetch_error}
+                            </p>
+                          )}
                         <time
                           style={{ fontSize: 10.5, color: "var(--text-muted)" }}
                         >

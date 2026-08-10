@@ -128,6 +128,17 @@ class BulkEmailSendResponse(BaseModel):
     results: list[BulkEmailSendItem]
 
 
+class BulkEmailSendJobResponse(BaseModel):
+    job_id: int
+    status: str
+    total_count: int
+    sent_count: int
+    failed_count: int
+    created_at: datetime
+    finished_at: datetime | None
+    results: list[BulkEmailSendItem]
+
+
 class GeneratedEmailTemplate(BaseModel):
     subject_template: str = Field(min_length=10, max_length=200)
     greeting_template: str = Field(min_length=3, max_length=200)
@@ -254,6 +265,7 @@ class CampaignGenerateRequest(BaseModel):
     guidance: str | None = Field(default=None, max_length=2000)
     interview_lead_days: int = Field(default=3, ge=1, le=30)
     interview_window: str | None = Field(default=None, max_length=120)
+    allow_resend: bool = False
 
     @field_validator("application_ids")
     @classmethod
@@ -338,6 +350,8 @@ class EmailThreadMessageResponse(BaseModel):
     ai_generated: bool
     provider_message_id: str | None
     occurred_at: datetime
+    fetch_status: str | None = None
+    fetch_error: str | None = None
 
 
 class EmailThreadSummaryResponse(BaseModel):
@@ -354,6 +368,8 @@ class EmailThreadSummaryResponse(BaseModel):
     last_inbound_at: datetime | None
     unread_count: int
     last_message_preview: str | None
+    inbound_replies_enabled: bool
+    has_fetched_inbound: bool
 
 
 class EmailThreadDetailResponse(EmailThreadSummaryResponse):

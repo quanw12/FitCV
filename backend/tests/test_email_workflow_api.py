@@ -16,6 +16,8 @@ from app.models import (
     Candidate,
     CandidateEmail,
     CandidateEmailEvent,
+    CandidateEmailInbound,
+    CandidateEmailSendJob,
     Company,
     Cv,
     Job,
@@ -81,6 +83,8 @@ class FakeGemini:
 
 class EmailWorkflowApiIntegrationTests(unittest.TestCase):
     def setUp(self) -> None:
+        self.previous_inbound_domain = settings.resend_inbound_domain
+        settings.resend_inbound_domain = "inbound.example.com"
         self.engine = create_engine(
             "sqlite+pysqlite:///:memory:",
             connect_args={"check_same_thread": False},
@@ -162,6 +166,7 @@ class EmailWorkflowApiIntegrationTests(unittest.TestCase):
         self.client = TestClient(app)
 
     def tearDown(self) -> None:
+        settings.resend_inbound_domain = self.previous_inbound_domain
         self.client.close()
         app.dependency_overrides.clear()
         self.db.close()
@@ -466,11 +471,43 @@ class EmailWorkflowApiIntegrationTests(unittest.TestCase):
                 "/api/hr/emails/bulk-send",
                 json={"email_ids": [draft["email_id"], draft["email_id"]]},
             )
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()["sent_count"], 0)
-        self.assertEqual(response.json()["failed_count"], 1)
-        self.assertIn("approve", response.json()["results"][0]["error_message"].lower())
+        self.assertEqual(response.status_code, 202)
+        self.assertEqual(response.json()["status"], "Queued")
+        self.assertEqual(response.json()["total_count"], 1)
+        self.assertEqual(response.json()["results"][0]["status"], "Queued")
         sender.assert_not_called()
+
+    def test_bulk_send_persists_progress_for_worker(self) -> None:
+        draft = self.generate_draft()
+        response = self.client.post(
+            "/api/hr/emails/bulk-send",
+            json={"email_ids": [draft["email_id"]]},
+        )
+        self.assertEqual(response.status_code, 202)
+        job_id = response.json()["job_id"]
+        job = self.db.get(CandidateEmailSendJob, job_id)
+        assert job is not None
+        claimed = email_workflow.claim_next_send_job(
+            self.db,
+            worker_id="test-worker",
+            now=datetime.now(timezone.utc).replace(tzinfo=None),
+            lease_seconds=60,
+        )
+        assert claimed is not None
+        item = email_workflow.claim_next_send_job_item(self.db, job_id)
+        assert item is not None
+        email_workflow.finish_send_job_item(
+            self.db,
+            job_id=job_id,
+            email_id=item.email_id,
+            status="Failed",
+            error_message="Approval is required.",
+            now=datetime.now(timezone.utc).replace(tzinfo=None),
+        )
+        progress = self.client.get(f"/api/hr/emails/bulk-send/{job_id}")
+        self.assertEqual(progress.status_code, 200)
+        self.assertEqual(progress.json()["status"], "Completed")
+        self.assertEqual(progress.json()["failed_count"], 1)
 
     def test_expired_retry_requires_reopen_and_fresh_approval(self) -> None:
         draft = self.generate_draft()
@@ -606,9 +643,9 @@ class EmailWorkflowApiIntegrationTests(unittest.TestCase):
                     return_value=event,
                 ),
                 patch(
-                    "app.services.email_webhook_service.retrieve_received_email",
+                    "app.services.email_service.retrieve_received_email",
                     return_value=received_content,
-                ),
+                ) as retrieve_received_email,
             ):
                 webhook = self.client.post(
                     "/api/webhooks/email/resend",
@@ -622,6 +659,28 @@ class EmailWorkflowApiIntegrationTests(unittest.TestCase):
                 )
             self.assertEqual(webhook.status_code, 200)
             self.assertTrue(webhook.json()["accepted"])
+            retrieve_received_email.assert_not_called()
+            claimed = email_workflow.claim_next_inbound_fetch(
+                self.db,
+                worker_id="test-worker",
+                now=datetime.now(timezone.utc).replace(tzinfo=None),
+            )
+            assert claimed is not None
+            email_workflow.complete_inbound_fetch(
+                self.db,
+                inbound_id=claimed.inbound_id,
+                worker_id="test-worker",
+                body_text=received_content["text"],
+                provider_message_id=received_content["message_id"],
+                in_reply_to=None,
+                references_text=None,
+                attachments_json=[],
+                fetched_at=datetime.now(timezone.utc).replace(tzinfo=None),
+            )
+            self.assertEqual(
+                self.db.query(CandidateEmailInbound).one().fetch_status,
+                "Fetched",
+            )
 
             threads = self.client.get("/api/hr/emails/threads")
             self.assertEqual(threads.status_code, 200)
@@ -670,6 +729,17 @@ class EmailWorkflowApiIntegrationTests(unittest.TestCase):
                 "<candidate-message@example.com>",
                 sender.call_args.kwargs["references"],
             )
+
+    def test_smart_reply_returns_503_when_inbound_routing_is_disabled(self) -> None:
+        draft = self.generate_draft()
+        thread_id = draft["thread_id"]
+        with patch.object(settings, "resend_inbound_domain", None):
+            response = self.client.post(
+                f"/api/hr/emails/threads/{thread_id}/smart-reply",
+                json={"tone": "professional"},
+            )
+        self.assertEqual(response.status_code, 503)
+        self.assertIn("RESEND_INBOUND_DOMAIN", response.json()["detail"])
 
     def test_delivery_webhook_is_idempotent(self) -> None:
         draft = self.generate_draft()
@@ -761,7 +831,7 @@ class EmailWorkflowApiIntegrationTests(unittest.TestCase):
                     return_value=event,
                 ),
                 patch(
-                    "app.services.email_webhook_service.retrieve_received_email"
+                    "app.services.email_service.retrieve_received_email"
                 ) as retrieve,
             ):
                 webhook = self.client.post(
