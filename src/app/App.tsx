@@ -28,9 +28,9 @@ import Layout from "@/ui/components/Layout"
 
 import ToastProvider from "@/ui/components/ToastProvider"
 
-const AuthScreen = lazy(() => import("@/ui/screens/AuthScreen"))
+import AuthScreen from "@/ui/screens/AuthScreen"
 
-const LandingScreen = lazy(() => import("@/ui/screens/LandingScreen"))
+import LandingScreen from "@/ui/screens/LandingScreen"
 
 const CVReBuildScreen = lazy(() => import("@/ui/screens/CVReBuildScreen"))
 
@@ -125,15 +125,12 @@ export default function App() {
     : null
 
   useEffect(() => {
-    if (session) {
+    if (session || publicJobId) {
       setAuthReady(true)
       return
     }
 
-    if (publicJobId) {
-      setAuthReady(true)
-      return
-    }
+    setAuthReady(true)
 
     let active = true
     authApi
@@ -147,9 +144,6 @@ export default function App() {
         }
       })
       .catch(() => undefined)
-      .finally(() => {
-        if (active) setAuthReady(true)
-      })
 
     return () => {
       active = false
@@ -318,22 +312,16 @@ export default function App() {
   if (!authReady) return <FullPageSkeleton />
 
   if (showLanding && !session) {
-    return (
-      <Suspense fallback={<FullPageSkeleton />}>
-        <LandingScreen onGetStarted={() => setShowLanding(false)} />
-      </Suspense>
-    )
+    return <LandingScreen onGetStarted={() => setShowLanding(false)} />
   }
 
   if (!session || session.requiresRoleSelection || !portal) {
     return (
-      <Suspense fallback={<FullPageSkeleton />}>
-        <AuthScreen
-          onAuth={handleAuth}
-          startInRoleSelection={Boolean(session?.requiresRoleSelection)}
-          onBackToLanding={() => setShowLanding(true)}
-        />
-      </Suspense>
+      <AuthScreen
+        onAuth={handleAuth}
+        startInRoleSelection={Boolean(session?.requiresRoleSelection)}
+        onBackToLanding={() => setShowLanding(true)}
+      />
     )
   }
 
