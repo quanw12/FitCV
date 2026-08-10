@@ -285,13 +285,32 @@ def test_skill_groups_render_categorized_technical_skills() -> None:
     assert "<span class=\"entry-title\">Frameworks:</span> React, FastAPI" in html
 
 
+def test_grouped_skills_are_not_duplicated_as_flat_list() -> None:
+    """Skills present in groups must not also appear in the leftover line."""
+    cv = CVData(
+        name="Nguyen Van A",
+        skills=["Python", "TypeScript", "React", "FastAPI", "Docker"],
+        skill_groups=[
+            {"category": "Languages", "items": ["Python", "TypeScript"]},
+            {"category": "Frameworks", "items": ["React", "FastAPI"]},
+        ],
+    )
+    html = render_cv(cv)
+    assert "Languages:" in html
+    assert "Frameworks:" in html
+    # Docker is the only skill outside any group -> it is the leftover line.
+    assert "Docker" in html
+    # The grouped skills must not be repeated in a flat comma line.
+    assert "Python, TypeScript, React, FastAPI, Docker" not in html
+    assert "Python, TypeScript, React, FastAPI" not in html
+
+
 def test_plain_skills_list_renders_when_no_groups() -> None:
     cv = CVData(name="Nguyen Van A", skills=["Python", "Docker"])
     html = render_cv(cv)
     assert "<h2>Technical Skills</h2>" in html
-    assert '<ul class="skills-list">' in html
-    assert "<li>Python</li>" in html
-    assert "<li>Docker</li>" in html
+    assert '<p class="skills-line">' in html
+    assert "Python, Docker" in html
     assert "<h2>Core Competencies</h2>" not in html
 
 

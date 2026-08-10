@@ -41,6 +41,8 @@ class Settings(BaseSettings):
     gemini_thinking_level: Literal["minimal", "low", "medium", "high"] = "high"
     gemini_timeout_seconds: float = 90.0
     gemini_max_retries: int = 2
+    gemini_cv_rebuild_temperature: float = 0.0
+    gemini_cv_rebuild_seed: int | None = None
     ocr_provider: str = "gemini"
     ocr_model: str = ""
     ocr_timeout_seconds: float = 120.0

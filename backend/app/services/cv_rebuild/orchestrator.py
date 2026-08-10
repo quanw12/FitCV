@@ -13,6 +13,12 @@ from pypdf.errors import PdfReadError
 
 from app.schemas.cv_rebuild import CVData, CvRebuildResponse
 from app.services.cv_rebuild.avatar import maybe_downscale_avatar
+from app.services.cv_rebuild.completeness import (
+    backfill_cv,
+    derive_baseline_from_text,
+    detect_sections_in_text,
+    _cv_dropped_content,
+)
 from app.services.cv_rebuild.language import cv_is_mixed, detect_cv_language
 from app.services.cv_rebuild.llm_extractor import CvExtractor
 from app.services.cv_rebuild.normalization import normalize_cv
@@ -23,6 +29,37 @@ from app.services.document_parser import extract_document_text, validate_cv_cont
 logger = logging.getLogger(__name__)
 
 _MAX_MIXED_ATTEMPTS = 3
+
+# Sections whose total loss during extraction is most damaging and worth a
+# targeted re-extraction. Order matters only for the remediation message.
+_SECTION_SAFETY_CHECKS = ("experience", "education", "projects")
+
+
+def _extract_with_section_safety(
+    cv_extractor: CvExtractor, raw_text: str
+) -> CVData:
+    """Extract a CV, then re-extract if a clearly-present section was dropped.
+
+    The grounding/backfill safety net downstream compares the polished CV
+    against the *extracted* baseline, so it cannot recover content the
+    extraction step itself lost.  This catches that gap: if the raw text
+    obviously signals a section (via a header) but the extracted CV has no
+    entries for it, we re-extract once with an explicit remediation prompt.
+    """
+    extracted = normalize_cv(cv_extractor.extract(raw_text))
+    present = detect_sections_in_text(raw_text)
+    for _ in range(2):
+        missing = [
+            section
+            for section in _SECTION_SAFETY_CHECKS
+            if section in present and not getattr(extracted, section)
+        ]
+        if not missing:
+            break
+        extracted = normalize_cv(
+            cv_extractor.extract(raw_text, missing_sections=missing)
+        )
+    return extracted
 
 
 async def rebuild_cv(
@@ -51,22 +88,58 @@ async def rebuild_cv(
             raise ValueError(f"Unable to read the CV file: {exc}") from exc
 
     cv_extractor = extractor or CvExtractor()
-    cv = normalize_cv(cv_extractor.extract(raw_text))
-    name = cv.name
-    language = detect_cv_language(cv)
+    extracted = _extract_with_section_safety(cv_extractor, raw_text)
+    name = extracted.name
+    language = detect_cv_language(extracted)
     warnings: list[str] = []
 
-    # cv_is_mixed retry loop
+    # Baseline = original input. Enrich contact details by parsing the raw
+    # text directly so a contact the LLM dropped during extraction is still
+    # recovered deterministically.
+    baseline = derive_baseline_from_text(raw_text)
+    baseline_cv = extracted.model_copy(deep=True)
+    if not baseline_cv.email and baseline.email:
+        baseline_cv = baseline_cv.model_copy(update={"email": baseline.email})
+    if not baseline_cv.phone and baseline.phone:
+        baseline_cv = baseline_cv.model_copy(update={"phone": baseline.phone})
+    if not baseline_cv.links and baseline.links:
+        baseline_cv = baseline_cv.model_copy(update={"links": baseline.links})
+
+    cv = extracted
+
+    # Completeness guarantee: re-polish while the output drops content the
+    # original clearly had. Bounded by _MAX_MIXED_ATTEMPTS; the deterministic
+    # backfill below is the final hard safety net.
+    for _ in range(_MAX_MIXED_ATTEMPTS):
+        if not _cv_dropped_content(baseline_cv, cv):
+            break
+        cv, completeness_warnings = cv_extractor.polish(
+            cv, language=language, jd_text=jd_text, baseline=baseline_cv
+        )
+        cv = normalize_cv(cv)
+        warnings.extend(completeness_warnings)
+        language = detect_cv_language(cv)
+    else:
+        # Still dropping content after max attempts — continue with backfill.
+        pass
+
+    # Mixed-language unification loop (gated on cv_is_mixed)
     for _ in range(_MAX_MIXED_ATTEMPTS):
         if not cv_is_mixed(cv):
             break
-        cv, mixed_warnings = cv_extractor.polish(cv, language=language, jd_text=jd_text)
+        cv, mixed_warnings = cv_extractor.polish(
+            cv, language=language, jd_text=jd_text, baseline=baseline_cv
+        )
         cv = normalize_cv(cv)
         warnings.extend(mixed_warnings)
         language = detect_cv_language(cv)
     else:
         # Still mixed after max attempts — continue with what we have
         pass
+
+    # Deterministic backfill: re-inject any field the polished output lost.
+    cv, backfill_warnings = backfill_cv(baseline_cv, cv)
+    warnings.extend(backfill_warnings)
 
     cv = cv.model_copy(update={"name": name})
     avatar_data = maybe_downscale_avatar(avatar, warnings)
@@ -111,18 +184,22 @@ async def rebuild_with_improvements(
         raise ValueError("Select at least one improvement before rebuilding the CV.")
 
     cv_extractor = extractor or CvExtractor()
-    cv = normalize_cv(cv_extractor.extract(parsed_text))
+    cv = _extract_with_section_safety(cv_extractor, parsed_text)
     name = cv.name
+    original_cv = cv.model_copy(deep=True)
     output_language = language or detect_cv_language(cv)
     warnings: list[str] = []
 
     # Apply the approved instructions once even when the CV language is already
     # uniform. Any follow-up mixed-language pass receives the same instructions.
+    # The baseline is the original parsed CV so grounding/polish never drifts
+    # away from the source during retries.
     cv, polish_warnings = cv_extractor.polish(
         cv,
         language=output_language,
         jd_text=jd_text,
         applied_improvements=applied_improvements,
+        baseline=original_cv,
     )
     cv = normalize_cv(cv)
     warnings.extend(polish_warnings)
@@ -136,10 +213,15 @@ async def rebuild_with_improvements(
             language=output_language,
             jd_text=jd_text,
             applied_improvements=applied_improvements,
+            baseline=original_cv,
         )
         cv = normalize_cv(cv)
         warnings.extend(mixed_warnings)
         output_language = detect_cv_language(cv)
+
+    # Deterministic backfill of anything the polished output still lost.
+    cv, backfill_warnings = backfill_cv(original_cv, cv)
+    warnings.extend(backfill_warnings)
 
     cv = cv.model_copy(update={"name": name})
     avatar_data = maybe_downscale_avatar(avatar, warnings)
@@ -172,19 +254,25 @@ async def build_cv(
     """Build a CV from form data: AI-polish, then render as a PDF."""
     cv_extractor = extractor or CvExtractor()
     name = cv.name
+    original_cv = cv.model_copy(deep=True)
     warnings: list[str] = []
 
-    # cv_is_mixed retry loop
+    # cv_is_mixed retry loop. The user's selected language is the fixed authoring
+    # target; we only use language detection to decide whether the mixed-language
+    # loop should continue (never to override the user's chosen language).
     polished = cv
     for _ in range(_MAX_MIXED_ATTEMPTS):
         polished, polish_warnings = cv_extractor.polish(
-            polished, language=language, jd_text=jd_text
+            polished, language=language, jd_text=jd_text, baseline=original_cv
         )
         polished = normalize_cv(polished)
         warnings.extend(polish_warnings)
-        language = detect_cv_language(polished)
         if not cv_is_mixed(polished):
             break
+
+    # Deterministic backfill of anything the polished output lost.
+    polished, backfill_warnings = backfill_cv(original_cv, polished)
+    warnings.extend(backfill_warnings)
 
     polished = polished.model_copy(update={"name": name})
     avatar_data = maybe_downscale_avatar(avatar, warnings)

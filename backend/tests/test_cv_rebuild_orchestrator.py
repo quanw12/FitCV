@@ -56,7 +56,13 @@ class FakeExtractor:
         self.last_applied_improvements: str | None = None
         self.polish_calls = 0
 
-    def extract(self, raw_text: str, *, max_attempts: int = 3) -> CVData:
+    def extract(
+        self,
+        raw_text: str,
+        *,
+        max_attempts: int = 3,
+        missing_sections: list[str] | None = None,
+    ) -> CVData:
         assert "Backend engineer" in raw_text
         return self.result
 
@@ -68,6 +74,7 @@ class FakeExtractor:
         max_attempts: int = 3,
         jd_text: str | None = None,
         applied_improvements: str | None = None,
+        baseline: CVData | None = None,
     ) -> tuple[CVData, list[str]]:
         self.last_polish_language = language
         self.last_applied_improvements = applied_improvements
@@ -308,7 +315,7 @@ class TestBuildCv:
         )
 
         class BrokenExtractor:
-            def polish(self, cv, *, language="en", max_attempts=3, jd_text=None):
+            def polish(self, cv, *, language="en", max_attempts=3, jd_text=None, baseline=None):
                 raise CvExtractionError("invalid structure")
 
         try:
@@ -403,3 +410,80 @@ class TestBuildCv:
             assert "no chromium" in str(exc)
         else:
             raise AssertionError("expected PdfRenderError")
+
+
+class FakeSequenceExtractor:
+    """Extractor that returns a programmed sequence of extraction results and
+    records whether ``missing_sections`` was requested (re-extraction)."""
+
+    def __init__(self, results: list[CVData]) -> None:
+        self.results = list(results)
+        self.extract_calls = 0
+        self.last_missing_sections: list[str] | None = None
+
+    def extract(
+        self,
+        raw_text: str,
+        *,
+        max_attempts: int = 3,
+        missing_sections: list[str] | None = None,
+    ) -> CVData:
+        self.extract_calls += 1
+        self.last_missing_sections = missing_sections
+        if not self.results:
+            raise AssertionError("no result")
+        return self.results.pop(0)
+
+    def polish(
+        self,
+        cv: CVData,
+        *,
+        language: str = "en",
+        max_attempts: int = 3,
+        jd_text: str | None = None,
+        applied_improvements: str | None = None,
+        baseline: CVData | None = None,
+    ) -> tuple[CVData, list[str]]:
+        return cv, []
+
+
+class TestExtractWithSectionSafety:
+    def test_re_extracts_when_section_dropped(self) -> None:
+        empty = CVData(name="A")
+        with_experience = CVData(
+            name="A",
+            experience=[
+                {
+                    "title": "Engineer",
+                    "company": "Acme",
+                    "date": "2020-2023",
+                    "bullets": ["Built APIs."],
+                }
+            ],
+        )
+        extractor = FakeSequenceExtractor([empty, with_experience])
+        result = orchestrator._extract_with_section_safety(
+            extractor, "Experience:\nEngineer at Acme (2020-2023)"
+        )
+        assert extractor.extract_calls >= 2
+        assert extractor.last_missing_sections == ["experience"]
+        assert len(result.experience) == 1
+
+    def test_no_re_extraction_when_complete(self) -> None:
+        complete = CVData(
+            name="A",
+            experience=[
+                {
+                    "title": "Engineer",
+                    "company": "Acme",
+                    "date": "2020-2023",
+                    "bullets": ["Built APIs."],
+                }
+            ],
+        )
+        extractor = FakeSequenceExtractor([complete])
+        orchestrator._extract_with_section_safety(
+            extractor, "Experience:\nEngineer at Acme (2020-2023)"
+        )
+        assert extractor.extract_calls == 1
+        assert extractor.last_missing_sections is None
