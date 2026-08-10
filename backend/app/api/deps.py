@@ -1,9 +1,8 @@
-from datetime import datetime, timezone
-
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
+from app.core.datetime_utils import utc_now_naive
 from app.core.security import decode_access_token
 from app.db.session import get_db
 from app.models.account import Account
@@ -28,7 +27,7 @@ def get_current_account(
     record = auth_sessions.get_active_by_id(
         db,
         claims.session_id,
-        now=datetime.now(timezone.utc).replace(tzinfo=None),
+        now=utc_now_naive(),
     )
     if record is None or record.account_id != int(claims.account_id):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Session is invalid or revoked.")

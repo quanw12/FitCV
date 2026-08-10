@@ -6,6 +6,7 @@ from secrets import compare_digest, randbelow
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
+from app.core.datetime_utils import utc_now_naive
 from app.core.google_auth import verify_google_credential
 from app.core.security import (
     create_access_token,
@@ -45,12 +46,14 @@ def _auth_payload(account: Account, session_id: str) -> AuthSession:
 
 
 def _issue_new_session(db: Session, account: Account) -> IssuedAuthSession:
+    now = utc_now_naive()
     refresh_token, expires_at = create_refresh_token()
     record = auth_sessions.create(
         db,
         account_id=account.account_id,
         refresh_token_hash=hash_refresh_token(refresh_token),
         expires_at=expires_at,
+        now=now,
     )
     return IssuedAuthSession(
         session=_auth_payload(account, record.session_id),
@@ -117,7 +120,7 @@ def select_role(
 
 
 def refresh(db: Session, *, refresh_token: str) -> IssuedAuthSession:
-    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    now = utc_now_naive()
     record = auth_sessions.get_active_by_refresh_hash(
         db,
         hash_refresh_token(refresh_token),
@@ -132,13 +135,11 @@ def refresh(db: Session, *, refresh_token: str) -> IssuedAuthSession:
     account = db.get(Account, record.account_id)
     if account is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Account not found.")
-    next_token, expires_at = create_refresh_token()
+    next_token, _ = create_refresh_token()
     auth_sessions.rotate(
         db,
         record,
         refresh_token_hash=hash_refresh_token(next_token),
-        expires_at=expires_at,
-        now=now,
     )
     return IssuedAuthSession(
         session=_auth_payload(account, record.session_id),
@@ -151,7 +152,7 @@ def logout(db: Session, *, session_id: str) -> None:
         db,
         session_id,
         reason="Logout",
-        now=datetime.now(timezone.utc).replace(tzinfo=None),
+        now=utc_now_naive(),
     )
 
 
@@ -160,8 +161,14 @@ def logout_by_refresh_token(db: Session, *, refresh_token: str) -> None:
         db,
         hash_refresh_token(refresh_token),
         reason="Logout",
-        now=datetime.now(timezone.utc).replace(tzinfo=None),
+        now=utc_now_naive(),
     )
+
+
+def record_activity(db: Session, *, session_id: str) -> None:
+    """Gia hạn cửa sổ idle chỉ từ tín hiệu tương tác người dùng đã xác thực."""
+
+    auth_sessions.touch_activity(db, session_id, now=utc_now_naive())
 
 
 def _hash_reset_code(email: str, code: str) -> str:
@@ -226,5 +233,5 @@ def reset_password(db: Session, *, email: str, code: str, password: str) -> None
         db,
         account.account_id,
         reason="PasswordReset",
-        now=datetime.now(timezone.utc).replace(tzinfo=None),
+        now=utc_now_naive(),
     )
