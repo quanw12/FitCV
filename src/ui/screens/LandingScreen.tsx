@@ -87,51 +87,76 @@ const HR_FEATURES: Feature[] = [
   },
 ]
 
-/* Both flows share one shape: three stages on the main line, then a fork where
-   the attempt either earns its place on the line or is left off it. */
+/* Job seeker: the fork lets the candidate either send the version or loop back
+   through improvement — every rebuild is saved, so nothing is discarded. */
 
 const SEEKER_FLOW: TimelineSpec = {
   badge: "LIVE",
-  marker: "Current CV",
-  branchBadge: "DRAFT",
-  stages: ["CV uploaded", "Parsed", "Scored vs JD"],
+  marker: "CV v1 · PDF",
+  stages: ["CV uploaded", "Parsed · sections", "JD attached", "Scored · 4 categories"],
+  gate: "YOU DECIDE",
 
-  pass: {
-    changed: "Improved · Gaps closed",
-    pill: "Rebuilt draft",
-    first: "Score improved",
-    second: "New version",
+  up: {
+    badge: "APPLY",
+    title: "Send this version",
+    note: "Strong match · gaps closed",
+    tone: "pass",
+    nodes: [
+      { label: "Applied", glyph: "check" },
+      { label: "Screening", glyph: "dot" },
+      { label: "Interview", glyph: "up" },
+    ],
+    ending: { kind: "rejoin", label: "Offer · tracked" },
   },
 
-  fail: {
-    changed: "Changed · Weak areas",
-    pill: "Discarded draft",
-    first: "Score dropped",
-    second: "Not saved",
+  down: {
+    badge: "IMPROVE",
+    title: "Close the gaps",
+    note: "Weak match · keywords missing",
+    tone: "loop",
+    nodes: [
+      { label: "AI suggestions", glyph: "spark" },
+      { label: "Saved as v2", glyph: "plus" },
+      { label: "Re-scored", glyph: "loop" },
+    ],
+    ending: { kind: "loop", label: "Same JD · new version · back through the flow" },
   },
-  outcome: "Version sent",
 }
+
+/* Recruiter: the score ranks, HR decides — a candidate is moved or held by a
+   person, never by the number, and the record stays even when not moved on. */
 
 const HR_FLOW: TimelineSpec = {
   badge: "OPEN",
-  marker: "Open role",
-  branchBadge: "CANDIDATE",
-  stages: ["Role posted", "CVs received", "Pool scored"],
+  marker: "Sr Frontend · 24 CVs",
+  stages: ["Role published", "CVs collected", "Parsed · evidence", "Ranked vs JD"],
+  gate: "HR DECIDES",
 
-  pass: {
-    changed: "Ranked · Top match",
-    pill: "Shortlisted",
-    first: "Interview",
-    second: "Offer",
+  up: {
+    badge: "SHORTLIST",
+    title: "Moved to screening",
+    note: "Above threshold · reviewed",
+    tone: "pass",
+    nodes: [
+      { label: "Invite drafted", glyph: "mail" },
+      { label: "HR approved · sent", glyph: "check" },
+      { label: "Offer", glyph: "up" },
+    ],
+    ending: { kind: "rejoin", label: "Hired" },
   },
 
-  fail: {
-    changed: "Ranked · Low match",
-    pill: "Left in pool",
-    first: "Below the bar",
-    second: "Rejected",
+  down: {
+    badge: "NOT NOW",
+    title: "Not moved forward",
+    note: "Below threshold · reviewed",
+    tone: "fail",
+    nodes: [
+      { label: "Rejection drafted", glyph: "mail" },
+      { label: "HR approved · sent", glyph: "check" },
+      { label: "Rejected", glyph: "cross" },
+    ],
+    ending: { kind: "stop", label: "Stage history kept" },
   },
-  outcome: "Hired",
 }
 
 function handleCardPointerMove(event: PointerEvent<HTMLElement>) {
@@ -332,7 +357,7 @@ export default function LandingScreen({ onGetStarted }: LandingScreenProps) {
           <div className="lp-reveal">
             <BranchTimeline
               spec={HR_FLOW}
-              caption="Recruiter workflow — illustrative flow, not recorded activity"
+              caption="Recruiter workflow — the score ranks, HR decides. Illustrative flow, not recorded activity"
             />
           </div>
         </div>
