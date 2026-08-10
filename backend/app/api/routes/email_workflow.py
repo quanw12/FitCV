@@ -6,7 +6,7 @@ from app.middleware.auth_guard import require_role
 from app.models.account import Account, AccountRole
 from app.schemas.email_workflow import (
     BulkEmailSendRequest,
-    BulkEmailSendResponse,
+    BulkEmailSendJobResponse,
     CampaignGenerateRequest,
     CampaignPreviewResponse,
     EmailAudienceResponse,
@@ -200,10 +200,26 @@ def send_draft(
     return email_workflow_service.send(db, account, email_id)
 
 
-@router.post("/bulk-send", response_model=BulkEmailSendResponse)
+@router.post(
+    "/bulk-send",
+    response_model=BulkEmailSendJobResponse,
+    status_code=202,
+)
 def bulk_send(
     payload: BulkEmailSendRequest,
     db: Session = Depends(get_db),
     account: Account = Depends(manager),
 ):
     return email_workflow_service.bulk_send(db, account, payload.email_ids)
+
+
+@router.get(
+    "/bulk-send/{job_id}",
+    response_model=BulkEmailSendJobResponse,
+)
+def bulk_send_progress(
+    job_id: int,
+    db: Session = Depends(get_db),
+    account: Account = Depends(manager),
+):
+    return email_workflow_service.bulk_send_progress(db, account, job_id)

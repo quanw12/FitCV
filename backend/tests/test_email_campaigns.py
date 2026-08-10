@@ -9,6 +9,7 @@ from sqlalchemy.pool import StaticPool
 
 from app.api.deps import get_current_account
 from app.db.session import Base, get_db
+from app.core.config import settings
 from app.main import app
 from app.models import (
     Application,
@@ -124,6 +125,8 @@ class SequencedGemini:
 
 class EmailCampaignIntegrationTests(unittest.TestCase):
     def setUp(self) -> None:
+        self.previous_inbound_domain = settings.resend_inbound_domain
+        settings.resend_inbound_domain = "inbound.example.com"
         self.engine = create_engine(
             "sqlite+pysqlite:///:memory:",
             connect_args={"check_same_thread": False},
@@ -179,6 +182,7 @@ class EmailCampaignIntegrationTests(unittest.TestCase):
         self.client = TestClient(app)
 
     def tearDown(self) -> None:
+        settings.resend_inbound_domain = self.previous_inbound_domain
         self.client.close()
         app.dependency_overrides.clear()
         self.db.close()
@@ -324,6 +328,41 @@ class EmailCampaignIntegrationTests(unittest.TestCase):
         blocked = {item["application_id"]: item for item in payload["blocked"]}
         self.assertEqual(blocked[missing_id]["blocked_reason"], "Missing candidate email.")
         self.assertEqual(blocked[pending_id]["blocked_reason"], "Draft already pending.")
+
+    def test_audience_blocks_duplicate_sent_template_for_current_stage(self) -> None:
+        sent_id = self.rejected_ids[0]
+        application = self.db.get(Application, sent_id)
+        assert application is not None
+        candidate = self.db.get(Candidate, application.candidate_id)
+        assert candidate is not None and candidate.email is not None
+        self.db.add(
+            CandidateEmail(
+                company_id=self.company.company_id,
+                application_id=sent_id,
+                template_key="rejection",
+                message_kind="Initial",
+                stage_at_generation="Rejected",
+                recipient_email=candidate.email,
+                subject="Already sent",
+                body="Already sent",
+                status="Sent",
+                sent_at=datetime.now(timezone.utc).replace(tzinfo=None),
+                created_by_account_id=self.manager.account_id,
+            )
+        )
+        self.db.commit()
+
+        payload = self.client.get("/api/hr/emails/audience?stage=Rejected").json()
+        blocked = {
+            item["application_id"]: item for item in payload["blocked"]
+        }
+        self.assertEqual(
+            blocked[sent_id]["blocked_reason"],
+            "Already emailed for this stage.",
+        )
+        self.assertTrue(
+            all(item["application_id"] != sent_id for item in payload["eligible"])
+        )
 
     def test_campaign_generates_identical_body_for_rejection(self) -> None:
         fake = FakeGemini()

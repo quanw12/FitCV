@@ -18,6 +18,8 @@ from app.models.email_workflow import (
     CandidateEmailCampaign,
     CandidateEmailEvent,
     CandidateEmailInbound,
+    CandidateEmailSendJob,
+    CandidateEmailSendJobItem,
     CandidateEmailThread,
 )
 from app.models.jobs import (
@@ -44,6 +46,8 @@ __all__ = [
     "CandidateEmailCampaign",
     "CandidateEmailEvent",
     "CandidateEmailInbound",
+    "CandidateEmailSendJob",
+    "CandidateEmailSendJobItem",
     "CandidateEmailThread",
     "Company",
     "Cv",

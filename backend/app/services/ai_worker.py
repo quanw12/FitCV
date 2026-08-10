@@ -9,8 +9,11 @@ from uuid import uuid4
 
 from app.core.config import settings
 from app.db.session import SessionLocal
+from fastapi import HTTPException
+
+from app.models.account import Account
 from app.models.improvement import AiTask
-from app.repositories import ai_tasks
+from app.repositories import ai_tasks, email_workflow
 
 logger = logging.getLogger(__name__)
 
@@ -112,19 +115,175 @@ def process_one(worker_id: str) -> bool:
     return True
 
 
+def process_one_email_job(worker_id: str) -> bool:
+    db = SessionLocal()
+    try:
+        job = email_workflow.claim_next_send_job(
+            db,
+            worker_id=worker_id,
+            now=_now(),
+            lease_seconds=settings.ai_worker_lease_seconds,
+        )
+    finally:
+        db.close()
+    if job is None:
+        return False
+
+    db = SessionLocal()
+    try:
+        item = email_workflow.claim_next_send_job_item(db, job.job_id)
+        account = db.get(Account, job.created_by_account_id)
+    finally:
+        db.close()
+    if item is None:
+        return True
+    if account is None:
+        db = SessionLocal()
+        try:
+            email_workflow.finish_send_job_item(
+                db,
+                job_id=job.job_id,
+                email_id=item.email_id,
+                status="Failed",
+                error_message="The account that created this bulk send job no longer exists.",
+                now=_now(),
+            )
+        finally:
+            db.close()
+        return True
+
+    status = "Sent"
+    error_message: str | None = None
+    try:
+        from app.services.email_workflow_service import send
+
+        db = SessionLocal()
+        try:
+            send(db, account, item.email_id)
+        finally:
+            db.close()
+    except HTTPException as exc:
+        status = "Failed"
+        error_message = str(exc.detail)
+    except Exception as exc:
+        logger.exception(
+            "Bulk email job item failed: job_id=%s email_id=%s",
+            job.job_id,
+            item.email_id,
+        )
+        status = "Failed"
+        error_message = str(exc) or "Email delivery failed."
+
+    db = SessionLocal()
+    try:
+        email_workflow.finish_send_job_item(
+            db,
+            job_id=job.job_id,
+            email_id=item.email_id,
+            status=status,
+            error_message=error_message,
+            now=_now(),
+        )
+    finally:
+        db.close()
+    return True
+
+
+def process_one_inbound_fetch(worker_id: str) -> bool:
+    db = SessionLocal()
+    try:
+        inbound = email_workflow.claim_next_inbound_fetch(
+            db,
+            worker_id=worker_id,
+            now=_now(),
+        )
+    finally:
+        db.close()
+    if inbound is None:
+        return False
+
+    try:
+        from app.services.email_service import retrieve_received_email
+        from app.services.email_webhook_service import (
+            _bare_email,
+            _body_text,
+            _header,
+            _safe_attachments,
+        )
+
+        content = retrieve_received_email(inbound.provider_email_id)
+        content_sender = _bare_email(content.get("from"))
+        if content_sender and content_sender != inbound.sender_email:
+            raise RuntimeError(
+                "Inbound email sender metadata does not match retrieved content."
+            )
+        body_text = _body_text(content) or "(No plain-text email content was provided.)"
+        headers = content.get("headers")
+        db = SessionLocal()
+        try:
+            email_workflow.complete_inbound_fetch(
+                db,
+                inbound_id=inbound.inbound_id,
+                worker_id=worker_id,
+                body_text=body_text,
+                provider_message_id=(
+                    str(content.get("message_id"))[:500]
+                    if content.get("message_id")
+                    else inbound.provider_message_id
+                ),
+                in_reply_to=_header(headers, "in-reply-to"),
+                references_text=_header(headers, "references"),
+                attachments_json=_safe_attachments(content.get("attachments")),
+                fetched_at=_now(),
+            )
+        finally:
+            db.close()
+    except Exception as exc:
+        logger.exception(
+            "Inbound email fetch failed: inbound_id=%s", inbound.inbound_id
+        )
+        db = SessionLocal()
+        try:
+            email_workflow.fail_inbound_fetch(
+                db,
+                inbound_id=inbound.inbound_id,
+                worker_id=worker_id,
+                now=_now(),
+                max_attempts=settings.ai_task_max_attempts,
+                error_message=str(exc) or "Inbound email fetch failed.",
+            )
+        finally:
+            db.close()
+    return True
+
+
 def kick_worker_once() -> None:
     """Opportunistically process one durable task after an API response."""
-    process_one(f"web-{_worker_id()}")
+    worker_id = f"web-{_worker_id()}"
+    process_one(worker_id) or process_one_email_job(worker_id) or process_one_inbound_fetch(
+        worker_id
+    )
 
 
 def recover_stale_tasks() -> int:
     db = SessionLocal()
     try:
-        return ai_tasks.recover_stale(
+        recovered = ai_tasks.recover_stale(
             db,
             stale_before=_now() - timedelta(seconds=settings.ai_worker_lease_seconds),
             now=_now(),
         )
+        recovered += email_workflow.recover_stale_send_jobs(
+            db,
+            stale_before=_now() - timedelta(seconds=settings.ai_worker_lease_seconds),
+            now=_now(),
+        )
+        recovered += email_workflow.recover_stale_inbound_fetches(
+            db,
+            stale_before=_now() - timedelta(seconds=settings.ai_worker_lease_seconds),
+            now=_now(),
+        )
+        return recovered
     finally:
         db.close()
 
@@ -140,6 +299,10 @@ async def run_worker(stop: asyncio.Event) -> None:
             await asyncio.to_thread(recover_stale_tasks)
             next_recovery_at = loop.time() + recovery_interval
         processed = await asyncio.to_thread(process_one, worker_id)
+        if not processed:
+            processed = await asyncio.to_thread(process_one_email_job, worker_id)
+        if not processed:
+            processed = await asyncio.to_thread(process_one_inbound_fetch, worker_id)
         if not processed:
             try:
                 await asyncio.wait_for(stop.wait(), timeout=settings.ai_worker_poll_seconds)

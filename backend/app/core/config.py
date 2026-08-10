@@ -58,5 +58,10 @@ class Settings(BaseSettings):
         "https://fit-cv.vercel.app",
     ]
 
+    @property
+    def inbound_replies_enabled(self) -> bool:
+        domain = (self.resend_inbound_domain or "").strip().lstrip("@")
+        return bool(domain and "." in domain)
+
 
 settings = Settings()

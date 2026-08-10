@@ -249,6 +249,7 @@ describe("AutoEmailScreen", () => {
       guidance: "",
       interview_lead_days: 3,
       interview_window: "09:00-17:00 ICT",
+      allow_resend: false,
     })
     expect(emailMocks.send).not.toHaveBeenCalled()
   })

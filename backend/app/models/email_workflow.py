@@ -223,6 +223,11 @@ class CandidateEmailInbound(Base):
             "thread_id",
             "is_read",
         ),
+        Index(
+            "idx_candidate_email_inbound_fetch_queue",
+            "fetch_status",
+            "fetch_available_at",
+        ),
     )
 
     inbound_id: Mapped[int] = mapped_column(
@@ -240,7 +245,7 @@ class CandidateEmailInbound(Base):
     sender_email: Mapped[str] = mapped_column(String(150), nullable=False)
     recipient_email: Mapped[str] = mapped_column(String(150), nullable=False)
     subject: Mapped[str] = mapped_column(String(300), nullable=False)
-    body_text: Mapped[str] = mapped_column(Text, nullable=False)
+    body_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     in_reply_to: Mapped[str | None] = mapped_column(
         String(500), nullable=True
     )
@@ -248,6 +253,25 @@ class CandidateEmailInbound(Base):
     attachments_json: Mapped[list[dict] | None] = mapped_column(
         JSON, nullable=True
     )
+    fetch_status: Mapped[str] = mapped_column(
+        String(20), default="Fetched", server_default="Fetched", nullable=False
+    )
+    fetch_attempts: Mapped[int] = mapped_column(
+        Integer, default=0, server_default="0", nullable=False
+    )
+    fetch_available_at: Mapped[datetime | None] = mapped_column(
+        DateTime, nullable=True
+    )
+    fetch_locked_by: Mapped[str | None] = mapped_column(
+        String(120), nullable=True
+    )
+    fetch_locked_at: Mapped[datetime | None] = mapped_column(
+        DateTime, nullable=True
+    )
+    fetch_error: Mapped[str | None] = mapped_column(
+        String(1000), nullable=True
+    )
+    fetched_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     is_read: Mapped[bool] = mapped_column(
         Boolean, default=False, server_default="0", nullable=False
     )
@@ -292,4 +316,75 @@ class CandidateEmailEvent(Base):
     occurred_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now(), nullable=False
+    )
+
+
+class CandidateEmailSendJob(Base):
+    __tablename__ = "candidate_email_send_job"
+    __table_args__ = (
+        Index(
+            "idx_candidate_email_send_job_company_status",
+            "company_id",
+            "status",
+        ),
+    )
+
+    job_id: Mapped[int] = mapped_column(
+        ID_TYPE, primary_key=True, autoincrement=True
+    )
+    company_id: Mapped[int] = mapped_column(
+        ID_TYPE,
+        ForeignKey("company.company_id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    created_by_account_id: Mapped[int | None] = mapped_column(
+        ID_TYPE,
+        ForeignKey("account.account_id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    status: Mapped[str] = mapped_column(
+        String(20), default="Queued", server_default="Queued", nullable=False
+    )
+    total_count: Mapped[int] = mapped_column(
+        Integer, default=0, server_default="0", nullable=False
+    )
+    sent_count: Mapped[int] = mapped_column(
+        Integer, default=0, server_default="0", nullable=False
+    )
+    failed_count: Mapped[int] = mapped_column(
+        Integer, default=0, server_default="0", nullable=False
+    )
+    lease_expires_at: Mapped[datetime | None] = mapped_column(
+        DateTime, nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), nullable=False
+    )
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+class CandidateEmailSendJobItem(Base):
+    __tablename__ = "candidate_email_send_job_item"
+    __table_args__ = (
+        Index("idx_candidate_email_send_job_item_status", "job_id", "status"),
+    )
+
+    job_id: Mapped[int] = mapped_column(
+        ID_TYPE,
+        ForeignKey("candidate_email_send_job.job_id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    email_id: Mapped[int] = mapped_column(
+        ID_TYPE,
+        ForeignKey("candidate_email.email_id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    status: Mapped[str] = mapped_column(
+        String(20), default="Queued", server_default="Queued", nullable=False
+    )
+    error_message: Mapped[str | None] = mapped_column(
+        String(1000), nullable=True
+    )
+    attempts: Mapped[int] = mapped_column(
+        Integer, default=0, server_default="0", nullable=False
     )

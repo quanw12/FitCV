@@ -8,7 +8,12 @@ export interface EmailTemplate {
   default_stage: EmailStage | null
 }
 
-export type CandidateEmailStatus = "Draft" | "Approved" | "Sent" | "Failed"
+export type CandidateEmailStatus =
+  | "Draft"
+  | "Approved"
+  | "Sent"
+  | "Failed"
+  | "Invalidated"
 
 export interface CandidateEmailDraft {
   email_id: number
@@ -99,10 +104,13 @@ export interface CampaignPreview {
 }
 
 export interface BulkEmailSendResult {
+  job_id: number
+  status: string
+  total_count: number
   sent_count: number
-
   failed_count: number
-
+  created_at: string
+  finished_at: string | null
   results: Array<{
     email_id: number
 
@@ -139,6 +147,10 @@ export interface EmailThreadMessage {
   provider_message_id: string | null
 
   occurred_at: string
+
+  fetch_status?: string | null
+
+  fetch_error?: string | null
 }
 
 export interface EmailThreadSummary {
@@ -165,6 +177,10 @@ export interface EmailThreadSummary {
   unread_count: number
 
   last_message_preview: string | null
+
+  inbound_replies_enabled?: boolean
+
+  has_fetched_inbound?: boolean
 }
 
 export interface EmailThreadDetail extends EmailThreadSummary {

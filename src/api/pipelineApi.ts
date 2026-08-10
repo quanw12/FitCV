@@ -34,6 +34,15 @@ export const pipelineApi = {
         }),
       },
     ),
+  reopen: (applicationId: number, stage: PipelineStage = "Applied") =>
+    requestJson<PipelineApplication>(
+      "/api/hr/pipeline/applications/" + applicationId + "/reopen",
+      {
+        authenticated: true,
+        method: "POST",
+        body: JSON.stringify({ stage }),
+      },
+    ),
   listNotes: (applicationId: number) =>
     requestJson<PipelineNote[]>(
       `/api/hr/pipeline/applications/${applicationId}/notes`,

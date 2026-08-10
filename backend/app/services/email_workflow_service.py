@@ -10,7 +10,7 @@ from app.models.account import Account
 from app.repositories import email_workflow
 from app.schemas.email_workflow import (
     BulkEmailSendItem,
-    BulkEmailSendResponse,
+    BulkEmailSendJobResponse,
     CampaignGenerateRequest,
     CampaignPreviewResponse,
     EmailAudienceItem,
@@ -62,6 +62,17 @@ def _company_id(account: Account) -> int:
             detail="A company must be assigned to manage candidate emails.",
         )
     return account.company_id
+
+
+def _require_inbound_replies_enabled() -> None:
+    if not settings.inbound_replies_enabled:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Smart Reply is unavailable until RESEND_INBOUND_DOMAIN is "
+                "configured for inbound email routing."
+            ),
+        )
 
 
 def templates() -> list[EmailTemplateResponse]:
@@ -205,16 +216,18 @@ def _audience_item(
     last_sent=None,
     blocked_reason: str | None = None,
 ) -> EmailAudienceItem:
-    if blocked_reason is None:
-        if not candidate.email:
-            blocked_reason = "Missing candidate email."
-        elif pending is not None:
-            blocked_reason = "Draft already pending."
     already_emailed = bool(
         last_sent is not None
         and last_sent.template_key == template_key
         and last_sent.stage_at_generation in {None, application.current_stage}
     )
+    if blocked_reason is None:
+        if not candidate.email:
+            blocked_reason = "Missing candidate email."
+        elif pending is not None:
+            blocked_reason = "Draft already pending."
+        elif already_emailed:
+            blocked_reason = "Already emailed for this stage."
     return EmailAudienceItem(
         application_id=application.application_id,
         candidate_name=candidate.full_name or "Candidate",
@@ -327,6 +340,7 @@ def audience(
         db,
         company_id,
         stage=stage,
+        template_key=template_key,
         job_id=job_id,
     )
     application_ids = [row[0].application_id for row in rows]
@@ -418,7 +432,12 @@ def generate_campaign(
         application_ids=requested_ids,
         template_key=payload.template_key,
     )
-    sent = email_workflow.sent_email_summary(db, company_id, requested_ids)
+    sent = email_workflow.sent_email_summary(
+        db,
+        company_id,
+        requested_ids,
+        template_key=payload.template_key,
+    )
     eligible_rows = []
     skipped: list[EmailAudienceItem] = []
     for row in rows:
@@ -430,6 +449,14 @@ def generate_campaign(
             blocked_reason = "Missing candidate email."
         elif application.application_id in pending:
             blocked_reason = "Draft already pending."
+        elif (
+            not payload.allow_resend
+            and application.application_id in sent
+            and sent[application.application_id].template_key == payload.template_key
+            and sent[application.application_id].stage_at_generation
+            in {None, application.current_stage}
+        ):
+            blocked_reason = "Already emailed for this stage."
         if blocked_reason:
             skipped.append(
                 _audience_item(
@@ -606,6 +633,12 @@ def generate_campaign(
         application_ids=list(locked_states),
         template_key=payload.template_key,
     )
+    raced_sent = email_workflow.sent_email_summary(
+        db,
+        company_id,
+        list(locked_states),
+        template_key=payload.template_key,
+    )
     filtered_drafts: list[dict] = []
     for rendered_draft in rendered_drafts:
         application_id = int(rendered_draft["application_id"])
@@ -624,6 +657,14 @@ def generate_campaign(
             )
         elif pending_draft is not None:
             blocked_reason = "Draft already pending."
+        elif (
+            not payload.allow_resend
+            and application_id in raced_sent
+            and raced_sent[application_id].template_key == payload.template_key
+            and raced_sent[application_id].stage_at_generation
+            in {None, state[0]}
+        ):
+            blocked_reason = "Already emailed for this stage."
         if blocked_reason is not None:
             skipped.append(
                 eligible_audience_items[application_id].model_copy(
@@ -1004,30 +1045,52 @@ def send(db: Session, account: Account, email_id: int) -> EmailDraftResponse:
     return _draft_response(email_workflow.row(db, email_id, company_id))
 
 
+def _send_job_response(
+    db: Session,
+    job,
+) -> BulkEmailSendJobResponse:
+    return BulkEmailSendJobResponse(
+        job_id=job.job_id,
+        status=job.status,
+        total_count=job.total_count,
+        sent_count=job.sent_count,
+        failed_count=job.failed_count,
+        created_at=job.created_at,
+        finished_at=job.finished_at,
+        results=[
+            BulkEmailSendItem(
+                email_id=item.email_id,
+                status=item.status,
+                error_message=item.error_message,
+            )
+            for item in email_workflow.send_job_items(db, job.job_id)
+        ],
+    )
+
+
 def bulk_send(
     db: Session, account: Account, email_ids: list[int]
-) -> BulkEmailSendResponse:
-    results: list[BulkEmailSendItem] = []
-    for email_id in dict.fromkeys(email_ids):
-        try:
-            sent = send(db, account, email_id)
-            results.append(
-                BulkEmailSendItem(email_id=email_id, status=sent.status)
-            )
-        except HTTPException as exc:
-            results.append(
-                BulkEmailSendItem(
-                    email_id=email_id,
-                    status="Failed",
-                    error_message=str(exc.detail),
-                )
-            )
-    sent_count = sum(item.status == "Sent" for item in results)
-    return BulkEmailSendResponse(
-        sent_count=sent_count,
-        failed_count=len(results) - sent_count,
-        results=results,
-    )
+) -> BulkEmailSendJobResponse:
+    company_id = _company_id(account)
+    try:
+        job = email_workflow.create_send_job(
+            db,
+            company_id=company_id,
+            account_id=account.account_id,
+            email_ids=email_ids,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return _send_job_response(db, job)
+
+
+def bulk_send_progress(
+    db: Session, account: Account, job_id: int
+) -> BulkEmailSendJobResponse:
+    job = email_workflow.send_job(db, job_id, _company_id(account))
+    if job is None:
+        raise HTTPException(status_code=404, detail="Bulk send job not found.")
+    return _send_job_response(db, job)
 
 
 def _thread_messages(
@@ -1058,6 +1121,8 @@ def _thread_messages(
                 ai_generated=outbound.ai_generated,
                 provider_message_id=outbound.provider_message_id,
                 occurred_at=outbound.sent_at or outbound.created_at,
+                fetch_status=None,
+                fetch_error=None,
             )
         )
     inbound_rows = (
@@ -1073,13 +1138,26 @@ def _thread_messages(
                 email_id=None,
                 inbound_id=inbound.inbound_id,
                 subject=inbound.subject,
-                body=inbound.body_text,
-                status="Received",
+                body=(
+                    inbound.body_text
+                    or (
+                        "Inbound content is still being fetched."
+                        if inbound.fetch_status == "Pending"
+                        else "Inbound content could not be fetched."
+                    )
+                ),
+                status=(
+                    "Received"
+                    if inbound.fetch_status == "Fetched"
+                    else inbound.fetch_status
+                ),
                 delivery_status=None,
                 retryable=False,
                 ai_generated=False,
                 provider_message_id=inbound.provider_message_id,
                 occurred_at=inbound.received_at,
+                fetch_status=inbound.fetch_status,
+                fetch_error=inbound.fetch_error,
             )
         )
     return sorted(messages, key=lambda message: message.occurred_at)
@@ -1102,6 +1180,11 @@ def _thread_summary(
     preview = None
     if last_message is not None:
         preview = " ".join(last_message.body.split())[:180] or None
+    has_fetched_inbound = any(
+        message.direction == "Inbound"
+        and message.fetch_status == "Fetched"
+        for message in thread_messages
+    )
     return EmailThreadSummaryResponse(
         thread_id=thread.thread_id,
         application_id=thread.application_id,
@@ -1119,6 +1202,8 @@ def _thread_summary(
             else email_workflow.unread_count(db, thread.thread_id)
         ),
         last_message_preview=preview,
+        inbound_replies_enabled=settings.inbound_replies_enabled,
+        has_fetched_inbound=has_fetched_inbound,
     )
 
 
@@ -1214,6 +1299,8 @@ def _conversation_context(
             )
         )
     for message in inbound_messages:
+        if message.fetch_status != "Fetched" or not message.body_text:
+            continue
         conversation.append(
             (
                 message.received_at,
@@ -1266,6 +1353,7 @@ def generate_smart_reply_batch(
     client: GeminiClient | None = None,
     today: date | None = None,
 ) -> SmartReplyBatchResponse:
+    _require_inbound_replies_enabled()
     company_id = _company_id(account)
     rows = email_workflow.thread_contexts_by_ids(
         db,
@@ -1278,6 +1366,14 @@ def generate_smart_reply_batch(
         db,
         scoped_thread_ids,
     )
+    fetched_inbound_by_thread = {
+        thread_id: [
+            message
+            for message in messages
+            if message.fetch_status == "Fetched" and message.body_text
+        ]
+        for thread_id, messages in inbound_by_thread.items()
+    }
     outbound_by_thread = email_workflow.outbound_messages_for_threads(
         db,
         scoped_thread_ids,
@@ -1314,7 +1410,7 @@ def generate_smart_reply_batch(
                 }
             )
             continue
-        inbound_messages = inbound_by_thread.get(thread_id, [])
+        inbound_messages = fetched_inbound_by_thread.get(thread_id, [])
         if not inbound_messages:
             skipped.append(
                 {
@@ -1365,7 +1461,7 @@ def generate_smart_reply_batch(
     recipient_conversations = [
         _conversation_context(
             outbound_by_thread.get(thread.thread_id, []),
-            inbound_by_thread.get(thread.thread_id, []),
+            fetched_inbound_by_thread.get(thread.thread_id, []),
         )
         for thread, *_rest in eligible
     ]
@@ -1453,7 +1549,7 @@ def generate_smart_reply_batch(
             f"{generated_subject}\n\n{body}",
             company_name=company.company_name,
         )
-        inbound_messages = inbound_by_thread[thread.thread_id]
+        inbound_messages = fetched_inbound_by_thread[thread.thread_id]
         latest_inbound = inbound_messages[-1]
         draft_items.append(
             {

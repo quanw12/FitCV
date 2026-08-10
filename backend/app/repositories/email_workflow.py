@@ -1,7 +1,7 @@
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from uuid import uuid4
 
-from sqlalchemy import and_, case, func, insert, or_, select, update
+from sqlalchemy import and_, case, exists, func, insert, or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, aliased
 
@@ -12,6 +12,8 @@ from app.models import (
     CandidateEmailCampaign,
     CandidateEmailEvent,
     CandidateEmailInbound,
+    CandidateEmailSendJob,
+    CandidateEmailSendJobItem,
     CandidateEmailThread,
     Company,
     Job,
@@ -66,6 +68,7 @@ def audience_rows(
     company_id: int,
     *,
     stage: str,
+    template_key: str,
     job_id: int | None = None,
 ):
     """Return a stage audience with latest match and last sent email in one query."""
@@ -78,6 +81,7 @@ def audience_rows(
         .where(
             CandidateEmail.company_id == company_id,
             CandidateEmail.status == "Sent",
+            CandidateEmail.template_key == template_key,
         )
         .group_by(CandidateEmail.application_id)
         .subquery()
@@ -448,6 +452,7 @@ def sent_email_summary(
     db: Session,
     company_id: int,
     application_ids: list[int],
+    template_key: str | None = None,
 ) -> dict[int, CandidateEmail]:
     ids = list(dict.fromkeys(application_ids))
     if not ids:
@@ -461,6 +466,11 @@ def sent_email_summary(
             CandidateEmail.company_id == company_id,
             CandidateEmail.application_id.in_(ids),
             CandidateEmail.status == "Sent",
+            *(
+                [CandidateEmail.template_key == template_key]
+                if template_key is not None
+                else []
+            ),
         )
         .group_by(CandidateEmail.application_id)
         .subquery()
@@ -912,11 +922,13 @@ def create_inbound(
     sender_email: str,
     recipient_email: str,
     subject: str,
-    body_text: str,
+    body_text: str | None,
     in_reply_to: str | None,
     references_text: str | None,
     attachments_json: list[dict] | None,
     received_at: datetime,
+    fetch_status: str = "Pending",
+    fetch_available_at: datetime | None = None,
 ) -> CandidateEmailInbound:
     inbound = CandidateEmailInbound(
         thread_id=thread.thread_id,
@@ -929,6 +941,8 @@ def create_inbound(
         in_reply_to=in_reply_to,
         references_text=references_text,
         attachments_json=attachments_json,
+        fetch_status=fetch_status,
+        fetch_available_at=fetch_available_at or received_at,
         received_at=received_at,
     )
     db.add(inbound)
@@ -938,6 +952,356 @@ def create_inbound(
     db.commit()
     db.refresh(inbound)
     return inbound
+
+
+def create_send_job(
+    db: Session,
+    *,
+    company_id: int,
+    account_id: int,
+    email_ids: list[int],
+) -> CandidateEmailSendJob:
+    ids = list(dict.fromkeys(email_ids))
+    owned_ids = set(
+        db.scalars(
+            select(CandidateEmail.email_id).where(
+                CandidateEmail.company_id == company_id,
+                CandidateEmail.email_id.in_(ids),
+            )
+        )
+    )
+    if owned_ids != set(ids):
+        raise ValueError("One or more email drafts were not found for this company.")
+
+    job = CandidateEmailSendJob(
+        company_id=company_id,
+        created_by_account_id=account_id,
+        status="Queued",
+        total_count=len(ids),
+    )
+    db.add(job)
+    db.flush()
+    db.add_all(
+        [
+            CandidateEmailSendJobItem(job_id=job.job_id, email_id=email_id)
+            for email_id in ids
+        ]
+    )
+    db.commit()
+    db.refresh(job)
+    return job
+
+
+def send_job(
+    db: Session, job_id: int, company_id: int
+) -> CandidateEmailSendJob | None:
+    return db.scalar(
+        select(CandidateEmailSendJob).where(
+            CandidateEmailSendJob.job_id == job_id,
+            CandidateEmailSendJob.company_id == company_id,
+        )
+    )
+
+
+def send_job_items(
+    db: Session, job_id: int
+) -> list[CandidateEmailSendJobItem]:
+    return list(
+        db.scalars(
+            select(CandidateEmailSendJobItem)
+            .where(CandidateEmailSendJobItem.job_id == job_id)
+            .order_by(CandidateEmailSendJobItem.email_id.asc())
+        )
+    )
+
+
+def claim_next_send_job(
+    db: Session,
+    *,
+    worker_id: str,
+    now: datetime,
+    lease_seconds: int,
+) -> CandidateEmailSendJob | None:
+    job = db.scalar(
+        select(CandidateEmailSendJob)
+        .where(
+            exists(
+                select(CandidateEmailSendJobItem.job_id).where(
+                    CandidateEmailSendJobItem.job_id == CandidateEmailSendJob.job_id,
+                    CandidateEmailSendJobItem.status == "Queued",
+                )
+            ),
+            or_(
+                CandidateEmailSendJob.status == "Queued",
+                and_(
+                    CandidateEmailSendJob.status == "Running",
+                    CandidateEmailSendJob.lease_expires_at <= now,
+                ),
+            )
+        )
+        .order_by(CandidateEmailSendJob.created_at, CandidateEmailSendJob.job_id)
+        .with_for_update(skip_locked=True)
+        .limit(1)
+    )
+    if job is None:
+        db.rollback()
+        return None
+
+    db.execute(
+        update(CandidateEmailSendJobItem)
+        .where(
+            CandidateEmailSendJobItem.job_id == job.job_id,
+            CandidateEmailSendJobItem.status == "Sending",
+        )
+        .values(status="Queued")
+    )
+    job.status = "Running"
+    job.lease_expires_at = now + timedelta(seconds=lease_seconds)
+    db.commit()
+    db.refresh(job)
+    return job
+
+
+def claim_next_send_job_item(
+    db: Session, job_id: int
+) -> CandidateEmailSendJobItem | None:
+    item = db.scalar(
+        select(CandidateEmailSendJobItem)
+        .where(
+            CandidateEmailSendJobItem.job_id == job_id,
+            CandidateEmailSendJobItem.status == "Queued",
+        )
+        .order_by(CandidateEmailSendJobItem.email_id.asc())
+        .with_for_update(skip_locked=True)
+        .limit(1)
+    )
+    if item is None:
+        db.rollback()
+        return None
+    item.status = "Sending"
+    item.attempts += 1
+    db.commit()
+    db.refresh(item)
+    return item
+
+
+def finish_send_job_item(
+    db: Session,
+    *,
+    job_id: int,
+    email_id: int,
+    status: str,
+    error_message: str | None = None,
+    now: datetime,
+) -> CandidateEmailSendJob | None:
+    item = db.scalar(
+        select(CandidateEmailSendJobItem).where(
+            CandidateEmailSendJobItem.job_id == job_id,
+            CandidateEmailSendJobItem.email_id == email_id,
+        )
+    )
+    job = db.get(CandidateEmailSendJob, job_id)
+    if item is None or job is None:
+        db.rollback()
+        return None
+    item.status = status
+    item.error_message = error_message[:1000] if error_message else None
+    items = send_job_items(db, job_id)
+    job.sent_count = sum(item.status == "Sent" for item in items)
+    job.failed_count = sum(item.status == "Failed" for item in items)
+    if job.sent_count + job.failed_count >= job.total_count:
+        job.status = "Completed"
+        job.finished_at = now
+        job.lease_expires_at = None
+    else:
+        job.status = "Running"
+    db.commit()
+    db.refresh(job)
+    return job
+
+
+def recover_stale_send_jobs(
+    db: Session, *, stale_before: datetime, now: datetime
+) -> int:
+    jobs = list(
+        db.scalars(
+            select(CandidateEmailSendJob)
+            .where(
+                CandidateEmailSendJob.status == "Running",
+                CandidateEmailSendJob.lease_expires_at < now,
+            )
+            .with_for_update(skip_locked=True)
+        )
+    )
+    for job in jobs:
+        db.execute(
+            update(CandidateEmailSendJobItem)
+            .where(
+                CandidateEmailSendJobItem.job_id == job.job_id,
+                CandidateEmailSendJobItem.status == "Sending",
+            )
+            .values(status="Queued")
+        )
+        job.status = "Queued"
+        job.lease_expires_at = None
+    db.commit()
+    return len(jobs)
+
+
+def invalidate_pending_drafts(
+    db: Session,
+    *,
+    company_id: int,
+    application_id: int,
+    reason: str,
+    commit: bool = True,
+) -> int:
+    result = db.execute(
+        update(CandidateEmail)
+        .where(
+            CandidateEmail.company_id == company_id,
+            CandidateEmail.application_id == application_id,
+            CandidateEmail.status.in_(("Draft", "Approved", "Failed")),
+        )
+        .values(
+            status="Invalidated",
+            delivery_status=None,
+            retryable=False,
+            error_message=reason[:1000],
+            approved_by_account_id=None,
+            approved_at=None,
+        )
+    )
+    if commit:
+        db.commit()
+    return int(result.rowcount or 0)
+
+
+def claim_next_inbound_fetch(
+    db: Session,
+    *,
+    worker_id: str,
+    now: datetime,
+) -> CandidateEmailInbound | None:
+    inbound = db.scalar(
+        select(CandidateEmailInbound)
+        .where(
+            CandidateEmailInbound.fetch_status == "Pending",
+            or_(
+                CandidateEmailInbound.fetch_available_at.is_(None),
+                CandidateEmailInbound.fetch_available_at <= now,
+            ),
+        )
+        .order_by(
+            CandidateEmailInbound.fetch_available_at,
+            CandidateEmailInbound.received_at,
+            CandidateEmailInbound.inbound_id,
+        )
+        .with_for_update(skip_locked=True)
+        .limit(1)
+    )
+    if inbound is None:
+        db.rollback()
+        return None
+    inbound.fetch_status = "Fetching"
+    inbound.fetch_locked_by = worker_id
+    inbound.fetch_locked_at = now
+    inbound.fetch_attempts += 1
+    db.commit()
+    db.refresh(inbound)
+    return inbound
+
+
+def complete_inbound_fetch(
+    db: Session,
+    *,
+    inbound_id: int,
+    worker_id: str,
+    body_text: str,
+    provider_message_id: str | None,
+    in_reply_to: str | None,
+    references_text: str | None,
+    attachments_json: list[dict] | None,
+    fetched_at: datetime,
+) -> bool:
+    result = db.execute(
+        update(CandidateEmailInbound)
+        .where(
+            CandidateEmailInbound.inbound_id == inbound_id,
+            CandidateEmailInbound.fetch_status == "Fetching",
+            CandidateEmailInbound.fetch_locked_by == worker_id,
+        )
+        .values(
+            body_text=body_text,
+            provider_message_id=provider_message_id,
+            in_reply_to=in_reply_to,
+            references_text=references_text,
+            attachments_json=attachments_json,
+            fetch_status="Fetched",
+            fetch_available_at=None,
+            fetch_locked_by=None,
+            fetch_locked_at=None,
+            fetch_error=None,
+            fetched_at=fetched_at,
+        )
+    )
+    db.commit()
+    return result.rowcount == 1
+
+
+def fail_inbound_fetch(
+    db: Session,
+    *,
+    inbound_id: int,
+    worker_id: str,
+    now: datetime,
+    max_attempts: int,
+    error_message: str,
+) -> bool:
+    inbound = db.scalar(
+        select(CandidateEmailInbound).where(
+            CandidateEmailInbound.inbound_id == inbound_id,
+            CandidateEmailInbound.fetch_status == "Fetching",
+            CandidateEmailInbound.fetch_locked_by == worker_id,
+        )
+    )
+    if inbound is None:
+        db.rollback()
+        return False
+    inbound.fetch_error = error_message[:1000]
+    inbound.fetch_locked_by = None
+    inbound.fetch_locked_at = None
+    if inbound.fetch_attempts >= max_attempts:
+        inbound.fetch_status = "FetchFailed"
+        inbound.fetch_available_at = None
+    else:
+        inbound.fetch_status = "Pending"
+        inbound.fetch_available_at = now + timedelta(
+            seconds=min(300, 2 ** max(0, inbound.fetch_attempts - 1) * 5)
+        )
+    db.commit()
+    return True
+
+
+def recover_stale_inbound_fetches(
+    db: Session, *, stale_before: datetime, now: datetime
+) -> int:
+    result = db.execute(
+        update(CandidateEmailInbound)
+        .where(
+            CandidateEmailInbound.fetch_status == "Fetching",
+            CandidateEmailInbound.fetch_locked_at < stale_before,
+        )
+        .values(
+            fetch_status="Pending",
+            fetch_available_at=now,
+            fetch_locked_by=None,
+            fetch_locked_at=None,
+            fetch_error="Inbound fetch lease expired and was recovered.",
+        )
+    )
+    db.commit()
+    return int(result.rowcount or 0)
 
 
 def inbound_messages(
