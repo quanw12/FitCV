@@ -2,9 +2,11 @@
 
 from pydantic import ValidationError
 
+from app.core.config import settings
 from app.schemas.cv_rebuild import CVData
 from app.services.cv_rebuild.grounding import (
     _ENTRY_COUNT_SECTIONS,
+    _find_title_inflation_details,
     find_missing_sections,
     find_project_description_overlap,
     find_title_inflation,
@@ -103,41 +105,25 @@ def _overlap_message(details: list[str]) -> str:
     return _OVERLAP_MESSAGE.format(details="; ".join(details))
 
 
-def _fix_title_inflation(cv: CVData, polished: CVData) -> CVData:
-    """Restore original experience titles when the LLM inflated them.
+def _fix_title_inflation(entered: CVData, polished: CVData) -> CVData:
+    """Restore original experience titles only where inflation was flagged.
 
-    Matches entries by company name (case-insensitive) and overwrites the
-    polished title with the original.  Returns a new CVData; the input is
-    not mutated.  This is the hard-override used when the LLM retry loop
-    fails to converge on the correct title within max_attempts.
+    Uses the structured details from :func:`_find_title_inflation_details` so
+    only entries that were actually inflated/fabricated are restored — and
+    each is restored by its own matched original title (correct duplicate
+    company alignment).  Returns a new CVData; the input is not mutated.
     """
-    issues = find_title_inflation(cv, polished)
-    if not issues:
+    details = _find_title_inflation_details(entered, polished)
+    if not details:
         return polished
 
-    # Build a lookup: company_lower -> list of original titles
-    entered_by_company: dict[str, list[str]] = {}
-    for item in cv.experience:
-        key = (item.company or "").strip().lower()
-        if key:
-            entered_by_company.setdefault(key, []).append(
-                (item.title or "").strip()
+    fixed_experiences = list(polished.experience)
+    for detail in details:
+        index = detail["index"]
+        if 0 <= index < len(fixed_experiences):
+            fixed_experiences[index] = fixed_experiences[index].model_copy(
+                update={"title": detail["orig"]}
             )
-
-    # Fix each experience entry whose company matches an entered entry
-    fixed_experiences = []
-    for item in polished.experience:
-        key = (item.company or "").strip().lower()
-        orig_titles = entered_by_company.get(key, [])
-        if orig_titles and item.title.strip() != orig_titles[0]:
-            # Restore the original title (pop to handle duplicate companies)
-            fixed_title = orig_titles.pop(0)
-            fixed_experiences.append(
-                item.model_copy(update={"title": fixed_title})
-            )
-        else:
-            fixed_experiences.append(item)
-
     return polished.model_copy(update={"experience": fixed_experiences})
 
 
@@ -145,14 +131,24 @@ class CvExtractor:
     def __init__(self, client: GeminiClient | None = None) -> None:
         self._client = client or GeminiClient()
 
-    def extract(self, raw_text: str, *, max_attempts: int = 3) -> CVData:
+    def extract(
+        self,
+        raw_text: str,
+        *,
+        max_attempts: int = 3,
+        missing_sections: list[str] | None = None,
+    ) -> CVData:
         last_error: str | None = None
-        prompt = build_extraction_prompt(raw_text)
+        prompt = build_extraction_prompt(
+            raw_text, missing_sections=missing_sections
+        )
         for _ in range(max_attempts):
             try:
                 payload = self._client.generate_structured(
                     prompt=prompt,
                     response_schema=CV_DATA_JSON_SCHEMA,
+                    temperature=settings.gemini_cv_rebuild_temperature,
+                    seed=settings.gemini_cv_rebuild_seed,
                 )
             except GeminiClientError:
                 raise
@@ -174,21 +170,29 @@ class CvExtractor:
         max_attempts: int = 3,
         jd_text: str | None = None,
         applied_improvements: str | None = None,
+        baseline: CVData | None = None,
     ) -> tuple[CVData, list[str]]:
         last_error: str | None = None
-        last_cv: CVData | None = None
-        source_text = cv.model_dump_json()
+        entered = baseline or cv
+        source_text = entered.model_dump_json()
         prompt = build_polish_prompt(
             source_text,
             language,
             jd_text=jd_text,
             applied_improvements=applied_improvements,
         )
+        # Best-attempt tracking: lowest guard-issue count wins (later attempt
+        # on a tie) so exhaustion returns the most complete, most grounded
+        # output instead of the last one tried.
+        best_cv: CVData | None = None
+        best_score: int | None = None
         for _ in range(max_attempts):
             try:
                 payload = self._client.generate_structured(
                     prompt=prompt,
                     response_schema=CV_DATA_JSON_SCHEMA,
+                    temperature=settings.gemini_cv_rebuild_temperature,
+                    seed=settings.gemini_cv_rebuild_seed,
                 )
             except GeminiClientError:
                 raise
@@ -206,12 +210,22 @@ class CvExtractor:
                 continue
             unfounded_nums = find_unfounded_numbers(source_text, polished)
             unfounded_skills = find_unfounded_skills(source_text, polished)
-            missing = find_missing_sections(cv, polished)
-            title_issues = find_title_inflation(cv, polished)
+            missing = find_missing_sections(entered, polished)
+            title_issues = find_title_inflation(entered, polished)
             verb_issues = find_verb_tense_issues(polished)
             overlap_issues = find_project_description_overlap(polished)
             if unfounded_nums or unfounded_skills or missing or title_issues or verb_issues or overlap_issues:
-                last_cv = polished
+                issue_score = (
+                    len(unfounded_nums)
+                    + len(unfounded_skills)
+                    + len(missing)
+                    + len(title_issues)
+                    + len(verb_issues)
+                    + len(overlap_issues)
+                )
+                if best_score is None or issue_score <= best_score:
+                    best_cv = polished
+                    best_score = issue_score
                 messages: list[str] = []
                 if unfounded_nums:
                     messages.append(_grounding_message(unfounded_nums))
@@ -228,7 +242,7 @@ class CvExtractor:
                     messages.append(_completeness_message(plain_missing))
                 for section_label in merged_sections:
                     section = section_label[len("merged_"):]
-                    e_count = len(getattr(cv, section) or [])
+                    e_count = len(getattr(entered, section) or [])
                     o_count = len(getattr(polished, section) or [])
                     messages.append(
                         _entry_count_message(section, e_count, o_count)
@@ -250,15 +264,15 @@ class CvExtractor:
                 continue
             # Hard-override: restore original titles even on clean pass
             # (LLM may have silently fixed some titles but not others)
-            return _fix_title_inflation(cv, polished), []
-        # Exhausted retries — return best attempt with warnings
+            return _fix_title_inflation(entered, polished), []
+        # Exhausted retries — return the best attempt with warnings
         warnings: list[str] = []
-        if last_cv is not None:
-            unfounded_nums = find_unfounded_numbers(source_text, last_cv)
-            unfounded_skills = find_unfounded_skills(source_text, last_cv)
-            missing = find_missing_sections(cv, last_cv)
-            title_issues = find_title_inflation(cv, last_cv)
-            verb_issues = find_verb_tense_issues(last_cv)
+        if best_cv is not None:
+            unfounded_nums = find_unfounded_numbers(source_text, best_cv)
+            unfounded_skills = find_unfounded_skills(source_text, best_cv)
+            missing = find_missing_sections(entered, best_cv)
+            title_issues = find_title_inflation(entered, best_cv)
+            verb_issues = find_verb_tense_issues(best_cv)
             if unfounded_nums:
                 warnings.append(
                     f"Numbers not grounded in source: {', '.join(unfounded_nums)}"
@@ -275,8 +289,8 @@ class CvExtractor:
                 )
             for section_label in merged:
                 section = section_label[len("merged_"):]
-                e_count = len(getattr(cv, section) or [])
-                o_count = len(getattr(last_cv, section) or [])
+                e_count = len(getattr(entered, section) or [])
+                o_count = len(getattr(best_cv, section) or [])
                 warnings.append(
                     f"Entries merged in {section}: entered {e_count}, "
                     f"output {o_count} — keep each entry separate"
@@ -289,14 +303,14 @@ class CvExtractor:
                 warnings.append(
                     f"Present-tense verbs in completed work: {'; '.join(verb_issues)}"
                 )
-            overlap_issues = find_project_description_overlap(last_cv)
+            overlap_issues = find_project_description_overlap(best_cv)
             if overlap_issues:
                 warnings.append(
                     f"Project description/bullet overlap: {'; '.join(overlap_issues)}"
                 )
             # Hard-override: restore original titles on fallback too
-            last_cv = _fix_title_inflation(cv, last_cv)
-            return last_cv, warnings
+            best_cv = _fix_title_inflation(entered, best_cv)
+            return best_cv, warnings
         raise CvExtractionError(
             f"AI returned an invalid CV structure after {max_attempts} attempts. "
             f"Last validation errors: {last_error}"

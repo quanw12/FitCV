@@ -23,7 +23,7 @@ class FakeGeminiClient:
         self.responses = list(responses)
         self.prompts: list[str] = []
 
-    def generate_structured(self, *, prompt: str, response_schema: dict) -> dict:
+    def generate_structured(self, *, prompt: str, response_schema: dict, temperature: float | None = None, seed: int | None = None) -> dict:
         self.prompts.append(prompt)
         if not self.responses:
             raise AssertionError("generate_structured called more times than responses provided")

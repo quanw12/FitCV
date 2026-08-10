@@ -142,11 +142,32 @@ _SECTION_HAS_CONTENT = {
     "projects": lambda cv: bool(cv.projects),
     "education": lambda cv: bool(cv.education),
     "languages": lambda cv: bool(cv.languages),
-    "skills": lambda cv: bool(cv.skills),
+    "skills": lambda cv: _skill_count(cv) > 0,
     "certifications": lambda cv: bool(cv.certifications),
     "publications": lambda cv: bool(cv.publications),
     "awards": lambda cv: bool(cv.awards),
 }
+
+
+def _skill_count(cv: CVData) -> int:
+    """Total distinct skill tokens, counting grouped skills separately.
+
+    Moving a skill into ``skill_groups`` must not be flagged as "skills
+    missing" — a grouped skill is still present in the output.
+    """
+    return len(cv.skills or []) + sum(
+        len(group.items or []) for group in cv.skill_groups
+    )
+
+
+# Common professional role words that should NOT be fabricated.
+_FABRICATED_TITLE_WORDS = frozenset({
+    "researcher", "contributor", "collaborator", "specialist",
+    "analyst", "engineer", "lead", "developer", "intern",
+    "assistant", "associate", "consultant", "manager", "director",
+    "scientist", "architect", "coordinator", "supervisor",
+    "member", "participant", "volunteer",
+})
 
 
 def find_title_inflation(entered: CVData, polished: CVData) -> list[str]:
@@ -160,16 +181,31 @@ def find_title_inflation(entered: CVData, polished: CVData) -> list[str]:
     2. Fabrication: entered title is empty, polished invented a professional
        title (Researcher, Contributor, Engineer, etc.) — this must not happen.
     """
-    # Common professional role words that should NOT be fabricated.
-    _FABRICATED_TITLE_WORDS = frozenset({
-        "researcher", "contributor", "collaborator", "specialist",
-        "analyst", "engineer", "lead", "developer", "intern",
-        "assistant", "associate", "consultant", "manager", "director",
-        "scientist", "architect", "coordinator", "supervisor",
-        "member", "participant", "volunteer",
-    })
+    inflated: list[str] = []
+    for detail in _find_title_inflation_details(entered, polished):
+        if detail["reason"] == "fabricated":
+            inflated.append(
+                f"\"\" -> \"{detail['new']}\" (company: {detail['company']}) "
+                f"[fabricated title from empty input]"
+            )
+        else:
+            inflated.append(
+                f"\"{detail['orig']}\" -> \"{detail['new']}\" "
+                f"(company: {detail['company']})"
+            )
+    return inflated
 
-    # Build a lookup from entered: company_lower -> list of orig titles
+
+def _find_title_inflation_details(entered: CVData, polished: CVData) -> list[dict]:
+    """Return flagged experience-title changes as structured details.
+
+    Each entry is ``{"index", "company", "orig", "new", "reason"}`` where
+    ``index`` is the position in ``polished.experience``.  Matching by
+    polished entry index (rather than rebuilding a per-company list and
+    blindly popping) keeps duplicate-company entries aligned: entry N of the
+    polished CV is always restored from entry N's matched original title.
+    """
+    # Build a lookup: company_lower -> list of orig titles (in entered order)
     entered_by_company: dict[str, list[str]] = {}
     for item in entered.experience:
         company_key = (item.company or "").strip().lower()
@@ -178,37 +214,46 @@ def find_title_inflation(entered: CVData, polished: CVData) -> list[str]:
                 (item.title or "").strip()
             )
 
-    inflated: list[str] = []
-    for new_item in polished.experience:
+    details: list[dict] = []
+    for i, new_item in enumerate(polished.experience):
         company_key = (new_item.company or "").strip().lower()
         if not company_key or company_key not in entered_by_company:
             continue
         new_title = (new_item.title or "").strip()
-        # Pop the first matching orig title (handles duplicate companies)
         orig_titles = entered_by_company[company_key]
         if not orig_titles:
             continue
+        # Pop the first matching orig title (handles duplicate companies)
         orig_title = orig_titles.pop(0)
 
         # --- CASE 1: Fabrication — entered title is empty but LLM invented one
         if not orig_title and new_title:
-            # Check if the fabricated title contains a common role word
             words_in_title = set(new_title.lower().replace("-", " ").split())
             if words_in_title & _FABRICATED_TITLE_WORDS:
-                inflated.append(
-                    f"\"\" -> \"{new_title}\" (company: {new_item.company}) "
-                    f"[fabricated title from empty input]"
+                details.append(
+                    {
+                        "index": i,
+                        "company": new_item.company,
+                        "orig": "",
+                        "new": new_title,
+                        "reason": "fabricated",
+                    }
                 )
                 continue
 
         # --- CASE 2: Inflation — entered title was changed
         if orig_title and orig_title != new_title:
             if orig_title.lower() != new_title.lower():
-                inflated.append(
-                    f"\"{orig_title}\" -> \"{new_title}\" "
-                    f"(company: {new_item.company})"
+                details.append(
+                    {
+                        "index": i,
+                        "company": new_item.company,
+                        "orig": orig_title,
+                        "new": new_title,
+                        "reason": "inflation",
+                    }
                 )
-    return inflated
+    return details
 
 
 _ENTRY_COUNT_SECTIONS = frozenset({"experience", "projects", "education"})

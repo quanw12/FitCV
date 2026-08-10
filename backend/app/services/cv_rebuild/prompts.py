@@ -368,12 +368,26 @@ phrase. Every listed item must appear individually in the output.
 Output ONLY the JSON object matching the provided schema."""
 
 
-def build_extraction_prompt(raw_text: str, validation_error: str | None = None) -> str:
+def build_extraction_prompt(
+    raw_text: str,
+    validation_error: str | None = None,
+    missing_sections: list[str] | None = None,
+) -> str:
     prompt = _EXTRACT_PROMPT.replace("<cv_text>", raw_text.strip())
     if validation_error:
         prompt = prompt + _VALIDATION_SUFFIX.replace(
             "<validation_error>", validation_error.strip()
         )
+    if missing_sections:
+        remediation = (
+            "\n\nCRITICAL — you omitted sections that are clearly present in the "
+            "source text: "
+            + ", ".join(missing_sections)
+            + ". You MUST re-scan the raw text and include EVERY entry for those "
+            "sections (all experience roles, all education entries, all projects, "
+            "all skills). Do not drop or merge them."
+        )
+        prompt = prompt + remediation
     return prompt
 
 

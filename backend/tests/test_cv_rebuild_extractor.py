@@ -11,7 +11,7 @@ class FakeGeminiClient:
         self.responses = list(responses)
         self.prompts: list[str] = []
 
-    def generate_structured(self, *, prompt: str, response_schema: dict) -> dict:
+    def generate_structured(self, *, prompt: str, response_schema: dict, temperature: float | None = None, seed: int | None = None) -> dict:
         self.prompts.append(prompt)
         if not self.responses:
             raise AssertionError("generate_structured called more times than responses provided")
@@ -92,7 +92,7 @@ class TestExtract:
 
     def test_propagates_gemini_failure(self) -> None:
         class BrokenClient:
-            def generate_structured(self, *, prompt: str, response_schema: dict) -> dict:
+            def generate_structured(self, *, prompt: str, response_schema: dict, temperature: float | None = None, seed: int | None = None) -> dict:
                 raise GeminiClientError("Gemini is unavailable.")
 
         with pytest.raises(GeminiClientError, match="unavailable"):

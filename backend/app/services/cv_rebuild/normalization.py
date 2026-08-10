@@ -7,7 +7,14 @@ symbols.
 
 import re
 
-from app.schemas.cv_rebuild import CVData, CvExperienceItem, CvLanguageItem, CvProjectItem
+from app.schemas.cv_rebuild import (
+    CVData,
+    CvEducationItem,
+    CvExperienceItem,
+    CvLanguageItem,
+    CvProjectItem,
+    CvPublicationItem,
+)
 from app.services.cv_rebuild.language import detect_cv_language
 
 _DECORATIVE_SYMBOLS = "★☆✦✧✪✫✬✭✮✯✰●○◐◑■□▲△▼▽◆◇►◄▪▫✔✓✕✖✗✘♥♦♣♠※†‡"
@@ -88,6 +95,38 @@ def _normalize_project(item: CvProjectItem) -> CvProjectItem:
         update={
             "name": _strip_symbols(item.name),
             "description": _strip_symbols(item.description),
+            "bullets": [
+                b for b in (_strip_symbols(b) for b in item.bullets) if b
+            ],
+            "links": [
+                link.model_copy(
+                    update={
+                        "label": _strip_symbols(link.label),
+                        "url": _WHITESPACE_RE.sub("", link.url or "").strip(),
+                    }
+                )
+                for link in item.links
+            ],
+        }
+    )
+
+
+def _normalize_education(item: CvEducationItem) -> CvEducationItem:
+    return item.model_copy(
+        update={
+            "degree": _strip_symbols(item.degree),
+            "institution": _strip_symbols(item.institution),
+            "date": _strip_symbols(item.date),
+        }
+    )
+
+
+def _normalize_publication(item: CvPublicationItem) -> CvPublicationItem:
+    return item.model_copy(
+        update={
+            "title": _strip_symbols(item.title),
+            "venue": _strip_symbols(item.venue),
+            "date": _strip_symbols(item.date),
         }
     )
 
@@ -113,6 +152,12 @@ def normalize_cv(cv: CVData) -> CVData:
                 _normalize_experience(item) for item in cv.experience
             ],
             "projects": [_normalize_project(item) for item in cv.projects],
+            "education": [
+                _normalize_education(item) for item in cv.education
+            ],
+            "publications": [
+                _normalize_publication(item) for item in cv.publications
+            ],
             "core_competencies": [
                 item.model_copy(
                     update={

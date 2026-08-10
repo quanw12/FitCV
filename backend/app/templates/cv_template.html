@@ -92,14 +92,11 @@
   ul.bullets li { margin-bottom: 2pt; }
   ul.bullets li:last-child { margin-bottom: 0; }
 
-  ul.skills-list {
-    columns: 2;
-    column-gap: 28pt;
-    margin: 2pt 0 0 20pt;
+  .skills-line {
+    margin-bottom: 3pt;
   }
-  ul.skills-list li {
-    break-inside: avoid;
-    margin-bottom: 1pt;
+  .skills-line:last-child {
+    margin-bottom: 0;
   }
 
   .project-links {
@@ -266,19 +263,20 @@
   {% endif %}
 
   {% if section == "technical_skills" %}
-  {% if data.skill_groups %}
+  {% if data.skill_groups or data.skills %}
   <section class="cv-section">
     <h2>{{ headings.technical_skills }}</h2>
+    {% set ns = namespace(grouped=[]) %}
     {% for group in data.skill_groups %}
-    <p><span class="entry-title">{{ group.category }}:</span> {{ group.items | join(", ") }}</p>
+    <p class="skills-line"><span class="entry-title">{{ group.category }}:</span> {{ group.items | join(", ") }}</p>
+    {% set ns.grouped = ns.grouped + group.items %}
     {% endfor %}
-  </section>
-  {% elif data.skills %}
-  <section class="cv-section">
-    <h2>{{ headings.technical_skills }}</h2>
-    <ul class="skills-list">
-      {% for skill in data.skills %}<li>{{ skill }}</li>{% endfor %}
-    </ul>
+    {% if data.skills %}
+    {% set leftover_skills = data.skills | reject("in", ns.grouped) | list %}
+    {% if leftover_skills %}
+    <p class="skills-line">{{ leftover_skills | join(", ") }}</p>
+    {% endif %}
+    {% endif %}
   </section>
   {% endif %}
   {% endif %}
