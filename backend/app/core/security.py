@@ -8,6 +8,7 @@ from jose import JWTError, jwt
 from passlib.context import CryptContext
 
 from app.core.config import settings
+from app.core.datetime_utils import utc_now_naive
 
 password_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
 
@@ -50,7 +51,7 @@ def decode_access_token(token: str) -> AccessTokenClaims | None:
 
 
 def create_refresh_token() -> tuple[str, datetime]:
-    expires_at = datetime.now(timezone.utc) + timedelta(days=settings.refresh_token_expire_days)
+    expires_at = utc_now_naive() + timedelta(days=settings.refresh_token_expire_days)
     return token_urlsafe(48), expires_at
 
 

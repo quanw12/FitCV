@@ -154,7 +154,12 @@ def refresh_session(
     auth_rate_limit.consume(
         db, action="refresh", request=request, identifier="refresh"
     )
-    issued = auth_service.refresh(db, refresh_token=token)
+    try:
+        issued = auth_service.refresh(db, refresh_token=token)
+    except HTTPException as exc:
+        if exc.status_code == status.HTTP_401_UNAUTHORIZED:
+            _clear_refresh_cookie(response)
+        raise
     _set_refresh_cookie(response, issued.refresh_token)
     return issued.session
 
@@ -170,6 +175,19 @@ def logout(
     if token:
         auth_service.logout_by_refresh_token(db, refresh_token=token)
     _clear_refresh_cookie(response)
+
+
+@router.post("/activity", status_code=status.HTTP_204_NO_CONTENT)
+def record_activity(
+    request: Request,
+    account: Account = Depends(get_current_account),
+    db: Session = Depends(get_db),
+) -> None:
+    _require_allowed_origin(request)
+    session_id = getattr(request.state, "auth_session_id", None)
+    if not session_id:
+        raise HTTPException(status_code=401, detail="Authenticated session is missing.")
+    auth_service.record_activity(db, session_id=session_id)
 
 
 @router.get("/me", response_model=AccountPublic)

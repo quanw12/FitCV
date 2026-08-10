@@ -1,6 +1,6 @@
 import type { ReactNode } from "react"
 
-import { fireEvent, render, screen } from "@testing-library/react"
+import { act, fireEvent, render, screen } from "@testing-library/react"
 
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
@@ -16,6 +16,12 @@ const authMocks = vi.hoisted(() => ({
   logout: vi.fn(),
 
   refresh: vi.fn(),
+
+  initializeActivity: vi.fn(),
+
+  startActivityMonitoring: vi.fn(() => vi.fn()),
+
+  onSessionExpired: vi.fn(),
 }))
 
 vi.mock("@/api", () => ({ authApi: authMocks }))
@@ -132,11 +138,18 @@ vi.mock("@/ui/screens/AuthScreen", () => ({
 import App from "./App"
 
 describe("Analyzer to Improvement selection", () => {
+  let expireSession: (() => void) | undefined
+
   beforeEach(() => {
     window.history.replaceState({}, "", "/")
 
     authMocks.getSession.mockReturnValue(primarySession)
+
     authMocks.refresh.mockResolvedValue(primarySession)
+    authMocks.onSessionExpired.mockImplementation((listener: () => void) => {
+      expireSession = listener
+      return vi.fn()
+    })
   })
 
   it("opens a shared public job before the authentication gate", async () => {
@@ -173,6 +186,7 @@ describe("Analyzer to Improvement selection", () => {
     render(<App />)
 
     expect(await screen.findByText("CV rebuild screen")).toBeInTheDocument()
+
     expect(authMocks.refresh).toHaveBeenCalledOnce()
   })
 
@@ -250,5 +264,17 @@ describe("Analyzer to Improvement selection", () => {
     fireEvent.click(screen.getByRole("button", { name: "Open Improvement" }))
 
     expect(await screen.findByText("Selected match: none")).toBeInTheDocument()
+  })
+
+  it("returns an automatically expired session to Landing without logout", async () => {
+    render(<App />)
+
+    expect(await screen.findByText("CV rebuild screen")).toBeInTheDocument()
+    act(() => expireSession?.())
+
+    expect(
+      await screen.findByRole("button", { name: "Get started" }),
+    ).toBeInTheDocument()
+    expect(authMocks.logout).not.toHaveBeenCalled()
   })
 })

@@ -2,15 +2,10 @@ import type { ProfileUpdate, UserProfile } from "@/types/profile"
 
 import { authApi } from "./authApi"
 
-import { API_BASE_URL, apiConnectionErrorMessage } from "./config"
+import { API_BASE_URL } from "./config"
+import { requestJson } from "./httpClient"
 
 const LOCAL_PROFILE_KEY = "fitcv.profile.records"
-
-interface ValidationDetail {
-  loc?: Array<string | number>
-
-  msg?: string
-}
 
 function readRecords(): Record<string, UserProfile> {
   if (typeof window === "undefined") return {}
@@ -60,32 +55,6 @@ function getLocalProfile(): UserProfile {
   const base = emptyLocalProfile()
 
   return readRecords()[base.accountId] ?? base
-}
-
-function errorMessage(detail: unknown, fallback: string): string {
-  if (typeof detail === "string") return detail
-
-  if (!Array.isArray(detail)) return fallback
-
-  const messages = detail
-
-    .map((item: ValidationDetail) => {
-      if (typeof item?.msg !== "string") return null
-
-      const field = item.loc
-
-        ?.filter((part) => part !== "body")
-
-        .map(String)
-
-        .join(".")
-
-      return field ? `${field}: ${item.msg}` : item.msg
-    })
-
-    .filter((message): message is string => Boolean(message))
-
-  return messages.length > 0 ? messages.join("; ") : fallback
 }
 
 function normalize(payload: any): UserProfile {
@@ -152,80 +121,29 @@ async function backendRequest(
 
   update?: ProfileUpdate,
 ): Promise<UserProfile> {
-  const session = authApi.getSession()
-
-  if (!session) throw new Error("Authentication required.")
-
-  let response: Response
-
-  try {
-    response = await fetch(`${API_BASE_URL}/api/profile`, {
-      method,
-
-      headers: {
-        Authorization: `Bearer ${session.accessToken}`,
-
-        ...(update ? { "Content-Type": "application/json" } : {}),
-      },
-
-      ...(update ? { body: JSON.stringify(requestBody(update)) } : {}),
-    })
-  } catch {
-    throw new Error(apiConnectionErrorMessage())
-  }
-
-  if (!response.ok) {
-    const error = await response.json().catch(() => undefined)
-
-    const fallback =
-      method === "GET" ? "Unable to load profile." : "Unable to update profile."
-
-    throw new Error(errorMessage(error?.detail, fallback))
-  }
-
-  return normalize(await response.json())
+  const payload = await requestJson<unknown>("/api/profile", {
+    method,
+    authenticated: true,
+    ...(update ? { body: JSON.stringify(requestBody(update)) } : {}),
+  })
+  return normalize(payload)
 }
 
 async function avatarRequest(
   method: "POST" | "DELETE",
+
   file?: File,
 ): Promise<UserProfile> {
-  const session = authApi.getSession()
-
-  if (!session) throw new Error("Authentication required.")
-
   const body = file ? new FormData() : undefined
 
   if (file) body!.append("file", file)
 
-  let response: Response
-
-  try {
-    response = await fetch(`${API_BASE_URL}/api/profile/avatar`, {
-      method,
-
-      headers: { Authorization: `Bearer ${session.accessToken}` },
-
-      body,
-    })
-  } catch {
-    throw new Error(apiConnectionErrorMessage())
-  }
-
-  if (!response.ok) {
-    const error = await response.json().catch(() => undefined)
-
-    throw new Error(
-      errorMessage(
-        error?.detail,
-        method === "POST"
-          ? "Unable to upload photo."
-          : "Unable to remove photo.",
-      ),
-    )
-  }
-
-  return normalize(await response.json())
+  const payload = await requestJson<unknown>("/api/profile/avatar", {
+    method,
+    authenticated: true,
+    body,
+  })
+  return normalize(payload)
 }
 
 function fileAsDataUrl(file: File): Promise<string> {
@@ -249,6 +167,7 @@ function persistLocal(profile: UserProfile): UserProfile {
 
   authApi.updateCurrentUser({
     fullName: profile.fullName,
+
     avatarUrl: profile.avatarUrl,
   })
 
@@ -271,8 +190,11 @@ export const profileApi = {
 
       const hasCompanyUpdate = [
         update.companyName,
+
         update.industryName,
+
         update.companyWebsiteUrl,
+
         update.companyLogoUrl,
       ].some((value) => value !== undefined)
 
@@ -370,7 +292,9 @@ export const profileApi = {
     else
       profile = persistLocal({
         ...getLocalProfile(),
+
         avatarUrl: await fileAsDataUrl(file),
+
         updatedAt: new Date().toISOString(),
       })
 
@@ -386,7 +310,9 @@ export const profileApi = {
     else
       profile = persistLocal({
         ...getLocalProfile(),
+
         avatarUrl: null,
+
         updatedAt: new Date().toISOString(),
       })
 
