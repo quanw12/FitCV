@@ -1,7 +1,7 @@
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
-from app.models.account import Account, AuthProvider
+from app.models.account import Account, AccountRole, AuthProvider
 
 
 def get_account_by_email(db: Session, email: str) -> Account | None:
@@ -10,6 +10,22 @@ def get_account_by_email(db: Session, email: str) -> Account | None:
 
 def get_account_by_id(db: Session, account_id: int) -> Account | None:
     return db.get(Account, account_id)
+
+
+def set_role_if_unset(
+    db: Session, *, account_id: int, role: AccountRole
+) -> Account | None:
+    result = db.execute(
+        update(Account)
+        .where(Account.account_id == account_id, Account.role.is_(None))
+        .values(role=role)
+    )
+    if result.rowcount != 1:
+        db.rollback()
+        return None
+
+    db.commit()
+    return get_account_by_id(db, account_id)
 
 
 def create_password_account(db: Session, *, email: str, password_hash: str, full_name: str) -> Account:

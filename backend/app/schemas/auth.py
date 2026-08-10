@@ -1,3 +1,5 @@
+from enum import Enum
+
 from pydantic import BaseModel, EmailStr, Field
 
 from app.models.account import AccountRole, AuthProvider
@@ -32,8 +34,13 @@ class LoginRequest(BaseModel):
     password: str = Field(min_length=1, max_length=128)
 
 
+class SelectableRole(str, Enum):
+    student = "Student"
+    hr = "HR"
+
+
 class SelectRoleRequest(BaseModel):
-    role: AccountRole
+    role: SelectableRole
 
 
 class ForgotPasswordRequest(BaseModel):

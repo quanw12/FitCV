@@ -33,11 +33,12 @@ from app.services.matching_service import (
     match_documents,
     supplement_semantic_cv,
 )
-from app.services.analyzer_service import _selected_analyzer_config
+from app.services.analyzer_service import _selected_analyzer_config, run_cv_parse
 from app.services import ocr_service
 from app.services.gemini_analyzer import (
     GeminiAnalyzerError,
     extract_cv_inputs_from_file,
+    extract_cv_search_profile,
     extract_match_inputs,
 )
 
@@ -492,6 +493,72 @@ class GeminiAnalyzerTests(unittest.TestCase):
         settings.gemini_max_retries = self.original_retries
         settings.gemini_thinking_level = self.original_thinking_level
 
+    @staticmethod
+    def _gemini_response(output: dict) -> MagicMock:
+        response = MagicMock(status_code=200)
+        response.json.return_value = {
+            "candidates": [
+                {
+                    "content": {"parts": [{"text": json.dumps(output)}]},
+                    "finishReason": "STOP",
+                }
+            ]
+        }
+        return response
+
+    @staticmethod
+    def _cv_file_output(
+        *,
+        education_entries: list[dict] | None = None,
+        education: str | None = None,
+        education_evidence: str | None = None,
+    ) -> dict:
+        return {
+            "skills": [],
+            "experience_years": None,
+            "experience_evidence": None,
+            "education": education,
+            "education_evidence": education_evidence,
+            "education_entries": education_entries or [],
+            "experience_entries": [],
+            "soft_skills": [],
+        }
+
+    @staticmethod
+    def _match_output(
+        *,
+        cv_skills: list[dict] | None = None,
+        jd_required_skills: list[dict] | None = None,
+        jd_required_skill_groups: list[dict] | None = None,
+    ) -> dict:
+        return {
+            "cv": {
+                "skills": cv_skills or [],
+                "experience_years": None,
+                "experience_evidence": None,
+                "education": None,
+                "education_evidence": None,
+                "education_entries": [],
+                "experience_entries": [],
+                "soft_skills": [],
+            },
+            "jd": {
+                "required_skills": jd_required_skills or [],
+                "preferred_skills": [],
+                "required_skill_groups": jd_required_skill_groups or [],
+                "preferred_skill_groups": [],
+                "experience_years": None,
+                "experience_evidence": None,
+                "education": None,
+                "education_evidence": None,
+                "soft_skills": [],
+            },
+        }
+
+    @classmethod
+    def _coverage_response(cls) -> MagicMock:
+        return cls._gemini_response({"skills": [], "soft_skills": []})
+
     def test_extracts_structured_keywords_for_weighted_matching(self) -> None:
         output = {
             "cv": {
@@ -505,6 +572,8 @@ class GeminiAnalyzerTests(unittest.TestCase):
                 "experience_evidence": None,
                 "education": "Bachelor",
                 "education_evidence": "Bachelor student",
+                "education_entries": [],
+                "experience_entries": [],
                 "soft_skills": [
                     {"name": "Communication", "evidence": "Communication"}
                 ],
@@ -518,6 +587,8 @@ class GeminiAnalyzerTests(unittest.TestCase):
                 "preferred_skills": [
                     {"name": "Nessus", "evidence": "Nessus preferred"}
                 ],
+                "required_skill_groups": [],
+                "preferred_skill_groups": [],
                 "experience_years": None,
                 "experience_evidence": None,
                 "education": "Bachelor",
@@ -598,6 +669,8 @@ Bachelor student using Splunk, Wireshark, and Python. Communication.""",
                 "experience_evidence": None,
                 "education": None,
                 "education_evidence": None,
+                "education_entries": [],
+                "experience_entries": [],
                 "soft_skills": [],
             },
             "jd": {
@@ -645,6 +718,255 @@ Bachelor student using Splunk, Wireshark, and Python. Communication.""",
         self.assertEqual(result["breakdown"]["skills"]["score"], 100.0)
         self.assertEqual(result["breakdown"]["skills"]["missing"], [])
 
+    def test_analyzer_evidence_at_300_characters_needs_no_validation_retry(self) -> None:
+        evidence = "A" * 300
+        output = self._match_output(
+            cv_skills=[{"name": "Boundary Skill", "evidence": evidence}]
+        )
+
+        with patch(
+            "app.services.gemini_analyzer.requests.post",
+            return_value=self._gemini_response(output),
+        ) as post:
+            cv, _ = extract_match_inputs(
+                cv_text=evidence,
+                job_description="No candidate requirements are stated.",
+            )
+
+        self.assertEqual(post.call_count, 1)
+        self.assertEqual(cv["skills"], ["Boundary Skill"])
+        evidence_schema = post.call_args.kwargs["json"]["generationConfig"][
+            "responseJsonSchema"
+        ]["properties"]["cv"]["properties"]["skills"]["items"]["properties"][
+            "evidence"
+        ]
+        self.assertIn("at most 300 characters", evidence_schema["description"])
+        self.assertNotIn("maxLength", evidence_schema)
+
+    def test_each_required_analyzer_list_triggers_one_corrective_retry(self) -> None:
+        required_paths = (
+            ("cv", "education_entries"),
+            ("cv", "experience_entries"),
+            ("jd", "required_skill_groups"),
+            ("jd", "preferred_skill_groups"),
+        )
+        for section, field in required_paths:
+            with self.subTest(path=f"{section}.{field}"):
+                invalid_output = self._match_output()
+                del invalid_output[section][field]
+                corrected_output = self._match_output()
+
+                with patch(
+                    "app.services.gemini_analyzer.requests.post",
+                    side_effect=[
+                        self._gemini_response(invalid_output),
+                        self._gemini_response(corrected_output),
+                    ],
+                ) as post:
+                    extract_match_inputs(
+                        cv_text="Python backend experience.",
+                        job_description="Python is required.",
+                    )
+
+                self.assertEqual(post.call_count, 2)
+                correction = post.call_args_list[1].kwargs["json"]["contents"][0][
+                    "parts"
+                ][-1]["text"]
+                self.assertIn(f"{section}.{field}:missing", correction)
+
+    def test_validation_locations_redact_model_controlled_keys_and_values(self) -> None:
+        private_key = "Jane Doe jane@example.com PRIVATE SOURCE TEXT"
+        private_value = "RAW PRIVATE PAYLOAD"
+        invalid_output = self._match_output(
+            cv_skills=[
+                {
+                    "name": "Python",
+                    "evidence": "Python",
+                    private_key: private_value,
+                }
+            ]
+        )
+
+        with patch(
+            "app.services.gemini_analyzer.requests.post",
+            side_effect=[
+                self._gemini_response(invalid_output),
+                self._gemini_response(invalid_output),
+            ],
+        ) as post:
+            with self.assertRaises(GeminiAnalyzerError) as raised:
+                extract_match_inputs(
+                    cv_text="Python appears in the source CV.",
+                    job_description="Python is required.",
+                )
+
+        self.assertEqual(post.call_count, 2)
+        correction = post.call_args_list[1].kwargs["json"]["contents"][0]["parts"][-1][
+            "text"
+        ]
+        message = str(raised.exception)
+        for rendered in (correction, message):
+            self.assertIn(
+                "cv.skills.0.unexpected_field:extra_forbidden",
+                rendered,
+            )
+            self.assertNotIn(private_key, rendered)
+            self.assertNotIn(private_value, rendered)
+            self.assertNotIn("Jane Doe", rendered)
+            self.assertNotIn("jane@example.com", rendered)
+            self.assertNotIn("PRIVATE SOURCE TEXT", rendered)
+
+    def test_search_profile_required_key_triggers_one_corrective_retry(self) -> None:
+        invalid_output = {
+            "job_title": "Backend Engineer",
+            "keywords": ["Python"],
+            "location_hint": None,
+            "level": None,
+        }
+        corrected_output = {
+            **invalid_output,
+            "level_evidence": None,
+        }
+
+        with patch(
+            "app.services.gemini_analyzer.requests.post",
+            side_effect=[
+                self._gemini_response(invalid_output),
+                self._gemini_response(corrected_output),
+            ],
+        ) as post:
+            profile = extract_cv_search_profile(cv_text="Python backend developer")
+
+        self.assertEqual(post.call_count, 2)
+        self.assertEqual(profile["job_title"], "Backend Engineer")
+        correction = post.call_args_list[1].kwargs["json"]["contents"][0]["parts"][-1][
+            "text"
+        ]
+        self.assertIn("level_evidence:missing", correction)
+
+    def test_analyzer_evidence_at_301_characters_retries_once(self) -> None:
+        invalid_evidence = "X" * 301
+        corrected_evidence = "Y" * 300
+        invalid_output = self._match_output(
+            cv_skills=[{"name": "Corrected Skill", "evidence": invalid_evidence}]
+        )
+        corrected_output = self._match_output(
+            cv_skills=[{"name": "Corrected Skill", "evidence": corrected_evidence}]
+        )
+
+        with patch(
+            "app.services.gemini_analyzer.requests.post",
+            side_effect=[
+                self._gemini_response(invalid_output),
+                self._gemini_response(corrected_output),
+            ],
+        ) as post:
+            cv, _ = extract_match_inputs(
+                cv_text=f"{invalid_evidence}\n{corrected_evidence}",
+                job_description="No candidate requirements are stated.",
+            )
+
+        self.assertEqual(post.call_count, 2)
+        self.assertEqual(cv["skills"], ["Corrected Skill"])
+        correction = post.call_args_list[1].kwargs["json"]["contents"][0]["parts"][-1][
+            "text"
+        ]
+        self.assertIn("cv.skills.0.evidence:string_too_long", correction)
+        self.assertNotIn(invalid_evidence, correction)
+
+    def test_analyzer_retry_recovers_nested_grounded_evidence(self) -> None:
+        cv_evidence = (
+            "Python delivery evidence. "
+            + "Built reliable backend services with Python " * 10
+        ).strip()
+        jd_group_evidence = (
+            "Know one of Python or Java. "
+            + "Either language is acceptable for backend delivery " * 10
+        ).strip()
+        self.assertGreater(len(cv_evidence), 300)
+        self.assertGreater(len(jd_group_evidence), 300)
+        output = self._match_output(
+            cv_skills=[{"name": "Python", "evidence": cv_evidence}],
+            jd_required_skill_groups=[
+                {
+                    "skills": [
+                        {"name": "Python", "evidence": "Python"},
+                        {"name": "Java", "evidence": "Java"},
+                    ],
+                    "minimum_required": 1,
+                    "evidence": jd_group_evidence,
+                }
+            ],
+        )
+
+        with patch(
+            "app.services.gemini_analyzer.requests.post",
+            side_effect=[self._gemini_response(output), self._gemini_response(output)],
+        ) as post:
+            cv, jd = extract_match_inputs(
+                cv_text=cv_evidence,
+                job_description=jd_group_evidence,
+            )
+
+        self.assertEqual(post.call_count, 2)
+        self.assertEqual(cv["skills"], ["Python"])
+        self.assertEqual(len(jd["required_skill_groups"]), 1)
+        recovered = jd["required_skill_groups"][0]["evidence"]
+        self.assertLessEqual(len(recovered), 300)
+        self.assertIn(recovered, jd_group_evidence)
+
+    def test_analyzer_non_repairable_failure_is_sanitized_after_one_retry(self) -> None:
+        private_name = "PRIVATE-CANDIDATE-DATA-" * 7
+        private_evidence = "PRIVATE-EVIDENCE-" * 30
+        invalid_output = self._match_output(
+            cv_skills=[{"name": private_name, "evidence": private_evidence}]
+        )
+
+        with patch(
+            "app.services.gemini_analyzer.requests.post",
+            side_effect=[
+                self._gemini_response(invalid_output),
+                self._gemini_response(invalid_output),
+            ],
+        ) as post:
+            with self.assertRaises(GeminiAnalyzerError) as raised:
+                extract_match_inputs(
+                    cv_text="Source without private model output.",
+                    job_description="No candidate requirements are stated.",
+                )
+
+        self.assertEqual(post.call_count, 2)
+        message = str(raised.exception)
+        self.assertIn("cv.skills.0.name:string_too_long", message)
+        self.assertIn("cv.skills.0.evidence:string_too_long", message)
+        self.assertNotIn(private_name, message)
+        self.assertNotIn(private_evidence, message)
+        correction = post.call_args_list[1].kwargs["json"]["contents"][0]["parts"][-1][
+            "text"
+        ]
+        self.assertNotIn(private_name, correction)
+        self.assertNotIn(private_evidence, correction)
+
+    def test_analyzer_strict_type_failure_remains_non_repairable(self) -> None:
+        invalid_output = self._match_output()
+        invalid_output["cv"]["experience_years"] = "3"
+
+        with patch(
+            "app.services.gemini_analyzer.requests.post",
+            side_effect=[
+                self._gemini_response(invalid_output),
+                self._gemini_response(invalid_output),
+            ],
+        ) as post:
+            with self.assertRaises(GeminiAnalyzerError) as raised:
+                extract_match_inputs(
+                    cv_text="Three years building backend services.",
+                    job_description="No candidate requirements are stated.",
+                )
+
+        self.assertEqual(post.call_count, 2)
+        self.assertIn("cv.experience_years:float_type", str(raised.exception))
+
     def test_retries_rate_limit_once(self) -> None:
         output = {
             "cv": {
@@ -653,11 +975,15 @@ Bachelor student using Splunk, Wireshark, and Python. Communication.""",
                 "experience_evidence": None,
                 "education": None,
                 "education_evidence": None,
+                "education_entries": [],
+                "experience_entries": [],
                 "soft_skills": [],
             },
             "jd": {
                 "required_skills": [],
                 "preferred_skills": [],
+                "required_skill_groups": [],
+                "preferred_skill_groups": [],
                 "experience_years": None,
                 "experience_evidence": None,
                 "education": None,
@@ -792,6 +1118,176 @@ Bachelor student using Splunk, Wireshark, and Python. Communication.""",
         )
         self.assertEqual(payload["_extraction_provider"], "gemini")
 
+    def test_cv_evidence_at_300_characters_passes_without_validation_retry(self) -> None:
+        evidence = "E" * 300
+        output = self._cv_file_output(
+            education_entries=[{"name": "Exact boundary", "evidence": evidence}]
+        )
+
+        with TemporaryDirectory() as directory:
+            path = Path(directory) / "resume.pdf"
+            path.write_bytes(b"%PDF-boundary")
+            with patch(
+                "app.services.gemini_analyzer.requests.post",
+                side_effect=[
+                    self._gemini_response(output),
+                    self._coverage_response(),
+                ],
+            ) as post:
+                payload = extract_cv_inputs_from_file(
+                    file_path=path,
+                    file_type="PDF",
+                    source_text=evidence,
+                )
+
+        self.assertEqual(post.call_count, 2)
+        self.assertEqual(payload["education_entries"], ["Exact boundary"])
+        evidence_schema = post.call_args_list[0].kwargs["json"]["generationConfig"][
+            "responseJsonSchema"
+        ]["properties"]["education_entries"]["items"]["properties"]["evidence"]
+        self.assertIn("at most 300 characters", evidence_schema["description"])
+        self.assertNotIn("maxLength", evidence_schema)
+
+    def test_cv_evidence_at_301_characters_retries_once_and_accepts_correction(self) -> None:
+        invalid_evidence = "X" * 301
+        corrected_evidence = "Y" * 300
+        invalid_output = self._cv_file_output(
+            education_entries=[
+                {"name": "Corrected education", "evidence": invalid_evidence}
+            ]
+        )
+        corrected_output = self._cv_file_output(
+            education_entries=[
+                {"name": "Corrected education", "evidence": corrected_evidence}
+            ]
+        )
+
+        with TemporaryDirectory() as directory:
+            path = Path(directory) / "resume.pdf"
+            path.write_bytes(b"%PDF-retry")
+            with patch(
+                "app.services.gemini_analyzer.requests.post",
+                side_effect=[
+                    self._gemini_response(invalid_output),
+                    self._gemini_response(corrected_output),
+                    self._coverage_response(),
+                ],
+            ) as post:
+                payload = extract_cv_inputs_from_file(
+                    file_path=path,
+                    file_type="PDF",
+                    source_text=f"{invalid_evidence} {corrected_evidence}",
+                )
+
+        self.assertEqual(post.call_count, 3)
+        self.assertEqual(payload["education_entries"], ["Corrected education"])
+        correction = post.call_args_list[1].kwargs["json"]["contents"][0]["parts"][-1][
+            "text"
+        ]
+        self.assertIn("education_entries.0.evidence:string_too_long", correction)
+        self.assertNotIn(invalid_evidence, correction)
+
+    def test_retry_falls_back_to_grounded_word_bounded_evidence_excerpt(self) -> None:
+        long_evidence = (
+            "Bachelor degree in Computer Science. "
+            + "Completed advanced software engineering coursework " * 8
+        ).strip()
+        self.assertGreater(len(long_evidence), 300)
+        output = self._cv_file_output(
+            education="Bachelor",
+            education_evidence=long_evidence,
+            education_entries=[
+                {"name": "Bachelor degree", "evidence": long_evidence}
+            ],
+        )
+
+        with TemporaryDirectory() as directory:
+            path = Path(directory) / "resume.pdf"
+            path.write_bytes(b"%PDF-grounded-fallback")
+            with patch(
+                "app.services.gemini_analyzer.requests.post",
+                side_effect=[
+                    self._gemini_response(output),
+                    self._gemini_response(output),
+                    self._coverage_response(),
+                ],
+            ) as post:
+                payload = extract_cv_inputs_from_file(
+                    file_path=path,
+                    file_type="PDF",
+                    source_text=long_evidence,
+                )
+
+        self.assertEqual(post.call_count, 3)
+        self.assertEqual(payload["education"], "Bachelor")
+        self.assertEqual(payload["education_entries"], ["Bachelor degree"])
+        self.assertLessEqual(len(payload["education_evidence"]), 300)
+        self.assertIn(payload["education_evidence"], long_evidence)
+        self.assertFalse(payload["education_evidence"].endswith(" "))
+
+    def test_retry_drops_ungrounded_overlong_optional_entry(self) -> None:
+        ungrounded_evidence = "Invented private evidence " * 20
+        output = self._cv_file_output(
+            education="Bachelor",
+            education_evidence=ungrounded_evidence,
+            education_entries=[
+                {"name": "Unverified education", "evidence": ungrounded_evidence}
+            ]
+        )
+
+        with TemporaryDirectory() as directory:
+            path = Path(directory) / "resume.pdf"
+            path.write_bytes(b"%PDF-ungrounded-fallback")
+            with patch(
+                "app.services.gemini_analyzer.requests.post",
+                side_effect=[
+                    self._gemini_response(output),
+                    self._gemini_response(output),
+                    self._coverage_response(),
+                ],
+            ) as post:
+                payload = extract_cv_inputs_from_file(
+                    file_path=path,
+                    file_type="PDF",
+                    source_text="Bachelor of Science in Computer Science.",
+                )
+
+        self.assertEqual(post.call_count, 3)
+        self.assertEqual(payload["education_entries"], [])
+        self.assertIsNone(payload["education_evidence"])
+        self.assertIsNone(payload["education"])
+
+    def test_final_cv_validation_error_contains_only_sanitized_issues(self) -> None:
+        private_name = "PRIVATE-CANDIDATE-DATA-" * 7
+        invalid_output = self._cv_file_output(
+            education_entries=[
+                {"name": private_name, "evidence": "Z" * 301}
+            ]
+        )
+
+        with TemporaryDirectory() as directory:
+            path = Path(directory) / "resume.pdf"
+            path.write_bytes(b"%PDF-invalid")
+            with patch(
+                "app.services.gemini_analyzer.requests.post",
+                side_effect=[
+                    self._gemini_response(invalid_output),
+                    self._gemini_response(invalid_output),
+                ],
+            ) as post:
+                with self.assertRaises(GeminiAnalyzerError) as raised:
+                    extract_cv_inputs_from_file(
+                        file_path=path,
+                        file_type="PDF",
+                        source_text="Source without the private model output.",
+                    )
+
+        self.assertEqual(post.call_count, 2)
+        message = str(raised.exception)
+        self.assertIn("education_entries.0.name:string_too_long", message)
+        self.assertIn("education_entries.0.evidence:string_too_long", message)
+        self.assertNotIn(private_name, message)
+
 
 class AnalyzerRepositoryTests(unittest.TestCase):
     def setUp(self) -> None:
@@ -885,6 +1381,54 @@ class AnalyzerRepositoryTests(unittest.TestCase):
         self.assertEqual(float(match.overall_score or 0), 100.0)
         self.assertIsNotNone(match.evidence_json)
 
+    def test_cv_parse_stays_processing_until_terminal_queue_attempt(self) -> None:
+        cv, _ = analyzer.create_cv(
+            self.db,
+            account_id=self.account.account_id,
+            file_name="cv.pdf",
+            file_path="cv/1/cv.pdf",
+            file_type="PDF",
+            file_size_kb=10,
+            file_sha256="4" * 64,
+            parser_version=PARSER_VERSION,
+        )
+        session_factory = sessionmaker(bind=self.engine)
+        parse_error = GeminiAnalyzerError(
+            "Gemini returned invalid CV extraction data "
+            "(education_entries.0.evidence: string_too_long)."
+        )
+
+        with (
+            patch("app.services.analyzer_service.SessionLocal", session_factory),
+            patch(
+                "app.services.analyzer_service.extract_document_text",
+                return_value="CV source text",
+            ),
+            patch(
+                "app.services.analyzer_service.selected_analyzer_config",
+                return_value=("fitcv-gemini-test", "gemini-test"),
+            ),
+            patch(
+                "app.services.analyzer_service.extract_cv_inputs_from_file",
+                side_effect=parse_error,
+            ),
+        ):
+            self.assertFalse(
+                run_cv_parse(cv.cv_id, terminal_failure=False)
+            )
+            self.db.expire_all()
+            parsed = analyzer.get_latest_parse(self.db, cv.cv_id)
+            self.assertIsNotNone(parsed)
+            self.assertEqual(parsed.parse_status, "Processing")
+            self.assertIsNone(parsed.error_message)
+
+            self.assertFalse(run_cv_parse(cv.cv_id, terminal_failure=True))
+            self.db.expire_all()
+            parsed = analyzer.get_latest_parse(self.db, cv.cv_id)
+            self.assertIsNotNone(parsed)
+            self.assertEqual(parsed.parse_status, "Failed")
+            self.assertIn("education_entries.0.evidence", parsed.error_message)
+
 
 class AnalyzerApiTests(unittest.TestCase):
     def setUp(self) -> None:
@@ -946,6 +1490,50 @@ class AnalyzerApiTests(unittest.TestCase):
         settings.analyzer_provider = self.original_analyzer_provider
         self.uploads.cleanup()
         self.engine.dispose()
+
+    def test_failed_cv_parse_can_enqueue_a_new_idempotent_retry(self) -> None:
+        document = Document()
+        document.add_heading("Technical Skills")
+        document.add_paragraph("Python, FastAPI, MySQL and communication")
+        document.add_heading("Experience")
+        document.add_paragraph("3 years building REST APIs.")
+        buffer = BytesIO()
+        document.save(buffer)
+
+        upload = self.client.post(
+            "/api/cvs",
+            files={
+                "file": (
+                    "resume.docx",
+                    buffer.getvalue(),
+                    "application/vnd.openxmlformats-officedocument."
+                    "wordprocessingml.document",
+                )
+            },
+        )
+        self.assertEqual(upload.status_code, 201, upload.text)
+        cv_id = upload.json()["cv_id"]
+        original_task_id = upload.json()["ai_task_id"]
+
+        db = self.session_factory()
+        try:
+            parsed = analyzer.get_latest_parse(db, cv_id)
+            self.assertIsNotNone(parsed)
+            analyzer.set_parse_failed(db, parsed, "Previous terminal parse failure.")
+        finally:
+            db.close()
+
+        retried = self.client.post(f"/api/cvs/{cv_id}/retry-parse")
+        self.assertEqual(retried.status_code, 202, retried.text)
+        self.assertNotEqual(retried.json()["ai_task_id"], original_task_id)
+
+        completed = self.client.get(f"/api/cvs/{cv_id}")
+        self.assertEqual(completed.status_code, 200, completed.text)
+        self.assertEqual(completed.json()["parse_status"], "Success")
+        self.assertIsNone(completed.json()["error_message"])
+
+        already_complete = self.client.post(f"/api/cvs/{cv_id}/retry-parse")
+        self.assertEqual(already_complete.status_code, 409, already_complete.text)
 
     def test_upload_analyze_history_and_delete(self) -> None:
         document = Document()

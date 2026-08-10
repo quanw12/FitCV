@@ -20,6 +20,10 @@ __pycache__/
 .pytest_cache/
 .mypy_cache/
 
+# Runtime logs may contain PII or provider error details.
+*.log
+backend/debug.log
+
 # Virtual environments
 .venv/
 venv/

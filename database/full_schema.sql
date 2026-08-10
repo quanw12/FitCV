@@ -740,6 +740,23 @@ CREATE TABLE ai_task (
     INDEX idx_ai_task_owner_created (owner_account_id, created_at)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
 
+-- Lưu lịch sử bất biến cho từng lần xử lý AI thất bại.
+-- Thành công ở lần thử sau không xóa các lỗi đã ghi nhận trước đó.
+CREATE TABLE ai_task_attempt_history (
+    ai_task_attempt_id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+    ai_task_id         BIGINT UNSIGNED NOT NULL,
+    attempt_number     INT UNSIGNED NOT NULL,
+    outcome            ENUM('RetryScheduled', 'TerminalFailure', 'StaleRecovery') NOT NULL,
+    error_message      VARCHAR(1000) NOT NULL,
+    failed_at          DATETIME NOT NULL,
+
+    CONSTRAINT fk_ai_task_attempt_task
+        FOREIGN KEY (ai_task_id) REFERENCES ai_task(ai_task_id)
+        ON DELETE CASCADE,
+    CONSTRAINT uq_ai_task_attempt_number
+        UNIQUE (ai_task_id, attempt_number)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
+
 CREATE INDEX idx_account_company_id ON account(company_id);
 CREATE INDEX idx_account_role ON account(role);
 CREATE INDEX idx_account_reset_token_hash ON account(reset_token_hash);

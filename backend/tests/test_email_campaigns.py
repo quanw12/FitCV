@@ -250,6 +250,34 @@ class EmailCampaignIntegrationTests(unittest.TestCase):
             today=today,
         )
 
+    def _add_sent_email(
+        self,
+        application_id: int,
+        *,
+        template_key: str = "rejection",
+        stage: str = "Rejected",
+    ) -> CandidateEmail:
+        application = self.db.get(Application, application_id)
+        assert application is not None
+        candidate = self.db.get(Candidate, application.candidate_id)
+        assert candidate is not None and candidate.email is not None
+        sent = CandidateEmail(
+            company_id=self.company.company_id,
+            application_id=application_id,
+            template_key=template_key,
+            message_kind="Initial",
+            stage_at_generation=stage,
+            recipient_email=candidate.email,
+            subject="Previous stage update",
+            body="This update was already reviewed, approved, and sent.",
+            status="Sent",
+            sent_at=datetime(2026, 8, 1, 9, 0, 0),
+            created_by_account_id=self.manager.account_id,
+        )
+        self.db.add(sent)
+        self.db.commit()
+        return sent
+
     @staticmethod
     def _without_greeting(body: str) -> str:
         return "\n\n".join(body.split("\n\n")[1:])
@@ -329,39 +357,231 @@ class EmailCampaignIntegrationTests(unittest.TestCase):
         self.assertEqual(blocked[missing_id]["blocked_reason"], "Missing candidate email.")
         self.assertEqual(blocked[pending_id]["blocked_reason"], "Draft already pending.")
 
-    def test_audience_blocks_duplicate_sent_template_for_current_stage(self) -> None:
-        sent_id = self.rejected_ids[0]
-        application = self.db.get(Application, sent_id)
-        assert application is not None
-        candidate = self.db.get(Candidate, application.candidate_id)
-        assert candidate is not None and candidate.email is not None
-        self.db.add(
-            CandidateEmail(
-                company_id=self.company.company_id,
-                application_id=sent_id,
-                template_key="rejection",
-                message_kind="Initial",
-                stage_at_generation="Rejected",
-                recipient_email=candidate.email,
-                subject="Already sent",
-                body="Already sent",
-                status="Sent",
-                sent_at=datetime.now(timezone.utc).replace(tzinfo=None),
-                created_by_account_id=self.manager.account_id,
-            )
-        )
-        self.db.commit()
+    def test_audience_blocks_candidate_already_emailed_for_same_stage(self) -> None:
+        application_id = self.rejected_ids[0]
+        self._add_sent_email(application_id)
 
-        payload = self.client.get("/api/hr/emails/audience?stage=Rejected").json()
+        response = self.client.get("/api/hr/emails/audience?stage=Rejected")
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        eligible_ids = {item["application_id"] for item in payload["eligible"]}
         blocked = {
             item["application_id"]: item for item in payload["blocked"]
         }
+        self.assertNotIn(application_id, eligible_ids)
         self.assertEqual(
-            blocked[sent_id]["blocked_reason"],
+            blocked[application_id]["blocked_reason"],
             "Already emailed for this stage.",
         )
-        self.assertTrue(
-            all(item["application_id"] != sent_id for item in payload["eligible"])
+        self.assertTrue(blocked[application_id]["already_emailed_for_stage"])
+
+    def test_audience_uses_the_explicitly_selected_template(self) -> None:
+        application_id = self.rejected_ids[0]
+        self._add_sent_email(application_id, template_key="follow_up")
+
+        response = self.client.get(
+            "/api/hr/emails/audience"
+            "?stage=Rejected&template_key=follow_up"
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["template_key"], "follow_up")
+        eligible_ids = {item["application_id"] for item in payload["eligible"]}
+        blocked = {item["application_id"]: item for item in payload["blocked"]}
+        self.assertNotIn(application_id, eligible_ids)
+        self.assertEqual(
+            blocked[application_id]["blocked_reason"],
+            "Already emailed for this stage.",
+        )
+
+    def test_campaign_api_skips_already_emailed_candidate_by_default(self) -> None:
+        sent_application_id = self.rejected_ids[0]
+        eligible_application_id = self.rejected_ids[1]
+        self._add_sent_email(sent_application_id)
+        sent_count_before = (
+            self.db.query(CandidateEmail)
+            .filter(CandidateEmail.application_id == sent_application_id)
+            .count()
+        )
+
+        with patch(
+            "app.services.email_workflow_service.GeminiClient",
+            side_effect=GeminiClientError("disabled for test"),
+        ):
+            response = self.client.post(
+                "/api/hr/emails/campaigns",
+                json={
+                    "application_ids": [
+                        sent_application_id,
+                        eligible_application_id,
+                    ],
+                    "template_key": "rejection",
+                },
+            )
+
+        self.assertEqual(response.status_code, 201)
+        payload = response.json()
+        self.assertEqual(
+            [item["application_id"] for item in payload["drafts"]],
+            [eligible_application_id],
+        )
+        self.assertEqual(len(payload["skipped"]), 1)
+        self.assertEqual(
+            payload["skipped"][0]["application_id"], sent_application_id
+        )
+        self.assertEqual(
+            payload["skipped"][0]["blocked_reason"],
+            "Already emailed for this stage.",
+        )
+        self.assertEqual(
+            self.db.query(CandidateEmail)
+            .filter(CandidateEmail.application_id == sent_application_id)
+            .count(),
+            sent_count_before,
+        )
+
+    def test_duplicate_only_campaign_returns_conflict_without_new_draft(self) -> None:
+        application_id = self.rejected_ids[0]
+        self._add_sent_email(application_id)
+        email_count_before = self.db.query(CandidateEmail).count()
+        campaign_count_before = self.db.query(CandidateEmailCampaign).count()
+
+        response = self.client.post(
+            "/api/hr/emails/campaigns",
+            json={
+                "application_ids": [application_id],
+                "template_key": "rejection",
+            },
+        )
+
+        self.assertEqual(response.status_code, 409)
+        self.assertIn(
+            "Already emailed for this stage.", response.json()["detail"]
+        )
+        self.assertEqual(self.db.query(CandidateEmail).count(), email_count_before)
+        self.assertEqual(
+            self.db.query(CandidateEmailCampaign).count(), campaign_count_before
+        )
+
+    def test_campaign_api_allows_explicit_resend(self) -> None:
+        application_id = self.rejected_ids[0]
+        self._add_sent_email(application_id)
+        request = CampaignGenerateRequest(
+            application_ids=[application_id],
+            template_key="rejection",
+            allow_resend=True,
+        )
+        self.assertTrue(request.allow_resend)
+
+        with patch(
+            "app.services.email_workflow_service.GeminiClient",
+            side_effect=GeminiClientError("disabled for test"),
+        ):
+            response = self.client.post(
+                "/api/hr/emails/campaigns",
+                json=request.model_dump(mode="json"),
+            )
+
+        self.assertEqual(response.status_code, 201)
+        payload = response.json()
+        self.assertEqual(len(payload["drafts"]), 1)
+        self.assertEqual(payload["drafts"][0]["application_id"], application_id)
+        self.assertEqual(payload["skipped"], [])
+
+    def test_older_matching_sent_still_blocks_after_newer_unrelated_sent(self) -> None:
+        sent_application_id = self.rejected_ids[0]
+        eligible_application_id = self.rejected_ids[1]
+        matching = self._add_sent_email(sent_application_id)
+        unrelated = self._add_sent_email(
+            sent_application_id,
+            template_key="follow_up",
+        )
+        self.assertGreater(unrelated.email_id, matching.email_id)
+
+        audience = self.client.get(
+            "/api/hr/emails/audience?stage=Rejected"
+        ).json()
+        blocked = {
+            item["application_id"]: item for item in audience["blocked"]
+        }
+        self.assertEqual(
+            blocked[sent_application_id]["blocked_reason"],
+            "Already emailed for this stage.",
+        )
+        self.assertEqual(
+            blocked[sent_application_id]["last_email_template_key"],
+            "rejection",
+        )
+
+        with patch(
+            "app.services.email_workflow_service.GeminiClient",
+            side_effect=GeminiClientError("disabled for test"),
+        ):
+            response = self.client.post(
+                "/api/hr/emails/campaigns",
+                json={
+                    "application_ids": [
+                        sent_application_id,
+                        eligible_application_id,
+                    ],
+                    "template_key": "rejection",
+                },
+            )
+
+        self.assertEqual(response.status_code, 201)
+        payload = response.json()
+        self.assertEqual(
+            [item["application_id"] for item in payload["drafts"]],
+            [eligible_application_id],
+        )
+        self.assertEqual(
+            [item["application_id"] for item in payload["skipped"]],
+            [sent_application_id],
+        )
+
+    def test_campaign_skips_matching_sent_discovered_after_lock(self) -> None:
+        raced_application_id = self.rejected_ids[0]
+        eligible_application_id = self.rejected_ids[1]
+        raced_sent = self._add_sent_email(raced_application_id)
+
+        with (
+            patch(
+                "app.services.email_workflow_service.GeminiClient",
+                side_effect=GeminiClientError("disabled for test"),
+            ),
+            patch.object(
+                email_workflow_service.email_workflow,
+                "sent_email_summary",
+                side_effect=[{}, {raced_application_id: raced_sent}],
+            ) as sent_summary,
+        ):
+            response = self.client.post(
+                "/api/hr/emails/campaigns",
+                json={
+                    "application_ids": [
+                        raced_application_id,
+                        eligible_application_id,
+                    ],
+                    "template_key": "rejection",
+                },
+            )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(sent_summary.call_count, 2)
+        payload = response.json()
+        self.assertEqual(
+            [item["application_id"] for item in payload["drafts"]],
+            [eligible_application_id],
+        )
+        self.assertEqual(len(payload["skipped"]), 1)
+        self.assertEqual(
+            payload["skipped"][0]["application_id"], raced_application_id
+        )
+        self.assertEqual(
+            payload["skipped"][0]["blocked_reason"],
+            "Already emailed for this stage.",
         )
 
     def test_campaign_generates_identical_body_for_rejection(self) -> None:

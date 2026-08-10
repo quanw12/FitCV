@@ -50,6 +50,7 @@ def list_drafts(
 def list_audience(
     stage: EmailStage,
     job_id: int | None = None,
+    template_key: str | None = None,
     db: Session = Depends(get_db),
     account: Account = Depends(manager),
 ):
@@ -58,6 +59,7 @@ def list_audience(
         account,
         stage=stage,
         job_id=job_id,
+        template_key=template_key,
     )
 
 

@@ -30,6 +30,8 @@ interface BackendCvVersion {
   parser_version: string | null
 
   error_message: string | null
+
+  ai_task_id?: number | null
 }
 
 interface BackendMatchAnalysis {
@@ -152,6 +154,8 @@ function normalizeCv(payload: BackendCvVersion): CvVersion {
     parserVersion: payload.parser_version,
 
     errorMessage: payload.error_message,
+
+    aiTaskId: payload.ai_task_id ?? null,
   }
 }
 
@@ -289,6 +293,21 @@ export const analyzerApi = {
 
       signal,
     })
+
+    return normalizeCv(payload)
+  },
+
+  async retryCvParse(cvId: number, signal?: AbortSignal): Promise<CvVersion> {
+    const payload = await requestJson<BackendCvVersion>(
+      `/api/cvs/${cvId}/retry-parse`,
+      {
+        method: "POST",
+
+        authenticated: true,
+
+        signal,
+      },
+    )
 
     return normalizeCv(payload)
   },

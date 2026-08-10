@@ -32,6 +32,8 @@ export interface CandidateEmailDraft {
 
   recipient_email: string
 
+  recipient_email_valid: boolean
+
   reply_to_email: string | null
 
   subject: string
@@ -161,6 +163,8 @@ export interface EmailThreadSummary {
   candidate_name: string
 
   candidate_email: string
+
+  recipient_email_valid: boolean
 
   job_title: string
 

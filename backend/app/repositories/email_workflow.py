@@ -5,6 +5,7 @@ from sqlalchemy import and_, case, exists, func, insert, or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, aliased
 
+from app.core.datetime_utils import utc_now_naive
 from app.models import (
     Application,
     Candidate,
@@ -82,6 +83,10 @@ def audience_rows(
             CandidateEmail.company_id == company_id,
             CandidateEmail.status == "Sent",
             CandidateEmail.template_key == template_key,
+            or_(
+                CandidateEmail.stage_at_generation.is_(None),
+                CandidateEmail.stage_at_generation == stage,
+            ),
         )
         .group_by(CandidateEmail.application_id)
         .subquery()
@@ -283,7 +288,7 @@ def create_drafts(
                         ),
                         else_=CandidateEmailThread.subject,
                     ),
-                    last_message_at=func.now(),
+                    last_message_at=utc_now_naive(),
                 )
             )
         db.execute(insert(CandidateEmail), draft_values)
@@ -453,6 +458,8 @@ def sent_email_summary(
     company_id: int,
     application_ids: list[int],
     template_key: str | None = None,
+    *,
+    stage: str | None = None,
 ) -> dict[int, CandidateEmail]:
     ids = list(dict.fromkeys(application_ids))
     if not ids:
@@ -469,6 +476,16 @@ def sent_email_summary(
             *(
                 [CandidateEmail.template_key == template_key]
                 if template_key is not None
+                else []
+            ),
+            *(
+                [
+                    or_(
+                        CandidateEmail.stage_at_generation.is_(None),
+                        CandidateEmail.stage_at_generation == stage,
+                    )
+                ]
+                if stage is not None
                 else []
             ),
         )
@@ -526,7 +543,7 @@ def create_draft(
         thread = db.get(CandidateEmailThread, thread_id)
         if thread is not None:
             thread.subject = thread.subject or subject
-            thread.last_message_at = func.now()
+            thread.last_message_at = utc_now_naive()
     db.commit()
     db.refresh(draft)
     return draft
@@ -627,7 +644,7 @@ def save(db: Session, draft: CandidateEmail, values: dict) -> CandidateEmail:
     if draft.thread_id is not None and values.get("status") == "Sent":
         thread = db.get(CandidateEmailThread, draft.thread_id)
         if thread is not None:
-            thread.last_message_at = func.now()
+            thread.last_message_at = values.get("sent_at") or utc_now_naive()
     db.commit()
     db.refresh(draft)
     return draft

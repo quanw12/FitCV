@@ -1,0 +1,1000 @@
+.fitcv-landing {
+  --lp-bg: #f8fafc;
+  --lp-surface: #ffffff;
+  --lp-surface-hi: #f1f5f9;
+  --lp-line: #e2e8f0;
+  --lp-line-soft: rgba(15, 23, 42, 0.08);
+  --lp-text: #0f172a;
+  --lp-muted: #475569;
+  --lp-dim: #94a3b8;
+  --lp-accent: #059669;
+  --lp-accent-deep: #047857;
+  --lp-warn: #ea580c;
+  --lp-radius: 4px;
+  --lp-shell: 1220px;
+  --lp-ease: cubic-bezier(0.16, 1, 0.3, 1);
+
+  min-height: 100vh;
+  background: var(--lp-bg);
+  color: var(--lp-text);
+  font-family: "Geist Variable", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+.fitcv-landing *,
+.fitcv-landing *::before,
+.fitcv-landing *::after {
+  box-sizing: border-box;
+}
+
+.fitcv-landing h1,
+.fitcv-landing h2,
+.fitcv-landing h3,
+.fitcv-landing p {
+  margin: 0;
+}
+
+.lp-mono {
+  font-family: "JetBrains Mono Variable", ui-monospace, monospace;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--lp-dim);
+}
+
+/* ---------- header ---------- */
+
+.lp-header {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  display: flex;
+  justify-content: center;
+  padding: 0 24px;
+  border-bottom: 1px solid transparent;
+  background: transparent;
+  transition:
+    background 240ms var(--lp-ease),
+    border-color 240ms var(--lp-ease),
+    backdrop-filter 240ms var(--lp-ease);
+}
+
+.lp-header.is-scrolled {
+  background: rgba(15, 23, 42, 0.72);
+  backdrop-filter: blur(12px);
+  border-bottom-color: var(--lp-line);
+}
+
+.lp-header-inner {
+  width: 100%;
+  max-width: var(--lp-shell);
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.lp-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 600;
+  font-size: 17px;
+  letter-spacing: -0.01em;
+}
+
+.lp-brand-mark {
+  width: 26px;
+  height: 26px;
+  border-radius: var(--lp-radius);
+  object-fit: contain;
+}
+
+.lp-nav {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.lp-nav a {
+  padding: 8px 12px;
+  border-radius: var(--lp-radius);
+  color: var(--lp-muted);
+  font-size: 14px;
+  text-decoration: none;
+  transition:
+    color 140ms var(--lp-ease),
+    background 140ms var(--lp-ease);
+}
+
+.lp-nav a:hover {
+  color: var(--lp-text);
+  background: rgba(15, 23, 42, 0.06);
+}
+
+.lp-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.lp-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 9px 16px;
+  border-radius: var(--lp-radius);
+  border: 1px solid transparent;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    filter 140ms var(--lp-ease),
+    background 140ms var(--lp-ease),
+    border-color 140ms var(--lp-ease),
+    transform 90ms ease-out;
+}
+
+.lp-btn-ghost {
+  background: transparent;
+  color: var(--lp-text);
+}
+
+.lp-btn-ghost:hover {
+  background: rgba(15, 23, 42, 0.07);
+}
+
+.lp-btn-primary {
+  background: var(--lp-accent);
+  color: #04140d;
+}
+
+.lp-btn-primary:hover {
+  filter: brightness(0.94);
+}
+
+.lp-btn-outline {
+  background: transparent;
+  color: var(--lp-text);
+  border-color: rgba(15, 23, 42, 0.28);
+}
+
+.lp-btn-outline:hover {
+  background: rgba(15, 23, 42, 0.07);
+  border-color: var(--lp-text);
+}
+
+.lp-btn:focus-visible,
+.lp-nav a:focus-visible {
+  outline: 2px solid var(--lp-accent);
+  outline-offset: 2px;
+}
+
+/* ---------- shell / sections ---------- */
+
+.lp-section {
+  display: flex;
+  justify-content: center;
+  padding: 0 24px;
+  border-bottom: 1px solid var(--lp-line);
+}
+
+.lp-section-inner {
+  width: 100%;
+  max-width: var(--lp-shell);
+  padding: 88px 56px;
+  border-left: 1px solid var(--lp-line);
+  border-right: 1px solid var(--lp-line);
+  display: flex;
+  flex-direction: column;
+  gap: 48px;
+}
+
+/* The closing CTA owns its own padding so its grid runs edge to edge. */
+
+.lp-section-close .lp-section-inner {
+  padding: 0;
+  gap: 0;
+}
+
+.lp-section-head {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 680px;
+}
+
+.lp-section-head h2 {
+  font-size: clamp(26px, 3vw, 36px);
+  line-height: 1.2;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+
+.lp-section-head p {
+  font-size: 16px;
+  line-height: 1.65;
+  color: var(--lp-muted);
+}
+
+/* ---------- hero ---------- */
+
+.lp-hero {
+  display: flex;
+  justify-content: center;
+  padding: 0 24px;
+}
+
+.lp-hero-inner {
+  width: 100%;
+  max-width: var(--lp-shell);
+  border-left: 1px solid var(--lp-line);
+  border-right: 1px solid var(--lp-line);
+  border-bottom: 1px solid var(--lp-line);
+  position: relative;
+  overflow: hidden;
+
+  /* The tag strip runs edge to edge under the CTA, so the hero drops its own
+     side padding and each child pays for its own gutter. */
+
+  padding: 96px 0 0;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 32px;
+}
+
+.lp-hero-grid {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(90deg, rgba(51, 51, 51, 0.7) 1px, transparent 0),
+    linear-gradient(180deg, rgba(51, 51, 51, 0.7) 1px, transparent 0);
+  background-size: 40px 40px;
+  background-position: 20px 20px;
+  -webkit-mask-image: linear-gradient(
+    104deg,
+    #d9d9d9,
+    rgba(217, 217, 217, 0) 52%,
+    #d9d9d9
+  );
+  mask-image: linear-gradient(
+    104deg,
+    #d9d9d9,
+    rgba(217, 217, 217, 0) 52%,
+    #d9d9d9
+  );
+}
+
+.lp-hero-glow {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(
+      ellipse 60% 50% at 74% 26%,
+      rgba(110, 231, 183, 0.11),
+      transparent 62%
+    ),
+    radial-gradient(
+      ellipse 80% 55% at 46% 96%,
+      rgba(110, 231, 183, 0.05),
+      transparent 70%
+    );
+}
+
+/* max-width carries the 56px gutters on top of the 780px measure, so the text
+   column stays the same width it was before the hero lost its padding. */
+
+.lp-hero-copy {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 22px;
+  margin: 0 auto;
+  padding: 0 56px;
+  text-align: center;
+  max-width: 892px;
+}
+
+.lp-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 13px;
+  border-radius: 999px;
+  background: rgba(110, 231, 183, 0.09);
+  border: 1px solid rgba(110, 231, 183, 0.32);
+  font-size: 13px;
+  color: var(--lp-accent);
+}
+
+.lp-badge-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--lp-accent);
+  box-shadow: 0 0 8px rgba(110, 231, 183, 0.8);
+}
+
+.lp-hero-title {
+  font-size: clamp(34px, 5.2vw, 60px);
+  line-height: 1.08;
+  font-weight: 500;
+  letter-spacing: -0.035em;
+}
+
+.lp-hero-title em {
+  font-style: normal;
+  color: var(--lp-accent);
+}
+
+.lp-hero-sub {
+  font-size: 17px;
+  line-height: 1.68;
+  color: var(--lp-muted);
+  max-width: 620px;
+}
+
+/* ---------- mascot ---------- */
+
+/* Three owners, three elements, and no two of them write the same property:
+   the rAF loop slides .lp-mascot-body along the track, the sprite carries the
+   facing flip, and the keyframes below drive the parts inside the artwork.
+   Put any two on one element and the JS and the animation fight. */
+
+.lp-mascot-track {
+  position: relative;
+  width: 100%;
+  pointer-events: none;
+  overflow: visible;
+}
+
+.lp-mascot-body {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  will-change: transform;
+}
+
+.lp-mascot-sprite {
+  display: block;
+  user-select: none;
+  -webkit-user-drag: none;
+  transition: filter 0.25s ease;
+
+  /* At the bottom of the swing the head passes a few units under the view
+     box. Letting it show is what makes the blow read as biting into the
+     surface instead of stopping politely short of it. */
+
+  overflow: visible;
+}
+
+.lp-mascot-sprite.is-left {
+  transform: scaleX(-1);
+}
+
+/* Only the three greens carry any hue, which is why hue-rotate over the whole
+   sprite recolours the character and leaves the hammer reading as metal. */
+
+.lp-mascot-sprite .m-skin {
+  fill: #6ee7b7;
+}
+
+.lp-mascot-sprite .m-edge {
+  fill: #58b992;
+}
+
+.lp-mascot-sprite .m-deep {
+  fill: #428b6e;
+}
+
+.lp-mascot-sprite .m-head {
+  fill: #fff;
+}
+
+.lp-mascot-sprite .m-wedge {
+  fill: #a3a3a3;
+}
+
+.lp-mascot-sprite .m-haft {
+  fill: #424242;
+}
+
+.lp-mascot-sprite .m-grip {
+  fill: #525252;
+}
+
+.lp-mascot-sprite .m-eye {
+  fill: #000;
+}
+
+/* view-box puts transform-origin in artwork units, so each pivot names a real
+   point on the character: the fist, the hips, the ground under the boots. */
+
+.lp-mascot-sprite g {
+  transform-box: view-box;
+}
+
+.lp-mascot-sprite .m-hammer {
+  transform-origin: 106px 158px;
+  will-change: transform;
+}
+
+.lp-mascot-sprite .m-core {
+  transform-origin: 150px 192px;
+  will-change: transform;
+}
+
+.lp-mascot-sprite .m-foot-l,
+.lp-mascot-sprite .m-foot-r {
+  will-change: transform;
+}
+
+/* Standing: 0deg is the artwork's own pose, hammer already up over the head,
+   so guard costs nothing. From there it winds a few degrees further back, then
+   drives clockwise — down across the front of the body, white face first, into
+   the ground on the character's right. Counter-clockwise would carry the head
+   behind the character and land it wedge-first, which is the wrong blow.
+   Each keyframe sets the easing for the segment after it, because one curve
+   cannot be both a lazy wind-up and a fast drop. The loop lands its hit on the
+   40% keyframe, and the pause at 88% is what gives the cycle its beat. */
+
+.lp-mascot-body.is-idle .m-hammer {
+  animation: lp-mascot-swing 1000ms infinite;
+}
+
+.lp-mascot-body.is-idle .m-core {
+  animation: lp-mascot-brace 1000ms infinite;
+}
+
+@keyframes lp-mascot-swing {
+  0% {
+    transform: rotate(0deg);
+    animation-timing-function: cubic-bezier(0.4, 0, 0.7, 0.3);
+  }
+  16% {
+    transform: rotate(-9deg);
+    animation-timing-function: cubic-bezier(0.7, 0, 0.85, 0.5);
+  }
+  40% {
+    transform: rotate(105deg);
+    animation-timing-function: cubic-bezier(0.2, 0, 0.2, 1);
+  }
+  47% {
+    transform: rotate(93deg);
+    animation-timing-function: ease-in-out;
+  }
+  55% {
+    transform: rotate(100deg);
+    animation-timing-function: cubic-bezier(0.45, 0, 0.2, 1);
+  }
+  88%,
+  100% {
+    transform: rotate(0deg);
+  }
+}
+
+/* The body throws its weight behind the blow and squats on impact. The boots
+   sit outside this group, so the squat compresses into them instead of
+   dragging them off the ground. */
+
+@keyframes lp-mascot-brace {
+  0% {
+    transform: translateY(0) rotate(0deg);
+  }
+  16% {
+    transform: translateY(-3px) rotate(-3deg);
+  }
+  40% {
+    transform: translateY(5px) rotate(5deg);
+  }
+  50% {
+    transform: translateY(2px) rotate(2.5deg);
+  }
+  88%,
+  100% {
+    transform: translateY(0) rotate(0deg);
+  }
+}
+
+/* Walking. One keyframe serves both boots; the second runs half a cycle out
+   of phase.
+
+   Amplitude is capped by the artwork, not by taste: the boots are 32 units wide
+   with 20 between them, so anything past ±7 walks one through the other. That
+   is far too short a step to cover 2.2 sprite heights a second, which means the
+   boots do slide — a front-facing pair of feet cannot do otherwise. Running the
+   stance half linear and backwards takes the edge off, and at this cadence the
+   eye reads a waddle rather than a skate. */
+
+.lp-mascot-body:not(.is-idle) .m-foot-l,
+.lp-mascot-body:not(.is-idle) .m-foot-r {
+  animation: lp-mascot-step 300ms linear infinite;
+}
+
+.lp-mascot-body:not(.is-idle) .m-foot-r {
+  animation-delay: -150ms;
+}
+
+.lp-mascot-body:not(.is-idle) .m-core {
+  animation: lp-mascot-bob 300ms ease-in-out infinite;
+}
+
+.lp-mascot-body:not(.is-idle) .m-hammer {
+  animation: lp-mascot-carry 600ms ease-in-out infinite;
+}
+
+@keyframes lp-mascot-step {
+  0% {
+    transform: translate(7px, 0);
+    animation-timing-function: linear;
+  }
+  44% {
+    transform: translate(-7px, 0);
+    animation-timing-function: cubic-bezier(0.3, 0, 0.4, 1);
+  }
+  62% {
+    transform: translate(-2px, -12px);
+    animation-timing-function: cubic-bezier(0.5, 0, 0.6, 1);
+  }
+  84% {
+    transform: translate(6px, -5px);
+    animation-timing-function: ease-in;
+  }
+  100% {
+    transform: translate(7px, 0);
+  }
+}
+
+/* Highest at mid-step, balanced on one boot; lowest at each footfall, when
+   both are down. Two bobs per cycle, and a lean into the direction of travel
+   that mirrors for free with the sprite. */
+
+@keyframes lp-mascot-bob {
+  0%,
+  50%,
+  100% {
+    transform: translateY(0) rotate(2deg);
+  }
+  25%,
+  75% {
+    transform: translateY(-5px) rotate(2deg);
+  }
+}
+
+/* Carried, not swung: a slow sway across two steps so it never syncs up with
+   the legs and turns mechanical. */
+
+@keyframes lp-mascot-carry {
+  0%,
+  100% {
+    transform: rotate(-6deg);
+  }
+  50% {
+    transform: rotate(5deg);
+  }
+}
+
+/* ---------- stats ---------- */
+
+.lp-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+
+.lp-stat {
+  padding: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: var(--lp-surface-hi);
+  border: 1px solid var(--lp-line);
+  border-radius: var(--lp-radius);
+}
+
+.lp-stat-value {
+  font-size: 28px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+
+.lp-stat-label {
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--lp-muted);
+}
+
+/* ---------- feature cards ---------- */
+
+.lp-cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+
+@media (max-width: 768px) {
+  .lp-cards {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 520px) {
+  .lp-cards {
+    grid-template-columns: 1fr;
+  }
+}
+
+.lp-card {
+  position: relative;
+  padding: 26px;
+  background: var(--lp-surface);
+  border: 1px solid var(--lp-line);
+  border-radius: var(--lp-radius);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow: hidden;
+  transition:
+    border-color 200ms var(--lp-ease),
+    background 200ms var(--lp-ease),
+    transform 200ms var(--lp-ease);
+}
+
+.lp-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  background: radial-gradient(
+    380px circle at var(--lp-mx, 50%) var(--lp-my, 0%),
+    rgba(110, 231, 183, 0.09),
+    transparent 70%
+  );
+  transition: opacity 240ms var(--lp-ease);
+}
+
+.lp-card:hover {
+  border-color: rgba(110, 231, 183, 0.34);
+  background: var(--lp-surface-hi);
+  transform: translateY(-2px);
+}
+
+.lp-card:hover::after {
+  opacity: 1;
+}
+
+.lp-card-icon {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--lp-radius);
+  background: rgba(110, 231, 183, 0.11);
+  border: 1px solid rgba(110, 231, 183, 0.24);
+  color: var(--lp-accent);
+}
+
+.lp-card h3 {
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.lp-card p {
+  font-size: 14px;
+  line-height: 1.65;
+  color: var(--lp-muted);
+}
+
+/* ---------- split (chart) ---------- */
+
+.lp-split {
+  display: grid;
+  grid-template-columns: 0.85fr 1.15fr;
+  gap: 48px;
+  align-items: center;
+}
+
+.lp-chart {
+  margin: 0;
+  padding: 22px;
+  background: var(--lp-surface-hi);
+  border: 1px solid var(--lp-line);
+  border-radius: var(--lp-radius);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.lp-chart-svg {
+  width: 100%;
+  height: auto;
+  display: block;
+  overflow: visible;
+}
+
+.lp-chart-grid {
+  stroke: var(--lp-line);
+  stroke-width: 1;
+}
+
+.lp-chart-tick,
+.lp-chart-label {
+  font-family: "JetBrains Mono Variable", ui-monospace, monospace;
+  font-size: 11px;
+  fill: var(--lp-dim);
+}
+
+.lp-chart-label {
+  font-size: 12px;
+  fill: var(--lp-muted);
+}
+
+.lp-chart-rail {
+  fill: rgba(15, 23, 42, 0.045);
+}
+
+.lp-chart-bar {
+  transform: scaleX(0);
+  transform-origin: left center;
+  transform-box: fill-box;
+  transition: transform 900ms var(--lp-ease);
+}
+
+.lp-chart-value {
+  font-family: "JetBrains Mono Variable", ui-monospace, monospace;
+  font-size: 12px;
+  font-weight: 600;
+  fill: #04140d;
+  opacity: 0;
+  transition: opacity 300ms ease;
+}
+
+.lp-chart-svg.is-active .lp-chart-bar {
+  transform: scaleX(1);
+}
+
+.lp-chart-svg.is-active .lp-chart-value {
+  opacity: 1;
+}
+
+.lp-chart-caption {
+  font-family: "JetBrains Mono Variable", ui-monospace, monospace;
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  color: var(--lp-dim);
+}
+
+/* ---------- steps ---------- */
+
+.lp-steps {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+  counter-reset: lp-step;
+}
+
+.lp-step {
+  position: relative;
+  padding: 24px 22px;
+  border: 1px solid var(--lp-line);
+  border-radius: var(--lp-radius);
+  background: var(--lp-surface);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.lp-step::before {
+  counter-increment: lp-step;
+  content: counter(lp-step, decimal-leading-zero);
+  font-family: "JetBrains Mono Variable", ui-monospace, monospace;
+  font-size: 12px;
+  color: var(--lp-accent);
+  letter-spacing: 0.08em;
+}
+
+.lp-step h3 {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.lp-step p {
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--lp-muted);
+}
+
+/* ---------- closing cta ---------- */
+
+/* The wrapper zeroes its padding so this grid runs edge to edge, which means
+   every child below pays for its own gutter. */
+
+.lp-close {
+  position: relative;
+  overflow: hidden;
+  padding: 88px 0;
+}
+
+.lp-close-grid {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(90deg, rgba(51, 51, 51, 0.7) 1px, transparent 0),
+    linear-gradient(180deg, rgba(51, 51, 51, 0.7) 1px, transparent 0);
+  background-size: 40px 40px;
+  background-position: 20px 20px;
+}
+
+.lp-close-body {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 30px;
+  padding: 0 56px;
+}
+
+.lp-close-head {
+  align-items: center;
+  text-align: center;
+}
+
+.lp-close-buttons {
+  display: flex;
+  gap: 12px;
+}
+
+.lp-close-buttons .lp-btn {
+  padding: 13px 26px;
+  font-size: 16px;
+  text-decoration: none;
+}
+
+/* ---------- footer ---------- */
+
+.lp-footer {
+  display: flex;
+  justify-content: center;
+  padding: 0 24px;
+}
+
+.lp-footer-inner {
+  width: 100%;
+  max-width: var(--lp-shell);
+  padding: 32px 56px;
+  border-left: 1px solid var(--lp-line);
+  border-right: 1px solid var(--lp-line);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.lp-footer-inner p {
+  font-size: 13px;
+  color: var(--lp-dim);
+}
+
+/* ---------- reveal ---------- */
+
+.lp-reveal {
+  opacity: 0;
+  transform: translate3d(0, 18px, 0);
+  transition:
+    opacity 620ms var(--lp-ease),
+    transform 620ms var(--lp-ease);
+}
+
+.lp-reveal.is-visible {
+  opacity: 1;
+  transform: translate3d(0, 0, 0);
+}
+
+@keyframes lp-fade-up {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 8px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+/* ---------- responsive ---------- */
+
+@media (max-width: 1024px) {
+  .lp-split {
+    grid-template-columns: 1fr;
+    gap: 32px;
+  }
+
+  .lp-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .lp-nav {
+    display: none;
+  }
+
+  .lp-section-inner,
+  .lp-footer-inner {
+    padding-left: 24px;
+    padding-right: 24px;
+  }
+
+  .lp-section-inner {
+    padding-top: 64px;
+    padding-bottom: 64px;
+    gap: 36px;
+  }
+
+  .lp-hero-inner {
+    padding: 64px 0 0;
+  }
+
+  .lp-hero-copy {
+    padding: 0 24px;
+  }
+
+  .lp-close {
+    padding: 64px 0;
+  }
+
+  .lp-close-body {
+    padding: 0 24px;
+  }
+
+  .lp-close-buttons {
+    flex-direction: column;
+    width: 100%;
+  }
+}
+
+@media (max-width: 520px) {
+  .lp-stats {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ---------- reduced motion ---------- */
+
+@media (prefers-reduced-motion: reduce) {
+  .fitcv-landing *,
+  .fitcv-landing *::before,
+  .fitcv-landing *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+
+  .lp-reveal {
+    opacity: 1;
+    transform: none;
+  }
+
+  .lp-chart-bar {
+    transform: scaleX(1);
+  }
+
+  .lp-chart-value {
+    opacity: 1;
+  }
+}

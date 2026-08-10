@@ -1,10 +1,145 @@
+import re
 from datetime import datetime
 
 from sqlalchemy import or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.models.improvement import AiTask, AiTaskStatus
+from app.models.improvement import (
+    AiTask,
+    AiTaskAttemptHistory,
+    AiTaskAttemptOutcome,
+    AiTaskStatus,
+)
+
+
+_REDACTED = "[redacted]"
+_ERROR_FALLBACK = "AI task attempt failed."
+_SENSITIVE_KEY = (
+    r"(?:api[_-]?key|key|access[_-]?token|refresh[_-]?token|id[_-]?token|token|"
+    r"client[_-]?secret|secret|password|passwd|pwd|authorization|auth|signature|sig)"
+)
+_PII_KEY = (
+    r"(?:e-?mail|full[_-]?name|candidate[_-]?name|name|phone|mobile|telephone|tel|"
+    r"address|ssn)"
+)
+_PRIVATE_KEY = rf"(?:{_SENSITIVE_KEY}|{_PII_KEY})"
+_DATABASE_URL_PATTERN = re.compile(
+    r"(?i)\b(?:postgres(?:ql)?|mysql(?:\+[a-z0-9_]+)?|mariadb(?:\+[a-z0-9_]+)?|"
+    r"mongodb(?:\+srv)?|redis(?:\+[a-z0-9_]+)?|rediss|mssql(?:\+[a-z0-9_]+)?|"
+    r"oracle(?:\+[a-z0-9_]+)?|sqlite(?:\+[a-z0-9_]+)?|cockroachdb(?:\+[a-z0-9_]+)?)"
+    r"://[^\s,;]+"
+)
+_CREDENTIAL_URL_PATTERN = re.compile(
+    r"(?i)\b[a-z][a-z0-9+.-]*://[^/\s:@]+:[^@\s/]+@[^\s,;]+"
+)
+_AUTHORIZATION_PATTERN = re.compile(
+    r"(?i)\b(?P<prefix>authorization\s*[:=]\s*)?"
+    r"(?P<scheme>bearer|basic)\s+"
+    r"(?P<credential>[a-z0-9._~+/=:-]+)"
+)
+_URL_QUERY_SECRET_PATTERN = re.compile(
+    r"(?i)(?P<prefix>[?&]"
+    + _SENSITIVE_KEY
+    + r"\s*=\s*)(?P<value>[^&#\s]*)"
+)
+_LABELED_QUOTED_VALUE_PATTERN = re.compile(
+    r"(?is)(?P<prefix>(?<![\w-])[\"']?"
+    + _PRIVATE_KEY
+    + r"[\"']?(?![\w-])\s*[:=]\s*)"
+    r"(?P<quote>[\"'])(?:\\.|(?!(?P=quote)).)*(?P=quote)"
+)
+_LABELED_UNQUOTED_VALUE_PATTERN = re.compile(
+    r"(?i)(?P<prefix>(?<![\w-])[\"']?"
+    + _PRIVATE_KEY
+    + r"[\"']?(?![\w-])\s*[:=])"
+    r"(?!\s*(?:[\"']|\[redacted\]|(?:bearer|basic)\s+\[redacted\]))"
+    r"(?P<spacing>\s*)(?P<value>[^,;\r\n&}\]]+)"
+)
+_EMAIL_PATTERN = re.compile(
+    r"(?i)(?<![\w.+-])[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@"
+    r"(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}(?![\w.-])"
+)
+_SSN_PATTERN = re.compile(r"(?<!\d)\d{3}-\d{2}-\d{4}(?!\d)")
+_RESIDUAL_PRIVATE_VALUE_PATTERN = re.compile(
+    r"(?i)(?<![\w-])[\"']?"
+    + _PRIVATE_KEY
+    + r"[\"']?(?![\w-])\s*[:=]"
+    r"(?!\s*(?:[\"']?\[redacted\][\"']?|(?:bearer|basic)\s+\[redacted\]))"
+)
+
+
+def _sanitize_attempt_error(error_message: str) -> str:
+    if not isinstance(error_message, str):
+        return _ERROR_FALLBACK
+    try:
+        sanitized = _DATABASE_URL_PATTERN.sub(_REDACTED, error_message)
+        sanitized = _CREDENTIAL_URL_PATTERN.sub(_REDACTED, sanitized)
+        sanitized = _AUTHORIZATION_PATTERN.sub(
+            lambda match: (
+                f"{match.group('prefix') or ''}"
+                f"{match.group('scheme').title()} {_REDACTED}"
+            ),
+            sanitized,
+        )
+        sanitized = _URL_QUERY_SECRET_PATTERN.sub(
+            lambda match: f"{match.group('prefix')}{_REDACTED}",
+            sanitized,
+        )
+        sanitized = _LABELED_QUOTED_VALUE_PATTERN.sub(
+            lambda match: (
+                f"{match.group('prefix')}{match.group('quote')}"
+                f"{_REDACTED}{match.group('quote')}"
+            ),
+            sanitized,
+        )
+        sanitized = _LABELED_UNQUOTED_VALUE_PATTERN.sub(
+            lambda match: (
+                f"{match.group('prefix')}{match.group('spacing')}{_REDACTED}"
+            ),
+            sanitized,
+        )
+        sanitized = _EMAIL_PATTERN.sub(_REDACTED, sanitized)
+        sanitized = _SSN_PATTERN.sub(_REDACTED, sanitized)
+        sanitized = " ".join(sanitized.split())
+        if not sanitized:
+            return _ERROR_FALLBACK
+        if any(
+            pattern.search(sanitized)
+            for pattern in (
+                _DATABASE_URL_PATTERN,
+                _CREDENTIAL_URL_PATTERN,
+                _AUTHORIZATION_PATTERN,
+                _EMAIL_PATTERN,
+                _SSN_PATTERN,
+                _RESIDUAL_PRIVATE_VALUE_PATTERN,
+            )
+        ):
+            return _ERROR_FALLBACK
+        return sanitized[:1000]
+    except (IndexError, re.error, TypeError, ValueError):
+        return _ERROR_FALLBACK
+
+
+def _append_attempt_history(
+    db: Session,
+    *,
+    task: AiTask,
+    outcome: AiTaskAttemptOutcome,
+    error_message: str,
+    failed_at: datetime,
+) -> str:
+    sanitized_error = _sanitize_attempt_error(error_message)
+    db.add(
+        AiTaskAttemptHistory(
+            ai_task_id=task.ai_task_id,
+            attempt_number=task.attempt_count,
+            outcome=outcome,
+            error_message=sanitized_error,
+            failed_at=failed_at,
+        )
+    )
+    return sanitized_error
 
 
 def create(
@@ -69,6 +204,20 @@ def get_visible(
             AiTask.ai_task_id == task_id,
             or_(*visibility),
         )
+    )
+
+
+def get_latest_for_resource(
+    db: Session, *, task_type: str, resource_id: int
+) -> AiTask | None:
+    return db.scalar(
+        select(AiTask)
+        .where(
+            AiTask.task_type == task_type,
+            AiTask.resource_id == resource_id,
+        )
+        .order_by(AiTask.ai_task_id.desc())
+        .limit(1)
     )
 
 
@@ -154,10 +303,22 @@ def fail_or_retry(
     if task is None:
         db.rollback()
         return None
-    task.error_message = error_message[:1000]
+    will_retry = task.attempt_count < task.max_attempts
+    sanitized_error = _append_attempt_history(
+        db,
+        task=task,
+        outcome=(
+            AiTaskAttemptOutcome.retry_scheduled
+            if will_retry
+            else AiTaskAttemptOutcome.terminal_failure
+        ),
+        error_message=error_message,
+        failed_at=now,
+    )
+    task.error_message = sanitized_error
     task.locked_by = None
     task.heartbeat_at = now
-    if task.attempt_count < task.max_attempts:
+    if will_retry:
         task.status = AiTaskStatus.pending
         task.available_at = available_at
         task.started_at = None
@@ -184,8 +345,16 @@ def recover_stale(db: Session, *, stale_before: datetime, now: datetime) -> int:
         )
     )
     for task in tasks:
+        recovery_message = "Task lease expired and was recovered."
+        sanitized_error = _append_attempt_history(
+            db,
+            task=task,
+            outcome=AiTaskAttemptOutcome.stale_recovery,
+            error_message=recovery_message,
+            failed_at=now,
+        )
         task.locked_by = None
-        task.error_message = "Task lease expired and was recovered."
+        task.error_message = sanitized_error
         if task.attempt_count < task.max_attempts:
             task.status = AiTaskStatus.pending
             task.available_at = now

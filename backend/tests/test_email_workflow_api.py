@@ -524,17 +524,23 @@ class EmailWorkflowApiIntegrationTests(unittest.TestCase):
 
         failed = self.db.get(CandidateEmail, draft["email_id"])
         assert failed is not None
-        failed.updated_at = (
+        failed.last_attempt_at = (
             datetime.now(timezone.utc).replace(tzinfo=None)
             - timedelta(hours=24, seconds=1)
         )
+        failed.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
         self.db.commit()
 
-        expired_retry = self.client.post(
-            f"/api/hr/emails/drafts/{draft['email_id']}/send"
-        )
+        with patch(
+            "app.services.email_workflow_service.send_candidate_email",
+            return_value="unexpected-provider-call",
+        ) as sender:
+            expired_retry = self.client.post(
+                f"/api/hr/emails/drafts/{draft['email_id']}/send"
+            )
         self.assertEqual(expired_retry.status_code, 409)
         self.assertIn("24-hour idempotency window", expired_retry.json()["detail"])
+        sender.assert_not_called()
 
         reopened = self.client.post(
             f"/api/hr/emails/drafts/{draft['email_id']}/reopen"

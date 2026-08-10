@@ -39,7 +39,7 @@ async def upload_cv(
     db: Session = Depends(get_db),
 ) -> CvVersionResponse:
     response = await analyzer_service.upload_cv(db, file=file, account=account)
-    ai_task_service.enqueue(
+    task = ai_task_service.enqueue(
         db,
         task_type="CvParse",
         resource_id=response.cv_id,
@@ -48,7 +48,7 @@ async def upload_cv(
     )
     if ai_task_service.should_eager_execute():
         background_tasks.add_task(analyzer_service.run_cv_parse, response.cv_id)
-    return response
+    return response.model_copy(update={"ai_task_id": task.ai_task_id})
 
 
 @router.get("/cvs", response_model=list[CvVersionResponse])
@@ -89,6 +89,43 @@ def get_cv(
     db: Session = Depends(get_db),
 ) -> CvVersionResponse:
     return analyzer_service.get_cv(db, cv_id=cv_id, account=account)
+
+
+@router.post(
+    "/cvs/{cv_id}/retry-parse",
+    response_model=CvVersionResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+def retry_cv_parse(
+    cv_id: int,
+    background_tasks: BackgroundTasks,
+    account: Account = Depends(get_current_account),
+    db: Session = Depends(get_db),
+) -> CvVersionResponse:
+    current = analyzer_service.get_cv(db, cv_id=cv_id, account=account)
+    active_task = ai_task_service.get_active_for_resource(
+        db, task_type="CvParse", resource_id=cv_id
+    )
+    response = analyzer_service.prepare_cv_parse_retry(
+        db, cv_id=cv_id, account=account
+    )
+    if active_task is not None and current.parse_status in {"Pending", "Processing"}:
+        return response.model_copy(update={"ai_task_id": active_task.ai_task_id})
+
+    previous_task = ai_task_service.get_latest_for_resource(
+        db, task_type="CvParse", resource_id=cv_id
+    )
+    retry_generation = previous_task.ai_task_id if previous_task is not None else 0
+    task = ai_task_service.enqueue(
+        db,
+        task_type="CvParse",
+        resource_id=cv_id,
+        account=account,
+        idempotency_key=f"cv-parse:{cv_id}:retry:{retry_generation}",
+    )
+    if ai_task_service.should_eager_execute():
+        background_tasks.add_task(analyzer_service.run_cv_parse, cv_id)
+    return response.model_copy(update={"ai_task_id": task.ai_task_id})
 
 
 @router.delete("/cvs/{cv_id}", status_code=status.HTTP_204_NO_CONTENT)

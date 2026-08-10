@@ -105,6 +105,7 @@ cd backend
 Tạo hoặc cập nhật `backend/.env`:
 
 ```env
+ENVIRONMENT=dev
 DATABASE_URL=mysql+pymysql://<db_user>:<url_encoded_password>@<db_host>:3306/fitcv
 JWT_SECRET_KEY=<local-secret>
 ACCESS_TOKEN_EXPIRE_MINUTES=15
@@ -146,8 +147,10 @@ http://127.0.0.1:8000/api/health
 Khi deploy backend lên Render, vào Render service > Environment và thêm các biến:
 
 ```env
+ENVIRONMENT=prod
 DATABASE_URL=mysql+pymysql://<db_user>:<url_encoded_password>@<db_host>:3306/fitcv
-JWT_SECRET_KEY=<strong-secret>
+# Generate a unique random value with at least 32 characters; this short placeholder is rejected.
+JWT_SECRET_KEY=<replace-me>
 ACCESS_TOKEN_EXPIRE_MINUTES=15
 REFRESH_TOKEN_EXPIRE_DAYS=30
 REFRESH_COOKIE_SECURE=true
@@ -194,17 +197,30 @@ Nếu tạo database mới:
 
 ### Platform Hardening: Screening, AI Queue, Auth Session
 
-Database hiện hữu phải backup rồi chạy migration sau đúng một lần trước khi
-deploy phiên bản backend này:
+Database MySQL hiện hữu phải backup rồi chạy tuần tự các migration sau trước khi
+deploy phiên bản backend dùng lịch sử lần thử của AI queue:
 
 ```text
 database/migrations/010_add_platform_hardening.sql
+database/migrations/013_add_ai_task_attempt_history.sql
 ```
 
 Migration thêm `hr_screening_batch`, `hr_screening_candidate`, `auth_session`,
-`auth_rate_limit` và mở rộng `ai_task` thành hàng đợi bền vững. Database mới tạo
-từ `database/full_schema.sql` đã có sẵn các bảng/cột này nên không chạy lại
-migration `010`.
+`auth_rate_limit` và mở rộng `ai_task` thành hàng đợi bền vững. Migration 013 phải
+chạy sau migration 010 vì nó tạo `ai_task_attempt_history` tham chiếu đến `ai_task`.
+Không deploy code đọc hoặc ghi lịch sử lần thử trước khi migration 013 hoàn tất;
+nếu thiếu bảng này, AI worker và API phụ thuộc lịch sử có thể lỗi khi runtime.
+Database mới tạo từ `database/full_schema.sql` đã có sẵn các bảng/cột này nên
+không chạy lại migration `010` hoặc `013`.
+
+Nếu cần rollback migration 013, rollback code phụ thuộc lịch sử trước rồi mới chạy:
+
+```text
+database/migrations/013_rollback_ai_task_attempt_history.sql
+```
+
+Rollback 013 xóa vĩnh viễn toàn bộ lịch sử lỗi theo từng lần thử trong
+`ai_task_attempt_history`; chỉ có thể khôi phục dữ liệu này từ bản backup.
 
 Mặc định API chạy một worker nền trong cùng process (`AI_WORKER_ENABLED=true`).
 Có thể tách worker thành Render Background Worker bằng lệnh sau và đặt
@@ -225,10 +241,13 @@ AI_WORKER_HEARTBEAT_SECONDS=30
 AI_TASK_MAX_ATTEMPTS=3
 ```
 
-Local dùng `REFRESH_COOKIE_SECURE=false`. Render dùng
-`REFRESH_COOKIE_SECURE=true`; backend khi đó đặt cookie `SameSite=None; Secure`
-để frontend Vercel gọi `/api/auth/refresh` với `credentials: include`. Domain
-Vercel chính xác vẫn phải có trong `CORS_ORIGINS`.
+Local dùng `ENVIRONMENT=dev` và `REFRESH_COOKIE_SECURE=false`. Render dùng
+`ENVIRONMENT=prod`, `REFRESH_COOKIE_SECURE=true`, cùng `JWT_SECRET_KEY` ngẫu
+nhiên dài tối thiểu 32 ký tự. Backend sẽ dừng ngay khi khởi động nếu cấu hình
+production không đáp ứng các điều kiện này. Cookie khi đó dùng
+`SameSite=None; Secure` để frontend Vercel gọi `/api/auth/refresh` với
+`credentials: include`. Domain Vercel chính xác vẫn phải có trong
+`CORS_ORIGINS`.
 
 ### Job Post Archiving And Scoring Schema
 
@@ -510,11 +529,15 @@ Flow hiện tại dùng mã xác minh 6 số:
 5. Nếu mã đúng và chưa hết hạn, UI mới hiện Set new password.
 6. Reset thành công thì backend xóa mã khỏi DB.
 
-Nếu chưa cấu hình email provider, backend in mã trong terminal:
+Trong `ENVIRONMENT=dev`, nếu chưa cấu hình email provider, backend ghi mã vào
+terminal ở mức warning để hỗ trợ kiểm thử local:
 
 ```text
 PASSWORD_RESET_CODE for user@example.com: 123456
 ```
+
+Trong `ENVIRONMENT=prod`, backend yêu cầu cấu hình Resend và từ chối yêu cầu
+trước khi tra cứu account hoặc tạo reset token nếu cấu hình gửi mail bị thiếu.
 
 Nếu muốn gửi email thật bằng Resend:
 
@@ -886,7 +909,8 @@ Reset code đúng nhưng verify lỗi:
 
 - Restart backend sau khi pull code mới.
 - Bấm gửi mã mới.
-- Kiểm tra terminal backend có `PASSWORD_RESET_CODE`.
+- Với `ENVIRONMENT=dev`, kiểm tra terminal backend có warning `PASSWORD_RESET_CODE`.
+- Với `ENVIRONMENT=prod`, kiểm tra `RESEND_API_KEY` và `RESEND_FROM_EMAIL`; backend không ghi reset code vào log.
 - Mã hết hạn theo `RESET_TOKEN_EXPIRE_MINUTES` / `reset_token_expire_minutes`.
 
 Backend không connect DB:

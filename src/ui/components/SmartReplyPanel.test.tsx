@@ -38,6 +38,8 @@ const summary: EmailThreadSummary = {
 
   candidate_email: "minh@example.com",
 
+  recipient_email_valid: true,
+
   job_title: "Backend Engineer",
 
   current_stage: "Interview",
@@ -129,6 +131,8 @@ const draft: CandidateEmailDraft = {
   job_title: "Backend Engineer",
 
   recipient_email: "minh@example.com",
+
+  recipient_email_valid: true,
 
   reply_to_email: "reply+token@inbound.example.com",
 
@@ -242,6 +246,29 @@ describe("SmartReplyPanel", () => {
 
       expect(mocks.send).toHaveBeenCalledWith(9)
     })
+  })
+
+  it("warns when the selected thread recipient email is invalid", async () => {
+    const invalidSummary = {
+      ...summary,
+      candidate_email: "legacy-address",
+      recipient_email_valid: false,
+    }
+    const invalidDetail = {
+      ...detail,
+      candidate_email: "legacy-address",
+      recipient_email_valid: false,
+    }
+    mocks.listThreads.mockResolvedValue([invalidSummary])
+    mocks.getThread.mockResolvedValue(invalidDetail)
+
+    render(<SmartReplyPanel />)
+
+    expect(
+      await screen.findByText(
+        "Candidate email address is missing or invalid. Update it before sending.",
+      ),
+    ).toBeInTheDocument()
   })
 
   it("generates one shared batch for two inbound conversations", async () => {

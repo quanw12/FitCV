@@ -26,31 +26,43 @@ export const emailWorkflowApi = {
 
       { authenticated: true },
     ),
-  listAudience: (stage: EmailStage, jobId?: number) => {
+
+  listAudience: (stage: EmailStage, jobId?: number, templateKey?: string) => {
     const params = new URLSearchParams({ stage })
+
     if (jobId != null) params.set("job_id", String(jobId))
+    if (templateKey) params.set("template_key", templateKey)
+
     return requestJson<EmailAudienceResponse>(
       `/api/hr/emails/audience?${params.toString()}`,
+
       { authenticated: true },
     )
   },
+
   createCampaign: (payload: {
     application_ids: number[]
     template_key: string
     guidance?: string
     interview_lead_days?: number
+
     interview_window?: string
     allow_resend?: boolean
   }) =>
     requestJson<CampaignPreview>("/api/hr/emails/campaigns", {
       authenticated: true,
+
       method: "POST",
+
       body: JSON.stringify({
         ...payload,
+
         guidance: payload.guidance?.trim() || null,
+
         interview_window: payload.interview_window?.trim() || null,
       }),
     }),
+
   generate: (applicationId: number, templateKey: string, guidance?: string) =>
     requestJson<CandidateEmailDraft>("/api/hr/emails/drafts/generate", {
       authenticated: true,
@@ -59,7 +71,9 @@ export const emailWorkflowApi = {
 
       body: JSON.stringify({
         application_id: applicationId,
+
         template_key: templateKey,
+
         guidance: guidance?.trim() || null,
       }),
     }),
@@ -134,8 +148,11 @@ export const emailWorkflowApi = {
 
   generateSmartReply: (
     threadId: number,
+
     tone: SmartReplyTone,
+
     intent: SmartReplyIntent,
+
     guidance?: string,
   ) =>
     requestJson<CandidateEmailDraft>(
@@ -148,28 +165,42 @@ export const emailWorkflowApi = {
 
         body: JSON.stringify({
           tone,
+
           intent,
+
           guidance: guidance?.trim() || null,
         }),
       },
     ),
+
   generateSmartReplyBatch: (
     threadIds: number[],
+
     tone: SmartReplyTone,
+
     intent: SmartReplyIntent,
+
     guidance?: string,
+
     interviewLeadDays = 3,
   ) =>
     requestJson<SmartReplyBatchResult>(
       "/api/hr/emails/threads/smart-reply/batch",
+
       {
         authenticated: true,
+
         method: "POST",
+
         body: JSON.stringify({
           thread_ids: threadIds,
+
           tone,
+
           intent,
+
           guidance: guidance?.trim() || null,
+
           interview_lead_days: interviewLeadDays,
         }),
       },
