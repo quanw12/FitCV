@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           # Full history so `openwiki code --update` can diff HEAD against the
           # commit it last documented; a shallow clone hides that commit and the
@@ -22,7 +22,7 @@ jobs:
           fetch-depth: 0
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: "22"
 
@@ -38,7 +38,7 @@ jobs:
           OPENWIKI_MODEL_ID: nvidia/nemotron-3-super-120b-a12b
 
       - name: Create OpenWiki update pull request
-        uses: peter-evans/create-pull-request@v7
+        uses: peter-evans/create-pull-request@v8
         with:
           add-paths: |
             openwiki
