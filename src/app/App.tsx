@@ -87,7 +87,7 @@ export default function App() {
     authApi.getSession(),
   )
 
-  const [authReady, setAuthReady] = useState(() => Boolean(authApi.getSession()))
+  const [authReady, setAuthReady] = useState(true)
 
   const [screen, setScreen] = useState<ScreenId | "">(() => {
     const currentSession = authApi.getSession()
