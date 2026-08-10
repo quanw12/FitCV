@@ -20,6 +20,14 @@ import BezelCard from "../components/BezelCard"
 
 const MAX_CV_BYTES = 10 * 1024 * 1024
 
+// The worker processes parse and match tasks serially. Keep polling long enough
+// for a queued Gemini parse to finish instead of showing a false retry failure.
+const ANALYZER_POLL_INTERVAL_MS = 2_000
+const ANALYZER_POLL_TIMEOUT_MS = 20 * 60 * 1_000
+const ANALYZER_POLL_ATTEMPTS = Math.ceil(
+  ANALYZER_POLL_TIMEOUT_MS / ANALYZER_POLL_INTERVAL_MS,
+)
+
 const breakdownLabels = {
   skills: "Skills Match",
 
@@ -959,7 +967,7 @@ export default function AnalyzerScreen({
 }
 
 async function waitForCv(cvId: number, signal: AbortSignal) {
-  for (let attempt = 0; attempt < 60; attempt += 1) {
+  for (let attempt = 0; attempt < ANALYZER_POLL_ATTEMPTS; attempt += 1) {
     throwIfAborted(signal)
 
     const cv = await analyzerApi.getCv(cvId, signal)
@@ -969,7 +977,7 @@ async function waitForCv(cvId: number, signal: AbortSignal) {
     if (cv.parseStatus === "Failed")
       throw new Error(cv.errorMessage ?? "CV parsing failed.")
 
-    await delay(500, signal)
+    await delay(ANALYZER_POLL_INTERVAL_MS, signal)
   }
 
   throw new Error(
@@ -978,7 +986,7 @@ async function waitForCv(cvId: number, signal: AbortSignal) {
 }
 
 async function waitForMatch(matchResultId: string, signal: AbortSignal) {
-  for (let attempt = 0; attempt < 60; attempt += 1) {
+  for (let attempt = 0; attempt < ANALYZER_POLL_ATTEMPTS; attempt += 1) {
     throwIfAborted(signal)
 
     const match = await analyzerApi.getMatchResult(matchResultId, signal)
@@ -988,7 +996,7 @@ async function waitForMatch(matchResultId: string, signal: AbortSignal) {
     if (match.status === "Failed")
       throw new Error(match.errorMessage ?? "CV/JD matching failed.")
 
-    await delay(500, signal)
+    await delay(ANALYZER_POLL_INTERVAL_MS, signal)
   }
 
   throw new Error(

@@ -794,8 +794,10 @@ def extract_cv_inputs_from_file(
         "generationConfig": {
             "responseMimeType": "application/json",
             "responseJsonSchema": CV_RESPONSE_JSON_SCHEMA,
-            "maxOutputTokens": 8_000,
-            "thinkingConfig": {"thinkingLevel": settings.gemini_thinking_level},
+            "maxOutputTokens": settings.gemini_structured_output_tokens,
+            "thinkingConfig": {
+                "thinkingLevel": settings.gemini_structured_thinking_level
+            },
         },
     }
     url = f"{GEMINI_API_BASE_URL}/{quote(model, safe='')}:generateContent"
@@ -879,8 +881,10 @@ def extract_match_inputs(
         "generationConfig": {
             "responseMimeType": "application/json",
             "responseJsonSchema": ANALYZER_RESPONSE_JSON_SCHEMA,
-            "maxOutputTokens": 8_000,
-            "thinkingConfig": {"thinkingLevel": settings.gemini_thinking_level},
+            "maxOutputTokens": settings.gemini_structured_output_tokens,
+            "thinkingConfig": {
+                "thinkingLevel": settings.gemini_structured_thinking_level
+            },
         },
     }
     url = f"{GEMINI_API_BASE_URL}/{quote(model, safe='')}:generateContent"
@@ -1058,8 +1062,10 @@ def _audit_cv_skill_coverage(
         "generationConfig": {
             "responseMimeType": "application/json",
             "responseJsonSchema": CV_COVERAGE_RESPONSE_JSON_SCHEMA,
-            "maxOutputTokens": 8_000,
-            "thinkingConfig": {"thinkingLevel": settings.gemini_thinking_level},
+            "maxOutputTokens": settings.gemini_structured_output_tokens,
+            "thinkingConfig": {
+                "thinkingLevel": settings.gemini_structured_thinking_level
+            },
         },
     }
     url = f"{GEMINI_API_BASE_URL}/{quote(model, safe='')}:generateContent"
