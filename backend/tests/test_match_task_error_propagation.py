@@ -5,7 +5,11 @@ import pytest
 from app.models.analyzer import MatchResult
 from app.models.improvement import AiTask
 from app.services import ai_worker
-from app.services.analyzer_service import MatchTaskError, run_match_task
+from app.services.analyzer_service import (
+    MatchTaskError,
+    _safe_match_error_message,
+    run_match_task,
+)
 from app.services.gemini_analyzer import GeminiAnalyzerError
 
 
@@ -89,6 +93,15 @@ def test_match_task_keeps_boolean_failure_for_direct_callers() -> None:
         db, match, "Required CV/JD matching data was not found."
     )
     db.close.assert_called_once_with()
+
+
+def test_match_task_maps_missing_gemini_model_to_configuration_error() -> None:
+    error = GeminiAnalyzerError("Gemini request failed with 404: model not found")
+
+    assert (
+        _safe_match_error_message(error)
+        == "The matching provider is not configured correctly."
+    )
 
 
 def test_match_dispatch_propagates_typed_safe_error_to_queue_worker() -> None:
