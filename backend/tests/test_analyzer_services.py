@@ -19,7 +19,7 @@ from app.main import app
 from app.models.account import Account, AuthProvider
 from app.models.analyzer import Cv, CvParseResult, JdParseResult, Job, JobDescription, MatchResult
 from app.models.improvement import AiTask
-from app.repositories import analyzer
+from app.repositories import ai_tasks, analyzer
 from app.services.document_parser import (
     PARSER_VERSION,
     extract_document_text,
@@ -478,10 +478,14 @@ class GeminiAnalyzerTests(unittest.TestCase):
         self.original_timeout = settings.gemini_timeout_seconds
         self.original_retries = settings.gemini_max_retries
         self.original_thinking_level = settings.gemini_thinking_level
+        self.original_structured_thinking_level = settings.gemini_structured_thinking_level
+        self.original_structured_output_tokens = settings.gemini_structured_output_tokens
         settings.analyzer_provider = "gemini"
         settings.gemini_api_key = "test-key"
         settings.gemini_model = "gemini-3.6-flash"
         settings.gemini_thinking_level = "high"
+        settings.gemini_structured_thinking_level = "low"
+        settings.gemini_structured_output_tokens = 24_000
         settings.gemini_timeout_seconds = 1
         settings.gemini_max_retries = 1
 
@@ -492,6 +496,8 @@ class GeminiAnalyzerTests(unittest.TestCase):
         settings.gemini_timeout_seconds = self.original_timeout
         settings.gemini_max_retries = self.original_retries
         settings.gemini_thinking_level = self.original_thinking_level
+        settings.gemini_structured_thinking_level = self.original_structured_thinking_level
+        settings.gemini_structured_output_tokens = self.original_structured_output_tokens
 
     @staticmethod
     def _gemini_response(output: dict) -> MagicMock:
@@ -635,7 +641,10 @@ Bachelor student using Splunk, Wireshark, and Python. Communication.""",
         )
         self.assertEqual(
             request_body["generationConfig"]["thinkingConfig"],
-            {"thinkingLevel": "high"},
+            {"thinkingLevel": "low"},
+        )
+        self.assertEqual(
+            request_body["generationConfig"]["maxOutputTokens"], 24_000
         )
         self.assertNotIn("temperature", request_body["generationConfig"])
         self.assertIn(
@@ -1100,6 +1109,13 @@ Bachelor student using Splunk, Wireshark, and Python. Communication.""",
                 )
 
         request_body = post.call_args_list[0].kwargs["json"]
+        self.assertEqual(
+            request_body["generationConfig"]["thinkingConfig"],
+            {"thinkingLevel": "low"},
+        )
+        self.assertEqual(
+            request_body["generationConfig"]["maxOutputTokens"], 24_000
+        )
         parts = request_body["contents"][0]["parts"]
         self.assertEqual(parts[0]["inlineData"]["mimeType"], "application/pdf")
         self.assertEqual(parts[0]["inlineData"]["data"], base64.b64encode(b"%PDF-fake-cv").decode("ascii"))
@@ -1598,6 +1614,74 @@ class AnalyzerApiTests(unittest.TestCase):
         self.assertEqual(len(self.client.get("/api/cvs").json()), 2)
         self.assertEqual(self.client.delete(f"/api/cvs/{cv_id}").status_code, 204)
         self.assertEqual(len(self.client.get("/api/cvs").json()), 1)
+
+    def test_failed_match_enqueues_a_new_idempotent_retry(self) -> None:
+        document = Document()
+        document.add_heading("Technical Skills")
+        document.add_paragraph("Python, FastAPI, MySQL and communication")
+        document.add_heading("Experience")
+        document.add_paragraph("3 years building REST APIs.")
+        buffer = BytesIO()
+        document.save(buffer)
+        request = {
+            "job_description": (
+                "Backend role requires 2 years of Python, FastAPI, MySQL and "
+                "REST API experience with strong communication skills."
+            ),
+            "title": "Backend Developer",
+        }
+
+        upload = self.client.post(
+            "/api/cvs",
+            files={
+                "file": (
+                    "resume.docx",
+                    buffer.getvalue(),
+                    "application/vnd.openxmlformats-officedocument."
+                    "wordprocessingml.document",
+                )
+            },
+        )
+        self.assertEqual(upload.status_code, 201, upload.text)
+        request["cv_id"] = upload.json()["cv_id"]
+
+        first = self.client.post("/api/analyzer/matches", json=request)
+        self.assertEqual(first.status_code, 202, first.text)
+        match_id = first.json()["match_result_id"]
+
+        db = self.session_factory()
+        try:
+            first_task = ai_tasks.get_latest_for_resource(
+                db, task_type="MatchAnalysis", resource_id=match_id
+            )
+            self.assertIsNotNone(first_task)
+            first_task_id = first_task.ai_task_id
+            match = db.get(MatchResult, match_id)
+            self.assertIsNotNone(match)
+            analyzer.set_match_failed(db, match, "Previous terminal match failure.")
+        finally:
+            db.close()
+
+        retried = self.client.post("/api/analyzer/matches", json=request)
+        self.assertEqual(retried.status_code, 202, retried.text)
+
+        db = self.session_factory()
+        try:
+            retry_task = ai_tasks.get_latest_for_resource(
+                db, task_type="MatchAnalysis", resource_id=match_id
+            )
+            self.assertIsNotNone(retry_task)
+            self.assertNotEqual(retry_task.ai_task_id, first_task_id)
+            self.assertEqual(
+                retry_task.idempotency_key,
+                f"match-analysis:{match_id}:retry:{first_task_id}",
+            )
+        finally:
+            db.close()
+
+        completed = self.client.get(f"/api/analyzer/matches/{match_id}")
+        self.assertEqual(completed.status_code, 200, completed.text)
+        self.assertEqual(completed.json()["status"], "Success")
 
 
 if __name__ == "__main__":
