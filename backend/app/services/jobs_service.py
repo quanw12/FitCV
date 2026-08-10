@@ -10,9 +10,11 @@ from app.models.account import Account
 from app.repositories import jobs
 from app.schemas.jobs import CompanyPublic, JobCreate, JobResponse, JobUpdate
 
-PUBLISH_FIELDS = (
-    "title", "about_job", "responsibilities", "requirements", "we_offer",
-    "life_at_company", "hiring_process", "location", "employment_type",
+# These are the minimum source-grounded facts needed for a useful public job
+# and for the shared matching engine. LinkedIn JDs commonly omit the other
+# fields, so they must remain optional.
+REQUIRED_JOB_FIELDS = (
+    "title", "about_job", "responsibilities", "requirements",
 )
 DESCRIPTION_MARKER = "FITCV_JOB_DESCRIPTION::v1::"
 DESCRIPTION_FIELDS = (
@@ -206,8 +208,15 @@ def _managed_response(
 def create(db: Session, account: Account, payload: JobCreate) -> JobResponse:
     company_id = _company(account)
     values = _clean(payload.model_dump(exclude_none=True))
-    if not values.get("title"):
-        raise HTTPException(status_code=422, detail="Title cannot be empty.")
+    missing = [
+        name for name in REQUIRED_JOB_FIELDS
+        if not str(values.get(name) or "").strip()
+    ]
+    if missing:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Cannot create job; missing required fields: {', '.join(missing)}.",
+        )
     _validate_weight_total(values)
     virtual = {
         name: values.pop(name, DEFAULT_OPENINGS_COUNT if name == "openings_count" else None)
@@ -249,13 +258,9 @@ def publish(db: Session, account: Account, job_id: int) -> JobResponse:
     virtual = _decode_description(job.description)
     publish_values = {
         **virtual,
-        **{name: getattr(job, name, None) for name in PUBLISH_FIELDS if name not in virtual},
+        **{name: getattr(job, name, None) for name in REQUIRED_JOB_FIELDS if name not in virtual},
     }
-    missing = [name for name in PUBLISH_FIELDS if not str(publish_values.get(name) or "").strip()]
-    if job.deadline is None or _utc_naive(job.deadline) <= _now():
-        missing.append("future deadline")
-    if virtual["openings_count"] < 1:
-        missing.append("openings_count")
+    missing = [name for name in REQUIRED_JOB_FIELDS if not str(publish_values.get(name) or "").strip()]
     if missing:
         raise HTTPException(status_code=422, detail=f"Cannot publish; missing or invalid: {', '.join(missing)}.")
     jobs.update_job(db, job, {"status": "Published"})
@@ -276,11 +281,6 @@ def reopen(db: Session, account: Account, job_id: int) -> JobResponse:
     _require_not_archived(job, "reopening it")
     if job.status != "Closed":
         raise HTTPException(status_code=409, detail="Only a closed job can be reopened.")
-    if job.deadline is None or _utc_naive(job.deadline) <= _now():
-        raise HTTPException(
-            status_code=422,
-            detail="Set a future application deadline before reopening this job.",
-        )
     jobs.update_job(db, job, {"status": "Published"})
     return _managed_response(db, account, job_id)
 
