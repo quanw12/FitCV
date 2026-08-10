@@ -470,6 +470,7 @@ def run_match_task(
         analyzer.set_match_success(db, match, result)
         return True
     except Exception as exc:
+        logger.exception("Match analysis task failed for match_result_id=%s", match_result_id)
         safe_error_message = _safe_match_error_message(exc)
         try:
             db.rollback()
@@ -657,6 +658,7 @@ def _safe_match_error_message(exc: Exception) -> str:
                 "rejected",
                 "401",
                 "403",
+                "404",
                 "unsupported analyzer_provider",
                 "gemini_model",
             )
