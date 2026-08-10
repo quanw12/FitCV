@@ -125,25 +125,59 @@ export default function App() {
     : null
 
   useEffect(() => {
-    if (session || publicJobId) {
+    return authApi.onSessionExpired(() => {
+      if (session) clearStoredImprovementMatchResultId(session.user.accountId)
+      setSession(null)
+      setShowLanding(true)
+      setCompanyProfileGate("complete")
+      setScreen("")
+      setAnalyzerDraft(emptyAnalyzerDraft())
+      setRebuiltFromImprovement(null)
+      setImprovementMatchResultId(null)
+      setTrackerFocusApplicationId(null)
+      toast.error("Phiên làm việc đã hết hạn.")
+    })
+  }, [session])
+
+  useEffect(() => {
+    if (!session) return
+    return authApi.startActivityMonitoring()
+  }, [session?.user.accountId])
+
+  useEffect(() => {
+    if (session) {
       setAuthReady(true)
+
+      return
+    }
+
+    if (publicJobId) {
+      setAuthReady(true)
+
       return
     }
 
     setAuthReady(true)
 
     let active = true
+
     authApi
+
       .refresh()
+
       .then((restored) => {
         if (!active) return
+
         setSession(restored)
+
         setShowLanding(false)
+
         if (restored.user.role) {
           setScreen(defaultScreen(portalFromAccountRole(restored.user.role)))
         }
       })
-      .catch(() => undefined)
+
+        .catch(() => undefined)
 
     return () => {
       active = false
@@ -178,7 +212,7 @@ export default function App() {
       })
 
       .catch(() => {
-        if (active) setCompanyProfileGate("required")
+        if (active && authApi.getSession()) setCompanyProfileGate("required")
       })
 
     return () => {
@@ -194,6 +228,8 @@ export default function App() {
     setShowLanding(false)
 
     setSession(nextSession)
+
+    authApi.initializeActivity()
 
     setCompanyProfileGate("checking")
 
@@ -263,8 +299,11 @@ export default function App() {
   const handleAnalyzeBuiltCv = (file: File, jdText?: string) => {
     setAnalyzerDraft({
       cvFile: file,
+
       uploadedCvId: null,
+
       jdText: jdText ?? "",
+
       result: null,
     })
 
@@ -442,6 +481,7 @@ export default function App() {
             matchResultId={improvementMatchResultId}
             onRebuilt={(result) => {
               setRebuiltFromImprovement(result)
+
               setScreen("cv-rebuild")
             }}
           />

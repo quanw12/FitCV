@@ -43,25 +43,22 @@ def job_search_recommendations(
     payload = (
         parsed_cv.parsed_json if isinstance(parsed_cv.parsed_json, dict) else {}
     )
-    query = (request.query or "").strip()
-    derived_by = "deterministic"
-    derived_level: str | None = None
+    # Always derive auto-detected search parameters (level, location hint, AI
+    # badge) so the seniority facet + level prefix are applied even when the
+    # user supplies their own keyword. The keyword only overrides `query`.
+    user_query = (request.query or "").strip()
     level = freehire_job_search.normalize_level(request.level)
-    location = (request.location or "").strip()
-    if not query:
-        derived = freehire_job_search.derive_ai_search_query(
-            cv_text=parsed_cv.parsed_text or "",
-            parsed_payload=payload,
-            preferred_level=level,
-        )
-        query = derived["query"]
-        location_hint = derived["location_hint"]
-        derived_level = derived["level"]
-        derived_by = "ai" if derived["used_ai"] else "deterministic"
-        if not location and location_hint:
-            location = location_hint
-    else:
-        derived_level = level
+    derived = freehire_job_search.derive_ai_search_query(
+        cv_text=parsed_cv.parsed_text or "",
+        parsed_payload=payload,
+        preferred_level=level,
+    )
+    derived_level = derived["level"]
+    derived_by = "ai" if derived["used_ai"] else "deterministic"
+    query = user_query or derived["query"]
+    location = (request.location or "").strip() or (
+        derived["location_hint"] or freehire_job_search.DEFAULT_LOCATION
+    )
     effective_level = level or derived_level
     if not query:
         raise HTTPException(
@@ -71,7 +68,6 @@ def job_search_recommendations(
                 "Enter keywords manually."
             ),
         )
-    location = location or freehire_job_search.DEFAULT_LOCATION
     jobage = request.jobage or 30
 
     errors: list[str] = []

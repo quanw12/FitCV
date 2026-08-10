@@ -18,16 +18,28 @@ class GeminiClient:
             raise GeminiClientError("GEMINI_API_KEY is required.")
         self.model_name = model_name or settings.gemini_model
 
-    def generate_structured(self, *, prompt: str, response_schema: dict) -> dict:
+    def generate_structured(
+        self,
+        *,
+        prompt: str,
+        response_schema: dict,
+        temperature: float | None = None,
+        seed: int | None = None,
+    ) -> dict:
+        generation_config: dict = {
+            "responseMimeType": "application/json",
+            "responseJsonSchema": response_schema,
+            "thinkingConfig": {
+                "thinkingLevel": settings.gemini_thinking_level,
+            },
+        }
+        if temperature is not None:
+            generation_config["temperature"] = temperature
+        if seed is not None:
+            generation_config["seed"] = seed
         body = {
             "contents": [{"parts": [{"text": prompt}]}],
-            "generationConfig": {
-                "responseMimeType": "application/json",
-                "responseJsonSchema": response_schema,
-                "thinkingConfig": {
-                    "thinkingLevel": settings.gemini_thinking_level,
-                },
-            },
+            "generationConfig": generation_config,
         }
         url = (
             "https://generativelanguage.googleapis.com/v1beta/models/"

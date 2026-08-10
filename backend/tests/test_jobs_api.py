@@ -90,6 +90,9 @@ class JobsApiIntegrationTests(unittest.TestCase):
             "/api/jobs",
             json={
                 "title": "Platform Engineer",
+                "about_job": "Build the platform behind FitCV.",
+                "responsibilities": "Design and maintain reliable services.",
+                "requirements": "Python and SQL experience.",
                 "skill_weight": 40,
                 "experience_weight": 35,
                 "education_weight": 15,
@@ -187,7 +190,7 @@ class JobsApiIntegrationTests(unittest.TestCase):
             1,
         )
 
-    def test_reopen_requires_a_future_deadline(self) -> None:
+    def test_reopen_allows_an_optional_deadline(self) -> None:
         job = self.create_published_job()
         self.assertEqual(
             self.client.post(f"/api/jobs/{job.job_id}/close").status_code,
@@ -202,21 +205,6 @@ class JobsApiIntegrationTests(unittest.TestCase):
             },
         )
         self.assertEqual(expired.status_code, 200)
-        blocked = self.client.post(f"/api/jobs/{job.job_id}/reopen")
-        self.assertEqual(blocked.status_code, 422)
-        self.assertIn("future application deadline", blocked.json()["detail"])
-
-        self.assertEqual(
-            self.client.patch(
-                f"/api/jobs/{job.job_id}",
-                json={
-                    "deadline": (
-                        datetime.now(timezone.utc) + timedelta(days=7)
-                    ).isoformat()
-                },
-            ).status_code,
-            200,
-        )
         self.assertEqual(
             self.client.post(f"/api/jobs/{job.job_id}/reopen").status_code,
             200,
@@ -255,6 +243,9 @@ class JobsApiIntegrationTests(unittest.TestCase):
             "/api/jobs",
             json={
                 "title": "Invalid weights",
+                "about_job": "Build the platform behind FitCV.",
+                "responsibilities": "Design and maintain reliable services.",
+                "requirements": "Python and SQL experience.",
                 "skill_weight": 50,
                 "experience_weight": 30,
                 "education_weight": 15,

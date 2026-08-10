@@ -1,7 +1,3 @@
-import { authApi } from "./authApi"
-
-import { API_BASE_URL } from "./config"
-
 import type {
   BatchParseCvResponse,
   ParsedCvCandidate,
@@ -10,7 +6,7 @@ import type {
   ScreeningBatchSummary,
 } from "@/types/cvRanking"
 
-import { requestJson } from "./httpClient"
+import { requestBlob, requestJson } from "./httpClient"
 
 interface BackendParsedCandidate {
   id: string
@@ -98,32 +94,20 @@ interface BackendBatchParseResponse {
 
 interface BackendScreeningBatchSummary {
   screening_batch_id: number
+
   title: string
+
   status: ScreeningBatchStatus
+
   total_files: number
+
   processed_count: number
+
   selected_count: number
+
   created_at: string
+
   completed_at?: string | null
-}
-
-async function requestBlob(path: string, fallback: string): Promise<Blob> {
-  const token = authApi.getSession()?.accessToken
-
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    credentials: "include",
-    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-  })
-
-  if (!response.ok) {
-    const payload = (await response.json().catch(() => null)) as {
-      detail?: string
-    } | null
-
-    throw new Error(payload?.detail ?? fallback)
-  }
-
-  return response.blob()
 }
 
 function normalizeCandidate(
@@ -190,18 +174,30 @@ function normalizeCandidate(
   }
 }
 
-function normalizeBatch(payload: BackendBatchParseResponse): BatchParseCvResponse {
+function normalizeBatch(
+  payload: BackendBatchParseResponse,
+): BatchParseCvResponse {
   return {
     requiredSkills: payload.required_skills,
+
     preferredSkills: payload.preferred_skills,
+
     candidates: payload.candidates.map(normalizeCandidate),
+
     warnings: payload.warnings,
+
     batchId: payload.screening_batch_id,
+
     taskId: payload.ai_task_id,
+
     status: payload.status,
+
     title: payload.title,
+
     createdAt: payload.created_at,
+
     totalFiles: payload.total_files,
+
     processedCount: payload.processed_count,
   }
 }
@@ -233,33 +229,53 @@ export const cvRankingApi = {
 
   async listBatches(filters?: {
     query?: string
+
     status?: ScreeningBatchStatus | ""
+
     minScore?: number
+
     createdFrom?: string
+
     createdTo?: string
   }): Promise<ScreeningBatchSummary[]> {
     const params = new URLSearchParams()
+
     if (filters?.query) params.set("q", filters.query)
+
     if (filters?.status) params.set("status", filters.status)
+
     if (filters?.minScore != null)
       params.set("min_score", String(filters.minScore))
+
     if (filters?.createdFrom)
       params.set("created_from", `${filters.createdFrom}T00:00:00`)
+
     if (filters?.createdTo)
       params.set("created_to", `${filters.createdTo}T23:59:59`)
+
     const suffix = params.size ? `?${params.toString()}` : ""
+
     const rows = await requestJson<BackendScreeningBatchSummary[]>(
       `/api/hr/cv-ranking/batches${suffix}`,
+
       { authenticated: true },
     )
+
     return rows.map((row) => ({
       screeningBatchId: row.screening_batch_id,
+
       title: row.title,
+
       status: row.status,
+
       totalFiles: row.total_files,
+
       processedCount: row.processed_count,
+
       selectedCount: row.selected_count,
+
       createdAt: row.created_at,
+
       completedAt: row.completed_at,
     }))
   },
@@ -267,33 +283,43 @@ export const cvRankingApi = {
   async getBatch(batchId: number): Promise<BatchParseCvResponse> {
     const payload = await requestJson<BackendBatchParseResponse>(
       `/api/hr/cv-ranking/batches/${batchId}`,
+
       { authenticated: true },
     )
+
     return normalizeBatch(payload)
   },
 
   async saveBatchSelection(
     batchId: number,
+
     selectedIds: string[],
+
     confirmedIds: string[],
   ): Promise<BatchParseCvResponse> {
     const payload = await requestJson<BackendBatchParseResponse>(
       `/api/hr/cv-ranking/batches/${batchId}/selection`,
+
       {
         method: "PATCH",
+
         authenticated: true,
+
         body: JSON.stringify({
           selected_candidate_keys: selectedIds,
+
           confirmed_candidate_keys: confirmedIds,
         }),
       },
     )
+
     return normalizeBatch(payload)
   },
 
   getBatchCandidateCv(batchId: number, candidateId: number) {
     return requestBlob(
       `/api/hr/cv-ranking/batches/${batchId}/candidates/${candidateId}/cv`,
+
       "Unable to load this screening CV.",
     )
   },
@@ -309,47 +335,33 @@ export const cvRankingApi = {
 
     files.forEach((file) => formData.append("files", file))
 
-    const token = authApi.getSession()?.accessToken
-
-    const response = await fetch(`${API_BASE_URL}/api/hr/cv-ranking/parse`, {
-      method: "POST",
-
-      credentials: "include",
-
-      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-
-      body: formData,
-    })
-
-    if (!response.ok) {
-      const payload = (await response.json().catch(() => null)) as {
-        detail?: string
-      } | null
-
-      throw new Error(
-        payload?.detail ??
-          `CV screening failed with status ${response.status}.`,
-      )
-    }
-
-    let payload = normalizeBatch(
-      (await response.json()) as BackendBatchParseResponse,
+    const response = await requestJson<BackendBatchParseResponse>(
+      "/api/hr/cv-ranking/parse",
+      {
+        method: "POST",
+        authenticated: true,
+        body: formData,
+      },
     )
+    let payload = normalizeBatch(response)
     if (!payload.batchId) return payload
+
     const batchId = payload.batchId
+
     const deadline = Date.now() + 10 * 60 * 1000
-    while (
-      payload.status === "Pending" ||
-      payload.status === "Processing"
-    ) {
+
+    while (payload.status === "Pending" || payload.status === "Processing") {
       if (Date.now() >= deadline) {
         throw new Error(
           "Screening is still processing. Open it from screening history later.",
         )
       }
+
       await delay(1200)
+
       payload = await cvRankingApi.getBatch(batchId)
     }
+
     return payload
   },
 }

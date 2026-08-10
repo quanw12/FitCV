@@ -153,12 +153,20 @@ def analyze_cv(
         db, request=request, account=account
     )
     if should_start:
+        previous_task = ai_task_service.get_latest_for_resource(
+            db,
+            task_type="MatchAnalysis",
+            resource_id=response.match_result_id,
+        )
+        retry_generation = previous_task.ai_task_id if previous_task is not None else 0
         ai_task_service.enqueue(
             db,
             task_type="MatchAnalysis",
             resource_id=response.match_result_id,
             account=account,
-            idempotency_key=f"match-analysis:{response.match_result_id}",
+            idempotency_key=(
+                f"match-analysis:{response.match_result_id}:retry:{retry_generation}"
+            ),
         )
         if ai_task_service.should_eager_execute():
             background_tasks.add_task(

@@ -132,7 +132,7 @@ describe("JobPostsScreen", () => {
     expect(screen.queryByText("Backend Engineer")).not.toBeInTheDocument()
   })
 
-  it("validates scoring weights before creating a draft", async () => {
+  it("validates required fields and scoring weights before creating a job post", async () => {
     jobsMocks.listManaged.mockResolvedValue([])
     jobsMocks.create.mockResolvedValue({
       ...activeJob,
@@ -148,10 +148,13 @@ describe("JobPostsScreen", () => {
     fireEvent.change(screen.getByLabelText("Title *"), {
       target: { value: "Platform Engineer" },
     })
+    fireEvent.change(screen.getByLabelText("About the job *"), { target: { value: "Build our candidate platform." } })
+    fireEvent.change(screen.getByLabelText("Responsibilities *"), { target: { value: "Build dependable services." } })
+    fireEvent.change(screen.getByLabelText("Requirements *"), { target: { value: "Python and SQL." } })
     fireEvent.change(screen.getByLabelText("Skills weight"), {
       target: { value: "50" },
     })
-    fireEvent.click(screen.getByRole("button", { name: "Create draft" }))
+    fireEvent.click(screen.getByRole("button", { name: "Create job post" }))
 
     expect(
       screen.getByText(
@@ -163,7 +166,7 @@ describe("JobPostsScreen", () => {
     fireEvent.change(screen.getByLabelText("Experience weight"), {
       target: { value: "25" },
     })
-    fireEvent.click(screen.getByRole("button", { name: "Create draft" }))
+    fireEvent.click(screen.getByRole("button", { name: "Create job post" }))
 
     await waitFor(() => {
       expect(jobsMocks.create).toHaveBeenCalledWith(

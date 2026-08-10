@@ -110,6 +110,7 @@ DATABASE_URL=mysql+pymysql://<db_user>:<url_encoded_password>@<db_host>:3306/fit
 JWT_SECRET_KEY=<local-secret>
 ACCESS_TOKEN_EXPIRE_MINUTES=15
 REFRESH_TOKEN_EXPIRE_DAYS=30
+SESSION_IDLE_TIMEOUT_MINUTES=60
 REFRESH_COOKIE_SECURE=false
 GOOGLE_CLIENT_ID=<google-oauth-client-id>
 CORS_ORIGINS=["http://localhost:5173","http://127.0.0.1:5173","https://fit-cv.vercel.app"]
@@ -121,6 +122,8 @@ ANALYZER_PROVIDER=deterministic
 GEMINI_API_KEY=<google-ai-studio-api-key>
 GEMINI_MODEL=gemini-3.6-flash
 GEMINI_THINKING_LEVEL=high
+GEMINI_STRUCTURED_THINKING_LEVEL=low
+GEMINI_STRUCTURED_OUTPUT_TOKENS=24000
 AI_WORKER_ENABLED=true
 ```
 
@@ -153,6 +156,7 @@ DATABASE_URL=mysql+pymysql://<db_user>:<url_encoded_password>@<db_host>:3306/fit
 JWT_SECRET_KEY=<replace-me>
 ACCESS_TOKEN_EXPIRE_MINUTES=15
 REFRESH_TOKEN_EXPIRE_DAYS=30
+SESSION_IDLE_TIMEOUT_MINUTES=60
 REFRESH_COOKIE_SECURE=true
 GOOGLE_CLIENT_ID=<google-oauth-client-id>
 CORS_ORIGINS=["http://localhost:5173","http://127.0.0.1:5173","https://fit-cv.vercel.app"]
@@ -556,6 +560,7 @@ POST /api/auth/login
 POST /api/auth/oauth/google
 POST /api/auth/select-role
 POST /api/auth/refresh
+POST /api/auth/activity
 POST /api/auth/logout
 GET  /api/auth/me
 POST /api/auth/forgot-password
@@ -568,6 +573,14 @@ nằm trong HttpOnly cookie, được xoay sau mỗi lần refresh và không th
 JavaScript. Logout thu hồi session phía server; reset password thu hồi toàn bộ
 session của tài khoản. Các endpoint auth nhạy cảm dùng rate limit lưu trong
 MySQL nên giới hạn vẫn còn hiệu lực sau khi API restart.
+
+Phiên đăng nhập tự hết hạn sau 60 phút không có tương tác thật của người dùng
+(`SESSION_IDLE_TIMEOUT_MINUTES=60`). Frontend chỉ gửi `/api/auth/activity` từ
+pointer, bàn phím, touch hoặc khi người dùng quay lại tab; refresh token và các
+request polling nền không kéo dài thời gian idle. Khi hết hạn, frontend xóa trạng
+thái đăng nhập và trở về Landing mà không gọi logout. Logout thủ công vẫn thu hồi
+session phía server. Refresh token có thời hạn tuyệt đối 30 ngày và không được
+gia hạn thêm khi xoay token.
 
 ## CV & JD Match Analyzer API
 
@@ -693,14 +706,14 @@ agreed shortlist or screening-session schema.
 - CV parsing và matching chạy bằng FastAPI background tasks. Frontend poll trạng thái `Pending`, `Processing`, `Success`, `Failed`.
 - MVP matcher dùng evidence có thể kiểm tra lại: Skills 45%, Experience 30%, Education 15%, Soft skills 10%. Nếu JD thiếu category, trọng số được phân bổ lại trên các category còn lại.
 - `ANALYZER_PROVIDER=deterministic` là mặc định và không gọi dịch vụ AI bên ngoài.
-- Để Gemini đọc CV/JD và trích xuất keyword, đặt `ANALYZER_PROVIDER=gemini`, `GEMINI_API_KEY=<server-side-key>`, `GEMINI_MODEL=gemini-3.6-flash`, và `GEMINI_THINKING_LEVEL=high` trong `backend/.env`, sau đó restart backend.
+- Để Gemini đọc CV/JD và trích xuất keyword, đặt `ANALYZER_PROVIDER=gemini`, `GEMINI_API_KEY=<server-side-key>`, `GEMINI_MODEL=gemini-3.6-flash`, `GEMINI_THINKING_LEVEL=high`, `GEMINI_STRUCTURED_THINKING_LEVEL=low`, và `GEMINI_STRUCTURED_OUTPUT_TOKENS=24000` trong `backend/.env`, sau đó restart backend.
 - Gemini chỉ làm bước semantic extraction; FitCV che các contact field phổ biến trong text CV/JD, gửi PDF/DOCX gốc cho bước CV parsing, yêu cầu quote bằng chứng có thật trong source, validate structured output bằng Pydantic, rồi mới tính score bằng trọng số cố định.
 - Không đặt `GEMINI_API_KEY` trong `.env.local`, biến `VITE_*`, frontend source, hoặc Git.
 - Pass probability là heuristic hỗ trợ quyết định, không phải dữ liệu tuyển dụng lịch sử và không tự động accept/reject ứng viên.
 - PDF dạng scan chưa có OCR; cần chuyển thành PDF có text hoặc DOCX trước khi upload.
 - Database hiện hữu cần chạy `database/migrations/003_add_cv_jd_analyzer.sql` trước khi bật API này.
 
-### Bật Gemini 3.6 Flash với high thinking cho Analyzer
+### Bật Gemini 3.6 Flash cho Analyzer
 
 1. Mở [Google AI Studio](https://aistudio.google.com/app/apikey), đăng nhập và tạo Gemini API key.
 2. Mở `backend/.env` và đặt cấu hình sau. API key chỉ được lưu ở backend:
@@ -710,6 +723,8 @@ ANALYZER_PROVIDER=gemini
 GEMINI_API_KEY=<your-secret-key>
 GEMINI_MODEL=gemini-3.6-flash
 GEMINI_THINKING_LEVEL=high
+GEMINI_STRUCTURED_THINKING_LEVEL=low
+GEMINI_STRUCTURED_OUTPUT_TOKENS=24000
 GEMINI_TIMEOUT_SECONDS=90
 GEMINI_MAX_RETRIES=2
 ```
@@ -724,9 +739,9 @@ VITE_API_BASE_URL=http://127.0.0.1:8000
 5. Restart cả backend (`python app/main.py`) và frontend (`npm run dev`) vì biến môi trường chỉ được đọc khi process khởi động.
 6. Đăng nhập bằng Student, vào **CV & JD Match Analyzer**, upload CV PDF/DOCX, paste JD tối thiểu 50 ký tự, rồi bấm **Analyze match**.
 
-Pipeline thật là: FitCV lấy text từ PDF/DOCX ở backend → gửi file CV gốc cùng text phụ trợ vào Gemini GenerateContent với JSON Schema và `thinkingLevel=high` → Gemini trích xuất kỹ năng, kinh nghiệm, học vấn, soft skills và quote nguồn → FitCV validate đúng schema, loại evidence không xuất hiện trong source rồi tự tính điểm bằng trọng số cố định. Với bước match text CV/JD, FitCV che email, phone, URL, contact fields và name header phổ biến trước khi gọi Gemini. File binary, API key và quyết định tuyển dụng không được gửi ra frontend.
+Pipeline thật là: FitCV lấy text từ PDF/DOCX ở backend → gửi file CV gốc cùng text phụ trợ vào Gemini GenerateContent với JSON Schema, `GEMINI_STRUCTURED_THINKING_LEVEL=low`, và đủ budget `GEMINI_STRUCTURED_OUTPUT_TOKENS=24000` → Gemini trích xuất kỹ năng, kinh nghiệm, học vấn, soft skills và quote nguồn → FitCV validate đúng schema, loại evidence không xuất hiện trong source rồi tự tính điểm bằng trọng số cố định. Với bước match text CV/JD, FitCV che email, phone, URL, contact fields và name header phổ biến trước khi gọi Gemini. File binary, API key và quyết định tuyển dụng không được gửi ra frontend.
 
-`gemini-3.6-flash` là model mặc định cho Analyzer, AI Improvement và OCR. `GEMINI_THINKING_LEVEL=high` ưu tiên độ sâu suy luận khi đọc CV phức tạp, nên timeout mặc định được tăng lên 90 giây (OCR: 120 giây). Backend gửi API key bằng header `x-goog-api-key`, không đặt key trong URL, rồi vẫn validate kết quả bằng Pydantic trước khi chấm điểm. Output sai schema hoặc evidence không có trong source sẽ fail an toàn. Redaction là best-effort, không thay thế consent và privacy policy; khi test nên dùng CV giả hoặc đã ẩn danh.
+`gemini-3.6-flash` là model mặc định cho Analyzer, AI Improvement và OCR. `GEMINI_THINKING_LEVEL=high` vẫn dùng cho OCR; các extraction JSON lớn của Analyzer dùng mức `low` và budget riêng để tránh cạn token trước khi trả JSON. Backend gửi API key bằng header `x-goog-api-key`, không đặt key trong URL, rồi vẫn validate kết quả bằng Pydantic trước khi chấm điểm. Output sai schema hoặc evidence không có trong source sẽ fail an toàn. Redaction là best-effort, không thay thế consent và privacy policy; khi test nên dùng CV giả hoặc đã ẩn danh.
 
 Analyzer luôn gọi backend thật; không còn nhánh fixture hoặc kết quả hard-code ở frontend.
 

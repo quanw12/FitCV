@@ -17,17 +17,29 @@ import {
   getStoredSession,
   persistBackendSession,
   storeSession,
+  subscribeToSessionExpired,
 } from "./authSession"
 
 import { refreshSession, requestJson } from "./httpClient"
+import {
+  initializeSessionActivity,
+  startSessionActivityMonitoring,
+} from "./sessionActivity"
 
 export const authApi = {
   getSession: getStoredSession,
+
+  initializeActivity: initializeSessionActivity,
+
+  startActivityMonitoring: startSessionActivityMonitoring,
+
+  onSessionExpired: subscribeToSessionExpired,
 
   async logout(): Promise<void> {
     try {
       await requestJson<void>("/api/auth/logout", {
         method: "POST",
+
         authenticated: true,
       })
     } finally {
@@ -64,6 +76,7 @@ export const authApi = {
   async register(payload: RegisterRequest): Promise<AuthSession> {
     const response = await requestJson<BackendAuthSession>(
       "/api/auth/register",
+
       {
         method: "POST",
 
@@ -93,6 +106,7 @@ export const authApi = {
   async oauthLogin(payload: OAuthLoginRequest): Promise<AuthSession> {
     const response = await requestJson<BackendAuthSession>(
       "/api/auth/oauth/google",
+
       {
         method: "POST",
 
@@ -106,6 +120,7 @@ export const authApi = {
   async selectRole(payload: SelectRoleRequest): Promise<AuthSession> {
     const response = await requestJson<BackendAuthSession>(
       "/api/auth/select-role",
+
       {
         method: "POST",
 
@@ -140,6 +155,7 @@ export const authApi = {
 
   resetPassword(payload: ResetPasswordRequest): Promise<void> {
     clearStoredSession()
+
     return requestJson("/api/auth/reset-password", {
       method: "POST",
 
