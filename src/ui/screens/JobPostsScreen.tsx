@@ -53,9 +53,9 @@ const weightFields = [
 ] as const
 
 const sections = [
-  ["about_job", "About the job"],
-  ["responsibilities", "Responsibilities"],
-  ["requirements", "Requirements"],
+  ["about_job", "About the job *"],
+  ["responsibilities", "Responsibilities *"],
+  ["requirements", "Requirements *"],
   ["we_offer", "We offer"],
   ["life_at_company", "Life at company"],
   ["hiring_process", "How we hire"],
@@ -78,6 +78,13 @@ const createEmptyForm = (): JobWrite => ({
   education_weight: 15,
   soft_skill_weight: 10,
 })
+
+const requiredJobFields: Array<[keyof JobWrite, string]> = [
+  ["title", "Title"],
+  ["about_job", "About the job"],
+  ["responsibilities", "Responsibilities"],
+  ["requirements", "Requirements"],
+]
 
 const hasTimezone = (value: string) => /(?:Z|[+-]\d{2}:?\d{2})$/i.test(value)
 const padDatePart = (value: number) => String(value).padStart(2, "0")
@@ -294,8 +301,13 @@ export default function JobPostsScreen() {
 
   const save = async (event: FormEvent) => {
     event.preventDefault()
-    if (!form.title.trim()) {
-      setFormError("A title is required, even for a draft.")
+    const missingRequiredFields = requiredJobFields
+      .filter(([key]) => !String(form[key] ?? "").trim())
+      .map(([, label]) => label)
+    if (missingRequiredFields.length > 0) {
+      setFormError(
+        `Complete the required fields before creating a job post: ${missingRequiredFields.join(", ")}.`,
+      )
       return
     }
     if (Number(form.openings_count) < 1) {
@@ -598,8 +610,8 @@ export default function JobPostsScreen() {
             <div style={{ flex: 1 }}>
               <h2>{editingId ? "Edit job post" : "Create job draft"}</h2>
               <p>
-                Save incomplete work as a draft. Review AI suggestions before
-                publishing.
+                Fields marked * are required to create or publish. Other LinkedIn
+                details are optional; review AI suggestions before publishing.
               </p>
             </div>
             <button
@@ -782,6 +794,7 @@ export default function JobPostsScreen() {
                     style={{ minHeight: 120 }}
                     value={form[key] ?? ""}
                     onChange={(event) => setField(key, event.target.value)}
+                    required={label.endsWith("*")}
                   />
                 </label>
               ))}
@@ -867,7 +880,7 @@ export default function JobPostsScreen() {
                 ? "Saving..."
                 : editingId
                   ? "Save changes"
-                  : "Create draft"}
+                  : "Create job post"}
             </button>
             <button
               className="fc-btn fc-btn--secondary"
