@@ -527,6 +527,10 @@ def test_match_evidence_json_is_structured_in_prompt() -> None:
     assert '"cv_evidence_lines"' in captured["prompt"]
     assert '"jd_evidence_lines"' in captured["prompt"]
     assert '"cv_raw_text"' not in captured["prompt"]
+    assert "Action + Project/Scope + Result" in captured["prompt"]
+    assert "contain placeholders such as" in captured["prompt"]
+    assert "never keyword-stuff" in captured["prompt"]
+    assert "Return fewer items" in captured["prompt"]
 
 
 def test_provider_discards_item_with_invalid_cv_line_index() -> None:

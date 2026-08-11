@@ -435,19 +435,70 @@ def _add_rewrites(
             identity = _normalize(original)
             if identity in existing:
                 continue
-            base = original.rstrip(" .;")
+            suggested = _safe_grounded_rewrite(original)
+            if suggested is None:
+                continue
             rewrites.append(
                 RewriteSuggestion(
                     section=section,
                     original_text=original,
                     issue=(
-                        "The entry leaves the verified scope or outcome less clear than it could be."
+                        "The entry can be more direct and easier to scan without changing its facts."
                     ),
-                    suggested_text=f"{base} — [verified scope or outcome].",
-                    framework="Action → Scope → Result",
+                    suggested_text=suggested,
+                    framework="Action → Scope",
                 )
             )
             existing.add(identity)
+
+
+def _safe_grounded_rewrite(value: str) -> str | None:
+    """Return a modest wording improvement using only facts in one source line."""
+    original = re.sub(r"^[\s•●▪◦*-]+", "", value).strip()
+    revised = re.sub(
+        r"\bfixed\b",
+        lambda match: (
+            "Resolved" if match.group(0)[0].isupper() else "resolved"
+        ),
+        original,
+        flags=re.IGNORECASE,
+    )
+    revised = re.sub(
+        r"\bthat processes\b",
+        "to process",
+        revised,
+        flags=re.IGNORECASE,
+    )
+
+    responsibility = re.match(
+        r"^(?:was\s+)?responsible\s+for\s+(.+)$",
+        revised,
+        flags=re.IGNORECASE,
+    )
+    if responsibility:
+        action = responsibility.group(1)
+        gerund_to_past = {
+            "building": "Built",
+            "creating": "Created",
+            "developing": "Developed",
+            "designing": "Designed",
+            "implementing": "Implemented",
+            "maintaining": "Maintained",
+            "managing": "Managed",
+            "supporting": "Supported",
+            "testing": "Tested",
+        }
+        lowered = action.casefold()
+        for gerund, past in gerund_to_past.items():
+            if lowered.startswith(f"{gerund} "):
+                revised = f"{past} {action[len(gerund) + 1:]}"
+                break
+
+    if _normalize(revised) == _normalize(original):
+        return None
+    if original.endswith(".") and not revised.endswith("."):
+        revised += "."
+    return revised
 
 
 def _add_quick_wins(
