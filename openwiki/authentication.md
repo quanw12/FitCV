@@ -12,7 +12,7 @@ FitCV implements a comprehensive authentication system with multiple providers, 
 ## Core Components
 
 ### Backend Authentication
-- **Main Entry Point**: `/backend/app/api/routes/auth.py` - Handles all authentication endpoints
+- **Main Entry Point**: `/backend/app/api/routes/auth.py` - Handles all authentication endpoints including login, registration, Google OAuth, password reset, token refresh, session activity recording, and logout.
 - **Auth Service**: `/backend/app/services/auth_service.py` - Business logic for authentication operations
 - **Auth Models**: `/backend/app/models/account.py` - SQLAlchemy model for user accounts
 - **Auth Schemas**: `/backend/app/schemas/auth.py` - Pydantic models for request/validation
@@ -73,6 +73,14 @@ FitCV implements a comprehensive authentication system with multiple providers, 
    - Returns new access token (refresh token rotation optional)
 3. Frontend updates access token
 
+### Session Idle Timeout
+- **Purpose**: Automatically log out users after a period of inactivity to enhance security.
+- **Implementation**: 
+  - Backend: `/backend/app/services/auth_rate_limit.py` (also handles rate limiting) and `/backend/app/repositories/auth_sessions.py` track session creation and last activity.
+  - Frontend: `/src/api/sessionActivity.ts` and `/src/api/authSession.ts` manage session heartbeat and timeout warnings.
+  - Configuration: Timeout duration is set in `/backend/app/core/config.py` (e.g., `SESSION_IDLE_TIMEOUT_MINUTES`).
+  - Tests: `/backend/tests/test_session_idle_timeout.py` verifies timeout behavior and extension on activity.
+
 ### Password Reset
 1. User submits email for password reset
 2. Backend:
@@ -85,6 +93,16 @@ FitCV implements a comprehensive authentication system with multiple providers, 
    - Updates password hash
    - Clears reset token fields
    - Returns success
+
+## Role-Based Access Control (RBAC)
+
+### Session Idle Timeout
+- **Purpose**: Automatically log out users after a period of inactivity to enhance security.
+- **Implementation**: 
+  - Backend: `/backend/app/services/auth_rate_limit.py` (also handles rate limiting) and `/backend/app/repositories/auth_sessions.py` track session creation and last activity.
+  - Frontend: `/src/api/sessionActivity.ts` and `/src/api/authSession.ts` manage session heartbeat and timeout warnings.
+  - Configuration: Timeout duration is set in `/backend/app/core/config.py` (e.g., `SESSION_IDLE_TIMEOUT_MINUTES`).
+  - Tests: `/backend/tests/test_session_idle_timeout.py` verifies timeout behavior and extension on activity.
 
 ## Role-Based Access Control (RBAC)
 
