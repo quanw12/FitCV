@@ -233,6 +233,25 @@ export default function ImprovementScreen({
 
   const rewrites = report?.rewriteSuggestions ?? []
 
+  const allSuggestionIds = useMemo(
+    () =>
+      Array.from(
+        new Set([
+          ...(report?.skillGaps.map((item) => item.suggestionId) ?? []),
+          ...(report?.sectionFeedback.map((item) => item.suggestionId) ?? []),
+          ...(report?.rewriteSuggestions.map((item) => item.suggestionId) ?? []),
+          ...(report?.quickWins.map((item) => item.suggestionId) ?? []),
+        ]),
+      ),
+    [report],
+  )
+
+  const allSuggestionsSelected =
+    allSuggestionIds.length > 0 &&
+    allSuggestionIds.every((suggestionId) =>
+      selectedSuggestionIds.has(suggestionId),
+    )
+
   const quickWins = useMemo(
     () =>
       [...(report?.quickWins ?? [])].sort(
@@ -269,6 +288,16 @@ export default function ImprovementScreen({
 
       return next
     })
+
+  const toggleAllSuggestions = () => {
+    if (allSuggestionsSelected) {
+      setSelectedSuggestionIds(new Set())
+
+      return
+    }
+
+    setSelectedSuggestionIds(new Set(allSuggestionIds))
+  }
 
   const copyRewrite = async (id: string, value: string) => {
     try {
@@ -663,31 +692,41 @@ export default function ImprovementScreen({
             </section>
 
             <div
-              className="fc-card"
-              style={{
-                position: "sticky",
-                bottom: 16,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                gap: 16,
-                padding: "14px 16px",
-                boxShadow: "0 12px 30px rgba(15, 23, 42, 0.15)",
-              }}
+              className="fc-card improvement-apply-bar"
             >
-              <span style={{ color: "var(--text-secondary)", fontSize: 14 }}>
-                {selectedSuggestionIds.size} improvement{selectedSuggestionIds.size === 1 ? "" : "s"} selected
-              </span>
-              <button
-                type="button"
-                className="fc-btn fc-btn--primary"
-                disabled={selectedSuggestionIds.size === 0 || applying}
-                onClick={() => void handleApplyImprovements()}
-              >
-                {applying
-                  ? "Applying improvements…"
-                  : `Apply ${selectedSuggestionIds.size} improvement${selectedSuggestionIds.size === 1 ? "" : "s"} & rebuild CV`}
-              </button>
+              <div className="improvement-selection-summary" aria-live="polite">
+                <strong>
+                  {selectedSuggestionIds.size}/{allSuggestionIds.length} selected
+                </strong>
+                <span>
+                  Only selected, CV-grounded changes will be used in the new CV.
+                </span>
+              </div>
+              <div className="improvement-apply-actions">
+                <button
+                  type="button"
+                  className="fc-btn fc-btn--secondary"
+                  onClick={toggleAllSuggestions}
+                  disabled={allSuggestionIds.length === 0 || applying}
+                >
+                  {allSuggestionsSelected ? (
+                    <Square size={16} aria-hidden="true" />
+                  ) : (
+                    <CheckSquare size={16} aria-hidden="true" />
+                  )}
+                  {allSuggestionsSelected ? "Clear all" : "Select all"}
+                </button>
+                <button
+                  type="button"
+                  className="fc-btn fc-btn--primary"
+                  disabled={selectedSuggestionIds.size === 0 || applying}
+                  onClick={() => void handleApplyImprovements()}
+                >
+                  {applying
+                    ? "Applying improvements…"
+                    : `Apply ${selectedSuggestionIds.size} improvement${selectedSuggestionIds.size === 1 ? "" : "s"} & rebuild CV`}
+                </button>
+              </div>
             </div>
           </>
         )}

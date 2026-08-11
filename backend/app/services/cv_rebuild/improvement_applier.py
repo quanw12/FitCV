@@ -28,7 +28,14 @@ def build_applied_instructions(rows: list[CvImprovementSuggestion]) -> str:
                 f'- [Section · {section}] "{original}" → Action: {suggested}'
             )
         elif row.suggestion_type == SuggestionType.quick_win:
-            instructions.append(f"- [Quick win] {suggested} ({explanation})")
+            category = (
+                (row.metadata_json or {}).get("category")
+                or row.category.value
+                or "Other"
+            )
+            instructions.append(
+                f"- [Quick win · {category}] {suggested} ({explanation})"
+            )
         elif row.suggestion_type == SuggestionType.skill_gap:
             instructions.append(
                 f'- [Skill gap] The JD needs "{suggested}". Highlight it ONLY '

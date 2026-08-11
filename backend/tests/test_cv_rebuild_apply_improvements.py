@@ -262,7 +262,7 @@ def test_skill_gap_instruction_never_allows_adding_missing_skill() -> None:
     assert "SKIP entirely" in instructions
 
 
-def test_polish_prompt_keeps_jd_and_grounding_instruction_blocks() -> None:
+def test_polish_prompt_applies_only_selected_grounded_changes() -> None:
     prompt = build_polish_prompt(
         '{"name":"A"}',
         "en",
@@ -270,5 +270,10 @@ def test_polish_prompt_keeps_jd_and_grounding_instruction_blocks() -> None:
         applied_improvements="- [Rewrite · Summary] Improve the existing summary.",
     )
     assert "<jd_text>" in prompt
+    assert "JD needs Python" in prompt
     assert "<approved_improvements>" in prompt
-    assert "Never invent or infer facts" in prompt
+    assert "strict selected-change operation" in prompt
+    assert "Preserve every field" in prompt
+    assert "Never invent or infer a skill" in prompt
+    assert "Never output placeholders" in prompt
+    assert "permission to make any additional tailoring" in prompt

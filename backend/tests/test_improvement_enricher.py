@@ -102,8 +102,9 @@ def test_moderate_match_gets_richer_grounded_coverage() -> None:
         item.original_text in RAW_CV
         for item in enriched.rewrite_suggestions
     )
+    assert all("[" not in item.suggested_text for item in enriched.rewrite_suggestions)
     assert all(
-        "[verified scope or outcome]" in item.suggested_text
+        item.suggested_text != item.original_text
         for item in enriched.rewrite_suggestions
     )
     validate_report_grounding(

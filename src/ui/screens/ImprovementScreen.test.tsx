@@ -289,6 +289,29 @@ describe("ImprovementScreen acceptance states", () => {
     expect(quickWin).toHaveAttribute("aria-pressed", "true")
   })
 
+  it("selects and clears every available improvement in one action", async () => {
+    improvementMocks.getReport.mockResolvedValueOnce(reportResponse())
+
+    render(<ImprovementScreen matchResultId="28" />)
+
+    await screen.findByText("Docker")
+    expect(screen.getByText("1/4 selected")).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole("button", { name: "Select all" }))
+
+    expect(screen.getByText("4/4 selected")).toBeInTheDocument()
+    expect(
+      screen.getByRole("button", { name: /apply 4 improvements & rebuild cv/i }),
+    ).toBeEnabled()
+
+    fireEvent.click(screen.getByRole("button", { name: "Clear all" }))
+
+    expect(screen.getByText("0/4 selected")).toBeInTheDocument()
+    expect(
+      screen.getByRole("button", { name: /apply 0 improvements & rebuild cv/i }),
+    ).toBeDisabled()
+  })
+
   it("applies selected suggestions and hands the rebuilt CV to the app", async () => {
     const onRebuilt = vi.fn()
     const rebuilt = {

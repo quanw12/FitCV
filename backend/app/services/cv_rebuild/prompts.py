@@ -261,6 +261,47 @@ output only the corrected JSON:
 
 _LANGUAGE_LABELS = {"en": "English", "vi": "Vietnamese"}
 
+_APPLY_IMPROVEMENTS_PROMPT = """You are editing an existing CV after the candidate
+reviewed and selected specific improvement instructions.
+
+This is a strict selected-change operation, not a general rewrite.
+
+Rules:
+- Return the complete CV JSON using the supplied schema.
+- Apply only instructions inside <approved_improvements>.
+- Use the target JD only to interpret an approved instruction. The JD is not
+  permission to make any additional tailoring or keyword changes.
+- Preserve every field, entry, bullet, fact, wording, and list order not targeted
+  by an approved instruction. Do not perform extra polishing, tailoring,
+  translation, keyword insertion, section reordering, or summarization.
+- For an approved rewrite, replace only the matching source text and keep all
+  surrounding content unchanged.
+- For approved section feedback or a quick win, edit only the named section and
+  only when the existing CV already contains every fact required by the edit.
+- A skill gap is not permission to claim a skill. Surface it only when the CV
+  already proves that exact skill; otherwise leave the CV unchanged for that item.
+- Never invent or infer a skill, employer, role, date, number, metric, project,
+  responsibility, achievement, or outcome from the instructions.
+- Never output placeholders such as [X%], [N users], TBD, or TODO. If an approved
+  instruction needs missing information, skip that instruction.
+- Keep the candidate's name, contact details, dates, titles, company names, URLs,
+  section membership, and all unrelated text exactly as supplied.
+
+Selected improvements:
+<approved_improvements>
+<improvements>
+</approved_improvements>
+
+Target JD reference for the selected instructions only:
+<jd_text>
+<job_description>
+</jd_text>
+
+Existing CV JSON, the sole source of truth:
+<cv_json>
+
+Output ONLY the JSON object matching the provided schema."""
+
 _BUILD_PROMPT = """You are an expert CV writer. The candidate entered their CV
 information in a form and selected the CV language: <language_label>.
 
@@ -398,6 +439,20 @@ def build_polish_prompt(
     jd_text: str | None = None,
     applied_improvements: str | None = None,
 ) -> str:
+    if applied_improvements:
+        prompt = _APPLY_IMPROVEMENTS_PROMPT.replace(
+            "<improvements>",
+            applied_improvements.strip()[:8000],
+        ).replace(
+            "<job_description>",
+            (jd_text or "").strip()[:8000],
+        ).replace("<cv_json>", cv_json.strip())
+        if validation_error:
+            prompt = prompt + _VALIDATION_SUFFIX.replace(
+                "<validation_error>", validation_error.strip()
+            )
+        return prompt
+
     prompt = _BUILD_PROMPT.replace(
         "<language_label>", _LANGUAGE_LABELS.get(language, "English")
     )
