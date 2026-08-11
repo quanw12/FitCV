@@ -97,6 +97,7 @@ REST endpoint definitions:
 - Role-based access control (Student, HR, Admin, etc.)
 - JWT-based stateless authentication
 - Password reset via 6-digit verification codes
+- Session idle timeout for automatic logout after inactivity
 
 ### CV Processing Pipeline
 1. **Upload & Parsing**: Document parsing service extracts text from CV files

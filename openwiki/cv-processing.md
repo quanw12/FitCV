@@ -22,7 +22,7 @@ FitCV's CV processing pipeline handles the complete lifecycle of CV documents fr
 - **Match Engine**: `/backend/app/services/match_engine.py` - Core matching algorithm implementation
 - **Matching Service**: `/backend/app/services/matching_service.py` - High-level matching operations
 - **Document Parser**: `/backend/app/services/document_parser.py` - Text extraction from PDF/DOCX
-- **CV Rebuild Service**: `/backend/app/services/cv_rebuild/` - CV regeneration and improvement application
+- **CV Rebuild Service**: `/backend/app/services/cv_rebuild/` - CV regeneration and improvement application (includes modules for avatar, completeness, grounding, improvement applier, language, LLM extraction, normalization, orchestration, PDF rendering, prompts, and template rendering)
 - **Gemini Analyzer**: `/backend/app/services/gemini_analyzer.py` - AI-powered CV analysis using Google Gemini
 - **Improvement Service**: `/backend/app/services/improvement_service.py` - Generates and manages improvement suggestions
 - **OCR Service**: `/backend/app/services/ocr_service.py` - Optical character recognition for scanned documents

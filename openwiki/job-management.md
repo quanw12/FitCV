@@ -45,11 +45,11 @@ FitCV's job and application management system handles the complete recruitment l
 ## Job Lifecycle Management
 
 ### Job Creation & Publication
-1. **Job Drafting**: HR creates job with title, description, requirements, location, etc.
+1. **Job Drafting**: HR creates job with at least title, about_job (job description), responsibilities, and requirements. Other fields like location, employment_type, etc. are optional.
 2. **Position & Level**: Selects from predefined positions and experience levels
 3. **Weight Configuration**: Sets skill/experience/education/soft skill weights (must total 100%)
 4. **Status Management**: Job starts in 'Draft' status
-5. **Publication**: Changing status to 'Published' makes job visible to candidates
+5. **Publication**: Job can be published when the required fields (title, about_job, responsibilities, requirements) are non-empty and the skill/experience/education/soft skill weights total 100%. Changing status to 'Published' makes job visible to candidates
 6. **Closing**: Setting status to 'Closed' stops new applications but preserves existing ones
 7. **Archiving**: Optional archiving for historical records
 
