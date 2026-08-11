@@ -30,6 +30,11 @@ import {
 
 import { cvRankingApi } from "@/api/cvRankingApi"
 
+import {
+  getCachedResource,
+  getOrFetchResource,
+} from "@/services/resourceCache"
+
 import type {
   BatchParseCvResponse,
   ParsedCvCandidate,
@@ -46,6 +51,15 @@ const MAX_FILE_BYTES = 10 * 1024 * 1024
 const MAX_BATCH_FILES = 20
 
 const ACCEPTED_EXTENSIONS = [".pdf", ".docx"]
+
+const rankingHistoryCacheKey = (
+  query: string,
+  status: ScreeningBatchStatus | "",
+  minScore: string,
+  createdFrom: string,
+  createdTo: string,
+) =>
+  `hr-ranking:history:${query.trim().toLowerCase()}:${status}:${minScore}:${createdFrom}:${createdTo}`
 
 function fileKey(file: File): string {
   return `${file.name}:${file.size}:${file.lastModified}`
@@ -161,17 +175,39 @@ export default function BulkCvRankingPanel() {
     }
   }, [result?.batchId, selectedCandidate, selectedFile])
 
-  const loadHistory = useCallback(async () => {
-    setHistoryLoading(true)
+  const loadHistory = useCallback(async (force = false) => {
+    const key = rankingHistoryCacheKey(
+      historyQuery,
+      historyStatus,
+      historyMinScore,
+      historyCreatedFrom,
+      historyCreatedTo,
+    )
+    const cached = getCachedResource<ScreeningBatchSummary[]>(key)
+
+    if (cached && !force) {
+      setHistory(cached)
+
+      setHistoryLoading(false)
+
+      return
+    }
+
+    setHistoryLoading(!cached)
     try {
       setHistory(
-        await cvRankingApi.listBatches({
-          query: historyQuery.trim() || undefined,
-          status: historyStatus,
-          minScore: historyMinScore ? Number(historyMinScore) : undefined,
-          createdFrom: historyCreatedFrom || undefined,
-          createdTo: historyCreatedTo || undefined,
-        }),
+        await getOrFetchResource(
+          key,
+          () =>
+            cvRankingApi.listBatches({
+              query: historyQuery.trim() || undefined,
+              status: historyStatus,
+              minScore: historyMinScore ? Number(historyMinScore) : undefined,
+              createdFrom: historyCreatedFrom || undefined,
+              createdTo: historyCreatedTo || undefined,
+            }),
+          { force },
+        ),
       )
     } catch (cause) {
       setError(
@@ -301,7 +337,7 @@ export default function BulkCvRankingPanel() {
         ),
       )
 
-      void loadHistory()
+      void loadHistory(true)
     } catch (cause) {
       setResult(null)
 
@@ -324,7 +360,7 @@ export default function BulkCvRankingPanel() {
         Array.from(nextSelected),
         Array.from(nextConfirmed),
       )
-      .then(() => void loadHistory())
+      .then(() => void loadHistory(true))
       .catch((cause) =>
         setError(
           cause instanceof Error

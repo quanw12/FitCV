@@ -81,9 +81,17 @@ vi.mock("@/ui/screens/PublicJobScreen", () => ({
   default: ({ jobId }: { jobId: number }) => <div>Public job {jobId}</div>,
 }))
 
+interface LandingMockProps {
+  onGetStarted: () => void
+  onSignIn?: () => void
+}
+
 vi.mock("@/ui/screens/LandingScreen", () => ({
-  default: ({ onGetStarted }: { onGetStarted: () => void }) => (
-    <button onClick={onGetStarted}>Get started</button>
+  default: ({ onGetStarted, onSignIn = onGetStarted }: LandingMockProps) => (
+    <div>
+      <button onClick={onGetStarted}>Get started</button>
+      <button onClick={onSignIn}>Sign in</button>
+    </div>
   ),
 }))
 
@@ -127,11 +135,19 @@ const secondarySession: AuthSession = {
   requiresRoleSelection: false,
 }
 
+interface AuthMockProps {
+  onAuth: (session: AuthSession) => void
+  initialMode?: "login" | "register"
+}
+
 vi.mock("@/ui/screens/AuthScreen", () => ({
-  default: ({ onAuth }: { onAuth: (session: AuthSession) => void }) => (
-    <button onClick={() => onAuth(secondarySession)}>
-      Sign in second account
-    </button>
+  default: ({ onAuth, initialMode = "login" }: AuthMockProps) => (
+    <div>
+      <span>Auth mode: {initialMode}</span>
+      <button onClick={() => onAuth(secondarySession)}>
+        Sign in second account
+      </button>
+    </div>
   ),
 }))
 
@@ -146,8 +162,10 @@ describe("Analyzer to Improvement selection", () => {
     authMocks.getSession.mockReturnValue(primarySession)
 
     authMocks.refresh.mockResolvedValue(primarySession)
+
     authMocks.onSessionExpired.mockImplementation((listener: () => void) => {
       expireSession = listener
+
       return vi.fn()
     })
   })
@@ -188,6 +206,28 @@ describe("Analyzer to Improvement selection", () => {
     expect(await screen.findByText("CV rebuild screen")).toBeInTheDocument()
 
     expect(authMocks.refresh).toHaveBeenCalledOnce()
+  })
+
+  it("opens create account mode from Landing Get started", async () => {
+    authMocks.getSession.mockReturnValue(null)
+    authMocks.refresh.mockRejectedValueOnce(new Error("No session"))
+
+    render(<App />)
+
+    fireEvent.click(await screen.findByRole("button", { name: "Get started" }))
+
+    expect(await screen.findByText("Auth mode: register")).toBeInTheDocument()
+  })
+
+  it("opens sign in mode from Landing Sign in", async () => {
+    authMocks.getSession.mockReturnValue(null)
+    authMocks.refresh.mockRejectedValueOnce(new Error("No session"))
+
+    render(<App />)
+
+    fireEvent.click(await screen.findByRole("button", { name: "Sign in" }))
+
+    expect(await screen.findByText("Auth mode: login")).toBeInTheDocument()
   })
 
   it("passes a completed analysis ID to Improvement and clears it when inputs change", async () => {
@@ -270,11 +310,13 @@ describe("Analyzer to Improvement selection", () => {
     render(<App />)
 
     expect(await screen.findByText("CV rebuild screen")).toBeInTheDocument()
+
     act(() => expireSession?.())
 
     expect(
       await screen.findByRole("button", { name: "Get started" }),
     ).toBeInTheDocument()
+
     expect(authMocks.logout).not.toHaveBeenCalled()
   })
 })

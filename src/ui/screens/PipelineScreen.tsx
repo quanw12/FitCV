@@ -34,6 +34,11 @@ import {
 
 import { jobsApi } from "@/api/jobsApi"
 import { pipelineApi } from "@/api/pipelineApi"
+import {
+  getCachedResource,
+  getOrFetchResource,
+  setCachedResource,
+} from "@/services/resourceCache"
 import type { JobPost } from "@/types/jobs"
 import type {
   PipelineApplication,
@@ -53,6 +58,24 @@ const stages: PipelineStage[] = [
 ]
 
 type ScoreFilter = "all" | "strong" | "moderate" | "weak" | "pending"
+
+interface PipelineSnapshot {
+  applications: PipelineApplication[]
+
+  jobs: JobPost[]
+}
+
+interface PipelineDetailSnapshot {
+  notes: PipelineNote[]
+
+  history: PipelineStageHistory[]
+}
+
+const pipelineCacheKey = (jobId?: number) =>
+  `pipeline:list:${jobId ?? "all"}`
+
+const pipelineDetailCacheKey = (applicationId: number) =>
+  `pipeline:detail:${applicationId}`
 
 const stageColors: Record<PipelineStage, {
   dot: string
@@ -185,9 +208,14 @@ function ColumnArea({
 }
 
 export default function PipelineScreen() {
-  const [applications, setApplications] = useState<PipelineApplication[]>([])
-  const [jobs, setJobs] = useState<JobPost[]>([])
   const [selectedJobId, setSelectedJobId] = useState<number | undefined>()
+  const cachedPipeline = getCachedResource<PipelineSnapshot>(
+    pipelineCacheKey(selectedJobId),
+  )
+  const [applications, setApplications] = useState<PipelineApplication[]>(
+    cachedPipeline?.applications ?? [],
+  )
+  const [jobs, setJobs] = useState<JobPost[]>(cachedPipeline?.jobs ?? [])
   const [stageFilter, setStageFilter] = useState<PipelineStage | "all">("all")
   const [scoreFilter, setScoreFilter] = useState<ScoreFilter>("all")
   const [selectedIds, setSelectedIds] = useState<number[]>([])
@@ -197,7 +225,7 @@ export default function PipelineScreen() {
   const [notes, setNotes] = useState<PipelineNote[]>([])
   const [history, setHistory] = useState<PipelineStageHistory[]>([])
   const [note, setNote] = useState("")
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(() => !cachedPipeline)
   const [detailLoading, setDetailLoading] = useState(false)
   const [movingId, setMovingId] = useState<number | null>(null)
   const [bulkMoving, setBulkMoving] = useState(false)
@@ -211,16 +239,58 @@ export default function PipelineScreen() {
     useSensor(KeyboardSensor),
   )
 
-  const load = useCallback(async () => {
-    setLoading(true)
+  const commitApplications = useCallback(
+    (
+      updater: (
+        current: PipelineApplication[],
+      ) => PipelineApplication[],
+    ) => {
+      setApplications((current) => {
+        const next = updater(current)
+
+        setCachedResource(pipelineCacheKey(selectedJobId), {
+          applications: next,
+          jobs,
+        })
+
+        return next
+      })
+    },
+    [jobs, selectedJobId],
+  )
+
+  const load = useCallback(async (force = false) => {
+    const key = pipelineCacheKey(selectedJobId)
+
+    const cached = getCachedResource<PipelineSnapshot>(key)
+
+    if (cached && !force) {
+      setApplications(cached.applications)
+
+      setJobs(cached.jobs)
+
+      setLoading(false)
+
+      return
+    }
+
+    setLoading(!cached)
     setError("")
     try {
-      const [nextApplications, nextJobs] = await Promise.all([
-        pipelineApi.list(selectedJobId),
-        jobsApi.listManaged(false),
-      ])
-      setApplications(nextApplications)
-      setJobs(nextJobs)
+      const snapshot = await getOrFetchResource(
+        key,
+        async () => {
+          const [nextApplications, nextJobs] = await Promise.all([
+            pipelineApi.list(selectedJobId),
+            jobsApi.listManaged(false),
+          ])
+
+          return { applications: nextApplications, jobs: nextJobs }
+        },
+        { force },
+      )
+      setApplications(snapshot.applications)
+      setJobs(snapshot.jobs)
     } catch (cause) {
       setError(errorMessage(cause, "Could not load the hiring pipeline."))
     } finally {
@@ -299,23 +369,42 @@ export default function PipelineScreen() {
   const openDetails = async (application: PipelineApplication) => {
     setSelected(application)
     setNote("")
+    setDetailError("")
+
+    const detailKey = pipelineDetailCacheKey(application.application_id)
+
+    const cached = getCachedResource<PipelineDetailSnapshot>(detailKey)
+
+    if (cached) {
+      setNotes(cached.notes)
+
+      setHistory(cached.history)
+
+      setDetailLoading(false)
+
+      return
+    }
+
     setNotes([])
     setHistory([])
-    setDetailError("")
     setDetailLoading(true)
     try {
-      const [nextNotes, nextHistory] = await Promise.all([
-        pipelineApi.listNotes(application.application_id),
-        pipelineApi.listHistory(application.application_id),
-      ])
+      const snapshot = await getOrFetchResource(detailKey, async () => {
+        const [nextNotes, nextHistory] = await Promise.all([
+          pipelineApi.listNotes(application.application_id),
+          pipelineApi.listHistory(application.application_id),
+        ])
+
+        return { notes: nextNotes, history: nextHistory }
+      })
       setNotes((current) => [
         ...current,
-        ...nextNotes.filter(
+        ...snapshot.notes.filter(
           (item) =>
             !current.some((existing) => existing.note_id === item.note_id),
         ),
       ])
-      setHistory(nextHistory)
+      setHistory(snapshot.history)
     } catch (cause) {
       setDetailError(errorMessage(cause, "Could not load candidate activity."))
     } finally {
@@ -338,7 +427,7 @@ export default function PipelineScreen() {
         application.application_id,
         stage,
       )
-      setApplications((current) =>
+      commitApplications((current) =>
         current.map((item) =>
           item.application_id === updated.application_id ? updated : item,
         ),
@@ -349,7 +438,14 @@ export default function PipelineScreen() {
       setSuccess(`Moved ${updated.candidate_name} to ${updated.current_stage}.`)
 
       if (selected?.application_id === updated.application_id) {
-        setHistory(await pipelineApi.listHistory(updated.application_id))
+        const nextHistory = await pipelineApi.listHistory(updated.application_id)
+
+        setHistory(nextHistory)
+
+        setCachedResource(pipelineDetailCacheKey(updated.application_id), {
+          notes,
+          history: nextHistory,
+        })
       }
     } catch (cause) {
       const message = errorMessage(cause, "Could not move this candidate.")
@@ -377,7 +473,7 @@ export default function PipelineScreen() {
           application,
         ]),
       )
-      setApplications((current) =>
+      commitApplications((current) =>
         current.map((application) =>
           updatedById.get(application.application_id) ?? application,
         ),
@@ -389,7 +485,14 @@ export default function PipelineScreen() {
         selected &&
         updatedById.has(selected.application_id)
       ) {
-        setHistory(await pipelineApi.listHistory(selected.application_id))
+        const nextHistory = await pipelineApi.listHistory(selected.application_id)
+
+        setHistory(nextHistory)
+
+        setCachedResource(pipelineDetailCacheKey(selected.application_id), {
+          notes,
+          history: nextHistory,
+        })
       }
       setSelectedIds([])
       const skippedMessage = result.skipped_application_ids.length
@@ -418,13 +521,20 @@ export default function PipelineScreen() {
     setSuccess("")
     try {
       const updated = await pipelineApi.reopen(selected.application_id)
-      setApplications((current) =>
+      commitApplications((current) =>
         current.map((item) =>
           item.application_id === updated.application_id ? updated : item,
         ),
       )
       setSelected(updated)
-      setHistory(await pipelineApi.listHistory(updated.application_id))
+      const nextHistory = await pipelineApi.listHistory(updated.application_id)
+
+      setHistory(nextHistory)
+
+      setCachedResource(pipelineDetailCacheKey(updated.application_id), {
+        notes,
+        history: nextHistory,
+      })
       setSuccess(
         "Reopened " + updated.candidate_name + " at " + updated.current_stage + ".",
       )
@@ -445,8 +555,17 @@ export default function PipelineScreen() {
         selected.application_id,
         note.trim(),
       )
-      setNotes((current) => [created, ...current])
-      setApplications((current) =>
+      setNotes((current) => {
+        const nextNotes = [created, ...current]
+
+        setCachedResource(pipelineDetailCacheKey(selected.application_id), {
+          notes: nextNotes,
+          history,
+        })
+
+        return nextNotes
+      })
+      commitApplications((current) =>
         current.map((item) =>
           item.application_id === selected.application_id
             ? { ...item, note_count: item.note_count + 1 }
@@ -676,7 +795,7 @@ export default function PipelineScreen() {
             type="button"
             className="fc-btn fc-btn--secondary pipeline-filter-refresh"
             disabled={loading}
-            onClick={() => void load()}
+            onClick={() => void load(true)}
           >
             <ArrowClockwise size={15} />
             Refresh
@@ -791,7 +910,7 @@ export default function PipelineScreen() {
           <button
             type="button"
             className="fc-btn fc-btn--secondary"
-            onClick={() => void load()}
+            onClick={() => void load(true)}
             style={{ marginTop: 12 }}
           >
             <ArrowClockwise size={15} />

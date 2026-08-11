@@ -28,6 +28,12 @@ import { cvRankingApi } from "@/api/cvRankingApi"
 
 import { jobsApi } from "@/api/jobsApi"
 
+import {
+  getCachedResource,
+  getOrFetchResource,
+  setCachedResource,
+} from "@/services/resourceCache"
+
 import type { RankedApplication, RankingBreakdown } from "@/types/cvRanking"
 
 import type { JobPost } from "@/types/jobs"
@@ -37,6 +43,11 @@ import ScoreRing from "../components/ScoreRing"
 type AnalysisState = "Pending" | "Processing" | "Failed" | "Success"
 
 type CvAction = "open" | "download"
+
+const RANKING_JOBS_CACHE_KEY = "hr-ranking:jobs"
+
+const rankingApplicationsCacheKey = (jobId: number) =>
+  `hr-ranking:applications:${jobId}`
 
 const breakdownCriteria: Array<[keyof RankingBreakdown, string]> = [
   ["skills", "Skills"],
@@ -151,9 +162,13 @@ function parsedText(
 }
 
 export default function JobApplicantsRankingPanel() {
-  const [jobs, setJobs] = useState<JobPost[]>([])
+  const cachedJobs = getCachedResource<JobPost[]>(RANKING_JOBS_CACHE_KEY)
 
-  const [selectedJobId, setSelectedJobId] = useState<number | null>(null)
+  const [jobs, setJobs] = useState<JobPost[]>(cachedJobs ?? [])
+
+  const [selectedJobId, setSelectedJobId] = useState<number | null>(
+    cachedJobs?.[0]?.job_id ?? null,
+  )
 
   const [applications, setApplications] = useState<RankedApplication[]>([])
 
@@ -166,7 +181,7 @@ export default function JobApplicantsRankingPanel() {
 
   const [threshold, setThreshold] = useState(70)
 
-  const [jobsLoading, setJobsLoading] = useState(true)
+  const [jobsLoading, setJobsLoading] = useState(() => !cachedJobs)
 
   const [applicationsLoading, setApplicationsLoading] = useState(false)
 
@@ -201,13 +216,13 @@ export default function JobApplicantsRankingPanel() {
   useEffect(() => {
     let active = true
 
-    setJobsLoading(true)
+    const cached = getCachedResource<JobPost[]>(RANKING_JOBS_CACHE_KEY)
+
+    setJobsLoading(!cached)
 
     setJobsError("")
 
-    jobsApi
-
-      .listManaged()
+    getOrFetchResource(RANKING_JOBS_CACHE_KEY, () => jobsApi.listManaged())
 
       .then((result) => {
         if (!active) return
@@ -257,13 +272,26 @@ export default function JobApplicantsRankingPanel() {
 
     let active = true
 
-    setApplicationsLoading(true)
+    const key = rankingApplicationsCacheKey(selectedJobId)
+    const cached = getCachedResource<RankedApplication[]>(key)
+
+    if (cached && reloadKey === 0) {
+      setApplications(cached)
+
+      setApplicationsLoading(false)
+
+      return
+    }
+
+    setApplicationsLoading(!cached)
 
     setApplicationsError("")
 
-    cvRankingApi
-
-      .listApplications(selectedJobId)
+    getOrFetchResource(
+      key,
+      () => cvRankingApi.listApplications(selectedJobId),
+      { force: reloadKey > 0 },
+    )
 
       .then((result) => {
         if (!active) return
@@ -545,11 +573,17 @@ export default function JobApplicantsRankingPanel() {
         breakdown: null,
       }
 
-      setApplications((current) =>
-        current.map((item) =>
+      setApplications((current) => {
+        const next = current.map((item) =>
           item.application_id === application.application_id ? pending : item,
-        ),
-      )
+        )
+
+        if (selectedJobId != null) {
+          setCachedResource(rankingApplicationsCacheKey(selectedJobId), next)
+        }
+
+        return next
+      })
 
       setSelectedApplication(pending)
     } catch (cause) {

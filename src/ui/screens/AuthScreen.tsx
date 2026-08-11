@@ -75,6 +75,7 @@ declare global {
 
 interface AuthScreenProps {
   onAuth: (session: AuthSession) => void
+  initialMode?: Extract<AuthMode, "login" | "register">
   startInRoleSelection?: boolean
   onBackToLanding?: () => void
 }
@@ -116,11 +117,12 @@ const authCss = `
 
 export default function AuthScreen({
   onAuth,
+  initialMode = "login",
   startInRoleSelection = false,
   onBackToLanding,
 }: AuthScreenProps) {
   const googleButtonRef = useRef<HTMLDivElement | null>(null)
-  const [mode, setMode] = useState<AuthMode>("login")
+  const [mode, setMode] = useState<AuthMode>(initialMode)
   const [step, setStep] = useState<"auth" | "role">(
     startInRoleSelection ? "role" : "auth",
   )

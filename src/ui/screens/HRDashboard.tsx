@@ -24,6 +24,10 @@ import type { ScreenId } from "@/types/app"
 import type { ReportJobRow, ReportSummary } from "@/types/reports"
 
 import { reportsApi } from "@/api/reportsApi"
+import {
+  getCachedResource,
+  getOrFetchResource,
+} from "@/services/resourceCache"
 
 interface HRDashboardProps {
   onNavigate: (screen: ScreenId) => void
@@ -39,6 +43,9 @@ const trailing30Days = () => {
   from.setDate(from.getDate() - 29)
   return { from: dateInput(from), to: dateInput(to) }
 }
+
+const hrDashboardCacheKey = (range: { from: string; to: string }) =>
+  `hr-dashboard:summary:${range.from}:${range.to}`
 
 const scoreColor = (score: number | null) =>
   score == null
@@ -61,13 +68,26 @@ const scoreDisplay = (score: number | null) =>
   score == null ? "—" : `${Math.round(score)}%`
 
 export default function HRDashboard({ onNavigate }: HRDashboardProps) {
-  const [summary, setSummary] = useState<ReportSummary | null>(null)
+  const defaultRange = trailing30Days()
+  const cachedSummary = getCachedResource<ReportSummary>(
+    hrDashboardCacheKey(defaultRange),
+  )
+  const [summary, setSummary] = useState<ReportSummary | null>(
+    cachedSummary ?? null,
+  )
   const [loadError, setLoadError] = useState("")
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (force = false) => {
+    const range = trailing30Days()
+    const key = hrDashboardCacheKey(range)
+
     setLoadError("")
     try {
-      setSummary(await reportsApi.summary(trailing30Days()))
+      setSummary(
+        await getOrFetchResource(key, () => reportsApi.summary(range), {
+          force,
+        }),
+      )
     } catch (cause) {
       setLoadError(
         cause instanceof Error ? cause.message : "Could not load the dashboard.",
@@ -188,7 +208,7 @@ export default function HRDashboard({ onNavigate }: HRDashboardProps) {
               >
                 {loadError}
               </span>
-              <button className="fc-btn fc-btn--primary" onClick={() => void load()}>
+              <button className="fc-btn fc-btn--primary" onClick={() => void load(true)}>
                 <RefreshCw size={15} aria-hidden="true" /> Retry
               </button>
             </div>

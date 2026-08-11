@@ -33,6 +33,10 @@ import BezelCard from "@/ui/components/BezelCard"
 import type { ReportSummary } from "@/types/reports"
 
 import { reportsApi } from "@/api/reportsApi"
+import {
+  getCachedResource,
+  getOrFetchResource,
+} from "@/services/resourceCache"
 
 const pad = (n: number) => String(n).padStart(2, "0")
 const dateInput = (d: Date) =>
@@ -65,20 +69,28 @@ const deltaText = (
   return `${sign}${Math.round(diff * 10) / 10}${suffix} vs prev. month`
 }
 
+const reportsCacheKey = (range: { from: string; to: string }) =>
+  `hr-reports:summary:${range.from}:${range.to}`
+
 export default function ReportsScreen() {
   const now = new Date()
   const currentMonth = { year: now.getFullYear(), month: now.getMonth() }
   const minMonth = new Date(now.getFullYear(), now.getMonth() - 11, 1)
 
   const [month, setMonth] = useState(currentMonth)
-  const [summary, setSummary] = useState<ReportSummary | null>(null)
-  const [loadError, setLoadError] = useState("")
-
   const windowRange = useMemo(() => {
     const first = new Date(month.year, month.month, 1)
     const last = new Date(month.year, month.month + 1, 0)
     return { from: dateInput(first), to: dateInput(last) }
   }, [month])
+
+  const cachedSummary = getCachedResource<ReportSummary>(
+    reportsCacheKey(windowRange),
+  )
+  const [summary, setSummary] = useState<ReportSummary | null>(
+    cachedSummary ?? null,
+  )
+  const [loadError, setLoadError] = useState("")
 
   const monthLabel = new Date(month.year, month.month, 1).toLocaleDateString(
     undefined,
@@ -91,10 +103,24 @@ export default function ReportsScreen() {
   const canGoBack = monthIndex > minIndex
   const canGoForward = monthIndex < currentIndex
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (force = false) => {
+    const cached = getCachedResource<ReportSummary>(reportsCacheKey(windowRange))
+
+    if (cached && !force) {
+      setSummary(cached)
+
+      return
+    }
+
     setLoadError("")
     try {
-      setSummary(await reportsApi.summary(windowRange))
+      setSummary(
+        await getOrFetchResource(
+          reportsCacheKey(windowRange),
+          () => reportsApi.summary(windowRange),
+          { force },
+        ),
+      )
     } catch (cause) {
       setLoadError(
         cause instanceof Error ? cause.message : "Could not load reports.",
@@ -324,7 +350,7 @@ export default function ReportsScreen() {
             >
               {loadError}
             </span>
-            <button className="fc-btn fc-btn--primary" onClick={() => void load()}>
+            <button className="fc-btn fc-btn--primary" onClick={() => void load(true)}>
               <ArrowClockwise size={15} /> Retry
             </button>
           </div>

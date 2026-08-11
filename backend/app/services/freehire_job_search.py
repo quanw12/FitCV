@@ -166,7 +166,11 @@ def _derive_level_from_experience(parsed_payload) -> str | None:
 
 
 def derive_ai_search_query(
-    *, cv_text: str, parsed_payload, preferred_level: str | None = None
+    *,
+    cv_text: str,
+    parsed_payload,
+    preferred_level: str | None = None,
+    use_ai: bool = True,
 ) -> dict:
     """Derive a search query from the CV, preferring AI when configured.
 
@@ -181,7 +185,7 @@ def derive_ai_search_query(
     """
     level = normalize_level(preferred_level)
     location_hint: str | None = None
-    if settings.analyzer_provider.strip().lower() == "gemini":
+    if use_ai and settings.analyzer_provider.strip().lower() == "gemini":
         try:
             profile = extract_cv_search_profile(cv_text=cv_text)
         except (GeminiAnalyzerError, ValueError):

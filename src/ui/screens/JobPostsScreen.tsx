@@ -29,6 +29,11 @@ import {
 } from "@phosphor-icons/react"
 
 import { jobsApi } from "@/api/jobsApi"
+import {
+  getCachedResource,
+  getOrFetchResource,
+  setCachedResource,
+} from "@/services/resourceCache"
 import type { JobPost, JobStatus, JobWrite } from "@/types/jobs"
 
 type JobListView = "active" | "archived"
@@ -44,6 +49,8 @@ interface ManagedJobs {
   active: JobPost[]
   archived: JobPost[]
 }
+
+const JOB_POSTS_CACHE_KEY = "hr-job-posts:managed"
 
 const weightFields = [
   ["skill_weight", "Skills", "Technical and role-specific skills"],
@@ -135,15 +142,19 @@ const actionLabels: Record<JobAction, string> = {
 }
 
 export default function JobPostsScreen() {
-  const [managedJobs, setManagedJobs] = useState<ManagedJobs>({
-    active: [],
-    archived: [],
-  })
+  const cachedManagedJobs =
+    getCachedResource<ManagedJobs>(JOB_POSTS_CACHE_KEY)
+  const [managedJobs, setManagedJobs] = useState<ManagedJobs>(
+    cachedManagedJobs ?? {
+      active: [],
+      archived: [],
+    },
+  )
   const [listView, setListView] = useState<JobListView>("active")
   const [form, setForm] = useState<JobWrite>(createEmptyForm)
   const [editingId, setEditingId] = useState<number | null>(null)
   const [editorOpen, setEditorOpen] = useState(false)
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(() => !cachedManagedJobs)
   const [saving, setSaving] = useState(false)
   const [extracting, setExtracting] = useState(false)
   const [rawJobDescription, setRawJobDescription] = useState("")
@@ -159,15 +170,46 @@ export default function JobPostsScreen() {
   const [previewJob, setPreviewJob] = useState<JobPost | null>(null)
   const [previewingId, setPreviewingId] = useState<number | null>(null)
 
-  const load = useCallback(async () => {
-    setLoading(true)
+  const commitManagedJobs = useCallback(
+    (updater: (current: ManagedJobs) => ManagedJobs) => {
+      setManagedJobs((current) => {
+        const next = updater(current)
+
+        setCachedResource(JOB_POSTS_CACHE_KEY, next)
+
+        return next
+      })
+    },
+    [],
+  )
+
+  const load = useCallback(async (force = false) => {
+    const cached = getCachedResource<ManagedJobs>(JOB_POSTS_CACHE_KEY)
+
+    if (cached && !force) {
+      setManagedJobs(cached)
+      setLoading(false)
+
+      return
+    }
+
+    setLoading(!cached)
     setLoadError("")
     try {
-      const [active, archived] = await Promise.all([
-        jobsApi.listManaged(false),
-        jobsApi.listManaged(true),
-      ])
-      setManagedJobs({ active, archived })
+      setManagedJobs(
+        await getOrFetchResource(
+          JOB_POSTS_CACHE_KEY,
+          async () => {
+            const [active, archived] = await Promise.all([
+              jobsApi.listManaged(false),
+              jobsApi.listManaged(true),
+            ])
+
+            return { active, archived }
+          },
+          { force },
+        ),
+      )
     } catch (cause) {
       setLoadError(errorMessage(cause, "Could not load company jobs."))
     } finally {
@@ -340,7 +382,7 @@ export default function JobPostsScreen() {
 
       if (editingId) {
         const updated = await jobsApi.update(editingId, payload)
-        setManagedJobs((current) => ({
+        commitManagedJobs((current) => ({
           ...current,
           active: current.active.map((job) =>
             job.job_id === updated.job_id ? updated : job,
@@ -349,7 +391,7 @@ export default function JobPostsScreen() {
         setSuccess(`Saved changes to “${updated.title}”.`)
       } else {
         const created = await jobsApi.create(payload)
-        setManagedJobs((current) => ({
+        commitManagedJobs((current) => ({
           ...current,
           active: [created, ...current.active],
         }))
@@ -372,14 +414,14 @@ export default function JobPostsScreen() {
       const updated = await jobsApi[action](job.job_id)
 
       if (action === "duplicate") {
-        setManagedJobs((current) => ({
+        commitManagedJobs((current) => ({
           ...current,
           active: [updated, ...current.active],
         }))
         setListView("active")
         setSuccess(`Created draft copy “${updated.title}”. Applications were not copied.`)
       } else if (action === "archive") {
-        setManagedJobs((current) => ({
+        commitManagedJobs((current) => ({
           active: current.active.filter(
             (item) => item.job_id !== updated.job_id,
           ),
@@ -388,7 +430,7 @@ export default function JobPostsScreen() {
         if (editingId === updated.job_id) closeEditor()
         setSuccess(`Archived “${updated.title}”.`)
       } else if (action === "unarchive") {
-        setManagedJobs((current) => ({
+        commitManagedJobs((current) => ({
           active: [updated, ...current.active],
           archived: current.archived.filter(
             (item) => item.job_id !== updated.job_id,
@@ -396,7 +438,7 @@ export default function JobPostsScreen() {
         }))
         setSuccess(`Restored “${updated.title}” to active jobs.`)
       } else {
-        setManagedJobs((current) => ({
+        commitManagedJobs((current) => ({
           ...current,
           active: current.active.map((item) =>
             item.job_id === updated.job_id ? updated : item,
@@ -915,7 +957,7 @@ export default function JobPostsScreen() {
           <button
             type="button"
             className="fc-btn fc-btn--secondary"
-            onClick={() => void load()}
+            onClick={() => void load(true)}
             disabled={loading}
           >
             <ArrowClockwise size={15} />
@@ -975,7 +1017,7 @@ export default function JobPostsScreen() {
             <button
               type="button"
               className="fc-btn fc-btn--secondary"
-              onClick={() => void load()}
+              onClick={() => void load(true)}
               style={{ marginTop: 12 }}
             >
               <ArrowClockwise size={15} />
