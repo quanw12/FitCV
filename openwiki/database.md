@@ -34,9 +34,10 @@ FitCV uses a MySQL 8.0+ database with utf8mb4 encoding to support Vietnamese and
 - **application_stage_history**: Audit trail of application stage changes
 - **application_note**: Notes on applications by HR or hiring managers
 - **candidate_email_thread**: Email conversation threads for applications
-- **candidate_email**: Individual emails sent as part of workflow (with AI generation flag)
+- **candidate_email**: Individual emails sent as part of workflow (with AI generation flag, plus foreign key to campaign and stage at generation for audit)
 - **candidate_email_inbound**: Incoming email replies from candidates
 - **candidate_email_event**: Email service provider events (opens, clicks, bounces)
+- **candidate_email_campaign**: Email campaigns for batch email sending with template management and targeting (stores template JSON, recipient count, interview date, AI generation flag)
 
 ### Tracking & External Applications
 - **tracked_application**: Student-owned applications tracked outside FitCV's recruiter pipeline

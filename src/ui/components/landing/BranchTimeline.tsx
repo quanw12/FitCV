@@ -2,45 +2,109 @@ import { useEffect, useRef, useState, type CSSProperties } from "react"
 
 import "./branch-timeline.css"
 
-const VIEW_W = 1240
-const VIEW_H = 410
-const RAIL_Y = 220
-const RAIL_X1 = 250
-const RAIL_X2 = 1225
-const UP_Y = 108
-const DOWN_Y = 336
+/* Canvas is wider than the old diagram so a four-stage trunk, a decision gate
+   and a looping lane all fit without overlapping. Heights differ because the
+   seeker loop needs room for the arc running back under the rail. */
 
-/* The three shared stages run along the rail; both outcomes fork off the last
-   one, so the diagram reads as one workflow with two possible endings. */
-
-const FORK_X = 540
-const STAGE_X = [300, 420, FORK_X]
-const BRANCH_X = 680
+const VIEW_W = 1440
+const RAIL_Y = 226
+const UP_Y = 96
+const DOWN_Y = 344
+const LOOP_Y = 448
+const RAIL_X1 = 300
+const RAIL_X2 = 1426
+const FORK_X = 600
+const BRANCH_X = 760
 const BRANCH_W = 250
 const BRANCH_END = BRANCH_X + BRANCH_W
+const REJOIN_X = 1360
+const LOOP_BACK_X = RAIL_X1 - 8
 const STATUS_R = 15
-const STATUS_1_X = BRANCH_END + 58
-const STATUS_2_X = STATUS_1_X + 92
-const REJOIN_X = 1150
-const NODE_X = [...STAGE_X, REJOIN_X]
-const GLYPH_CHECK = "M-5,0 L-1.6,3.6 L5.2,-3.6"
-const GLYPH_UP = "M0,4.6 V-4.6 M-3.8,-1 L0,-4.8 L3.8,-1"
-const GLYPH_BANG = "M0,-5.4 V0.8 M0,4.2 h0.01"
-const GLYPH_CROSS = "M-4.2,-4.2 L4.2,4.2 M4.2,-4.2 L-4.2,4.2"
+const GATE_R = 22
+
+export type TimelineGlyph =
+  | "check"
+  | "up"
+  | "cross"
+  | "bang"
+  | "mail"
+  | "spark"
+  | "plus"
+  | "loop"
+  | "dot"
+
+/* Glyph paths are centred on the node origin. `dot` is the only filled mark;
+   every other glyph is stroked. */
+
+const GLYPHS: Record<TimelineGlyph, { d: string; fill?: boolean }> = {
+  check: { d: "M-5,0 L-1.6,3.6 L5.2,-3.6" },
+  up: { d: "M0,4.6 V-4.6 M-3.8,-1 L0,-4.8 L3.8,-1" },
+  cross: { d: "M-4.2,-4.2 L4.2,4.2 M4.2,-4.2 L-4.2,4.2" },
+  bang: { d: "M0,-5.4 V0.8 M0,4.2 h0.01" },
+  mail: { d: "M-6,-3.5 H6 V3.5 H-6 Z M-6,-3.5 L0,1 L6,-3.5" },
+  spark: { d: "M0,-6 L1.4,-1.4 L6,0 L1.4,1.4 L0,6 L-1.4,1.4 L-6,0 L-1.4,-1.4 Z" },
+  plus: { d: "M0,-5 V5 M-5,0 H5" },
+  loop: { d: "M2.5,-4.33 A5,5 0 1 1 -2.5,-4.33 M-2.5,-4.33 L-0.4,-4.1 M-2.5,-4.33 L-1.6,-2.2" },
+  dot: { d: "M0,-2.2 A2.2,2.2 0 1 0 0.01,0 Z", fill: true },
+}
+
+export interface TimelineNode {
+  label: string
+  glyph: TimelineGlyph
+}
+
+export type TimelineEnding =
+  | { kind: "rejoin"; label: string }
+  | { kind: "loop"; label: string }
+  | { kind: "stop"; label: string }
+
+export interface TimelineLane {
+  badge: string
+  title: string
+  note: string
+  tone: "pass" | "fail" | "loop"
+  nodes: TimelineNode[]
+  ending: TimelineEnding
+}
+
+export interface TimelineSpec {
+  badge: string
+  marker: string
+  stages: string[]
+  gate: string
+  up: TimelineLane
+  down: TimelineLane
+}
+
+export interface BranchTimelineProps {
+  spec: TimelineSpec
+  caption: string
+}
 
 function after(ms: number): CSSProperties {
   return { transitionDelay: `${ms}ms` }
 }
 
-function railDots(): number[] {
-  const dots: number[] = []
+/* Trunk stages fan out left of the fork so the last one lands exactly on the
+   gate. Derived from the stage count, so 3–5 stages all space themselves. */
 
-  for (let x = RAIL_X1 + 30; x <= RAIL_X2 - 20; x += 40) {
-    if (NODE_X.some((node) => Math.abs(node - x) < 24)) continue
-    dots.push(x)
-  }
+function stageX(i: number, n: number): number {
+  if (n <= 1) return FORK_X
+  const step = (FORK_X - (RAIL_X1 + 40)) / (n - 1)
 
-  return dots
+  return FORK_X - (n - 1 - i) * step
+}
+
+/* Lane nodes spread evenly between the branch pill and the rejoin point so a
+   varying node count never collides with the rail or the fork. */
+
+function laneNodeX(j: number, m: number): number {
+  const start = BRANCH_END + 70
+  const end = REJOIN_X - 60
+
+  if (m <= 1) return (start + end) / 2
+
+  return start + (j * (end - start)) / (m - 1)
 }
 
 /* An S-curve from the fork on the rail out to a branch pill, mirrored by the
@@ -49,7 +113,69 @@ function railDots(): number[] {
 function connector(y: number): string {
   const bend = (BRANCH_X - FORK_X) * 0.45
 
-  return `M${FORK_X},${RAIL_Y} C${FORK_X + bend},${RAIL_Y} ${BRANCH_X - bend},${y} ${BRANCH_X},${y}`
+  return `M${FORK_X + GATE_R},${RAIL_Y} C${FORK_X + bend},${RAIL_Y} ${BRANCH_X - bend},${y} ${BRANCH_X},${y}`
+}
+
+/* Prefer splitting on the middot so "Scored · 4 categories" keeps the marker on
+   the first line; otherwise break at the last space before the limit. */
+
+function wrapLabel(text: string, maxChars: number): string[] {
+  if (text.length <= maxChars) return [text]
+
+  const dot = text.indexOf("·")
+
+  if (dot > 0 && dot <= maxChars) {
+    return [text.slice(0, dot + 1).trim(), text.slice(dot + 1).trim()]
+  }
+
+  const cut = text.lastIndexOf(" ", maxChars)
+
+  if (cut <= 0) return [text.slice(0, maxChars), text.slice(maxChars)]
+
+  return [text.slice(0, cut), text.slice(cut + 1)]
+}
+
+interface WrappedTextProps {
+  x: number
+  y: number
+  text: string
+  maxChars: number
+  className?: string
+  textAnchor?: "start" | "middle" | "end"
+  style?: CSSProperties
+}
+
+function WrappedText({
+  x,
+  y,
+  text,
+  maxChars,
+  className,
+  textAnchor = "middle",
+  style,
+}: WrappedTextProps) {
+  const lines = wrapLabel(text, maxChars)
+
+  return (
+    <text x={x} y={y} textAnchor={textAnchor} className={className} style={style}>
+      {lines.map((line, i) => (
+        <tspan key={i} x={x} dy={i === 0 ? 0 : 13}>
+          {line}
+        </tspan>
+      ))}
+    </text>
+  )
+}
+
+function railDots(nodeXs: number[]): number[] {
+  const dots: number[] = []
+
+  for (let x = RAIL_X1 + 30; x <= RAIL_X2 - 20; x += 40) {
+    if (nodeXs.some((node) => Math.abs(node - x) < 24)) continue
+    dots.push(x)
+  }
+
+  return dots
 }
 
 interface RailNodeProps {
@@ -68,39 +194,44 @@ function RailNode({ x, ms }: RailNodeProps) {
   )
 }
 
-interface ChangedPillProps {
-  cy: number
-  label: string
-  tone: "up" | "down"
+interface GateProps {
+  x: number
+  y: number
   ms: number
+  label: string
+  stamp: string
+  stampMs: number
 }
 
-/* Mono at 11px advances ~6.6px per character, so the pill can size itself to
-   whatever the spec puts in it rather than clipping a longer label. */
+/* The fork is a diamond on the rail, not a plain node, so the read is
+   "decide here" rather than "another step on the line". */
 
-function ChangedPill({ cy, label, tone, ms }: ChangedPillProps) {
-  const width = Math.max(132, Math.round(label.length * 6.6) + 48)
-  const left = Math.round((FORK_X + BRANCH_X) / 2 - width / 2)
+function Gate({ x, y, ms, label, stamp, stampMs }: GateProps) {
+  const r = GATE_R
 
   return (
-    <g className="bt-fade" style={after(ms)}>
-      <rect
-        x={left}
-        y={cy - 13}
-        width={width}
-        height={26}
-        rx={13}
-        className="bt-changed"
+    <g>
+      <path
+        d={`M${x},${y - r} L${x + r},${y} L${x},${y + r} L${x - r},${y} Z`}
+        className="bt-gate"
+        style={after(ms)}
       />
-      <circle
-        cx={left + 18}
-        cy={cy}
-        r={4}
-        className={`bt-changed-dot is-${tone}`}
+      <path
+        d={`M${x - r + 7},${y} L${x - 2},${y + r - 10} L${x + r - 6},${y - 7}`}
+        className="bt-gate-tick"
+        style={after(ms + 80)}
       />
-      <text x={left + 30} y={cy + 4} className="bt-changed-text">
+      <text x={x} y={y - r - 12} textAnchor="middle" className="bt-gate-text" style={after(ms + 120)}>
         {label}
       </text>
+      <WrappedText
+        x={x}
+        y={y + 34}
+        text={stamp}
+        maxChars={12}
+        className="bt-stamp bt-fade"
+        style={after(stampMs)}
+      />
     </g>
   )
 }
@@ -108,41 +239,31 @@ function ChangedPill({ cy, label, tone, ms }: ChangedPillProps) {
 interface BranchPillProps {
   y: number
   badge: string
-  label: string
+  title: string
+  note: string
   ms: number
 }
 
-function BranchPill({ y, badge, label, ms }: BranchPillProps) {
+/* The lane header is a single card: a tone badge, the lane title, and the note
+   describing why the candidate lands on this branch. Keeping it one block stops
+   the note from floating over the connector. */
+
+function BranchPill({ y, badge, title, note, ms }: BranchPillProps) {
   const badgeW = Math.max(64, Math.round(badge.length * 6.5) + 16)
+  const top = y - 26
 
   return (
     <g className="bt-fade" style={after(ms)}>
-      <rect
-        x={BRANCH_X}
-        y={y - 22}
-        width={BRANCH_W}
-        height={44}
-        rx={5}
-        className="bt-pill"
-      />
-      <rect
-        x={BRANCH_X + 13}
-        y={y - 10}
-        width={badgeW}
-        height={20}
-        rx={3}
-        className="bt-badge"
-      />
-      <text
-        x={BRANCH_X + 13 + badgeW / 2}
-        y={y + 4}
-        textAnchor="middle"
-        className="bt-badge-text"
-      >
+      <rect x={BRANCH_X} y={top} width={BRANCH_W} height={56} rx={6} className="bt-pill" />
+      <rect x={BRANCH_X + 13} y={top + 12} width={badgeW} height={18} rx={3} className="bt-badge" />
+      <text x={BRANCH_X + 13 + badgeW / 2} y={top + 25} textAnchor="middle" className="bt-badge-text">
         {badge}
       </text>
-      <text x={BRANCH_X + badgeW + 37} y={y + 5} className="bt-pill-text">
-        {label}
+      <text x={BRANCH_X + badgeW + 30} y={top + 25} className="bt-pill-text">
+        {title}
+      </text>
+      <text x={BRANCH_X + 13} y={top + 45} className="bt-pill-note">
+        {note}
       </text>
     </g>
   )
@@ -151,24 +272,107 @@ function BranchPill({ y, badge, label, ms }: BranchPillProps) {
 interface StatusNodeProps {
   x: number
   y: number
-  tone: "pass" | "fail"
-  glyph: string
+  tone: "pass" | "fail" | "loop"
+  glyph: TimelineGlyph
   label: string
   ms: number
 }
 
 function StatusNode({ x, y, tone, glyph, label, ms }: StatusNodeProps) {
+  const g = GLYPHS[glyph]
+
   return (
     <g transform={`translate(${x},${y})`}>
       <g className={`bt-pop is-${tone}`} style={after(ms)}>
         <circle r={STATUS_R} className="bt-status-ring" />
-        <path d={glyph} className="bt-status-glyph" />
+        <path d={g.d} className={`bt-status-glyph${g.fill ? " is-filled" : ""}`} />
       </g>
-      <text
+      <WrappedText
+        x={0}
         y={38}
-        textAnchor="middle"
+        text={label}
+        maxChars={15}
         className="bt-caption bt-fade"
         style={after(ms + 130)}
+      />
+    </g>
+  )
+}
+
+interface LaneProps {
+  lane: TimelineLane
+  side: "up" | "down"
+}
+
+/* A branch renders the connector, the lane header, an evenly spaced run of
+   nodes, then whichever ending the spec calls for. Delays are derived from the
+   node index so any length animates in order. */
+
+function Lane({ lane, side }: LaneProps) {
+  const y = side === "up" ? UP_Y : DOWN_Y
+  const connDelay = side === "up" ? 900 : 960
+  const pillDelay = side === "up" ? 1180 : 1240
+  const segBase = side === "up" ? 1320 : 1380
+  const tone = lane.tone
+  const m = lane.nodes.length
+  const nodeMs = (j: number) => segBase + j * 200 + 140
+  const segMs = (j: number) => segBase + j * 200
+  const lastX = laneNodeX(m - 1, m)
+
+  return (
+    <g>
+      <path d={connector(y)} pathLength={1} className="bt-draw bt-connector" style={after(connDelay)} />
+
+      <BranchPill y={y} badge={lane.badge} title={lane.title} note={lane.note} ms={pillDelay} />
+
+      {lane.nodes.map((node, j) => {
+        const nx = laneNodeX(j, m)
+        const prevX = j === 0 ? BRANCH_END : laneNodeX(j - 1, m) + STATUS_R
+        const lead = `M${prevX},${y} H${nx - STATUS_R}`
+
+        return (
+          <g key={node.label}>
+            <path d={lead} pathLength={1} className={`bt-draw bt-${tone}`} style={after(segMs(j))} />
+            <StatusNode x={nx} y={y} tone={tone} glyph={node.glyph} label={node.label} ms={nodeMs(j)} />
+          </g>
+        )
+      })}
+
+      {lane.ending.kind === "rejoin" && (
+        <RejoinEnding y={y} lastX={lastX} label={lane.ending.label} endMs={segMs(m - 1) + 300} />
+      )}
+
+      {lane.ending.kind === "loop" && (
+        <LoopEnding lastX={lastX} label={lane.ending.label} endMs={segMs(m - 1) + 300} />
+      )}
+
+      {lane.ending.kind === "stop" && (
+        <StopEnding y={y} lastX={lastX} label={lane.ending.label} endMs={segMs(m - 1) + 300} />
+      )}
+    </g>
+  )
+}
+
+interface EndingProps {
+  y: number
+  lastX: number
+  label: string
+  endMs: number
+}
+
+function RejoinEnding({ y, lastX, label, endMs }: EndingProps) {
+  const rejoin = `M${lastX + STATUS_R},${y} H${REJOIN_X - 26} Q${REJOIN_X},${y} ${REJOIN_X},${y + 26} V${RAIL_Y}`
+
+  return (
+    <g>
+      <path d={rejoin} pathLength={1} className="bt-draw bt-pass" style={after(endMs)} />
+      <RailNode x={REJOIN_X} ms={endMs + 120} />
+      <text
+        x={REJOIN_X}
+        y={RAIL_Y + 34}
+        textAnchor="middle"
+        className="bt-stamp is-pass bt-fade"
+        style={after(endMs + 240)}
       >
         {label}
       </text>
@@ -176,39 +380,80 @@ function StatusNode({ x, y, tone, glyph, label, ms }: StatusNodeProps) {
   )
 }
 
-export interface TimelineBranch {
-  changed: string
-  pill: string
-  first: string
-  second: string
+/* The seeker loop leaves the last node to the right, drops to a rail beneath the
+   diagram, runs back to the head and points into it — so the same CV is sent
+   through the flow again rather than ending the story. */
+
+function LoopEnding({ lastX, label, endMs }: { lastX: number; label: string; endMs: number }) {
+  const d = `M${lastX + STATUS_R},${DOWN_Y} H${lastX + 40} Q${lastX + 40},${LOOP_Y} ${lastX + 10},${LOOP_Y} H${LOOP_BACK_X} Q${LOOP_BACK_X},${RAIL_Y} ${RAIL_X1 - 30},${RAIL_Y} H${RAIL_X1}`
+
+  return (
+    <g>
+      <path
+        d={d}
+        pathLength={1}
+        className="bt-draw bt-loop"
+        markerEnd="url(#bt-arrow-loop)"
+        style={after(endMs)}
+      />
+      <g className="bt-fade" style={after(endMs + 200)}>
+        <rect
+          x={(lastX + 10 + LOOP_BACK_X) / 2 - 180}
+          y={LOOP_Y - 13}
+          width={360}
+          height={26}
+          rx={13}
+          className="bt-loop-pill"
+        />
+        <text x={(lastX + 10 + LOOP_BACK_X) / 2} y={LOOP_Y + 4} textAnchor="middle" className="bt-loop-text">
+          {label}
+        </text>
+      </g>
+    </g>
+  )
 }
 
-export interface TimelineSpec {
-  badge: string
-  marker: string
-  branchBadge: string
-  stages: string[]
-  pass: TimelineBranch
-  fail: TimelineBranch
-  outcome: string
-}
+/* A terminal lane simply stops: a short lead past the last node, a 2px cap bar
+   and a mono label saying the record is kept. Nothing rejoins the rail. */
 
-export interface BranchTimelineProps {
-  spec: TimelineSpec
-  caption: string
+function StopEnding({ y, lastX, label, endMs }: EndingProps) {
+  const capX = lastX + 46
+
+  return (
+    <g>
+      <path
+        d={`M${lastX + STATUS_R},${y} H${capX}`}
+        pathLength={1}
+        className="bt-draw bt-fail"
+        style={after(endMs - 160)}
+      />
+      <path d={`M${capX},${y - 24} V${y + 24}`} className="bt-stop-cap" style={after(endMs)} />
+      <text
+        x={capX}
+        y={y + 64}
+        textAnchor="middle"
+        className="bt-stamp is-fail bt-fade"
+        style={after(endMs + 80)}
+      >
+        {label}
+      </text>
+    </g>
+  )
 }
 
 export default function BranchTimeline({ spec, caption }: BranchTimelineProps) {
   const svgRef = useRef<SVGSVGElement>(null)
   const [isActive, setIsActive] = useState(false)
+  const hasLoop = spec.down.ending.kind === "loop"
+  const viewH = hasLoop ? 500 : 460
 
   useEffect(() => {
     const svg = svgRef.current
     if (!svg) return
 
-    const reduced = window.matchMedia(
-      "(prefers-reduced-motion: reduce)",
-    ).matches
+    const reduced =
+      typeof window.matchMedia === "function" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches
 
     if (reduced || typeof IntersectionObserver === "undefined") {
       setIsActive(true)
@@ -232,7 +477,19 @@ export default function BranchTimeline({ spec, caption }: BranchTimelineProps) {
     return () => observer.disconnect()
   }, [])
 
+  const n = spec.stages.length
+  const stageXs = spec.stages.map((_, i) => stageX(i, n))
+  const nodeXs = [...stageXs, REJOIN_X]
   const badgeW = Math.max(54, Math.round(spec.badge.length * 7) + 22)
+
+  const srItems: string[] = [`${spec.badge} ${spec.marker}`]
+  for (const stage of spec.stages) srItems.push(`Stage: ${stage}`)
+  srItems.push(`Gate: ${spec.gate}`)
+  for (const lane of [spec.up, spec.down]) {
+    srItems.push(`${lane.badge} ${lane.title} — ${lane.note}`)
+    for (const node of lane.nodes) srItems.push(node.label)
+    srItems.push(`${lane.ending.kind}: ${lane.ending.label}`)
+  }
 
   return (
     <figure className="bt">
@@ -241,225 +498,87 @@ export default function BranchTimeline({ spec, caption }: BranchTimelineProps) {
       <svg
         ref={svgRef}
         className={isActive ? "bt-svg is-active" : "bt-svg"}
-        viewBox={`0 0 ${VIEW_W} ${VIEW_H}`}
+        viewBox={`0 0 ${VIEW_W} ${viewH}`}
         preserveAspectRatio="xMidYMid meet"
-        role="img"
-        aria-label={caption}
+        aria-hidden="true"
       >
-        <g className="bt-fade" style={after(120)}>
-          <rect
-            x={8}
-            y={RAIL_Y - 14}
-            width={badgeW}
-            height={28}
-            rx={4}
-            className="bt-live"
-          />
-          <text
-            x={8 + badgeW / 2}
-            y={RAIL_Y + 4}
-            textAnchor="middle"
-            className="bt-live-text"
+        <defs>
+          <marker
+            id="bt-arrow-loop"
+            viewBox="0 0 10 10"
+            refX="8"
+            refY="5"
+            markerWidth="7"
+            markerHeight="7"
+            orient="auto"
           >
+            <path d="M0,0 L10,5 L0,10 L2.5,5 Z" className="bt-arrow-loop" />
+          </marker>
+        </defs>
+
+        <g className="bt-fade" style={after(120)}>
+          <rect x={8} y={RAIL_Y - 14} width={badgeW} height={28} rx={4} className="bt-live" />
+          <text x={8 + badgeW / 2} y={RAIL_Y + 4} textAnchor="middle" className="bt-live-text">
             {spec.badge}
           </text>
 
-          <rect
-            x={badgeW + 20}
-            y={RAIL_Y - 21}
-            width={166}
-            height={42}
-            rx={5}
-            className="bt-pill"
-          />
+          <rect x={badgeW + 20} y={RAIL_Y - 21} width={166} height={42} rx={5} className="bt-pill" />
           <text x={badgeW + 36} y={RAIL_Y + 5} className="bt-pill-text">
             {spec.marker}
           </text>
         </g>
 
-        <path
-          d={`M${RAIL_X1},${RAIL_Y} H${RAIL_X2}`}
-          pathLength={1}
-          className="bt-draw bt-rail"
-          style={after(0)}
-        />
+        <path d={`M${RAIL_X1},${RAIL_Y} H${RAIL_X2}`} pathLength={1} className="bt-draw bt-rail" style={after(0)} />
 
         <g className="bt-fade" style={after(420)}>
-          {railDots().map((x) => (
-            <circle
-              key={x}
-              cx={x}
-              cy={RAIL_Y}
-              r={1.6}
-              className="bt-rail-dot"
-            />
+          {railDots(nodeXs).map((x) => (
+            <circle key={x} cx={x} cy={RAIL_Y} r={1.6} className="bt-rail-dot" />
           ))}
         </g>
 
-        {spec.stages.map((stage, index) => (
-          <g key={stage}>
-            <RailNode x={STAGE_X[index]} ms={480 + index * 120} />
-            <text
-              x={STAGE_X[index]}
-              y={RAIL_Y + 34}
-              textAnchor="middle"
-              className="bt-stamp bt-fade"
-              style={after(560 + index * 120)}
-            >
-              {stage}
-            </text>
-          </g>
-        ))}
+        {spec.stages.map((stage, index) => {
+          const x = stageXs[index]
 
-        <PassBranch spec={spec} />
-        <FailBranch spec={spec} />
+          if (index === n - 1) {
+            return (
+              <Gate
+                key={stage}
+                x={FORK_X}
+                y={RAIL_Y}
+                ms={480 + index * 110}
+                label={spec.gate}
+                stamp={stage}
+                stampMs={560 + index * 110}
+              />
+            )
+          }
+
+          return (
+            <g key={stage}>
+              <RailNode x={x} ms={480 + index * 110} />
+              <WrappedText
+                x={x}
+                y={RAIL_Y + 34}
+                text={stage}
+                maxChars={12}
+                className="bt-stamp bt-fade"
+                style={after(560 + index * 110)}
+              />
+            </g>
+          )
+        })}
+
+        <Lane lane={spec.up} side="up" />
+        <Lane lane={spec.down} side="down" />
       </svg>
+
+      <ol className="bt-sr">
+        {srItems.map((item, i) => (
+          <li key={i}>{item}</li>
+        ))}
+      </ol>
 
       <figcaption className="bt-figcaption">{caption}</figcaption>
     </figure>
-  )
-}
-
-interface BranchProps {
-  spec: TimelineSpec
-}
-
-/* The kept path: fork up, run the two checks, then corner back down into the
-   rail so the outcome lands on the main line. */
-
-function PassBranch({ spec }: BranchProps) {
-  const lead = `M${BRANCH_END},${UP_Y} H${STATUS_1_X - STATUS_R}`
-  const link = `M${STATUS_1_X + STATUS_R},${UP_Y} H${STATUS_2_X - STATUS_R}`
-  const rejoin = `M${STATUS_2_X + STATUS_R},${UP_Y} H${REJOIN_X - 26} Q${REJOIN_X},${UP_Y} ${REJOIN_X},${UP_Y + 26} V${RAIL_Y}`
-
-  return (
-    <g>
-      <path
-        d={connector(UP_Y)}
-        pathLength={1}
-        className="bt-draw bt-connector"
-        style={after(900)}
-      />
-
-      <ChangedPill cy={164} label={spec.pass.changed} tone="up" ms={1080} />
-
-      <BranchPill
-        y={UP_Y}
-        badge={spec.branchBadge}
-        label={spec.pass.pill}
-        ms={1180}
-      />
-
-      <path
-        d={lead}
-        pathLength={1}
-        className="bt-draw bt-pass"
-        style={after(1320)}
-      />
-
-      <StatusNode
-        x={STATUS_1_X}
-        y={UP_Y}
-        tone="pass"
-        glyph={GLYPH_CHECK}
-        label={spec.pass.first}
-        ms={1460}
-      />
-
-      <path
-        d={link}
-        pathLength={1}
-        className="bt-draw bt-pass"
-        style={after(1560)}
-      />
-
-      <StatusNode
-        x={STATUS_2_X}
-        y={UP_Y}
-        tone="pass"
-        glyph={GLYPH_UP}
-        label={spec.pass.second}
-        ms={1660}
-      />
-
-      <path
-        d={rejoin}
-        pathLength={1}
-        className="bt-draw bt-pass"
-        style={after(1800)}
-      />
-
-      <RailNode x={REJOIN_X} ms={2080} />
-
-      <text
-        x={REJOIN_X}
-        y={RAIL_Y + 34}
-        textAnchor="middle"
-        className="bt-stamp is-pass bt-fade"
-        style={after(2180)}
-      >
-        {spec.outcome}
-      </text>
-    </g>
-  )
-}
-
-/* The dropped path: forks down from the same point and simply ends, so nothing
-   it produced ever reaches the main line. */
-
-function FailBranch({ spec }: BranchProps) {
-  const lead = `M${BRANCH_END},${DOWN_Y} H${STATUS_1_X - STATUS_R}`
-  const link = `M${STATUS_1_X + STATUS_R},${DOWN_Y} H${STATUS_2_X - STATUS_R}`
-
-  return (
-    <g>
-      <path
-        d={connector(DOWN_Y)}
-        pathLength={1}
-        className="bt-draw bt-connector"
-        style={after(960)}
-      />
-
-      <ChangedPill cy={278} label={spec.fail.changed} tone="down" ms={1140} />
-
-      <BranchPill
-        y={DOWN_Y}
-        badge={spec.branchBadge}
-        label={spec.fail.pill}
-        ms={1240}
-      />
-
-      <path
-        d={lead}
-        pathLength={1}
-        className="bt-draw bt-fail"
-        style={after(1380)}
-      />
-
-      <StatusNode
-        x={STATUS_1_X}
-        y={DOWN_Y}
-        tone="fail"
-        glyph={GLYPH_BANG}
-        label={spec.fail.first}
-        ms={1520}
-      />
-
-      <path
-        d={link}
-        pathLength={1}
-        className="bt-draw bt-fail"
-        style={after(1620)}
-      />
-
-      <StatusNode
-        x={STATUS_2_X}
-        y={DOWN_Y}
-        tone="fail"
-        glyph={GLYPH_CROSS}
-        label={spec.fail.second}
-        ms={1720}
-      />
-    </g>
   )
 }

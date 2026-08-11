@@ -155,6 +155,11 @@ FitCV provides specialized HR functionality for recruiters and hiring managers t
   - Engagement metrics (open rates, click-through rates)
   - Bounce and complaint handling
   - AI-generation flag for automated content
+- **Email Campaigns**: 
+  - Stage-driven batch email sending for targeted groups of candidates
+  - Template management with JSON storage for dynamic content
+  - Tracking of application stage at generation for audit and compliance
+  - Campaign-level analytics (recipient count, interview date association)
 
 #### Email Webhooks
 - **Provider Integration**: Connects to email services (SendGrid, SES, etc.) for event tracking
