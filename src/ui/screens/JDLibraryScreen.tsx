@@ -36,6 +36,12 @@ import BezelCard from "@/ui/components/BezelCard"
 
 import { profileApi } from "@/api/profileApi"
 
+import {
+  clearResourceCache,
+  getCachedResource,
+  getOrFetchResource,
+} from "@/services/resourceCache"
+
 import type { JobPost } from "@/types/jobs"
 
 import type { StudentApplication } from "@/types/applications"
@@ -43,6 +49,23 @@ import type { StudentApplication } from "@/types/applications"
 import type { JdLibraryInsights, JdLibraryItem } from "@/types/jdLibrary"
 
 const MAX_CV_BYTES = 10 * 1024 * 1024
+
+const JD_OPPORTUNITIES_CACHE_KEY = "jd-library:opportunities"
+
+const jdLibraryCacheKey = (search: string) =>
+  `jd-library:saved:${search.trim().toLowerCase()}`
+
+interface JdOpportunitiesSnapshot {
+  jobs: JobPost[]
+
+  applications: StudentApplication[]
+}
+
+interface JdLibrarySnapshot {
+  items: JdLibraryItem[]
+
+  insights: JdLibraryInsights
+}
 
 const sections = [
   ["about_job", "About the job"],
@@ -110,13 +133,27 @@ export default function JDLibraryScreen({
   onViewTracking,
   onUseJd,
 }: JDLibraryScreenProps) {
-  const [jobs, setJobs] = useState<JobPost[]>([])
+  const cachedOpportunities = getCachedResource<JdOpportunitiesSnapshot>(
+    JD_OPPORTUNITIES_CACHE_KEY,
+  )
 
-  const [savedJds, setSavedJds] = useState<JdLibraryItem[]>([])
+  const cachedLibrary = getCachedResource<JdLibrarySnapshot>(
+    jdLibraryCacheKey(""),
+  )
 
-  const [insights, setInsights] = useState<JdLibraryInsights | null>(null)
+  const [jobs, setJobs] = useState<JobPost[]>(cachedOpportunities?.jobs ?? [])
 
-  const [applications, setApplications] = useState<StudentApplication[]>([])
+  const [savedJds, setSavedJds] = useState<JdLibraryItem[]>(
+    cachedLibrary?.items ?? [],
+  )
+
+  const [insights, setInsights] = useState<JdLibraryInsights | null>(
+    cachedLibrary?.insights ?? null,
+  )
+
+  const [applications, setApplications] = useState<StudentApplication[]>(
+    cachedOpportunities?.applications ?? [],
+  )
 
   const [recentApplications, setRecentApplications] =
     useState<Record<number, number>>({})
@@ -135,9 +172,9 @@ export default function JDLibraryScreen({
 
   const [location, setLocation] = useState("")
 
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(() => !cachedOpportunities)
 
-  const [libraryLoading, setLibraryLoading] = useState(true)
+  const [libraryLoading, setLibraryLoading] = useState(() => !cachedLibrary)
 
   const [deletingJdId, setDeletingJdId] = useState<number | null>(null)
 
@@ -155,40 +192,101 @@ export default function JDLibraryScreen({
   const [applyError, setApplyError] = useState("")
 
   useEffect(() => {
-    Promise.all([jobsApi.listPublic(), applicationsApi.listMine()])
+    let active = true
 
-      .then(([availableJobs, trackedApplications]) => {
-        setJobs(availableJobs)
+    const loadOpportunities = async () => {
+      const cached = getCachedResource<JdOpportunitiesSnapshot>(
+        JD_OPPORTUNITIES_CACHE_KEY,
+      )
 
-        setApplications(trackedApplications)
-      })
+      if (cached) {
+        setJobs(cached.jobs)
 
-      .catch((cause) =>
+        setApplications(cached.applications)
+
+        setLoading(false)
+
+        return
+      }
+
+      setLoading(true)
+
+      try {
+        const snapshot = await getOrFetchResource(
+          JD_OPPORTUNITIES_CACHE_KEY,
+          async () => {
+            const [availableJobs, trackedApplications] = await Promise.all([
+              jobsApi.listPublic(),
+
+              applicationsApi.listMine(),
+            ])
+
+            return { jobs: availableJobs, applications: trackedApplications }
+          },
+        )
+
+        if (!active) return
+
+        setJobs(snapshot.jobs)
+
+        setApplications(snapshot.applications)
+      } catch (cause) {
+        if (!active) return
+
         setError(
           cause instanceof Error
             ? cause.message
             : "Could not load jobs and applications.",
-        ),
-      )
+        )
+      } finally {
+        if (active) setLoading(false)
+      }
+    }
 
-      .finally(() => setLoading(false))
+    void loadOpportunities()
+
+    return () => {
+      active = false
+    }
   }, [])
 
-  const loadLibrary = async (search = libraryQuery) => {
-    setLibraryLoading(true)
+  const loadLibrary = async (search = libraryQuery, force = false) => {
+    const key = jdLibraryCacheKey(search)
+
+    const cached = getCachedResource<JdLibrarySnapshot>(key)
+
+    if (cached && !force) {
+      setSavedJds(cached.items)
+
+      setInsights(cached.insights)
+
+      setLibraryLoading(false)
+
+      return
+    }
+
+    setLibraryLoading(!cached)
 
     setLibraryError("")
 
     try {
-      const [items, summary] = await Promise.all([
-        jdLibraryApi.list(search),
+      const snapshot = await getOrFetchResource(
+        key,
+        async () => {
+          const [items, summary] = await Promise.all([
+            jdLibraryApi.list(search),
 
-        jdLibraryApi.getInsights(),
-      ])
+            jdLibraryApi.getInsights(),
+          ])
 
-      setSavedJds(items)
+          return { items, insights: summary }
+        },
+        { force },
+      )
 
-      setInsights(summary)
+      setSavedJds(snapshot.items)
+
+      setInsights(snapshot.insights)
     } catch (cause) {
       setLibraryError(
         cause instanceof Error
@@ -216,7 +314,9 @@ export default function JDLibraryScreen({
     try {
       await jdLibraryApi.delete(item.jobDescriptionId)
 
-      await loadLibrary(libraryQuery)
+      clearResourceCache("jd-library:saved:")
+
+      await loadLibrary(libraryQuery, true)
     } catch (cause) {
       setLibraryError(
         cause instanceof Error
@@ -360,6 +460,8 @@ export default function JDLibraryScreen({
 
         [applyJob.job_id]: created.application_id,
       }))
+
+      clearResourceCache(JD_OPPORTUNITIES_CACHE_KEY)
 
       setSubmittedApplicationId(created.application_id)
     } catch (cause) {

@@ -1,8 +1,4 @@
-"""Route-level tests for /job-search/recommendations.
-
-Bug 2 fix: a user-typed keyword must NOT disable CV auto-detection (level +
-location hint + AI badge).  These tests pin that behaviour.
-"""
+"""Route-level tests for /job-search/recommendations."""
 
 import unittest
 from unittest import mock
@@ -82,14 +78,9 @@ class JobSearchRouteTests(unittest.TestCase):
         )
         self.client = TestClient(app)
 
-        derive_patch = mock.patch(
-            "app.services.freehire_job_search.derive_ai_search_query",
-            return_value={
-                "query": "python fastapi sql",
-                "location_hint": "Ho Chi Minh City",
-                "level": "Mid-level",
-                "used_ai": True,
-            },
+        ai_profile_patch = mock.patch(
+            "app.services.freehire_job_search.extract_cv_search_profile",
+            side_effect=AssertionError("AI search profile should not run."),
         )
         search_patch = mock.patch(
             "app.services.freehire_job_search.search_jobs",
@@ -107,10 +98,10 @@ class JobSearchRouteTests(unittest.TestCase):
             "app.services.linkedin_job_search.recommend_jobs",
             return_value=[],
         )
-        self.derive_mock = derive_patch.start()
+        self.ai_profile_mock = ai_profile_patch.start()
         self.search_mock = search_patch.start()
         self.linkedin_mock = linkedin_patch.start()
-        self.patchers = [derive_patch, search_patch, linkedin_patch]
+        self.patchers = [ai_profile_patch, search_patch, linkedin_patch]
 
     def tearDown(self) -> None:
         for patcher in self.patchers:
@@ -121,36 +112,29 @@ class JobSearchRouteTests(unittest.TestCase):
         Base.metadata.drop_all(self.engine)
         self.engine.dispose()
 
-    def test_keyword_does_not_disable_auto_detect(self) -> None:
-        """A typed keyword still yields a CV-derived level + AI badge."""
+    def test_keyword_skips_ai_cv_profile(self) -> None:
+        """A typed keyword should not send parsed CV text through AI."""
         response = self.client.post(
             "/api/job-search/recommendations",
             json={"cv_id": self.cv_id, "query": "remote backend jobs"},
         )
         self.assertEqual(response.status_code, 200, response.text)
         body = response.json()
-        # User keyword wins for the query...
         self.assertEqual(body["query"], "remote backend jobs")
-        # ...but level auto-detection still runs and is reported.
-        self.assertEqual(body["derived_level"], "Mid-level")
-        self.assertEqual(body["derived_by"], "ai")
-        # The seniority facet passed to the search is the derived level
-        # (not the empty dropdown default).
-        self.assertEqual(
-            self.search_mock.call_args.kwargs["level"], body["derived_level"]
-        )
+        self.assertEqual(body["derived_by"], "deterministic")
+        self.ai_profile_mock.assert_not_called()
 
-    def test_no_keyword_uses_derived_query(self) -> None:
-        """With no keyword, the query is the AI/deterministic derived keywords."""
+    def test_no_keyword_uses_deterministic_skills_without_ai(self) -> None:
+        """With parsed skills, the query is derived without reading full CV text."""
         response = self.client.post(
             "/api/job-search/recommendations",
             json={"cv_id": self.cv_id},
         )
         self.assertEqual(response.status_code, 200, response.text)
         body = response.json()
-        self.assertEqual(body["query"], "python fastapi sql")
-        self.assertEqual(body["derived_level"], "Mid-level")
-        self.assertEqual(body["derived_by"], "ai")
+        self.assertEqual(body["query"], "Python FastAPI SQL Docker")
+        self.assertEqual(body["derived_by"], "deterministic")
+        self.ai_profile_mock.assert_not_called()
 
     def test_explicit_level_overrides_derived_level(self) -> None:
         """An explicit user level becomes the effective level."""

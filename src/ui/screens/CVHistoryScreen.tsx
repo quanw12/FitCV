@@ -25,6 +25,12 @@ import { toast } from "sonner"
 
 import { analyzerApi } from "@/api/analyzerApi"
 
+import {
+  clearResourceCache,
+  getCachedResource,
+  getOrFetchResource,
+} from "@/services/resourceCache"
+
 import type {
   CvComparisonSeries,
   CvSemanticComparison,
@@ -36,12 +42,25 @@ import BezelCard from "@/ui/components/BezelCard"
 
 const MAX_CV_BYTES = 10 * 1024 * 1024
 
+const CV_HISTORY_CACHE_KEY = "cv-history:summary"
+
+interface CvHistorySnapshot {
+  cvs: CvVersion[]
+
+  comparisons: CvComparisonSeries[]
+}
+
 export default function CVHistoryScreen() {
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const [cvs, setCvs] = useState<CvVersion[]>([])
+  const cachedHistory =
+    getCachedResource<CvHistorySnapshot>(CV_HISTORY_CACHE_KEY)
 
-  const [comparisons, setComparisons] = useState<CvComparisonSeries[]>([])
+  const [cvs, setCvs] = useState<CvVersion[]>(cachedHistory?.cvs ?? [])
+
+  const [comparisons, setComparisons] = useState<CvComparisonSeries[]>(
+    cachedHistory?.comparisons ?? [],
+  )
 
   const [selectedJdId, setSelectedJdId] = useState<number | null>(null)
 
@@ -52,7 +71,7 @@ export default function CVHistoryScreen() {
 
   const [comparisonLoading, setComparisonLoading] = useState(false)
 
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(() => !cachedHistory)
 
   const [uploading, setUploading] = useState(false)
 
@@ -60,27 +79,47 @@ export default function CVHistoryScreen() {
 
   const [error, setError] = useState<string | null>(null)
 
-  const loadCvs = useCallback(async () => {
-    setLoading(true)
+  const loadCvs = useCallback(async (force = false) => {
+    const cached = getCachedResource<CvHistorySnapshot>(CV_HISTORY_CACHE_KEY)
+
+    if (cached && !force) {
+      setCvs(cached.cvs)
+
+      setComparisons(cached.comparisons)
+
+      setLoading(false)
+
+      return
+    }
+
+    setLoading(!cached)
 
     setError(null)
 
     try {
-      const [versions, scoreComparisons] = await Promise.all([
-        analyzerApi.listCvs(),
+      const snapshot = await getOrFetchResource(
+        CV_HISTORY_CACHE_KEY,
+        async () => {
+          const [versions, scoreComparisons] = await Promise.all([
+            analyzerApi.listCvs(),
 
-        analyzerApi.listCvComparisons(),
-      ])
+            analyzerApi.listCvComparisons(),
+          ])
 
-      setCvs(versions)
+          return { cvs: versions, comparisons: scoreComparisons }
+        },
+        { force },
+      )
 
-      setComparisons(scoreComparisons)
+      setCvs(snapshot.cvs)
+
+      setComparisons(snapshot.comparisons)
 
       setSelectedJdId((current) =>
         current != null &&
-        scoreComparisons.some((item) => item.jobDescriptionId === current)
+        snapshot.comparisons.some((item) => item.jobDescriptionId === current)
           ? current
-          : (scoreComparisons[0]?.jobDescriptionId ?? null),
+          : (snapshot.comparisons[0]?.jobDescriptionId ?? null),
       )
     } catch (caught) {
       setError(
@@ -164,7 +203,9 @@ export default function CVHistoryScreen() {
 
       toast.success("CV uploaded successfully")
 
-      await loadCvs()
+      clearResourceCache(CV_HISTORY_CACHE_KEY)
+
+      await loadCvs(true)
     } catch (caught) {
       setError(
         caught instanceof Error ? caught.message : "Unable to upload this CV.",
@@ -187,7 +228,9 @@ export default function CVHistoryScreen() {
 
       setSelected((current) => current.filter((id) => id !== cv.cvId))
 
-      await loadCvs()
+      clearResourceCache(CV_HISTORY_CACHE_KEY)
+
+      await loadCvs(true)
     } catch (caught) {
       setError(
         caught instanceof Error ? caught.message : "Unable to delete this CV.",
@@ -255,7 +298,7 @@ export default function CVHistoryScreen() {
           <button
             type="button"
             className="fitcv-btn-secondary"
-            onClick={() => void loadCvs()}
+            onClick={() => void loadCvs(true)}
             disabled={loading}
           >
             <ArrowsClockwise size={15} weight="light" /> Refresh

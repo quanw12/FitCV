@@ -16,6 +16,11 @@ import { analyzerApi } from "@/api/analyzerApi"
 
 import { jobSearchApi } from "@/api/jobSearchApi"
 
+import {
+  getCachedResource,
+  getOrFetchResource,
+} from "@/services/resourceCache"
+
 import type { CvVersion } from "@/types/analyzer"
 
 import type { JobSearchResult } from "@/types/jobSearch"
@@ -59,6 +64,26 @@ const cardIconStyle: React.CSSProperties = {
   marginBottom: 14,
 }
 
+const JOB_SEARCH_CVS_CACHE_KEY = "job-search:cvs"
+
+const jobSearchResultCacheKey = (params: {
+  cvId: number
+  query: string
+  location: string
+  remote: string
+  jobage: string
+  level: string
+}) =>
+  [
+    "job-search:results",
+    params.cvId,
+    params.query.trim().toLowerCase(),
+    params.location.trim().toLowerCase(),
+    params.remote,
+    params.jobage,
+    params.level,
+  ].join(":")
+
 function formatPostedDate(value: string | null) {
   if (!value) return "Date unknown"
 
@@ -74,9 +99,17 @@ function formatPostedDate(value: string | null) {
 }
 
 export default function JobSearchScreen() {
-  const [cvs, setCvs] = useState<CvVersion[]>([])
+  const cachedCvs = getCachedResource<CvVersion[]>(JOB_SEARCH_CVS_CACHE_KEY)
 
-  const [selectedCvId, setSelectedCvId] = useState<number | null>(null)
+  const [cvs, setCvs] = useState<CvVersion[]>(cachedCvs ?? [])
+
+  const [selectedCvId, setSelectedCvId] = useState<number | null>(
+    cachedCvs?.find((cv) => cv.parseStatus === "Success" && cv.isLatest)
+      ?.cvId ??
+      cachedCvs?.find((cv) => cv.parseStatus === "Success")?.cvId ??
+      cachedCvs?.[0]?.cvId ??
+      null,
+  )
 
   const [query, setQuery] = useState("")
 
@@ -90,19 +123,32 @@ export default function JobSearchScreen() {
 
   const [result, setResult] = useState<JobSearchResult | null>(null)
 
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(() => !cachedCvs)
 
   const [searching, setSearching] = useState(false)
 
   const [error, setError] = useState<string | null>(null)
 
   const loadCvs = useCallback(async () => {
+    const cached = getCachedResource<CvVersion[]>(JOB_SEARCH_CVS_CACHE_KEY)
+
+    if (cached) {
+      setCvs(cached)
+
+      setLoading(false)
+
+      return
+    }
+
     setLoading(true)
 
     setError(null)
 
     try {
-      const versions = await analyzerApi.listCvs()
+      const versions = await getOrFetchResource(
+        JOB_SEARCH_CVS_CACHE_KEY,
+        () => analyzerApi.listCvs(),
+      )
 
       setCvs(versions)
 
@@ -138,18 +184,29 @@ export default function JobSearchScreen() {
     setError(null)
 
     try {
-      const response = await jobSearchApi.recommendations({
-        cvId: selectedCvId,
-        query: query.trim() || undefined,
-        location: location.trim() || undefined,
-        remote:
-          remote === "any"
-            ? undefined
-            : remote as "remote" | "hybrid" | "onsite",
-        jobage: jobage ? Number(jobage) : undefined,
-        level: level || undefined,
-        limit: 12,
-      })
+      const response = await getOrFetchResource(
+        jobSearchResultCacheKey({
+          cvId: selectedCvId,
+          query,
+          location,
+          remote,
+          jobage,
+          level,
+        }),
+        () =>
+          jobSearchApi.recommendations({
+            cvId: selectedCvId,
+            query: query.trim() || undefined,
+            location: location.trim() || undefined,
+            remote:
+              remote === "any"
+                ? undefined
+                : remote as "remote" | "hybrid" | "onsite",
+            jobage: jobage ? Number(jobage) : undefined,
+            level: level || undefined,
+            limit: 12,
+          }),
+      )
 
       setResult(response)
     } catch (caught) {

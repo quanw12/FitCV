@@ -14,6 +14,8 @@ import {
 
 import { isCompanyProfileComplete, requiresCompanyProfile } from "@/services"
 
+import { clearResourceCache } from "@/services/resourceCache"
+
 import type { AnalyzerDraftState } from "@/types/analyzer"
 
 import type { CvRebuildResponse } from "@/types/cvRebuild"
@@ -63,6 +65,7 @@ const ProfileScreen = lazy(() => import("@/ui/screens/ProfileScreen"))
 const PublicJobScreen = lazy(() => import("@/ui/screens/PublicJobScreen"))
 
 type CompanyProfileGate = "checking" | "required" | "complete"
+type AuthEntryMode = "login" | "register"
 
 function defaultScreen(portal: Portal) {
   return portal === "seeker" ? "cv-rebuild" : "hr-dashboard"
@@ -116,6 +119,7 @@ export default function App() {
     useState<number | null>(null)
 
   const [showLanding, setShowLanding] = useState(() => !authApi.getSession())
+  const [authEntryMode, setAuthEntryMode] = useState<AuthEntryMode>("login")
 
   const [companyProfileGate, setCompanyProfileGate] =
     useState<CompanyProfileGate>("checking")
@@ -127,20 +131,29 @@ export default function App() {
   useEffect(() => {
     return authApi.onSessionExpired(() => {
       if (session) clearStoredImprovementMatchResultId(session.user.accountId)
+      clearResourceCache()
       setSession(null)
       setShowLanding(true)
+
       setCompanyProfileGate("complete")
+
       setScreen("")
+
       setAnalyzerDraft(emptyAnalyzerDraft())
+
       setRebuiltFromImprovement(null)
+
       setImprovementMatchResultId(null)
+
       setTrackerFocusApplicationId(null)
+
       toast.error("Phiên làm việc đã hết hạn.")
     })
   }, [session])
 
   useEffect(() => {
     if (!session) return
+
     return authApi.startActivityMonitoring()
   }, [session?.user.accountId])
 
@@ -224,6 +237,7 @@ export default function App() {
     if (session) clearStoredImprovementMatchResultId(session.user.accountId)
 
     clearStoredImprovementMatchResultId(nextSession.user.accountId)
+    clearResourceCache()
 
     setShowLanding(false)
 
@@ -250,6 +264,7 @@ export default function App() {
 
   const handleLogout = async () => {
     if (session) clearStoredImprovementMatchResultId(session.user.accountId)
+    clearResourceCache()
 
     try {
       await authApi.logout()
@@ -351,16 +366,32 @@ export default function App() {
   if (!authReady) return <FullPageSkeleton />
 
   if (showLanding && !session) {
-    return <LandingScreen onGetStarted={() => setShowLanding(false)} />
+    return (
+      <Suspense fallback={<FullPageSkeleton />}>
+        <LandingScreen
+          onSignIn={() => {
+            setAuthEntryMode("login")
+            setShowLanding(false)
+          }}
+          onGetStarted={() => {
+            setAuthEntryMode("register")
+            setShowLanding(false)
+          }}
+        />
+      </Suspense>
+    )
   }
 
   if (!session || session.requiresRoleSelection || !portal) {
     return (
-      <AuthScreen
-        onAuth={handleAuth}
-        startInRoleSelection={Boolean(session?.requiresRoleSelection)}
-        onBackToLanding={() => setShowLanding(true)}
-      />
+      <Suspense fallback={<FullPageSkeleton />}>
+        <AuthScreen
+          onAuth={handleAuth}
+          initialMode={authEntryMode}
+          startInRoleSelection={Boolean(session?.requiresRoleSelection)}
+          onBackToLanding={() => setShowLanding(true)}
+        />
+      </Suspense>
     )
   }
 

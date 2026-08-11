@@ -23,6 +23,7 @@ import "./landing.css"
 
 interface LandingScreenProps {
   onGetStarted: () => void
+  onSignIn?: () => void
 }
 
 interface Feature {
@@ -166,7 +167,10 @@ function handleCardPointerMove(event: PointerEvent<HTMLElement>) {
   card.style.setProperty("--lp-my", `${event.clientY - box.top}px`)
 }
 
-export default function LandingScreen({ onGetStarted }: LandingScreenProps) {
+export default function LandingScreen({
+  onGetStarted,
+  onSignIn = onGetStarted,
+}: LandingScreenProps) {
   const rootRef = useRef<HTMLDivElement>(null)
   const headerRef = useRef<HTMLElement>(null)
 
@@ -237,7 +241,7 @@ export default function LandingScreen({ onGetStarted }: LandingScreenProps) {
             <button
               type="button"
               className="lp-btn lp-btn-ghost"
-              onClick={onGetStarted}
+              onClick={onSignIn}
             >
               Sign in
             </button>

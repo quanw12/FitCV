@@ -4,6 +4,8 @@ import { cleanup } from "@testing-library/react"
 
 import { afterEach } from "vitest"
 
+import { clearResourceCache } from "@/services/resourceCache"
+
 class IntersectionObserverMock implements IntersectionObserver {
   readonly root = null
 
@@ -48,6 +50,8 @@ Object.defineProperty(window, "localStorage", {
 
 afterEach(() => {
   cleanup()
+
+  clearResourceCache()
 
   window.sessionStorage.clear()
   window.localStorage.clear()

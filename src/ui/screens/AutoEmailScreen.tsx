@@ -17,6 +17,13 @@ import { emailWorkflowApi } from "@/api/emailWorkflowApi"
 
 import { pipelineApi } from "@/api/pipelineApi"
 
+import {
+  clearResourceCache,
+  getCachedResource,
+  getOrFetchResource,
+  setCachedResource,
+} from "@/services/resourceCache"
+
 import type {
   CampaignPreview,
   BulkEmailSendResult,
@@ -60,6 +67,22 @@ const stageTemplates: Record<EmailStage, string> = {
 }
 
 const SAME_STAGE_RESEND_REASON = "Already emailed for this stage."
+
+const AUTO_EMAIL_CACHE_KEY = "hr-auto-email:workflow"
+
+const autoEmailAudienceCacheKey = (
+  stage: EmailStage,
+  jobId?: number,
+  templateKey?: string,
+) => `hr-auto-email:audience:${stage}:${jobId ?? "all"}:${templateKey ?? ""}`
+
+interface AutoEmailSnapshot {
+  templates: EmailTemplate[]
+
+  applications: PipelineApplication[]
+
+  drafts: CandidateEmailDraft[]
+}
 
 const isResendableBlocked = (item: EmailAudienceItem) =>
   item.already_emailed_for_stage &&
@@ -154,11 +177,20 @@ const statusClass = (status: CandidateEmailDraft["status"]) => {
 export default function AutoEmailScreen() {
   const audienceRequestRef = useRef(0)
 
-  const [templates, setTemplates] = useState<EmailTemplate[]>([])
+  const cachedWorkflow =
+    getCachedResource<AutoEmailSnapshot>(AUTO_EMAIL_CACHE_KEY)
 
-  const [applications, setApplications] = useState<PipelineApplication[]>([])
+  const [templates, setTemplates] = useState<EmailTemplate[]>(
+    cachedWorkflow?.templates ?? [],
+  )
 
-  const [drafts, setDrafts] = useState<CandidateEmailDraft[]>([])
+  const [applications, setApplications] = useState<PipelineApplication[]>(
+    cachedWorkflow?.applications ?? [],
+  )
+
+  const [drafts, setDrafts] = useState<CandidateEmailDraft[]>(
+    cachedWorkflow?.drafts ?? [],
+  )
 
   const [templateKey, setTemplateKey] = useState("")
 
@@ -196,7 +228,7 @@ export default function AutoEmailScreen() {
     null,
   )
 
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(() => !cachedWorkflow)
 
   const [generating, setGenerating] = useState(false)
 
@@ -217,28 +249,43 @@ export default function AutoEmailScreen() {
     setBody(draft?.body ?? "")
   }
 
-  const load = useCallback(async (preferredDraftId?: number) => {
-    setLoading(true)
+  const load = useCallback(async (preferredDraftId?: number, force = false) => {
+    const cached = getCachedResource<AutoEmailSnapshot>(AUTO_EMAIL_CACHE_KEY)
+
+    setLoading(!cached)
 
     setError("")
 
     try {
-      const [nextTemplates, nextApplications, nextDrafts] = await Promise.all([
-        emailWorkflowApi.listTemplates(),
+      const snapshot = await getOrFetchResource(
+        AUTO_EMAIL_CACHE_KEY,
+        async () => {
+          const [nextTemplates, nextApplications, nextDrafts] =
+            await Promise.all([
+              emailWorkflowApi.listTemplates(),
 
-        pipelineApi.list(),
+              pipelineApi.list(),
 
-        emailWorkflowApi.listDrafts(),
-      ])
+              emailWorkflowApi.listDrafts(),
+            ])
 
-      setTemplates(nextTemplates)
+          return {
+            templates: nextTemplates,
+            applications: nextApplications,
+            drafts: nextDrafts,
+          }
+        },
+        { force },
+      )
 
-      setApplications(nextApplications)
+      setTemplates(snapshot.templates)
 
-      setDrafts(nextDrafts)
+      setApplications(snapshot.applications)
+
+      setDrafts(snapshot.drafts)
 
       const sendableIds = new Set(
-        nextDrafts
+        snapshot.drafts
 
           .filter(
             (draft) =>
@@ -255,9 +302,9 @@ export default function AutoEmailScreen() {
       )
 
       const firstStage =
-        nextTemplates[0]?.default_stage ??
-        (stages.includes(nextApplications[0]?.current_stage as EmailStage)
-          ? nextApplications[0].current_stage as EmailStage
+        snapshot.templates[0]?.default_stage ??
+        (stages.includes(snapshot.applications[0]?.current_stage as EmailStage)
+          ? snapshot.applications[0].current_stage as EmailStage
           : "Applied")
 
       setStage(firstStage)
@@ -265,9 +312,9 @@ export default function AutoEmailScreen() {
       const mappedTemplate = stageTemplates[firstStage]
 
       setTemplateKey(
-        nextTemplates.some((template) => template.key === mappedTemplate)
+        snapshot.templates.some((template) => template.key === mappedTemplate)
           ? mappedTemplate
-          : (nextTemplates.find(
+          : (snapshot.templates.find(
               (template) =>
                 template.allowed_stages == null ||
                 template.allowed_stages.includes(firstStage),
@@ -275,8 +322,8 @@ export default function AutoEmailScreen() {
       )
 
       const nextActive =
-        nextDrafts.find((draft) => draft.email_id === preferredDraftId) ??
-        nextDrafts[0] ??
+        snapshot.drafts.find((draft) => draft.email_id === preferredDraftId) ??
+        snapshot.drafts[0] ??
         null
 
       setActiveDraft(nextActive)
@@ -300,15 +347,35 @@ export default function AutoEmailScreen() {
 
     const requestId = ++audienceRequestRef.current
 
+    const key = autoEmailAudienceCacheKey(stage, jobId, templateKey)
+
+    const cached = getCachedResource<EmailAudienceResponse>(key)
+
+    if (cached) {
+      setAudience(cached)
+
+      setAudienceSelection((current) =>
+        current.filter((id) =>
+          [
+            ...cached.eligible,
+            ...cached.blocked.filter(isResendableBlocked),
+          ].some((item) => item.application_id === id),
+        ),
+      )
+
+      setAudienceLoading(false)
+
+      return
+    }
+
     setAudienceLoading(true)
 
     setAudienceError("")
 
     try {
-      const nextAudience = await emailWorkflowApi.listAudience(
-        stage,
-        jobId,
-        templateKey,
+      const nextAudience = await getOrFetchResource(
+        key,
+        () => emailWorkflowApi.listAudience(stage, jobId, templateKey),
       )
 
       if (requestId !== audienceRequestRef.current) return
@@ -343,11 +410,21 @@ export default function AutoEmailScreen() {
   }, [loadAudience])
 
   const replaceDraft = (updated: CandidateEmailDraft) => {
-    setDrafts((current) => [
-      updated,
+    setDrafts((current) => {
+      const next = [
+        updated,
 
-      ...current.filter((draft) => draft.email_id !== updated.email_id),
-    ])
+        ...current.filter((draft) => draft.email_id !== updated.email_id),
+      ]
+
+      setCachedResource(AUTO_EMAIL_CACHE_KEY, {
+        templates,
+        applications,
+        drafts: next,
+      })
+
+      return next
+    })
 
     selectDraft(updated)
   }
@@ -442,20 +519,31 @@ export default function AutoEmailScreen() {
 
       setCampaignPreview(created)
 
-      setDrafts((current) => [
-        ...created.drafts,
+      setDrafts((current) => {
+        const next = [
+          ...created.drafts,
 
-        ...current.filter(
-          (draft) =>
-            !created.drafts.some(
-              (createdDraft) => createdDraft.email_id === draft.email_id,
+          ...current.filter(
+            (draft) =>
+              !created.drafts.some(
+                (createdDraft) => createdDraft.email_id === draft.email_id,
+              ),
             ),
-        ),
-      ])
+        ]
+
+        setCachedResource(AUTO_EMAIL_CACHE_KEY, {
+          templates,
+          applications,
+          drafts: next,
+        })
+
+        return next
+      })
 
       selectDraft(created.drafts[0] ?? null)
       setAudienceSelection([])
       setAllowResend(false)
+      clearResourceCache("hr-auto-email:audience:")
       await loadAudience()
 
       setSuccess("AI draft created. Review and edit it before approving.")
@@ -573,6 +661,12 @@ export default function AutoEmailScreen() {
 
         setDrafts(refreshed)
 
+        setCachedResource(AUTO_EMAIL_CACHE_KEY, {
+          templates,
+          applications,
+          drafts: refreshed,
+        })
+
         const failed = refreshed.find(
           (draft) => draft.email_id === activeDraft.email_id,
         )
@@ -637,7 +731,10 @@ export default function AutoEmailScreen() {
 
       setBulkSelection([])
 
-      await load(activeDraft?.email_id)
+      clearResourceCache("hr-auto-email:audience:")
+      clearResourceCache(AUTO_EMAIL_CACHE_KEY)
+
+      await load(activeDraft?.email_id, true)
     } catch (cause) {
       setError(errorMessage(cause, "Bulk delivery could not be completed."))
     } finally {
@@ -711,7 +808,7 @@ export default function AutoEmailScreen() {
             type="button"
             className="fc-btn fc-btn--secondary"
             disabled={loading}
-            onClick={() => void load(activeDraft?.email_id)}
+            onClick={() => void load(activeDraft?.email_id, true)}
           >
             <ArrowClockwise size={15} />
             Refresh
@@ -765,7 +862,7 @@ export default function AutoEmailScreen() {
           <button
             type="button"
             className="fc-btn fc-btn--secondary"
-            onClick={() => void load()}
+            onClick={() => void load(undefined, true)}
             style={{ marginTop: 12 }}
           >
             <ArrowClockwise size={15} />
