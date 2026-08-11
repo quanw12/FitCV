@@ -11,7 +11,7 @@ The FitCV backend is a FastAPI modular monolith with async processing capabiliti
 
 ## Main Entry Point
 - **File**: `/backend/app/main.py`
-- **Purpose**: FastAPI application initialization, middleware setup, route registration, and lifespan management
+- **Purpose**: FastAPI application initialization, middleware setup, route registration, and lifespan management. Includes logging initialization and inbound replies feature flag check.
 
 ## Core Architecture
 
@@ -36,7 +36,7 @@ SQLAlchemy models representing database tables:
 - `account.py` - User accounts and authentication
 - `analyzer.py` - CV analysis results and data
 - `application.py` - Job applications
-- `email_workflow.py` - Automated email tracking
+- `email_workflow.py` - Automated email tracking, campaigns, and smart replies
 - `improvement.py` - CV improvement suggestions
 - `jobs.py` - Job postings
 - `platform.py` - Platform-wide settings
@@ -75,7 +75,7 @@ REST endpoint definitions:
 - `pipeline.py` - Recruitment pipeline management
 - `profile.py` - User profile management
 - `reports.py` - Analytics and reporting endpoints
-- `email_workflow.py` - Automated email workflows
+- `email_workflow.py` - Automated email workflows, campaigns, and smart replies
 - `improvements.py` - CV improvement suggestions
 - `job_search.py` - Advanced job search functionality
 - `ai_tasks.py` - Background AI task management
