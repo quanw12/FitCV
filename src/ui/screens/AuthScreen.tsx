@@ -73,9 +73,25 @@ declare global {
   }
 }
 
+function hexToRgba(hex: string, alpha: number): string {
+  const h = hex.replace("#", "").trim()
+  const r = parseInt(h.slice(0, 2), 16)
+  const g = parseInt(h.slice(2, 4), 16)
+  const b = parseInt(h.slice(4, 6), 16)
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`
+}
+
+function getAccentColor(): string {
+  if (typeof document === "undefined") return "#2563eb"
+  const shell = document.querySelector<HTMLElement>(".auth-shell")
+  const value = shell
+    ? getComputedStyle(shell).getPropertyValue("--auth-accent").trim()
+    : ""
+  return value || "#2563eb"
+}
+
 interface AuthScreenProps {
   onAuth: (session: AuthSession) => void
-  initialMode?: Extract<AuthMode, "login" | "register">
   startInRoleSelection?: boolean
   onBackToLanding?: () => void
 }
@@ -105,10 +121,11 @@ const authCss = `
   .fitcv-auth *, .fitcv-auth *::before, .fitcv-auth *::after { box-sizing: border-box; }
   .auth-shell { --auth-accent: #2563eb; --auth-accent-soft: #eff6ff; position: relative; display: grid; grid-template-columns: minmax(0,1.05fr) minmax(430px,.95fr); min-height: 100dvh; overflow: hidden; isolation: isolate; background: #f8fafc; }.auth-shell--register { --auth-accent: #c25a05; --auth-accent-soft: #fff7ed; }.auth-shell--forgot, .auth-shell--verify, .auth-shell--reset { --auth-accent: #7c3aed; --auth-accent-soft: #f5f3ff; }.auth-shell--role { --auth-accent: #047857; --auth-accent-soft: #ecfdf5; }
   .auth-shell::before { position: absolute; z-index: -1; width: min(72vw, 760px); height: min(72vw, 760px); border: 1px solid rgba(148,163,184,.17); border-radius: 50%; content: ""; transform: translate(43vw, -42vh); }.auth-shell::after { position: absolute; z-index: -1; width: 42vw; height: 42vw; min-width: 440px; min-height: 440px; border-radius: 50%; background: var(--auth-accent-soft); content: ""; filter: blur(4px); opacity: .58; transform: translate(-42vw, 44vh); transition: background .32s ease; }
-  .auth-hero { position: relative; display: flex; align-items: stretch; overflow: hidden; background: #0f172a; color: #fff; padding: clamp(32px,5vw,76px); }.auth-hero::before { position: absolute; top: -18%; right: -16%; width: min(42vw,620px); aspect-ratio: 1; border: 1px solid rgba(147,197,253,.25); border-radius: 50%; content: ""; box-shadow: 0 0 0 70px rgba(96,165,250,.04), 0 0 0 140px rgba(96,165,250,.025); }.auth-hero::after { position: absolute; right: 8%; bottom: 8%; width: 180px; height: 180px; border-radius: 50%; background: radial-gradient(circle, rgba(37,99,235,.26), transparent 68%); content: ""; filter: blur(8px); }.auth-hero-inner { position: relative; z-index: 1; display: flex; width: min(100%, 590px); flex-direction: column; justify-content: space-between; }.auth-hero-brand { display: inline-flex; align-items: center; gap: 9px; color: #fff; font-family: var(--font-display); font-size: 22px; font-weight: 800; letter-spacing: -.05em; }.auth-hero-brand svg { flex: 0 0 auto; }.auth-hero-copy { max-width: 530px; margin: auto 0; padding: 56px 0; }.auth-hero-eyebrow { display: inline-flex; align-items: center; gap: 8px; color: #93c5fd; font-size: 11px; font-weight: 750; letter-spacing: .14em; text-transform: uppercase; }.auth-hero-copy h1 { max-width: 540px; margin: 20px 0 0; font-family: var(--font-display); font-size: clamp(42px,5vw,76px); font-weight: 750; line-height: .98; letter-spacing: -.075em; }.auth-hero-copy p { max-width: 470px; margin: 24px 0 0; color: #cbd5e1; font-size: 16px; line-height: 1.65; }.auth-hero-proof { display: grid; gap: 12px; margin-top: 31px; }.auth-proof-row { display: flex; align-items: center; gap: 10px; color: #e2e8f0; font-size: 13px; }.auth-proof-row svg { color: #60a5fa; }.auth-hero-footer { color: #94a3b8; font-size: 12px; }
+  .auth-hero { position: relative; display: flex; align-items: stretch; overflow: hidden; color: #0f172a; padding: clamp(28px,4vw,56px); margin: 18px; border-radius: 28px; background: radial-gradient(120% 90% at 12% 6%, color-mix(in srgb, var(--auth-accent) 15%, transparent), transparent 55%), radial-gradient(120% 95% at 94% 100%, color-mix(in srgb, var(--auth-accent) 12%, transparent), transparent 52%), linear-gradient(180deg, #ffffff 0%, #f5f8ff 100%); box-shadow: inset 0 0 0 1px rgba(226,232,240,.9), 0 30px 60px -42px rgba(37,99,235,.4); }.auth-hero::before { position: absolute; inset: 0; content: ""; background: radial-gradient(55% 50% at 84% 14%, color-mix(in srgb, var(--auth-accent) 12%, transparent), transparent 62%), radial-gradient(50% 46% at 12% 92%, color-mix(in srgb, var(--auth-accent) 12%, transparent), transparent 62%); filter: blur(2px); }.auth-hero::after { position: absolute; left: 0; right: 0; bottom: 0; height: 46%; content: ""; background: radial-gradient(120% 100% at 50% 100%, color-mix(in srgb, var(--auth-accent) 10%, transparent), transparent 70%); }.auth-hero-waves { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; }.auth-hero-inner { position: relative; z-index: 1; display: flex; width: min(100%, 640px); flex-direction: column; justify-content: space-between; margin: auto; }.auth-hero-brand { display: inline-flex; align-items: center; gap: 9px; color: #0f172a; font-family: var(--font-display); font-size: 22px; font-weight: 800; letter-spacing: -.05em; }.auth-hero-brand svg { flex: 0 0 auto; }.auth-hero-copy { max-width: 560px; margin: auto 0; padding: 48px 0; }.auth-hero-eyebrow { display: inline-flex; align-items: center; gap: 8px; color: var(--auth-accent); font-size: 11px; font-weight: 750; letter-spacing: .14em; text-transform: uppercase; background: color-mix(in srgb, var(--auth-accent) 10%, #fff); border: 1px solid color-mix(in srgb, var(--auth-accent) 18%, transparent); padding: 6px 12px; border-radius: 999px; }.auth-hero-copy h1 { max-width: 560px; margin: 22px 0 0; font-family: var(--font-display); font-size: clamp(38px,4.4vw,64px); font-weight: 750; line-height: 1.02; letter-spacing: -.045em; color: #0f172a; }.auth-hero-copy h1 .auth-hero-accent { color: var(--auth-accent); }.auth-hero-copy p { max-width: 480px; margin: 22px 0 0; color: #475569; font-size: 16px; line-height: 1.65; }.auth-hero-proof { display: grid; gap: 10px; margin-top: 30px; }.auth-proof-row { display: flex; align-items: center; gap: 10px; color: #334155; font-size: 13px; background: rgba(255,255,255,.62); border: 1px solid rgba(226,232,240,.9); padding: 10px 14px; border-radius: 12px; }.auth-proof-row svg { color: var(--auth-accent); }.auth-hero-footer { color: #94a3b8; font-size: 12px; }
+  @media (max-width: 980px) { .auth-hero { margin: 0; border-radius: 0; } }
   .auth-panel { display: grid; width: 100%; min-height: 100dvh; place-items: center; padding: 48px 34px; background: #f8fafc; }.auth-content { width: min(100%, 438px); animation: auth-card-enter .28s cubic-bezier(.2,.8,.2,1) both; }.auth-brand { margin-bottom: 25px !important; text-align: center !important; }.auth-brand > div { margin-bottom: 7px !important; justify-content: center; }.auth-brand > div > span { letter-spacing: -.05em !important; }.auth-brand > div + div { color: #667085 !important; }
   .auth-card { position: relative; overflow: hidden; border: 1px solid #e4e7ec !important; border-radius: 20px !important; background: rgba(255,255,255,.94) !important; padding: 30px !important; box-shadow: 0 22px 54px -38px rgba(16,24,40,.28) !important; }.auth-card::before { position: absolute; inset: 0 0 auto; height: 2px; background: var(--auth-accent); content: ""; transition: background .28s ease; }.auth-card input { transition: border-color .16s ease, box-shadow .16s ease; }.auth-card input:focus { border-color: var(--auth-accent) !important; box-shadow: 0 0 0 3px color-mix(in srgb, var(--auth-accent) 14%, transparent); }.auth-card .fc-btn--primary { border-radius: 10px; background: var(--auth-accent) !important; box-shadow: none; transition: transform .18s ease, background .28s ease; }.auth-card .fc-btn--primary:hover:not(:disabled) { background: color-mix(in srgb, var(--auth-accent) 88%, #000) !important; transform: translateY(-1px); }.auth-card .fc-btn--primary:disabled { transform: none; }.auth-mode-tab.is-active.login { background: #eff6ff !important; color: #1d4ed8 !important; }.auth-mode-tab.is-active.register { background: #fff7ed !important; color: #b45309 !important; }
-  :root[data-theme='dark'] .fitcv-auth { background: var(--bg); }:root[data-theme='dark'] .fitcv-auth .auth-panel { background: var(--bg); }.fitcv-auth .auth-shell { background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%); }:root[data-theme='dark'] .fitcv-auth .auth-shell { background: radial-gradient(circle at 12% 88%, color-mix(in srgb, var(--auth-accent) 15%, transparent), transparent 30%), radial-gradient(circle at 88% 8%, rgba(124, 131, 255, .12), transparent 27%), var(--bg); }.fitcv-auth .auth-shell::after { opacity: .58; }:root[data-theme='dark'] .fitcv-auth .auth-shell::before { border-color: rgba(148, 163, 184, .18); }:root[data-theme='dark'] .fitcv-auth .auth-shell::after { opacity: .16; }.fitcv-auth .auth-brand > div + div { color: #667085 !important; }:root[data-theme='dark'] .fitcv-auth .auth-brand > div + div { color: var(--text-secondary) !important; }:root[data-theme='dark'] .fitcv-auth .auth-card { border-color: var(--border-strong) !important; background: color-mix(in srgb, var(--surface) 94%, #000) !important; box-shadow: 0 24px 62px -38px rgba(0, 0, 0, .82) !important; }:root[data-theme='dark'] .fitcv-auth .auth-mode-tab.is-active.login { background: rgba(37, 99, 235, .2) !important; color: #a5c7ff !important; }:root[data-theme='dark'] .fitcv-auth .auth-mode-tab.is-active.register { background: rgba(217, 119, 6, .19) !important; color: #f8c27d !important; }
+  .fitcv-auth .auth-shell { background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%); }.fitcv-auth .auth-shell::after { opacity: .58; }.fitcv-auth .auth-brand > div + div { color: #667085 !important; }
   @keyframes auth-card-enter { from { opacity: .18; transform: translateY(8px) scale(.985); } to { opacity: 1; transform: translateY(0) scale(1); } }
   @media (max-width: 980px) { .auth-shell { display: block; }.auth-hero { display: none; }.auth-panel { min-height: 100dvh; } }
   @media (max-width: 480px) { .auth-panel { padding: 34px 16px; }.auth-card { padding: 23px !important; border-radius: 17px !important; }.auth-shell::after { min-width: 340px; min-height: 340px; } }
@@ -117,12 +134,12 @@ const authCss = `
 
 export default function AuthScreen({
   onAuth,
-  initialMode = "login",
   startInRoleSelection = false,
   onBackToLanding,
 }: AuthScreenProps) {
   const googleButtonRef = useRef<HTMLDivElement | null>(null)
-  const [mode, setMode] = useState<AuthMode>(initialMode)
+  const heroCanvasRef = useRef<HTMLCanvasElement | null>(null)
+  const [mode, setMode] = useState<AuthMode>("login")
   const [step, setStep] = useState<"auth" | "role">(
     startInRoleSelection ? "role" : "auth",
   )
@@ -137,11 +154,7 @@ export default function AuthScreen({
   const [googleError, setGoogleError] = useState("")
   const [loading, setLoading] = useState(false)
   const [googleButtonTheme, setGoogleButtonTheme] =
-    useState<GoogleButtonTheme>(() =>
-      document.documentElement.dataset.theme === "dark"
-        ? "outline_dark"
-        : "outline",
-    )
+    useState<GoogleButtonTheme>("outline")
 
   const resetFeedback = () => {
     setErrors({})
@@ -183,9 +196,7 @@ export default function AuthScreen({
   useEffect(() => {
     const root = document.documentElement
     const syncGoogleButtonTheme = () => {
-      setGoogleButtonTheme(
-        root.dataset.theme === "dark" ? "outline_dark" : "outline",
-      )
+      setGoogleButtonTheme("outline")
     }
     const observer = new MutationObserver(syncGoogleButtonTheme)
 
@@ -260,6 +271,77 @@ export default function AuthScreen({
       active = false
     }
   }, [googleButtonTheme, mode, step])
+
+  useEffect(() => {
+    const canvas = heroCanvasRef.current
+    if (!canvas) return
+    const ctx = canvas.getContext("2d")
+    if (!ctx) return
+
+    const reduceMotion = window.matchMedia(
+      "(prefers-reduced-motion: reduce)",
+    ).matches
+
+    const accent = getAccentColor()
+    const waves = [
+      { amp: 30, len: 240, speed: 0.012, y: 0.6, alpha: 0.18 },
+      { amp: 22, len: 300, speed: 0.009, y: 0.68, alpha: 0.13 },
+      { amp: 36, len: 200, speed: 0.017, y: 0.54, alpha: 0.1 },
+      { amp: 18, len: 360, speed: 0.007, y: 0.76, alpha: 0.09 },
+    ].map((wave) => ({ ...wave, color: hexToRgba(accent, wave.alpha) }))
+
+    let width = 0
+    let height = 0
+    let raf = 0
+    let t = 0
+
+    const resize = () => {
+      const dpr = Math.min(window.devicePixelRatio || 1, 2)
+      const rect = canvas.getBoundingClientRect()
+      width = rect.width
+      height = rect.height
+      canvas.width = Math.max(1, Math.floor(width * dpr))
+      canvas.height = Math.max(1, Math.floor(height * dpr))
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+    }
+
+    const draw = () => {
+      ctx.clearRect(0, 0, width, height)
+      for (let i = 0; i < waves.length; i++) {
+        const wave = waves[i]
+        const baseY = height * wave.y
+        ctx.beginPath()
+        ctx.moveTo(0, height)
+        for (let x = 0; x <= width; x += 6) {
+          const k = (x / wave.len) * Math.PI * 2
+          const y =
+            baseY +
+            Math.sin(k + t * wave.speed + i) * wave.amp +
+            Math.sin(k * 0.5 + t * wave.speed * 1.4) * wave.amp * 0.35
+          ctx.lineTo(x, y)
+        }
+        ctx.lineTo(width, height)
+        ctx.closePath()
+        ctx.fillStyle = wave.color
+        ctx.fill()
+      }
+      if (!reduceMotion) {
+        t += 1
+        raf = requestAnimationFrame(draw)
+      }
+    }
+
+    resize()
+    draw()
+    if (!reduceMotion) {
+      window.addEventListener("resize", resize)
+    }
+
+    return () => {
+      cancelAnimationFrame(raf)
+      window.removeEventListener("resize", resize)
+    }
+  }, [mode, step])
 
   const handleAuthSubmit = async (e: FormEvent) => {
     e.preventDefault()
@@ -393,6 +475,7 @@ export default function AuthScreen({
       <style>{authCss}</style>
       <div className={`auth-shell auth-shell--${screenPhase}`}>
         <aside className="auth-hero" aria-label="About FitCV">
+          <canvas ref={heroCanvasRef} className="auth-hero-waves" aria-hidden="true" />
           <div className="auth-hero-inner">
             <div className="auth-hero-brand">
               <BrandMark size={40} />
@@ -403,7 +486,10 @@ export default function AuthScreen({
                 <Sparkle size={14} weight="fill" />
                 Evidence-first career intelligence
               </span>
-              <h1>Make your next career decision clearer.</h1>
+              <h1>
+                Make your next career decision{" "}
+                <span className="auth-hero-accent">clearer</span>.
+              </h1>
               <p>
                 FitCV helps applicants understand their next step and helps
                 hiring teams review candidates with the evidence in view.
@@ -442,7 +528,7 @@ export default function AuthScreen({
                 fontFamily: "var(--font-display)",
                 fontWeight: 800,
                 fontSize: 21,
-                color: "var(--text-primary)",
+                color: "#0f172a",
                 letterSpacing: "-0.02em",
               }}
             >
@@ -452,7 +538,7 @@ export default function AuthScreen({
           <div
             style={{
               fontSize: 13,
-              color: "var(--text-muted)",
+              color: "#94a3b8",
               fontWeight: 500,
             }}
           >
@@ -467,7 +553,7 @@ export default function AuthScreen({
               style={{
                 background: "none",
                 border: "none",
-                color: "var(--text-muted)",
+                color: "#94a3b8",
                 cursor: "pointer",
                 fontSize: 13,
                 display: "inline-flex",
@@ -477,10 +563,10 @@ export default function AuthScreen({
                 transition: "color 0.15s",
               }}
               onMouseEnter={(e) =>
-                (e.currentTarget.style.color = "var(--text-primary)")
+                (e.currentTarget.style.color = "#0f172a")
               }
               onMouseLeave={(e) =>
-                (e.currentTarget.style.color = "var(--text-muted)")
+                (e.currentTarget.style.color = "#94a3b8")
               }
             >
               <CaretLeft size={13} weight="bold" /> Back to home
@@ -502,8 +588,8 @@ export default function AuthScreen({
                   style={{
                     display: "flex",
                     padding: 3,
-                    background: "var(--surface-2)",
-                    border: "1px solid var(--border)",
+                    background: "#fbfcfe",
+                    border: "1px solid #e7e9f1",
                     borderRadius: 12,
                     marginBottom: 24,
                   }}
@@ -522,11 +608,11 @@ export default function AuthScreen({
                         fontSize: 13.5,
                         fontWeight: 600,
                         background:
-                          mode === m ? "var(--surface)" : "transparent",
+                          mode === m ? "#ffffff" : "transparent",
                         color:
                           mode === m
-                            ? "var(--text-primary)"
-                            : "var(--text-secondary)",
+                            ? "#0f172a"
+                            : "#64748b",
                         boxShadow:
                           mode === m ? "0 1px 3px rgba(0,0,0,0.06)" : "none",
                         transition: "all 0.15s ease",
@@ -543,7 +629,7 @@ export default function AuthScreen({
                   style={{
                     fontSize: 22,
                     fontWeight: 700,
-                    color: "var(--text-primary)",
+                    color: "#0f172a",
                     marginBottom: 4,
                     fontFamily: "var(--font-display)",
                     letterSpacing: "-0.01em",
@@ -553,7 +639,7 @@ export default function AuthScreen({
                 </h2>
                 <p
                   style={{
-                    color: "var(--text-secondary)",
+                    color: "#64748b",
                     fontSize: 13.5,
                     minHeight: 18,
                   }}
@@ -638,13 +724,13 @@ export default function AuthScreen({
                       style={{
                         flex: 1,
                         height: 1,
-                        background: "var(--border)",
+                        background: "#e7e9f1",
                       }}
                     />
                     <span
                       style={{
                         fontSize: 11.5,
-                        color: "var(--text-muted)",
+                        color: "#94a3b8",
                         fontWeight: 600,
                         letterSpacing: "0.05em",
                       }}
@@ -655,7 +741,7 @@ export default function AuthScreen({
                       style={{
                         flex: 1,
                         height: 1,
-                        background: "var(--border)",
+                        background: "#e7e9f1",
                       }}
                     />
                   </div>
@@ -670,7 +756,7 @@ export default function AuthScreen({
                       <User
                         size={15}
                         weight="light"
-                        color="var(--text-muted)"
+                        color="#94a3b8"
                       />
                     }
                     value={fullName}
@@ -689,7 +775,7 @@ export default function AuthScreen({
                       <Envelope
                         size={15}
                         weight="light"
-                        color="var(--text-muted)"
+                        color="#94a3b8"
                       />
                     }
                     value={email}
@@ -707,7 +793,7 @@ export default function AuthScreen({
                       <ArrowClockwise
                         size={15}
                         weight="light"
-                        color="var(--text-muted)"
+                        color="#94a3b8"
                       />
                     }
                     value={resetCode}
@@ -726,7 +812,7 @@ export default function AuthScreen({
                       <Lock
                         size={15}
                         weight="light"
-                        color="var(--text-muted)"
+                        color="#94a3b8"
                         style={{
                           position: "absolute",
                           left: 13,
@@ -745,7 +831,7 @@ export default function AuthScreen({
                           ...inp,
                           borderColor: errors.password
                             ? "#DC2626"
-                            : "var(--border-strong)",
+                            : "#d7dae6",
                         }}
                       />
                       <button
@@ -759,7 +845,7 @@ export default function AuthScreen({
                           background: "none",
                           border: "none",
                           cursor: "pointer",
-                          color: "var(--text-muted)",
+                          color: "#94a3b8",
                           lineHeight: 0,
                         }}
                       >
@@ -819,14 +905,14 @@ export default function AuthScreen({
                   style={{
                     fontSize: 21,
                     fontWeight: 700,
-                    color: "var(--text-primary)",
+                    color: "#0f172a",
                     marginBottom: 4,
                     fontFamily: "var(--font-display)",
                   }}
                 >
                   Choose your workspace
                 </h2>
-                <p style={{ color: "var(--text-secondary)", fontSize: 13.5 }}>
+                <p style={{ color: "#64748b", fontSize: 13.5 }}>
                   FitCV saves your role and routes you to the right portal.
                 </p>
               </div>
@@ -849,11 +935,11 @@ export default function AuthScreen({
                         borderRadius: 14,
                         cursor: "pointer",
                         border: `2px solid ${
-                          active ? "var(--accent)" : "var(--border)"
+                          active ? "#2563eb" : "#e7e9f1"
                         }`,
                         background: active
-                          ? "var(--accent-soft)"
-                          : "var(--surface)",
+                          ? "#eff4ff"
+                          : "#ffffff",
                         textAlign: "left",
                         display: "flex",
                         alignItems: "center",
@@ -868,12 +954,12 @@ export default function AuthScreen({
                           borderRadius: 12,
                           flexShrink: 0,
                           background: active
-                            ? "var(--accent)"
-                            : "var(--surface-2)",
+                            ? "#2563eb"
+                            : "#fbfcfe",
                           display: "flex",
                           alignItems: "center",
                           justifyContent: "center",
-                          color: active ? "white" : "var(--text-secondary)",
+                          color: active ? "white" : "#64748b",
                         }}
                       >
                         {option.icon}
@@ -883,7 +969,7 @@ export default function AuthScreen({
                           style={{
                             fontWeight: 700,
                             fontSize: 14.5,
-                            color: "var(--text-primary)",
+                            color: "#0f172a",
                             marginBottom: 2,
                           }}
                         >
@@ -892,7 +978,7 @@ export default function AuthScreen({
                         <div
                           style={{
                             fontSize: 12,
-                            color: "var(--text-secondary)",
+                            color: "#64748b",
                           }}
                         >
                           {option.description}
@@ -929,7 +1015,7 @@ export default function AuthScreen({
                   marginTop: 10,
                   background: "none",
                   border: "none",
-                  color: "var(--text-secondary)",
+                  color: "#64748b",
                   fontSize: 13.5,
                   cursor: "pointer",
                   padding: 8,
@@ -947,7 +1033,7 @@ export default function AuthScreen({
           <p
             style={{
               textAlign: "center",
-              color: "var(--text-muted)",
+              color: "#94a3b8",
               fontSize: 11.5,
               marginTop: 24,
             }}
@@ -1003,7 +1089,7 @@ function Field({
           onChange={(e) => onChange(e.target.value)}
           style={{
             ...inp,
-            borderColor: error ? "#DC2626" : "var(--border-strong)",
+            borderColor: error ? "#DC2626" : "#d7dae6",
           }}
         />
       </div>
@@ -1050,7 +1136,7 @@ function Feedback({
 const lbl: CSSProperties = {
   fontSize: 12.5,
   fontWeight: 600,
-  color: "var(--text-primary)",
+  color: "#0f172a",
   display: "block",
   marginBottom: 5,
 }
@@ -1059,12 +1145,12 @@ const inp: CSSProperties = {
   width: "100%",
   padding: "10px 14px 10px 38px",
   borderRadius: 10,
-  border: "1px solid var(--border-strong)",
+  border: "1px solid #d7dae6",
   fontSize: 13.5,
   outline: "none",
   fontFamily: "var(--font-body)",
-  color: "var(--text-primary)",
-  background: "var(--surface)",
+  color: "#0f172a",
+  background: "#ffffff",
 }
 
 const errTxt: CSSProperties = {
@@ -1075,7 +1161,7 @@ const errTxt: CSSProperties = {
 }
 
 const linkBtn: CSSProperties = {
-  color: "var(--accent)",
+  color: "#2563eb",
   fontWeight: 600,
   background: "none",
   border: "none",
@@ -1087,8 +1173,8 @@ const googleBtnStyle: CSSProperties = {
   width: "100%",
   padding: "10px 20px",
   borderRadius: 10,
-  border: "1px solid var(--border-strong)",
-  background: "var(--surface)",
+  border: "1px solid #d7dae6",
+  background: "#ffffff",
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
@@ -1096,7 +1182,7 @@ const googleBtnStyle: CSSProperties = {
   fontSize: 13.5,
   fontWeight: 600,
   cursor: "pointer",
-  color: "var(--text-primary)",
+  color: "#0f172a",
   marginBottom: 18,
 }
 
