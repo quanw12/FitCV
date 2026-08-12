@@ -1,107 +1,144 @@
 ---
-type: system
-title: Frontend Application
-description: React 19 + Vite frontend with Tailwind CSS providing the user interface for FitCV platform.
-tags: [frontend, react, vite, tailwind]
+type: Architecture
+title: Frontend Architecture
+description: React frontend structure, setup, and development guidelines for the FitCV application.
+tags: [frontend, react, architecture]
 ---
-# Frontend Application
 
-## Overview
-The FitCV frontend is a React 19 application built with Vite and styled with Tailwind CSS v4. It provides the user interface for both job seekers and HR professionals, featuring multiple screens for CV analysis, job search, application tracking, and HR dashboard functionalities.
+# Frontend Architecture
 
-## Entry Point
-- **Main Entry Point**: `/src/main.tsx` - React 19 + Vite bootstrap
-- **Root App Component**: `/src/app/App.tsx` - Application shell and routing
+FitCV's frontend is built with React 19, Vite, and Tailwind CSS v4. This document outlines the frontend structure, setup procedures, and development guidelines.
 
-## Key Components
+## Technology Stack
 
-### Screens (User Interface)
-Located in `/src/ui/screens/`:
-- **Authentication**: `AuthScreen.tsx` - Login, registration, Google sign-in, role selection
-- **Analyzer**: `AnalyzerScreen.tsx` - CV analysis against job descriptions
-- **CV Builder/Rebuild**: `CVReBuildScreen.tsx` - CV creation and improvement
-- **Job Search**: `JobSearchScreen.tsx` - Search and filter job postings
-- **Job Posts**: `JobPostsScreen.tsx` - View and manage job listings (HR)
-- **CV Ranking**: `CVRankingScreen.tsx` - Rank CVs against job descriptions (HR)
-- **Auto Email**: `AutoEmailScreen.tsx` - Automated email workflows (HR)
-- **Application Tracker**: 
-  - `FitCVApplicationTracker.tsx` - HR view of applications
-  - `PersonalApplicationTracker.tsx` - Job seeker view of applications
-  - `AppTrackerScreen.tsx` - General application tracking
-- **Pipeline**: `PipelineScreen.tsx` - HR recruitment pipeline management
-- **Reports**: `ReportsScreen.tsx` - Analytics and reporting
-- **Improvement Suggestions**: `ImprovementScreen.tsx` - CV improvement recommendations
-- **HR Dashboard**: `HRDashboard.tsx` - HR overview and metrics
-- **Public Job Viewing**: `PublicJobScreen.tsx` - Public access to job postings
-- **JD Library**: `JDLibraryScreen.tsx` - Job description library management
+- **Framework**: React 19
+- **Build Tool**: Vite
+- **Styling**: Tailwind CSS v4
+- **Language**: TypeScript
+- **State Management**: React Context and hooks (inferred from structure)
+- **HTTP Client**: Likely fetch or axios (inferred from API calls)
 
-### Components
-Reusable UI components in `/src/ui/components/`:
-- Layout components (headers, footers, sidebars)
-- Form components (inputs, selects, buttons)
-- Data display components (tables, cards, lists)
-- Modal and dialog components
-- Notification and toast components
+## File Organization
 
-### Services
-API service layer in `/src/services/`:
-- `authValidation.ts` - Authentication validation logic
-- `theme.ts` - Theme initialization and management
-- Other service modules for API interactions
+Frontend code must reside in the `src/` directory with the following structure:
 
-### API Layer
-API client functions in `/src/api/`:
-- `authApi.ts` - Authentication endpoints
-- `analyzerApi.ts` - CV analysis endpoints
-- `cvApi.ts` - CV management endpoints
-- `jobApi.ts` - Job posting endpoints
-- `applicationApi.ts` - Application management endpoints
-- Additional API modules for other features
+```
+src/
+├── app/          # Application-level components and routes
+├── ui/           # Reusable UI components
+├── api/          # API service calls and endpoints
+├── services/     # Business logic services
+├── data/         # Data structures and utilities
+�└── types/        # TypeScript type definitions
+```
 
-### Types
-TypeScript type definitions in `/src/types/`:
-- `auth.ts` - Authentication-related types
-- `cv.ts` - CV and profile types
-- `job.ts` - Job posting and application types
-- `api.ts` - API response types
-- Domain-specific types for various features
+### Layer Responsibilities
 
-### State/Data Management
-Data layer in `/src/data/`:
-- State management utilities
-- Data transformation and formatting functions
-- Local storage helpers
+- **src/app**: Contains application routes, layout components, and page-level components
+- **src/ui**: Reusable, presentational components (buttons, forms, modals, etc.)
+- **src/api**: Functions for making HTTP requests to backend endpoints
+- **src/services**: Business logic that orchestrates API calls and data processing
+  - **resourceCache.ts**: Caching mechanism for API responses to reduce redundant requests
+- **src/data**: Data transformation utilities, constants, and mock data
+- **src/types**: TypeScript interfaces and type definitions shared across the application
 
-### Static Assets
-- **HTML Template**: `/index.html` - Base HTML file with root div and Vite script imports
-- **Global Styles**: `/src/index.css` - Tailwind CSS v4 configuration and custom utility classes
-- **Public Directory**: `/public/` - Fonts and other static assets served by Vite
+## Setup Instructions
 
-### Real-Time Communication
-WebSocket connection attempt in `LandingScreen.tsx` (referenced in skeleton) for real-time analyzer updates, connecting to `ws://{location.host}`.
+### Prerequisites
 
-## Related Systems
-- **Backend API**: Communicates with `/backend` via REST API calls
-- **Authentication System**: Integrates with backend auth endpoints and Google OAuth
-- **CV Processing**: Uses analyzer and CV rebuild services from backend
-- **Job Management**: Interacts with job and application backend services
+- Node.js 20+ recommended
+- npm (comes with Node.js)
+- Git
+
+### Installation
+
+1. From the repository root:
+   ```bash
+   npm install
+   ```
+
+2. Create or update `.env.local` in the root directory:
+   ```env
+   VITE_API_BASE_URL=http://127.0.0.1:8000
+   VITE_GOOGLE_CLIENT_ID=<google-oauth-client-id>
+   ```
+
+   > **Note**: Use local backend while testing on your machine. If `.env.local` points to Render, requests will go to Render and the local backend terminal will not show auth logs.
+
+3. Frontend production fallback URL (if `VITE_API_BASE_URL` is not set):
+   ```
+   https://fitcv-0cab.onrender.com
+   ```
+
+   > **Important**: Still set `VITE_API_BASE_URL` explicitly in Vercel so future backend URL changes do not require code changes.
+
+### Development
+
+Run the frontend development server:
+```bash
+npm run dev
+```
+
+Frontend typically runs at:
+```
+http://localhost:5173
+```
+
+### Google OAuth Configuration
+
+If Google OAuth reports origin errors, open the app using:
+- `http://localhost:5173`
+- `http://127.0.0.1:5173`
+
+Do NOT use IP LAN/Tailscale format like `http://100.x.x.x:5173`.
+
+### Vercel Environment Variables
+
+For Vercel deployment:
+```env
+VITE_API_BASE_URL=https://fitcv-0cab.onrender.com
+VITE_GOOGLE_CLIENT_ID=<google-oauth-client-id>
+```
+
+## Build Commands
+
+- **Development**: `npm run dev`
+- **Production Build**: `npm run build`
+- **Format Code**: `npm run format`
+- **TypeScript Check**: `npx tsc --noEmit`
+- **Run Tests**: `npm test`
+
+## Important Symbols and Entry Points
+
+- **Main Entry Point**: `src/main.tsx` (inferred from standard React/Vite structure)
+- **Router**: Likely in `src/app/` directory
+- **API Services**: `src/api/` directory contains backend communication
+- **Components**: `src/ui/` for reusable components, `src/app/` for page components
 
 ## Focused Tests
-- Component tests in `/src/test/` (Vitest)
-- Specific test files mentioned in skeleton: `/src/app/App.test.tsx`
+
+- **Unit Tests**: Run with `npm test` (likely Vitest or Jest based)
+- **Component Testing**: Test individual UI components in isolation
+- **Service Testing**: Test API service functions with mocked responses
 
 ## Validation Commands
-- **Frontend Development**: `npm run dev` (starts Vite dev server)
-- **Frontend Build**: `npm run build` (creates production build)
-- **Frontend Preview**: `npm run preview` (previews production build)
-- **Linting**: (if configured) `npm run lint`
-- **Type Checking**: `npm run type-check` or via `tsc`
+
+- **Development Server**: `npm run dev` - validates frontend compiles and runs
+- **Production Build**: `npm run build` - validates frontend builds without errors
+- **Type Checking**: `npx tsc --noEmit` - validates TypeScript correctness
+- **Code Formatting**: `npm run format` - validates code style compliance
 
 ## Change Navigation
-When modifying the frontend:
-- **UI Changes**: Edit relevant screen/component in `/src/ui/`
-- **API Integration**: Update service calls in `/src/services/` or `/src/api/`
-- **Type Changes**: Modify types in `/src/types/`
-- **State Logic**: Update data utilities in `/src/data/`
-- **Styling**: Adjust Tailwind classes or `/src/index.css`
-- **Authentication Flow**: Modify `AuthScreen.tsx` and related auth services
+
+When making frontend changes:
+
+1. **UI Component Changes**: Edit files in `src/ui/` and test in isolation
+2. **Page/Route Changes**: Edit files in `src/app/` and verify navigation
+3. **API Integration Changes**: Edit files in `src/api/` and corresponding service files
+4. **Business Logic Changes**: Edit files in `src/services/` and update related tests
+5. **Type Definitions**: Edit files in `src/types/` and ensure consistency across usage
+
+Always verify changes by running:
+- `npm run dev` for development testing
+- `npm run build` for production build validation
+- `npm test` for running test suite
