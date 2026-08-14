@@ -16,6 +16,8 @@ okf_version: "0.1"
 - [Job & Application Management](job-management.md) - Complete job lifecycle management including job creation, application processing, tracking, and pipeline management for both job seekers and recruiters.
 - [Profile Management](profile-management.md) - User profile management system for both job seekers and HR professionals, including personal information, CV management, and application history.
 - [FitCV Wiki](quickstart.md) - Entrypoint for the FitCV repository documentation. Provides overview and navigation to all major sections.
+- [Setup & Installation](setup.md) - Installation and setup instructions for the FitCV development environment.
+- [Troubleshooting](troubleshooting.md) - Common issues and solutions for FitCV development and deployment.
 
 # Directories
 

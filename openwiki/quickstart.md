@@ -40,14 +40,14 @@ Use the links below to explore different aspects of the FitCV system:
 - [CV & JD Match Analyzer](./features/cv_jd_match_analyzer.md) - CV parsing, matching, and ranking (including HR CV Ranking and Job Applicants)
 
 ### Operational Guides
-<!-- openwiki: broken internal link [./setup.md] file "./setup.md" does not exist. Fix the href or restore the target, then delete this comment. -->
+
 - [Setup & Installation](./setup.md) - Installation instructions for development and deployment
-<!-- openwiki: broken internal link [./troubleshooting.md] file "./troubleshooting.md" does not exist. Fix the href or restore the target, then delete this comment. -->
+
 - [Troubleshooting](./troubleshooting.md) - Common issues and solutions
 
 ## Getting Started
 
-<!-- openwiki: broken internal link [./setup.md] file "./setup.md" does not exist. Fix the href or restore the target, then delete this comment. -->
+
 For detailed setup instructions, see the [Setup & Installation](./setup.md) guide.
 
 To understand how to contribute code, review the [Architecture](./frontend.md) and [Backend](./backend.md) pages which outline the code organization rules.
@@ -60,9 +60,9 @@ When making changes to the FitCV codebase:
 2. **Backend/API changes**: Start with [Backend Architecture](./backend.md)
 3. **Database changes**: Start with [Database Schema](./database.md)
 4. **Feature-specific changes**: Navigate to the relevant feature page above
-<!-- openwiki: broken internal link [./setup.md] file "./setup.md" does not exist. Fix the href or restore the target, then delete this comment. -->
+
 5. **Configuration changes**: Check [Setup & Installation](./setup.md)
-<!-- openwiki: broken internal link [./troubleshooting.md] file "./troubleshooting.md" does not exist. Fix the href or restore the target, then delete this comment. -->
+
 6. **Debugging issues**: Consult [Troubleshooting](./troubleshooting.md)
 
 Each major section contains specific entry points, important symbols, focused tests, and validation commands for that area.
