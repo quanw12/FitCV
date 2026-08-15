@@ -7,6 +7,8 @@ const cache = new Map<string, ResourceCacheEntry<unknown>>()
 
 const pending = new Map<string, Promise<unknown>>()
 
+let cacheGeneration = 0
+
 export function getCachedResource<T>(key: string): T | undefined {
   return cache.get(key)?.value as T | undefined
 }
@@ -18,6 +20,8 @@ export function setCachedResource<T>(key: string, value: T): T {
 }
 
 export function clearResourceCache(prefix?: string) {
+  cacheGeneration += 1
+
   if (!prefix) {
     cache.clear()
     pending.clear()
@@ -47,8 +51,13 @@ export async function getOrFetchResource<T>(
 
   if (!options.force && inFlight) return inFlight
 
+  const generation = cacheGeneration
   const request = loader()
-    .then((value) => setCachedResource(key, value))
+    .then((value) => {
+      if (generation === cacheGeneration) setCachedResource(key, value)
+
+      return value
+    })
     .finally(() => {
       if (pending.get(key) === request) pending.delete(key)
     })

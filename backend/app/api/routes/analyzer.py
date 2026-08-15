@@ -7,6 +7,7 @@ from fastapi import (
     UploadFile,
     status,
 )
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_account
@@ -16,6 +17,7 @@ from app.schemas.analyzer import (
     AnalyzeCvRequest,
     CvComparisonResponse,
     CvComparisonSeriesResponse,
+    CvFilePreviewResponse,
     CvVersionResponse,
     JdLibraryInsightsResponse,
     JdLibraryItemResponse,
@@ -89,6 +91,26 @@ def get_cv(
     db: Session = Depends(get_db),
 ) -> CvVersionResponse:
     return analyzer_service.get_cv(db, cv_id=cv_id, account=account)
+
+
+@router.get("/cvs/{cv_id}/file")
+def get_cv_file(
+    cv_id: int,
+    account: Account = Depends(get_current_account),
+    db: Session = Depends(get_db),
+) -> FileResponse:
+    return analyzer_service.get_cv_file(db, cv_id=cv_id, account=account)
+
+
+@router.get("/cvs/{cv_id}/preview", response_model=CvFilePreviewResponse)
+def get_cv_preview_pages(
+    cv_id: int,
+    account: Account = Depends(get_current_account),
+    db: Session = Depends(get_db),
+) -> CvFilePreviewResponse:
+    return CvFilePreviewResponse(
+        pages=analyzer_service.get_cv_preview_pages(db, cv_id=cv_id, account=account)
+    )
 
 
 @router.post(
