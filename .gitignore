@@ -40,4 +40,5 @@ testsprite_tests/tmp/config.json
 .agents/
 .claude/ 
 skills-lock.json
+.kilo 
 
