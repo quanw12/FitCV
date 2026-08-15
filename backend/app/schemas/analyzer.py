@@ -17,6 +17,10 @@ class CvVersionResponse(BaseModel):
     ai_task_id: int | None = None
 
 
+class CvFilePreviewResponse(BaseModel):
+    pages: list[str]
+
+
 class AnalyzeCvRequest(BaseModel):
     cv_id: int = Field(gt=0)
     job_description: str = Field(min_length=50, max_length=100_000)

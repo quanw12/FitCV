@@ -3,27 +3,20 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import {
   WarningCircle,
   ChartBar,
-  Check,
-  FileText,
-  GitBranch,
   ArrowsClockwise,
-  TrashSimple,
   UploadSimple,
+  Eye,
 } from "@phosphor-icons/react"
 
-import {
-  Area,
-  AreaChart,
-  CartesianGrid,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts"
+import { Check, Trash2 } from "lucide-react"
+
+import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts"
 
 import { toast } from "sonner"
 
 import { analyzerApi } from "@/api/analyzerApi"
+
+import { getScoreTone } from "@/services/matchScore"
 
 import {
   clearResourceCache,
@@ -240,6 +233,35 @@ export default function CVHistoryScreen() {
     }
   }
 
+  const [viewerLoadingId, setViewerLoadingId] = useState<number | null>(null)
+  const [viewerPages, setViewerPages] = useState<string[]>([])
+  const [viewerName, setViewerName] = useState<string | null>(null)
+
+  const openViewer = useCallback(async (cv: CvVersion) => {
+    setError(null)
+
+    setViewerLoadingId(cv.cvId)
+
+    try {
+      const previewPages = await analyzerApi.getCvPreviewPages(cv.cvId)
+      setViewerPages(previewPages)
+      setViewerName(cv.fileName)
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "Unable to open this CV file.",
+      )
+    } finally {
+      setViewerLoadingId(null)
+    }
+  }, [])
+
+  const closeViewer = () => {
+    setViewerPages([])
+    setViewerName(null)
+  }
+
   const toggleSelect = (cvId: number) => {
     setSelected((current) => {
       if (current.includes(cvId)) return current.filter((id) => id !== cvId)
@@ -332,7 +354,7 @@ export default function CVHistoryScreen() {
       )}
 
       {selected.length === 1 && (
-        <div style={selectionHintStyle}>
+        <div className="mb-4 text-sm text-zinc-500">
           Select one more CV to compare metadata.
         </div>
       )}
@@ -525,7 +547,7 @@ export default function CVHistoryScreen() {
       )}
 
       {!loading && cvs.length > 0 && comparisons.length === 0 && (
-        <div style={selectionHintStyle}>
+        <div className="mb-4 flex items-center gap-2 text-sm text-zinc-500">
           <ChartBar size={16} weight="light" /> Analyze at least one CV against
           a JD to start the score history. Analyze two versions against the same
           JD to see improvement.
@@ -602,7 +624,7 @@ export default function CVHistoryScreen() {
           style={{
             display: "grid",
 
-            gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+            gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
 
             gap: 14,
 
@@ -613,85 +635,17 @@ export default function CVHistoryScreen() {
             const isSelected = selected.includes(cv.cvId)
 
             return (
-              <article
+              <CvVersionCard
                 key={cv.cvId}
-                className="fitcv-card"
-                style={{
-                  padding: 20,
-
-                  border: `2px solid ${
-                    isSelected ? "var(--accent)" : "var(--border)"
-                  }`,
-
-                  background: isSelected
-                    ? "var(--accent-soft)"
-                    : "var(--surface)",
-
-                  position: "relative",
-                }}
-              >
-                {cv.isLatest && (
-                  <span
-                    className="badge-green"
-                    style={{ position: "absolute", top: 12, right: 12 }}
-                  >
-                    Latest
-                  </span>
-                )}
-                <div style={fileIconStyle}>
-                  <FileText size={22} weight="light" />
-                </div>
-                <div
-                  title={cv.fileName}
-                  style={{
-                    fontSize: 14,
-
-                    fontWeight: 700,
-
-                    color: "var(--text-primary)",
-
-                    marginBottom: 6,
-
-                    overflowWrap: "anywhere",
-
-                    paddingRight: cv.isLatest ? 48 : 0,
-                  }}
-                >
-                  {cv.fileName}
-                </div>
-                <div style={metadataStyle}>
-                  Version {cv.versionNumber} · {cv.fileType} ·{" "}
-                  {formatFileSize(cv.fileSizeKb)}
-                </div>
-                <div style={metadataStyle}>{formatDate(cv.uploadedAt)}</div>
-                <div style={{ marginTop: 14 }}>
-                  <StatusBadge cv={cv} />
-                </div>
-                <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
-                  <button
-                    type="button"
-                    className="fitcv-btn-secondary"
-                    onClick={() => toggleSelect(cv.cvId)}
-                    style={{ flex: 1, justifyContent: "center" }}
-                  >
-                    {isSelected ? (
-                      <Check size={14} weight="light" />
-                    ) : (
-                      <GitBranch size={14} weight="light" />
-                    )}
-                    {isSelected ? "Selected" : "Compare"}
-                  </button>
-                  <button
-                    type="button"
-                    aria-label={`Delete ${cv.fileName}`}
-                    onClick={() => void deleteVersion(cv)}
-                    disabled={deletingId === cv.cvId}
-                    style={deleteButtonStyle}
-                  >
-                    <TrashSimple size={15} weight="light" />
-                  </button>
-                </div>
-              </article>
+                cv={cv}
+                isSelected={isSelected}
+                isDeleting={deletingId === cv.cvId}
+                isViewing={viewerLoadingId === cv.cvId}
+                scorePoint={scoreByCv.get(cv.cvId)}
+                onToggleSelect={() => toggleSelect(cv.cvId)}
+                onView={() => void openViewer(cv)}
+                onDelete={() => void deleteVersion(cv)}
+              />
             )
           })}
         </div>
@@ -911,6 +865,90 @@ export default function CVHistoryScreen() {
           )}
         </div>
       )}
+
+      {viewerPages.length > 0 && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={`CV preview: ${viewerName ?? "CV"}`}
+          onClick={(event) => {
+            if (event.target === event.currentTarget) closeViewer()
+          }}
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 1000,
+            display: "flex",
+            alignItems: "flex-start",
+            justifyContent: "center",
+            padding: "96px 24px 32px",
+            background: "rgba(15, 23, 42, 0.68)",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              width: "min(100%, 700px)",
+              height: "min(78vh, 820px)",
+              overflow: "hidden",
+              borderRadius: 14,
+              background: "var(--surface)",
+              boxShadow: "0 24px 80px rgba(15, 23, 42, 0.35)",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 12,
+                padding: "12px 16px",
+                borderBottom: "1px solid var(--border)",
+              }}
+            >
+              <strong style={{ overflowWrap: "anywhere" }}>
+                {viewerName ?? "CV preview"}
+              </strong>
+              <button
+                type="button"
+                className="fc-btn fc-btn--secondary"
+                onClick={closeViewer}
+                aria-label="Close CV preview"
+              >
+                Close
+              </button>
+            </div>
+            <div
+              style={{
+                flex: 1,
+                overflowY: "auto",
+                padding: 16,
+                background: "#475569",
+              }}
+            >
+              {viewerPages.map((page, index) => (
+                <img
+                  key={index}
+                  src={page}
+                  alt={`${viewerName ?? "CV"} — page ${index + 1}`}
+                  style={{
+                    display: "block",
+                    width: "min(100%, 570px)",
+                    margin:
+                      index === viewerPages.length - 1
+                        ? "0 auto"
+                        : "0 auto 20px",
+                    background: "white",
+                    boxShadow: "0 4px 18px rgba(15, 23, 42, 0.35)",
+                  }}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   )
 }
@@ -1049,38 +1087,170 @@ function ScoreBaseline({ point }: { point: CvScorePoint }) {
   )
 }
 
-function StatusBadge({ cv }: { cv: CvVersion }) {
-  const config = {
-    Success: { label: "Parsed", color: "#166534", background: "#DCFCE7" },
+interface CvVersionCardProps {
+  cv: CvVersion
 
-    Failed: { label: "Parse failed", color: "#B91C1C", background: "#FEE2E2" },
+  isSelected: boolean
 
-    Processing: { label: "Parsing", color: "#1D4ED8", background: "#DBEAFE" },
+  isDeleting: boolean
 
-    Pending: { label: "Queued", color: "#92400E", background: "#FEF3C7" },
-  }[cv.parseStatus]
+  isViewing: boolean
+
+  scorePoint?: CvScorePoint
+
+  onToggleSelect: () => void
+
+  onView: () => void
+
+  onDelete: () => void
+}
+
+function parseStatusBadge(status: CvVersion["parseStatus"]) {
+  if (status === "Success") return "fc-badge fc-badge--green"
+
+  if (status === "Failed") return "fc-badge fc-badge--red"
+
+  return "fc-badge fc-badge--amber"
+}
+
+function parseStatusLabel(status: CvVersion["parseStatus"]) {
+  if (status === "Success") return "Parsed"
+
+  if (status === "Failed") return "Failed"
+
+  return "Processing"
+}
+
+function CvVersionCard({
+  cv,
+
+  isSelected,
+
+  isDeleting,
+
+  isViewing,
+
+  scorePoint,
+
+  onToggleSelect,
+
+  onView,
+
+  onDelete,
+}: CvVersionCardProps) {
+  const typeLabel = (cv.fileType ?? "PDF").toUpperCase()
+
+  const tone = scorePoint ? getScoreTone(scorePoint.overallScore) : null
 
   return (
-    <span
-      title={cv.errorMessage ?? undefined}
-      style={{
-        display: "inline-flex",
-
-        color: config.color,
-
-        background: config.background,
-
-        borderRadius: 999,
-
-        padding: "4px 9px",
-
-        fontSize: 11,
-
-        fontWeight: 700,
-      }}
+    <article
+      className="cv-version-card"
+      data-selected={isSelected}
+      data-deleting={isDeleting}
+      aria-pressed={isSelected}
     >
-      {config.label}
-    </span>
+      <div className="cv-version-card__top">
+        <div className="cv-version-card__thumb" aria-hidden="true">
+          <span className="cv-version-card__thumb-type">{typeLabel}</span>
+
+          <span className="cv-version-card__thumb-version">
+            v{cv.versionNumber}
+          </span>
+
+          {isSelected && (
+            <span className="cv-version-card__selected-mark">
+              <Check size={11} strokeWidth={3.5} />
+            </span>
+          )}
+        </div>
+
+        <div className="cv-version-card__body">
+          <div className="cv-version-card__head">
+            <p className="cv-version-card__name" title={cv.fileName}>
+              {cv.fileName}
+            </p>
+
+            {cv.isLatest && (
+              <span className="fc-badge fc-badge--blue">Latest</span>
+            )}
+
+            <span className={parseStatusBadge(cv.parseStatus)}>
+              {parseStatusLabel(cv.parseStatus)}
+            </span>
+          </div>
+
+          <div className="cv-version-card__meta">
+            Version {cv.versionNumber} · {cv.fileType} ·{" "}
+            {formatFileSize(cv.fileSizeKb)} · {formatDate(cv.uploadedAt)}
+          </div>
+
+          {scorePoint && tone && (
+            <div
+              className="cv-version-card__score"
+              style={{
+                borderColor: tone.trackColor,
+
+                background: tone.trackColor,
+              }}
+            >
+              <span
+                className="cv-version-card__score-value"
+                style={{ color: tone.color }}
+              >
+                {scorePoint.overallScore.toFixed(1)}%
+              </span>
+
+              <span className="cv-version-card__score-label">
+                {scorePoint.matchLabel ?? tone.label}
+              </span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="cv-version-card__actions">
+        <button
+          type="button"
+          className="cv-version-card__view"
+          onClick={onView}
+          disabled={isViewing}
+          title="Open this CV in a new tab"
+        >
+          {isViewing ? (
+            <ArrowsClockwise className="state-spinner" size={13} weight="light" />
+          ) : (
+            <Eye size={14} weight="light" />
+          )}
+          {isViewing ? "Opening…" : "View"}
+        </button>
+
+        <button
+          type="button"
+          className="cv-version-card__compare"
+          data-active={isSelected}
+          onClick={onToggleSelect}
+        >
+          {isSelected ? (
+            <>
+              <Check size={13} strokeWidth={2.75} /> Selected
+            </>
+          ) : (
+            "Compare"
+          )}
+        </button>
+
+        <button
+          type="button"
+          className="cv-version-card__delete"
+          aria-label={`Delete ${cv.fileName}`}
+          title="Delete CV"
+          onClick={onDelete}
+          disabled={isDeleting}
+        >
+          <Trash2 size={16} strokeWidth={1.75} />
+        </button>
+      </div>
+    </article>
   )
 }
 
@@ -1168,22 +1338,6 @@ const alertStyle: React.CSSProperties = {
   fontSize: 13,
 }
 
-const selectionHintStyle: React.CSSProperties = {
-  padding: "10px 16px",
-
-  background: "var(--accent-soft)",
-
-  borderRadius: 10,
-
-  marginBottom: 14,
-
-  fontSize: 13,
-
-  color: "var(--accent-ink)",
-
-  fontWeight: 600,
-}
-
 const emptyStyle: React.CSSProperties = {
   minHeight: 220,
 
@@ -1202,54 +1356,4 @@ const emptyStyle: React.CSSProperties = {
   textAlign: "center",
 
   padding: 24,
-}
-
-const fileIconStyle: React.CSSProperties = {
-  width: 44,
-
-  height: 44,
-
-  borderRadius: 12,
-
-  background: "#DBEAFE",
-
-  color: "#2563EB",
-
-  display: "flex",
-
-  alignItems: "center",
-
-  justifyContent: "center",
-
-  marginBottom: 14,
-}
-
-const metadataStyle: React.CSSProperties = {
-  color: "var(--text-muted)",
-
-  fontSize: 12,
-
-  lineHeight: 1.6,
-}
-
-const deleteButtonStyle: React.CSSProperties = {
-  width: 38,
-
-  height: 38,
-
-  display: "inline-flex",
-
-  alignItems: "center",
-
-  justifyContent: "center",
-
-  color: "#B91C1C",
-
-  background: "#FEF2F2",
-
-  border: "1px solid #FECACA",
-
-  borderRadius: 8,
-
-  cursor: "pointer",
 }

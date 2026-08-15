@@ -7,6 +7,14 @@ import { requestJson } from "./httpClient"
 
 const LOCAL_PROFILE_KEY = "fitcv.profile.records"
 
+let profileCache: UserProfile | null = null
+
+let profileCacheAccountId: string | null = null
+
+let profileFetchInFlight: Promise<UserProfile> | null = null
+
+let profileFetchAccountId: string | null = null
+
 function readRecords(): Record<string, UserProfile> {
   if (typeof window === "undefined") return {}
 
@@ -176,9 +184,46 @@ function persistLocal(profile: UserProfile): UserProfile {
 
 export const profileApi = {
   async get(): Promise<UserProfile> {
-    if (API_BASE_URL) return backendRequest("GET")
+    const session = authApi.getSession()
 
-    return getLocalProfile()
+    if (!session) throw new Error("Authentication required.")
+
+    if (
+      profileCache &&
+      profileCacheAccountId === session.user.accountId
+    ) {
+      return profileCache
+    }
+
+    if (
+      profileFetchInFlight &&
+      profileFetchAccountId === session.user.accountId
+    ) {
+      return profileFetchInFlight
+    }
+
+    profileFetchAccountId = session.user.accountId
+    profileFetchInFlight = (API_BASE_URL
+      ? backendRequest("GET")
+      : Promise.resolve(getLocalProfile())
+    ).then((profile) => {
+      profileCache = profile
+      profileCacheAccountId = profile.accountId
+
+      return profile
+    })
+
+    try {
+      return await profileFetchInFlight
+    } finally {
+      profileFetchInFlight = null
+      profileFetchAccountId = null
+    }
+  },
+
+  clearCache() {
+    profileCache = null
+    profileCacheAccountId = null
   },
 
   async update(update: ProfileUpdate): Promise<UserProfile> {
@@ -276,6 +321,9 @@ export const profileApi = {
       avatarUrl: profile.avatarUrl,
     })
 
+    profileCache = profile
+    profileCacheAccountId = profile.accountId
+
     return profile
   },
 
@@ -300,6 +348,9 @@ export const profileApi = {
 
     authApi.updateCurrentUser({ avatarUrl: profile.avatarUrl })
 
+    profileCache = profile
+    profileCacheAccountId = profile.accountId
+
     return profile
   },
 
@@ -317,6 +368,9 @@ export const profileApi = {
       })
 
     authApi.updateCurrentUser({ avatarUrl: null })
+
+    profileCache = profile
+    profileCacheAccountId = profile.accountId
 
     return profile
   },
