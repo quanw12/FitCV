@@ -1,12 +1,12 @@
 export const DEFAULT_PRODUCTION_API_BASE_URL = "https://fitcv-0cab.onrender.com"
 
 const DEFAULT_DEVELOPMENT_API_BASE_URL = ""
+const configuredApiBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim()
 
 export const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL ??
-  (import.meta.env.PROD
-    ? DEFAULT_PRODUCTION_API_BASE_URL
-    : DEFAULT_DEVELOPMENT_API_BASE_URL)
+  import.meta.env.PROD
+    ? configuredApiBaseUrl || DEFAULT_PRODUCTION_API_BASE_URL
+    : DEFAULT_DEVELOPMENT_API_BASE_URL
 
 export function apiConnectionErrorMessage(): string {
   const apiAddress =

@@ -297,6 +297,14 @@ export const analyzerApi = {
     return normalizeCv(payload)
   },
 
+  async getCvPreviewPages(cvId: number): Promise<string[]> {
+    const payload = await requestJson<{ pages: string[] }>(
+      `/api/cvs/${cvId}/preview`,
+      { authenticated: true },
+    )
+    return payload.pages
+  },
+
   async retryCvParse(cvId: number, signal?: AbortSignal): Promise<CvVersion> {
     const payload = await requestJson<BackendCvVersion>(
       `/api/cvs/${cvId}/retry-parse`,
