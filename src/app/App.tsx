@@ -4,7 +4,9 @@ import { AnimatePresence } from "framer-motion"
 
 import { toast } from "sonner"
 
-import { authApi, profileApi } from "@/api"
+import { authApi } from "@/api"
+
+import { profileApi } from "@/api/profileApi"
 
 import {
   clearStoredImprovementMatchResultId,
@@ -15,6 +17,8 @@ import {
 import { isCompanyProfileComplete, requiresCompanyProfile } from "@/services"
 
 import { clearResourceCache } from "@/services/resourceCache"
+
+import { prefetchAuthenticatedResources } from "@/services/authenticatedPrefetch"
 
 import type { AnalyzerDraftState } from "@/types/analyzer"
 
@@ -132,6 +136,7 @@ export default function App() {
     return authApi.onSessionExpired(() => {
       if (session) clearStoredImprovementMatchResultId(session.user.accountId)
       clearResourceCache()
+      profileApi.clearCache()
       setSession(null)
       setShowLanding(true)
 
@@ -156,6 +161,12 @@ export default function App() {
 
     return authApi.startActivityMonitoring()
   }, [session?.user.accountId])
+
+  useEffect(() => {
+    if (!session) return
+
+    void prefetchAuthenticatedResources(session)
+  }, [session?.accessToken, session?.user.accountId])
 
   useEffect(() => {
     if (session) {
@@ -238,6 +249,7 @@ export default function App() {
 
     clearStoredImprovementMatchResultId(nextSession.user.accountId)
     clearResourceCache()
+    profileApi.clearCache()
 
     setShowLanding(false)
 
@@ -265,6 +277,7 @@ export default function App() {
   const handleLogout = async () => {
     if (session) clearStoredImprovementMatchResultId(session.user.accountId)
     clearResourceCache()
+    profileApi.clearCache()
 
     try {
       await authApi.logout()
