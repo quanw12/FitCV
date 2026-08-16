@@ -1,57 +1,68 @@
 ---
-type: documentation
-title: FitCV Repository Documentation Quickstart
-description: Entrypoint to the FitCV repository documentation. Provides high-level overview and navigation to major systems.
-tags: [repository, getting-started, navigation]
+type: Documentation Homepage
+title: FitCV Wiki
+description: Entrypoint for the FitCV repository documentation. Provides overview and navigation to all major sections.
+tags: [quickstart, navigation]
 ---
-# FitCV Repository Documentation
 
-FitCV is a CV screening and job matching platform using AI, serving two main user groups:
-- **Students/Job Seekers**: upload CVs, analyze against job descriptions, get improvement suggestions, track applications.
-- **HR/Recruiters**: manage job postings, applicant CVs, ranking, pipeline, email workflows, and reports.
+# FitCV Documentation
 
-## Repository Structure
+Welcome to the FitCV repository documentation. This wiki provides comprehensive information about the FitCV platform - an AI-powered CV screening and job matching platform.
 
-The repository consists of a React 19 + Vite frontend and a FastAPI backend with SQLAlchemy and MySQL.
+## Overview
 
-## Major Systems
+FitCV is a platform for CV screening and job suitability assessment using AI, serving two main user groups:
 
-- [Frontend Application](./frontend.md) - React 19 + Vite frontend with Tailwind CSS
-- [Backend API](./backend.md) - FastAPI modular monolith with async processing
-- [Database Layer](./database.md) - Schema, models, repositories, and migrations
-- [Authentication & Authorization](./authentication.md) - Auth flows, Google sign-in, role-based access
-- [CV Processing & Analysis Pipeline](./cv-processing.md) - Analyzer, match engine, CV rebuild, ranking, improvement reports
-- [Job & Application Management](./job-management.md) - Job posts, applications, search, pipeline tracking
-- [HR Functionality](./hr-functionality.md) - CV ranking, job applicant ranking, pipeline management, reports, auto email, HR dashboard
-- [Profile Management](./profile-management.md) - User profile CRUD
-- [Background Workers & AI Processing](./background-workers.md) - AI worker, async task processing
+- **Student / Job Seeker**: Register, select role, upload CV, analyze CV against job descriptions, view improvement suggestions, CV history, and application tracker
+- **HR / Recruiter / Hiring Manager / Admin**: Manage job postings, upload candidate CVs, rank applicants, manage pipelines, send emails, and generate reports
+
+The platform consists of:
+- **Frontend**: React 19 + Vite + Tailwind CSS v4
+- **Backend**: FastAPI + SQLAlchemy + MySQL
+- **Authentication**: Register/login, Google sign-in, 4 role selection, forgot/reset password with 6-digit verification code
+
+## Navigation
+
+Use the links below to explore different aspects of the FitCV system:
+
+### Core Architecture
+- [Frontend Architecture](./frontend.md) - React frontend structure and setup
+- [Backend Architecture](./backend.md) - FastAPI backend structure and setup
+- [Database Schema](./database.md) - MySQL schema and migrations
+
+### Key Features
+- [Authentication System](./auth.md) - User registration, login, roles, and security
+- [AI Improvement Suggestions](./features/ai_improvement_suggestions.md) - Generate CV improvement recommendations
+- [AI Rebuild CV](./features/ai_rebuild_cv.md) - Convert CVs to standardized PDF format
+- [Job Post Management](./features/job_post_management.md) - Create, manage, and archive job postings
+- [Recruiter Pipeline & Email](./features/recruiter_pipeline_email.md) - Application tracking and automated email workflows
+- [Application Tracker](./features/application_tracker.md) - Student job application tracking
+- [CV & JD Match Analyzer](./features/cv_jd_match_analyzer.md) - CV parsing, matching, and ranking (including HR CV Ranking and Job Applicants)
+
+### Operational Guides
+
+- [Setup & Installation](./setup.md) - Installation instructions for development and deployment
+
+- [Troubleshooting](./troubleshooting.md) - Common issues and solutions
 
 ## Getting Started
 
-1. **Prerequisites**: Node.js 20+, Python 3.11+, MySQL server, npm, Git
-2. **Frontend Setup**:
-   ```bash
-   npm install
-   # Create .env.local with VITE_API_BASE_URL and VITE_GOOGLE_CLIENT_ID
-   npm run dev
-   ```
-3. **Backend Setup**:
-   ```bash
-   # In backend directory
-   pip install -r requirements.txt
-   # Set up MySQL database and update .env
-   uvicorn app.main:app --reload
-   ```
+
+For detailed setup instructions, see the [Setup & Installation](./setup.md) guide.
+
+To understand how to contribute code, review the [Architecture](./frontend.md) and [Backend](./backend.md) pages which outline the code organization rules.
 
 ## Change Navigation
 
-Use this quickstart to navigate to the relevant system documentation when making changes:
-- **UI changes**: Start with [Frontend](./frontend.md)
-- **API changes**: Start with [Backend API](./backend.md)
-- **Data model changes**: Start with [Database Layer](./database.md)
-- **Auth changes**: Start with [Authentication & Authorization](./authentication.md)
-- **CV analysis changes**: Start with [CV Processing & Analysis Pipeline](./cv-processing.md)
-- **Job/application changes**: Start with [Job & Application Management](./job-management.md)
-- **HR features**: Start with [HR Functionality](./hr-functionality.md)
-- **Profile changes**: Start with [Profile Management](./profile-management.md)
-- **Background tasks**: Start with [Background Workers & AI Processing](./background-workers.md)
+When making changes to the FitCV codebase:
+
+1. **UI/Frontend changes**: Start with [Frontend Architecture](./frontend.md)
+2. **Backend/API changes**: Start with [Backend Architecture](./backend.md)
+3. **Database changes**: Start with [Database Schema](./database.md)
+4. **Feature-specific changes**: Navigate to the relevant feature page above
+
+5. **Configuration changes**: Check [Setup & Installation](./setup.md)
+
+6. **Debugging issues**: Consult [Troubleshooting](./troubleshooting.md)
+
+Each major section contains specific entry points, important symbols, focused tests, and validation commands for that area.

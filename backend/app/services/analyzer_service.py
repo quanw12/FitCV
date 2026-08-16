@@ -1,3 +1,4 @@
+import base64
 import hashlib
 import logging
 from collections import Counter
@@ -5,6 +6,7 @@ from pathlib import Path
 from uuid import uuid4
 
 from fastapi import HTTPException, UploadFile, status
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -373,6 +375,77 @@ def delete_cv(db: Session, *, cv_id: int, account: Account) -> None:
     stored_path = _stored_file_path(cv.file_path)
     analyzer.delete_owned_cv(db, cv)
     stored_path.unlink(missing_ok=True)
+
+
+def get_cv_file(
+    db: Session, *, cv_id: int, account: Account
+) -> FileResponse:
+    cv = analyzer.get_owned_cv(db, cv_id, account.account_id)
+    if cv is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="CV not found."
+        )
+    stored_path = _stored_file_path(cv.file_path)
+    if not stored_path.is_file():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Stored CV file is unavailable.",
+        )
+    media_type = (
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        if cv.file_type == "DOCX"
+        else "application/pdf"
+    )
+    safe_name = (cv.file_name or "cv").replace('"', "_")
+    disposition = "inline" if cv.file_type == "PDF" else "attachment"
+    return FileResponse(
+        stored_path,
+        media_type=media_type,
+        headers={"Content-Disposition": f'{disposition}; filename="{safe_name}"'},
+    )
+
+
+def get_cv_preview_pages(db: Session, *, cv_id: int, account: Account) -> list[str]:
+    """Render an owned PDF without relying on the browser PDF plugin."""
+    cv = analyzer.get_owned_cv(db, cv_id, account.account_id)
+    if cv is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="CV not found."
+        )
+    stored_path = _stored_file_path(cv.file_path)
+    if not stored_path.is_file():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Stored CV file is unavailable.",
+        )
+    if cv.file_type != "PDF":
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Preview is currently available for PDF CVs only.",
+        )
+    try:
+        import fitz
+
+        with fitz.open(stored_path) as document:
+            if document.page_count == 0:
+                raise ValueError("PDF has no pages.")
+            return [
+                "data:image/png;base64,"
+                + base64.b64encode(
+                    page.get_pixmap(
+                        matrix=fitz.Matrix(1.5, 1.5), alpha=False
+                    ).tobytes("png")
+                ).decode("ascii")
+                for page in document
+            ]
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("Unable to render CV preview for cv_id=%s", cv_id)
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Unable to render this CV preview.",
+        ) from exc
 
 
 def request_analysis(

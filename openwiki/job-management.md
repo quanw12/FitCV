@@ -15,32 +15,41 @@ FitCV's job and application management system handles the complete recruitment l
 - **Job Routes**: `/backend/app/api/routes/jobs.py` - Job CRUD operations and management
 - **Application Routes**: `/backend/app/api/routes/applications.py` - Application submission and management
 - **Pipeline Routes**: `/backend/app/api/routes/pipeline.py` - Recruitment pipeline stage management
-- **Job Search Routes**: `/backend/app/api/routes/job_search.py` - Job search and filtering functionality
+- **Job Search Routes**: `/backend/app/api/routes/job_search.py` - Job search and filtering functionality (integrates with freehire.me and LinkedIn APIs) (integrates with freehire.me and LinkedIn APIs)
 - **Job Description Routes**: Part of job management (handled in jobs/routes or separate)
 
 ### Services
 - **Jobs Service**: `/backend/app/services/jobs_service.py` - Business logic for job operations
 - **Job Extraction Service**: `/backend/app/services/job_extraction_service.py` - Extracts job details from text
-- **FreeHire Job Search**: `/backend/app/services/freehire_job_search.py` - External job search integration
+- **FreeHire Job Search**: `/backend/app/services/freehire_job_search.py` - External job search integration (freehire.me aggregator)
 - **LinkedIn Job Search**: `/backend/app/services/linkedin_job_search.py` - LinkedIn job scraping
 - **Application Service**: `/backend/app/services/application_service.py` - Application processing logic
 - **Pipeline Service**: `/backend/app/services/pipeline_service.py` - Pipeline stage management
+- **Improvement Enricher Service**: `/backend/app/services/improvement_enricher.py` - Enriches CV improvement suggestions with job market data
+- **Improvement Provider Service**: `/backend/app/services/improvement_provider.py` - Provides improvement suggestions based on job market trends
 
 ### Repositories
 - **Jobs Repository**: `/backend/app/repositories/jobs.py` - Data access for job operations
 - **Applications Repository**: `/backend/app/repositories/applications.py` - Data access for applications
 - **Candidates Repository**: `/backend/app/repositories/candidates.py` - Candidate data access
 - **CV Repository**: `/backend/app/repositories/cv.py` - CV data access (for applications)
+- **Analyzer Repository**: `/backend/app/repositories/analyzer.py` - Data access for CV analysis results
 
 ### Frontend Components
 - **Job Posts Screen**: `/src/ui/screens/JobPostsScreen.tsx` - View and manage job postings
-- **Job Search Screen**: `/src/ui/screens/JobSearchScreen.tsx` - Search and filter jobs
+- **Job Search Screen**: `/src/ui/screens/JobSearchScreen.tsx` - Search and filter jobs (includes external job search from freehire.me and LinkedIn)
 - **Application Tracker Screens**:
   - `/src/ui/screens/FitCVApplicationTracker.tsx` - Internal applications (HR view)
   - `/src/ui/screens/PersonalApplicationTracker.tsx` - Personal applications (Student view)
   - `/src/ui/screens/AppTrackerScreen.tsx` - General application tracker
 - **Job Applicants Ranking Panel**: `/src/ui/screens/JobApplicantsRankingPanel.tsx` - Rank applicants for a job
 - **Bulk CV Ranking Panel**: `/src/ui/screens/BulkCvRankingPanel.tsx` - Rank multiple CVs against a job
+- **Improvement Screen**: `/src/ui/screens/ImprovementScreen.tsx` - View and apply CV improvement suggestions
+- **JD Library Screen**: `/src/ui/screens/JDLibraryScreen.tsx` - Manage job description templates
+- **Reports Screen**: `/src/ui/screens/ReportsScreen.tsx` - View recruitment reports and analytics
+- **Pipeline Screen**: `/src/ui/screens/PipelineScreen.tsx` - Manage recruitment pipelines
+- **Auto Email Screen**: `/src/ui/screens/AutoEmailScreen.tsx` - Configure automated email workflows
+- **CV History Screen**: `/src/ui/screens/CVHistoryScreen.tsx` - View CV version history
 
 ## Job Lifecycle Management
 
@@ -98,307 +107,142 @@ FitCV's job and application management system handles the complete recruitment l
 ## Pipeline Management
 
 ### Pipeline Configuration
-- **Custom Stages**: Organizations can define custom recruitment pipeline stages
-- **Stage Configuration**: Each stage has entry/exit criteria, required actions, and notifications
-- **Automation**: Rules for automatic stage movement based on conditions
-- **SLAs**: Time targets for each stage to prevent bottlenecks
+- **Pipeline Stages**: Applied, Screening, Interview, Offer, Hired, Rejected
+- **Stage Notes**: Each stage can have notes and history tracking
+- **Stage Transitions**: Configured transitions between stages with validation
+- **Automation Triggers**: Events that can trigger automatic stage changes or notifications
 
-### Pipeline Operations
-- **Bulk Operations**: Move multiple applications between stages simultaneously
-- **Bulk Actions**: Send emails, schedule interviews, update status for multiple applications
-- **Reporting**: Pipeline analytics showing conversion rates, time-in-stage, bottlenecks
-- **Forecasting**: Predictive analytics based on historical pipeline data
+### Pipeline Usage
+1. **View Pipeline**: HR sees all applications for their jobs organized by stage
+2. **Update Stage**: Move applications between stages as they progress
+3. **Add Notes**: Add notes to applications at any stage
+4. **Track History**: View complete history of each application
+5. **Email Integration**: Send emails to candidates at specific stages
+6. **Smart Reply**: Use AI to draft replies to candidate emails (requires configuration)
 
-### Pipeline Views
-- **Kanban Board**: Visual representation of applications by stage
-- **List View**: Detailed table view with filtering and sorting
-- **Calendar View**: Interview scheduling and important dates
-- **Analytics Dashboard**: Metrics and KPIs for recruitment performance
+## Job Search Functionality
 
-## Job Search & Discovery
+### External Job Search
+FitCV integrates with external job search APIs to provide students with job recommendations based on their CVs:
 
-### Search Functionality
-- **Text Search**: Full-text search on title, description, requirements
-- **Filters**: Location, employment type, experience level, position, company, industry
-- **Salary Range**: Min/max salary filtering (if implemented)
-- **Date Filters**: Posted within, application deadline
-- **Remote/Hybrid**: Work arrangement filtering
-- **Saved Searches**: Users can save frequently used search criteria
+#### FreeHire.me Integration
+- **Service**: `/backend/app/services/freehire_job_search.py`
+- **Function**: Queries the freehire.me public API for tech job listings
+- **Features**: 
+  - Search by skills, experience level, location, remote preference
+  - Job age filtering (default 30 days)
+  - Best-effort service - continues if one source fails
 
-### Search Algorithms
-- **Keyword Matching**: Basic text matching with stemming
-- **Relevance Scoring**: Boosts for exact matches, recent postings, etc.
-- **Personalization**: Job recommendations based on user profile and CV
-- **Trending Jobs**: Popular or rapidly filling positions
-- **Similar Jobs**: Recommendations based on current job view
+#### LinkedIn Integration
+- **Service**: `/backend/app/services/linkedin_job_search.py`
+- **Function**: Scrapes LinkedIn's public guest endpoint for job recommendations
+- **Features**:
+  - Similar search parameters to freehire.me
+  - Guest endpoint access (no authentication required)
+  - Best-effort service with error handling
 
-### External Job Integration
-- **FreeHire Integration**: Import jobs from FreeHire platforms
-- **LinkedIn Integration**: Scrape and import public LinkedIn job postings
-- **API Integrations**: Potential for other job board APIs
-- **Deduplication**: Detection and handling of duplicate jobs from multiple sources
-- **Refresh Cycles**: Periodic updating of external job listings
+### Job Search Endpoint
+- **Endpoint**: `POST /job-search/recommendations`
+- **Authentication**: Requires verified Student account
+- **Input**: 
+  - CV ID (must be successfully parsed)
+  - Optional manual query keywords
+  - Optional experience level filter
+  - Optional location filter
+  - Optional remote work preference
+  - Optional job age filter (days)
+  - Optional result limit
+- **Process**:
+  1. Retrieves parsed CV data for the given CV ID
+  2. Derives search keywords from CV metadata (skills, experience, etc.)
+  3. Falls back to AI-generated query from full CV text if needed
+  4. Queries both freehire.me and LinkedIn APIs
+  5. Deduplicates results by title/company
+  6. Returns merged, deduplicated job recommendations
+- **Output**: Array of job hits with source attribution (freehire/linkedin)
 
-## Application Tracking (External)
+### Error Handling
+- **Partial Results**: If one search source fails, results from the working source are still returned
+- **Complete Failure**: If both sources fail, returns appropriate error message
+- **Validation**: Validates that CV exists and is successfully parsed before searching
+- **Query Requirements**: Requires either derivable skills from CV or manual query input
 
-### Student Application Tracking
-- **Manual Entry**: Students can manually track applications outside FitCV
-- **Automatic Detection**: Potential for automatic tracking via email parsing (future)
-- **Company & Position**: Tracks where applications were submitted
-- **Application Date**: When the application was submitted
-- **Source**: Where the application was submitted (job board, company site, referral, etc.)
-- **Job URL**: Link to original job posting
-- **Reminders**: Follow-up reminders for application status checks
-- **Status Tracking**: Applied, Screening, Interview, Offer, Rejected (mirrors internal stages)
-- **Last Activity**: Timestamp of last known activity on application
-- **Notes**: Free-form notes about the application process
-- **Notifications**: Status change reminders and follow-up prompts
+## Improvement Enrichment
 
-## Data Models & Relationships
+### Improvement Enricher Service
+The improvement enricher service enhances CV improvement suggestions with current job market data:
 
-### Core Entities
-```
-Job ←→ Company (many jobs per company)
-Job ←→ Position (many-to-one)
-Job ←→ Level (many-to-one)
-Job ←→ HR Accounts (many-to-many via job_hr)
-Job ←→ Job Description (one-to-one or one-to-many)
-Job Description ←→ JD Parse Result (one-to-one)
-Job ←→ Applications (one-to-many)
-Application ←→ Candidate (many-to-one)
-Application ←→ Job (many-to-one)
-Application ←→ CV (many-to-one)
-Application ←→ Application Stage History (one-to-many)
-Application ←→ Application Notes (one-to-many)
-Application ←→ Candidate Email Thread (one-to-one)
-Candidate Email Thread ←→ Candidate Emails (one-to-many)
-Candidate Email Thread ←→ Inbound Emails (one-to-many)
-Candidate ←→ Tracked Applications (one-to-many)
-Tracked Application ←→ Tracked Application Notes (one-to-many)
-Tracked Application ←→ Status History (one-to-many)
-Tracked Application ←→ Notifications (one-to-many)
-```
+#### Function
+- **Service**: `/backend/app/services/improvement_enricher.py`
+- **Purpose**: Enriches generic CV improvement suggestions with specific, actionable advice based on current job market trends
+- **Process**:
+  1. Takes baseline improvement suggestions from Gemini analysis
+  2. Queries external job markets (freehire.me, LinkedIn) for current demand
+  3. Identifies high-demand skills, technologies, and qualifications
+  4. Modifies suggestions to emphasize market-relevant improvements
+  5. Returns enriched suggestions with job market context
 
-### Key Fields & Constraints
+#### Integration
+- **Used by**: Improvement provider service when generating improvement reports
+- **Trigger**: When a student requests improvement suggestions for a CV-JD match
+- **Configuration**: Controlled by feature flags and service availability
 
-#### Job Table
-- **status**: ENUM('Draft', 'Published', 'Closed') with archiving timestamp
-- **weights**: skill_weight, experience_weight, education_weight, soft_skill_weight (must sum to 100)
-- **timestamps**: created_at, updated_at, archived_at, deadline
-- **relationships**: company_id (FK), created_by_account_id (FK), position_id (FK), level_id (FK)
+### Improvement Provider Service
+The improvement provider service orchestrates the generation of CV improvement suggestions:
 
-#### Application Table
-- **current_stage**: ENUM('Applied', 'Screening', 'Interview', 'Offer', 'Hired', 'Rejected')
-- **status**: ENUM('Active', 'Withdrawn', 'Rejected', 'Hired')
-- **timestamps**: applied_at, updated_at
-- **relationships**: candidate_id (FK), job_id (FK), cv_id (FK with RESTRICT on delete)
+#### Function
+- **Service**: `/backend/app/services/improvement_provider.py`
+- **Purpose**: Provides the main improvement suggestion generation workflow
+- **Process**:
+  1. Receives match result ID from improvement suggestion request
+  2. Retrieves the completed match result (CV-JD analysis)
+  3. Generates baseline improvement suggestions using Gemini AI
+  4. Enriches suggestions with job market data via improvement enricher (if available)
+  5. Returns final improvement report to frontend
 
-#### Tracked Application Table
-- **status**: ENUM('Applied', 'Screening', 'Interview', 'Offer', 'Rejected')
-- **timestamps**: applied_on (date), reminder_at, last_activity_at, created_at, updated_at
-- **relationships**: account_id (FK), company_name (denormalized for quick access)
+#### Integration
+- **Called by**: Improvement routes (`/backend/app/api/routes/improvements.py`)
+- **Depends on**: Match engine results, Gemini API, external job search services
+- **Fallback**: If enrichment services unavailable, returns baseline Gemini suggestions
 
 ## Focused Tests
 
-### Backend Tests (`/backend/tests/`)
-- **Job Service Tests**:
-  - Job creation, validation, and persistence
-  - Status transition logic (Draft → Published → Closed)
-  - Weight validation and normalization
-  - Company and creator associations
-  - Job search and filtering accuracy
-- **Application Service Tests**:
-  - Application submission validation
-  - Stage transition logic and validation
-  - Duplicate prevention (same candidate/job/CV)
-  - Withdrawal and rejection handling
-  - Notification triggering
-- **Pipeline Service Tests**:
-  - Stage configuration and validation
-  - Bulk operation correctness
-  - Automation rule processing
-  - SLA tracking and reporting
-- **Job Search Tests**:
-  - Text search relevance and accuracy
-  - Filter combinations and performance
-  - Personalization and recommendation logic
-  - External integration and deduplication
-- **Repository Tests**:
-  - CRUD operations for all entities
-  - Relationship loading and cascading
-  - Query optimization and indexing effectiveness
-  - Transaction handling and rollback behavior
+### Backend Tests
+- **Job Search Route Tests**: `/backend/tests/test_job_search_route.py` - Tests job search endpoint functionality and error handling
+- **CV Rebuild Apply Improvements**: `/backend/tests/test_cv_rebuild_apply_improvements.py` - Tests applying improvement suggestions to CV rebuild
+- **Improvement Enricher Tests**: `/backend/tests/test_improvement_enricher.py` - Tests job market data enrichment functionality
+- **Improvement Provider Tests**: `/backend/tests/test_improvement_provider.py` - Tests improvement suggestion generation workflow
 
 ### Frontend Tests
-- **Job Posts Screen Tests**:
-  - Job creation form validation
-  - Draft/publish/close workflow
-  - Job listing and sorting
-  - Job detail view
-- **Job Search Screen Tests**:
-  - Search input handling and debouncing
-  - Filter application and persistence
-  - Search results display and pagination
-  - Saved search functionality
-- **Application Tracker Tests**:
-  - Application submission flow
-  - Stage tracking and history display
-  - Withdrawal and status update
-  - Note taking and email integration
-- **Pipeline Tests**:
-  - Kanban board drag-and-drop
-  - Bulk selection and operations
-  - Filtering and view switching
-  - Analytics data display
+- **Improvement Screen Tests**: `/src/ui/screens/ImprovementScreen.test.tsx` - Tests improvement suggestion UI and interaction
+- **App Tests**: `/src/app/App.test.tsx` - Main application component tests
 
 ## Validation Commands
 
-### Backend Job/Application Tests
+### Backend Validation
 ```bash
-# From backend directory
-# Test job service
-pytest -xvs backend/tests/test_jobs_service.py
+# Test job search functionality
+cd backend
+python -m pytest tests/test_job_search_route.py -v
 
-# Test application service
-pytest -xvs backend/tests/test_application_service.py
+# Test improvement enrichment
+cd backend
+python -m pytest tests/test_improvement_enricher.py -v
 
-# Test pipeline service
-pytest -xvs backend/tests/test_pipeline_service.py
+# Test improvement provider
+cd backend
+python -m pytest tests/test_improvement_provider.py -v
 
-# Test job search
-pytest -xvs backend/tests/test_job_search.py
-
-# Test repositories
-pytest -xvs backend/tests/test_jobs_repository.py
-pytest -xvs backend/tests/test_applications_repository.py
+# Test CV rebuild with improvements
+cd backend
+python -m pytest tests/test_cv_rebuild_apply_improvements.py -v
 ```
 
-### Frontend Job/Application Tests
+### Frontend Validation
 ```bash
-# From root directory
-# Test job posts screen
-npm test -- src/ui/screens/JobPostsScreen.test.tsx
+# Test improvement screen
+npm test src/ui/screens/ImprovementScreen.test.tsx
 
-# Test job search screen
-npm test -- src/ui/screens/JobSearchScreen.test.tsx
-
-# Test application tracker
-npm test -- src/ui/screens/FitCVApplicationTracker.test.tsx
-npm test -- src/ui/screens/PersonalApplicationTracker.test.tsx
-
-# Test pipeline screen
-npm test -- src/ui/screens/PipelineScreen.test.tsx
-
-# Test ranking panels
-npm test -- src/ui/screens/JobApplicantsRankingPanel.test.tsx
-npm test -- src/ui/screens/BulkCvRankingPanel.test.tsx
+# Run all frontend tests
+npm test
 ```
-
-### Manual Validation
-```bash
-# Test job creation (requires auth)
-curl -X POST "http://localhost:8000/jobs/" \
-  -H "Authorization: Bearer <jwt_token>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "title": "Software Engineer",
-    "description": "We are looking for a skilled software engineer...",
-    "requirements": "3+ years experience in Python, Django...",
-    "location": "Ho Chi Minh City, Vietnam",
-    "employment_type": "Full-time",
-    "position_id": 1,
-    "level_id": 2,
-    "company_id": 1,
-    "skill_weight": 45.0,
-    "experience_weight": 30.0,
-    "education_weight": 15.0,
-    "soft_skill_weight": 10.0
-  }'
-
-# Test job search
-curl -X GET "http://localhost:8000/job-search/?keyword=engineer&location=hcmc" \
-  -H "Authorization: Bearer <jwt_token>"
-
-# Test application submission
-curl -X POST "http://localhost:8000/applications/" \
-  -H "Authorization: Bearer <jwt_token>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "candidate_id": 123,
-    "job_id": 456,
-    "cv_id": 789
-  }'
-```
-
-## Change Navigation
-
-### Adding New Job Fields
-1. Add column to `job` table in `/database/full_schema.sql`
-2. Create migration script in `/database/migrations/`
-3. Update SQLAlchemy model in `/backend/app/models/jobs.py`
-4. Update Pydantic schemas in `/backend/app/schemas/jobs.py`
-5. Modify route handlers in `/backend/app/api/routes/jobs.py`
-6. Update service layer in `/backend/app/services/jobs_service.py`
-7. Adjust frontend forms in `/src/ui/screens/JobPostsScreen.tsx`
-8. Update API service in `/src/api/jobsApi.ts` if needed
-9. Modify types in `/src/types/jobs.ts` if exists
-10. Update tests for new field validation and persistence
-
-### Modifying Application Workflow
-1. Update `current_stage` ENUM in application table if adding/removing stages
-2. Modify stage transition validation in `/backend/app/services/application_service.py`
-3. Update route handlers in `/backend/app/api/routes/applications.py`
-4. Adjust frontend application tracker components
-5. Update email workflow triggers if stage changes affect notifications
-6. Modify pipeline service if new stages require special handling
-7. Update tests for new stage logic and transition rules
-8. Consider impact on existing applications (may need migration script)
-
-### Changing Search Functionality
-1. Modify search query logic in `/backend/app/services/jobs_service.py` or search service
-2. Update route handler in `/backend/app/api/routes/job_search.py`
-3. Adjust search result formatting and pagination
-4. Update frontend search components in `/src/ui/screens/JobSearchScreen.tsx`
-5. Modify API service in `/src/api/jobSearchApi.ts`
-6. Update search type definitions in `/src/types/jobSearch.ts`
-7. Add/update tests for search relevance and performance
-8. Consider adding search analytics or tracking if needed
-
-### Implementing New Pipeline Features
-1. Extend pipeline configuration in database if needed (new tables/columns)
-2. Update pipeline service logic in `/backend/app/services/pipeline_service.py`
-3. Modify route handlers in `/backend/app/api/routes/pipeline.py`
-4. Update frontend pipeline components in `/src/ui/screens/PipelineScreen.tsx`
-5. Adjust API service in `/src/api/pipelineApi.ts`
-6. Update types in `/src/types/pipeline.ts`
-7. Add tests for new pipeline automation, reporting, or visualization features
-8. Consider impact on existing pipeline configurations
-
-### Integrating New Job Sources
-1. Create new service class following pattern of existing job search services
-2. Add service to dependency injection or factory pattern
-3. Update job search orchestrator to include new source
-4. Implement deduplication logic for new source
-5. Add configuration for API keys or credentials if needed
-6. Create frontend components for source-specific controls if needed
-7. Add tests for new integration including error handling and rate limiting
-8. Update documentation and any admin configuration interfaces
-
-## Related Systems
-- **Authentication**: Users must be authenticated to manage jobs or submit applications
-- **CV Processing**: Applications require verified CVs; match scores inform screening decisions
-- **Database**: All job/application data stored in tables defined in `/database/full_schema.sql`
-- **HR Functionality**: Job management is core HR functionality; pipeline management overlaps significantly
-- **Reports**: Job and application analytics feed into reports system
-- **Email System**: Application status changes trigger email notifications
-- **AI Worker**: Background processing for job search integrations and bulk operations
-- **Notifications**: Real-time updates for application status changes
-- **Analytics**: Job performance and application conversion metrics
-
-## Change Impact Summary
-- **High Impact**: Changes to job/application data models, core workflow logic, or stage transitions
-- **Medium Impact**: Changes to search algorithms, pipeline configuration, or integration methods
-- **Low Impact**: UI tweaks, minor validation changes, non-core feature additions
-- **Breaking Changes**: Altering ENUM values or removing required fields requires data migration
-- **Performance Sensitive**: Search queries, bulk operations, pipeline analytics on large datasets
-- **Testing Critical**: Workflow changes require comprehensive test coverage due to state complexity

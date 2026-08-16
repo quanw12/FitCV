@@ -1,154 +1,189 @@
 ---
-type: system
-title: Database Layer
-description: MySQL database schema for FitCV platform with tables for accounts, jobs, applications, CV processing, and HR functionality.
-tags: [database, mysql, schema]
+type: Architecture
+title: Database Schema and Migrations
+description: MySQL database schema, migration files, and database setup instructions for the FitCV application.
+tags: [database, mysql, schema, migrations]
 ---
-# Database Layer
 
-## Overview
-FitCV uses a MySQL 8.0+ database with utf8mb4 encoding to support Vietnamese and multilingual text. The schema is defined in `/database/full_schema.sql` and managed through SQL migration files in `/database/migrations/`.
+# Database Schema and Migrations
 
-## Core Tables
+FitCV uses MySQL as its primary database. This document outlines the database schema, migration files, setup instructions, and important migration notes.
 
-### Authentication & Accounts
-- **account**: Core user accounts with email, password hash, role (Student/HR/HiringManager/Admin), avatar, company association, and auth provider (Password/Google)
-- **auth_session**: JWT refresh token storage with expiration and revocation tracking
-- **auth_rate_limit**: Rate limiting for authentication attempts to prevent brute force attacks
+## Schema Overview
 
-### CV & Candidate Management
-- **candidate**: Candidate profiles (can be HR-created or self-created)
-- **cv**: CV file uploads with metadata (filename, path, type, size, SHA256, versioning)
-- **cv_parse_result**: Parsed CV text and JSON structure from document processing
-- **cv_improvement_suggestion**: AI-generated suggestions for CV improvement linked to match results
+The main database schema is defined in:
+```
+database/full_schema.sql
+```
 
-### Job & Application Management
-- **company**: Employer information with industry association
-- **position**: Job positions (abbreviation and full name)
-- **level**: Experience levels (entry, mid, senior, etc.)
-- **job**: Job postings with title, description, requirements, location, employment type, status, and weighted scoring criteria
-- **job_hr**: Many-to-many relationship between jobs and HR accounts
-- **job_description**: Detailed job descriptions (can be pasted text, uploaded file, or derived from job)
-- **jd_parse_result**: Parsed job description JSON structure
-- **application**: Job applications linking candidate, job, and CV with stage tracking (Applied → Screening → Interview → Offer → Hired → Rejected)
-- **application_stage_history**: Audit trail of application stage changes
-- **application_note**: Notes on applications by HR or hiring managers
-- **candidate_email_thread**: Email conversation threads for applications
-- **candidate_email**: Individual emails sent as part of workflow (with AI generation flag, plus foreign key to campaign and stage at generation for audit)
-- **candidate_email_inbound**: Incoming email replies from candidates
-- **candidate_email_event**: Email service provider events (opens, clicks, bounces)
-- **candidate_email_campaign**: Email campaigns for batch email sending with template management and targeting (stores template JSON, recipient count, interview date, AI generation flag)
+This file contains the complete schema for a fresh database installation.
 
-### Tracking & External Applications
-- **tracked_application**: Student-owned applications tracked outside FitCV's recruiter pipeline
-- **tracked_application_note**: Notes on externally tracked applications
-- **tracked_application_status_history**: Status change history for tracked applications
-- **tracked_application_notification**: Notifications for tracked application updates
+### Key Tables
 
-### HR Screening & Batch Processing
-- **hr_screening_batch**: Batch CV screening jobs initiated by HR
-- **hr_screening_candidate**: Individual CVs within a screening batch with match scores and selection status
+Based on the README.md, important tables include (but are not limited to):
 
-### AI & Matching
-- **match_result**: CV-JD matching results with overall score, category breakdowns (skill, experience, education, soft skill), pass probability, labels, and evidence
-- **ai_task**: Background AI tasks for CV analysis, matching, improvement generation, etc.
+- `account`: Stores user information (id, email, password_hash, role, auth_provider, etc.)
+- `job`: Stores job postings (id, company_id, title, description, etc.)
+- `cv`: Stores candidate CVs (id, account_id, file data, parsed data, etc.)
+- `match_result`: Stores CV-JD matching results
+- `application`: Stores job applications (for students applying to jobs)
+- `hr_screening_batch` and `hr_screening_candidate`: For external CV batch processing
+- `auth_session`: For session management
+- `ai_task` and `ai_task_attempt_history`: For AI processing tasks and their attempt history
+- Tables for recruiter pipeline, email workflows, smart replies, email campaigns, etc.
 
-## Key Relationships
+## Migrations
 
-### Core Data Flow
-1. **Accounts** → **Candidates** (optional) → **CVs** → **CV Parse Results**
-2. **Accounts** (HR) → **Companies** → **Jobs** → **Job Descriptions** → **JD Parse Results**
-3. **CVs** + **Jobs/JDs** → **Match Results** → **Improvement Suggestions**
-4. **Candidates** + **Jobs** + **CVs** → **Applications** → **Email Workflows** → **Application Notes/History**
+Migration scripts are located in the `database/migrations/` directory. These are SQL files that modify the database schema incrementally.
 
-### Weighted Scoring System
-Jobs define weighted scoring criteria that must total 100%:
-- **skill_weight** (default 45%)
-- **experience_weight** (default 30%)
-- **education_weight** (default 15%)
-- **soft_skill_weight** (default 10%)
+### Important Migrations
 
-These weights are used in match calculations to compute category-specific scores.
+1. **003_add_cv_jd_analyzer.sql**
+   - Adds tables for CV/JD matching functionality
+   - **Prerequisite**: Run this before enabling the CV/JD Analyzer API
 
-## Indexes for Performance
-The schema includes numerous indexes for query optimization:
-- **account**: company_id, role, reset_token_hash
-- **candidate**: account_id, created_by_hr
-- **cv**: account_id, candidate_id, account_latest (for latest CV per user)
-- **job**: company_id, created_by_account, company_archive_status, public_visibility
-- **application**: candidate_id, job_id
-- **match_result**: cv_job (for CV-JD lookups), cv_generated (for recent matches)
-- **email**: company_status, application_created, thread_created, provider
-- **tracking**: account_date, account_status, reminder, note_application, history_application
-- **ai_task**: resource, claim, owner_created
+2. **004_add_application_tracker.sql**
+   - Adds tables for the Application Tracker feature
+   - **Prerequisite**: Run this before using the Application Tracker
 
-## Constraints & Data Integrity
-- **Foreign Keys**: Proper cascading deletes and set null behaviors
-- **Check Constraints**: Weight validation (0-100 range), score validation (0-100), weight total = 100
-- **Unique Constraints**: Email uniqueness, version per account, cv_parse/jd_parse uniqueness per algorithm
-- **Not Null**: Required fields enforced at database level
-- **Enum Validation**: Role, status, type fields use ENUM for data integrity
+3. **005_add_job_archiving_and_scoring.sql**
+   - Adds archiving timestamp and custom scoring weights to job postings
+   - **Note**: Migration can be re-run, but backup database first as MySQL DDL auto-commits
+   - **Rollback**: Use `005_rollback_job_archiving_and_scoring.sql` (will delete archived data and custom weights)
 
-## File Storage Integration
-- **CV Files**: Stored in `/backend/uploads/` with file paths recorded in `cv.file_path`
-- **Hash Verification**: SHA256 hashes stored for file integrity verification
-- **Template Files**: CV template stored at `/backend/app/templates/cv_template.html`
+4. **006_add_recruiter_pipeline.sql**
+   - Adds notes and history for recruiter pipeline stages (Applied, Screening, Interview, Offer, Hired, Rejected)
 
-## Migration System
-Schema evolution managed through SQL migration files in `/database/migrations/`:
-- Example: `001_add_auth_fields_to_account.sql`
-- Migration naming convention: sequential numbering with descriptive names
-- Applied via application startup or manual execution
+5. **007_add_candidate_email_workflow.sql**
+   - Adds tables for tracking candidate email workflows (drafts, sent emails, etc.)
 
-## Related Systems
-- **Backend**: SQLAlchemy models in `/backend/app/models/` map directly to these tables
-- **Services**: Repository layer in `/backend/app/repositories/` handles data access
-- **Frontend**: Consumes data via API endpoints that query these tables
+6. **008_add_application_notifications.sql**
+   - Adds tables for application notifications (reminders, etc.)
 
-## Focused Tests
-- **Location**: `/backend/tests/` directory
-- **Test Types**: 
-  - Repository unit tests
-  - Service integration tests with database
-  - Migration validation tests
-- **Tools**: pytest with database fixtures
+7. **009_add_smart_reply_workflow.sql**
+   - Adds tables for smart reply email functionality (inbound/outbound email tracking)
+
+8. **010_add_platform_hardening.sql**
+   - Adds tables for platform hardening: `hr_screening_batch`, `hr_screening_candidate`, `auth_session`, `auth_rate_limit`
+   - Extends `ai_task` to be a durable queue
+
+9. **011_add_reliable_email_delivery.sql**
+   - Adds `retryable`, `retry_count`, and `last_attempt_at` columns for email retry mechanism
+
+10. **012_add_email_campaigns.sql**
+    - Adds tables for email campaign functionality (stage-based campaigns, templates)
+
+11. **013_add_ai_task_attempt_history.sql**
+    - **Important**: Must run **after** migration 010
+    - Creates `ai_task_attempt_history` table which references `ai_task`
+    - **Do not deploy code that reads/writes ai_task_attempt_history before this migration completes**
+
+### Migration Dependencies
+
+- Migration 013 depends on migration 010 (must run after 010)
+- Other migrations can generally be run in numerical order, but always check the migration comments for specific dependencies
+
+## Database Setup
+
+### For a New Database
+
+1. Create the database:
+   ```sql
+   CREATE DATABASE fitcv;
+   ```
+
+2. Run the full schema:
+   ```bash
+   mysql -u <db_user> -p fitcv < database/full_schema.sql
+   ```
+
+3. Ensure the backend runtime user has `SELECT`, `INSERT`, `UPDATE`, `DELETE` permissions on the `fitcv` database.
+
+### For an Existing Database
+
+When deploying updates, run the necessary migration files in order. For example, to update to the latest schema:
+```bash
+mysql -u <db_user> -p fitcv < database/migrations/001_initial.sql
+mysql -u <db_user> -p fitcv < database/migrations/002_next.sql
+# ... continue through to the latest migration
+```
+
+> **Note**: Always backup your database before running migrations, especially in production.
+
+## Environment Configuration
+
+Database connection is configured via the `DATABASE_URL` environment variable in `backend/.env`:
+
+```env
+DATABASE_URL=mysql+pymysql://<db_user>:<url_encoded_password>@<db_host>:3306/fitcv
+```
+
+> **Important**: The password must be URL-encoded. For example, if your password contains `!`, it should be encoded as `%21`.
+
+## Platform Hardening
+
+If you have an existing MySQL database and need to enable platform hardening features (AI task attempt history, etc.), you must run the following migrations **in order**:
+
+1. `database/migrations/010_add_platform_hardening.sql`
+2. `database/migrations/013_add_ai_task_attempt_history.sql`
+
+> **Warning**: Do not deploy code that depends on `ai_task_attempt_history` until after migration 013 has successfully completed.
+
+## Job Post Archiving and Scoring
+
+To enable job archiving and custom scoring weights on an existing database, run:
+```bash
+mysql -u <db_user> -p fitcv < database/migrations/005_add_job_archiving_and_scoring.sql
+```
+
+This migration:
+- Keeps the existing recruitment statuses (`Draft`, `Published`, `Closed`)
+- Adds an `archived_at` timestamp (nullable)
+- Adds four default scoring weights:
+  - Skills: 45%
+  - Experience: 30%
+  - Education: 15%
+  - Soft Skills: 10%
+
+> **Note**: The four weights must always be between 0-100 and sum to 100.
+
+## Recruiter Pipeline and Email Workflows
+
+To enable the recruiter pipeline and email workflows, run these migrations in order:
+```bash
+mysql -u <db_user> -p fitcv < database/migrations/006_add_recruiter_pipeline.sql
+mysql -u <db_user> -p fitcv < database/migrations/007_add_candidate_email_workflow.sql
+mysql -u <db_user> -p fitcv < database/migrations/009_add_smart_reply_workflow.sql
+mysql -u <db_user> -p fitcv < database/migrations/011_add_reliable_email_delivery.sql
+mysql -u <db_user> -p fitcv < database/migrations/012_add_email_campaigns.sql
+```
+
+## Application Tracker
+
+To enable the Application Tracker feature, run:
+```bash
+mysql -u <db_user> -p fitcv < database/migrations/004_add_application_tracker.sql
+mysql -u <db_user> -p fitcv < database/migrations/008_add_application_notifications.sql
+```
 
 ## Validation Commands
-- **Schema Validation**:
+
+- **Health Check Endpoint**: The backend provides a health check at `/api/health` which verifies database connectivity.
+- **Manual Connection Test**: You can test the database connection directly with:
   ```bash
-  # Check MySQL connection and schema
-  mysql -u root -p < /database/full_schema.sql
-  ```
-- **Migration Testing**:
-  ```bash
-  # Apply migrations to test database
-  # (Specific migration tool commands would go here)
-  ```
-- **Backend Tests with DB**:
-  ```bash
-  # From backend directory
-  pytest -xvs
-  ```
-- **Connection Testing**:
-  ```bash
-  # Test database connectivity
-  mysqladmin ping -h localhost -u root -p
+  mysql -u <db_user> -p -h <db_host> fitcv
   ```
 
 ## Change Navigation
-When modifying the database:
-- **Schema Changes**: Edit `/database/full_schema.sql` and create new migration file in `/database/migrations/`
-- **Model Updates**: Modify corresponding SQLAlchemy models in `/backend/app/models/`
-- **Repository Changes**: Update data access methods in `/backend/app/repositories/`
-- **Service Adjustments**: Modify business logic in `/backend/app/services/` to handle new fields
-- **API Updates**: Adjust route handlers and schemas in `/backend/app/api/routes/` and `/backend/app/schemas/`
-- **Frontend Updates**: Modify API calls in `/src/services/` and `/src/api/` if new data is needed
-- **Testing**: Update or add tests in `/backend/tests/` to cover schema changes
 
-## Index Discipline
-When adding new indexes:
-1. Consider query patterns from services and repositories
-2. Focus on WHERE, JOIN, and ORDER BY clauses
-3. Avoid over-indexing on write-heavy tables
-4. Test performance impact with realistic data volumes
-5. Document index purpose in migration comments
+When making database changes:
+
+1. **Schema Changes**: Create a new migration file in `database/migrations/` with a sequential number and descriptive name.
+2. **Modify Existing Migrations**: Avoid modifying existing migration files that have already been run in production. Instead, create a new migration.
+3. **Testing Migrations**: Test migration scripts on a copy of production data before applying to production.
+4. **Documentation**: Update this document if you add or modify important tables or migration procedures.
+
+Always verify migrations by:
+- Checking the backend health endpoint after migration
+- Running application tests that depend on the changed schema
+- Verifying that the expected tables/columns exist in the database

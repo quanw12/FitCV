@@ -9,9 +9,17 @@ import {
   MapPin,
   ArrowsClockwise,
   MagnifyingGlass,
+  X,
+  Spinner,
 } from "@phosphor-icons/react"
 
 import { applicationsApi } from "@/api/applicationsApi"
+
+import {
+  getCachedResource,
+  getOrFetchResource,
+  setCachedResource,
+} from "@/services/resourceCache"
 
 import type {
   ApplicationProcessingStatus,
@@ -35,34 +43,42 @@ const STAGES: ApplicationStage[] = [
 
 const stageConfig: Record<ApplicationStage, {
   background: string
-
   color: string
+  solid: string
 }> = {
-  Applied: { background: "#F1F5F9", color: "var(--text-secondary)" },
+  Applied: { background: "#F1F5F9", color: "#475569", solid: "#64748B" },
 
-  Screening: { background: "#DBEAFE", color: "var(--accent)" },
+  Screening: { background: "#DBEAFE", color: "#1D4ED8", solid: "#2563EB" },
 
-  Interview: { background: "#FEF3C7", color: "var(--warning)" },
+  Interview: { background: "#FEF3C7", color: "#B45309", solid: "#F59E0B" },
 
-  Offer: { background: "#DCFCE7", color: "var(--success)" },
+  Offer: { background: "#DCFCE7", color: "#15803D", solid: "#16A34A" },
 
-  Hired: { background: "#CCFBF1", color: "var(--success)" },
+  Hired: { background: "#CCFBF1", color: "#0F766E", solid: "#0D9488" },
 
-  Rejected: { background: "#FEE2E2", color: "var(--danger)" },
+  Rejected: { background: "#FEE2E2", color: "#B91C1C", solid: "#DC2626" },
 }
 
 interface AppTrackerScreenProps {
   focusApplicationId?: number | null
 }
 
+const FITCV_APPLICATIONS_CACHE_KEY = "fitcv-applications:list"
+
 export default function AppTrackerScreen({
   focusApplicationId = null,
 }: AppTrackerScreenProps) {
   const focusedCardRef = useRef<HTMLElement | null>(null)
 
-  const [applications, setApplications] = useState<StudentApplication[]>([])
+  const cachedApplications = getCachedResource<StudentApplication[]>(
+    FITCV_APPLICATIONS_CACHE_KEY,
+  )
 
-  const [loading, setLoading] = useState(true)
+  const [applications, setApplications] = useState<StudentApplication[]>(
+    cachedApplications ?? [],
+  )
+
+  const [loading, setLoading] = useState(() => !cachedApplications)
 
   const [error, setError] = useState<string | null>(null)
 
@@ -76,13 +92,29 @@ export default function AppTrackerScreen({
 
   const [retryErrors, setRetryErrors] = useState<Record<number, string>>({})
 
-  const loadApplications = useCallback(async () => {
-    setLoading(true)
+  const loadApplications = useCallback(async (force = false) => {
+    const cached = getCachedResource<StudentApplication[]>(
+      FITCV_APPLICATIONS_CACHE_KEY,
+    )
+
+    if (cached && !force) {
+      setApplications(cached)
+      setLoading(false)
+      return
+    }
+
+    setLoading(!cached)
 
     setError(null)
 
     try {
-      setApplications(await applicationsApi.listMine())
+      setApplications(
+        await getOrFetchResource(
+          FITCV_APPLICATIONS_CACHE_KEY,
+          () => applicationsApi.listMine(),
+          { force },
+        ),
+      )
     } catch (caught) {
       setError(
         caught instanceof Error
@@ -120,6 +152,7 @@ export default function AppTrackerScreen({
         if (cancelled) return
 
         setApplications(nextApplications)
+        setCachedResource(FITCV_APPLICATIONS_CACHE_KEY, nextApplications)
 
         const shouldContinue = nextApplications.some(
           (application) =>
@@ -187,6 +220,21 @@ export default function AppTrackerScreen({
     [applications],
   )
 
+  const maxStageCount = Math.max(1, ...stageCounts.map((item) => item.count))
+
+  const inProgressCount = useMemo(
+    () =>
+      applications.filter(
+        (application) =>
+          application.parse_status === "Pending" ||
+          application.parse_status === "Processing" ||
+          application.analysis_status === "Pending" ||
+          application.analysis_status === "Processing",
+      ).length,
+
+    [applications],
+  )
+
   const filteredApplications = useMemo(() => {
     const query = search.trim().toLocaleLowerCase()
 
@@ -218,8 +266,8 @@ export default function AppTrackerScreen({
     try {
       await applicationsApi.retryAnalysis(applicationId)
 
-      setApplications((current) =>
-        current.map((application) =>
+      setApplications((current) => {
+        const next = current.map((application) =>
           application.application_id === applicationId
             ? {
                 ...application,
@@ -234,8 +282,10 @@ export default function AppTrackerScreen({
                 analysis_error: null,
               }
             : application,
-        ),
-      )
+        )
+        setCachedResource(FITCV_APPLICATIONS_CACHE_KEY, next)
+        return next
+      })
     } catch (caught) {
       setRetryErrors((current) => ({
         ...current,
@@ -256,635 +306,357 @@ export default function AppTrackerScreen({
     }
   }, [])
 
+  const hasActiveFilters = stageFilter !== "All" || search.trim().length > 0
+
+  const clearFilters = () => {
+    setSearch("")
+
+    setStageFilter("All")
+  }
+
   return (
-    <div>
-      <style>{`
-        .tracker-header,
-        .tracker-toolbar,
-        .tracker-card__heading,
-        .tracker-card__footer {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 16px;
-        }
-        .tracker-header {
-          align-items: flex-start;
-          margin-bottom: 24px;
-        }
-        .tracker-overview {
-          display: grid;
-          grid-template-columns: repeat(6, minmax(110px, 1fr));
-          gap: 10px;
-          margin-bottom: 20px;
-        }
-        .tracker-overview__item {
-          min-width: 0;
-          padding: 14px;
-          border: 1px solid var(--border);
-          border-radius: 8px;
-          background: var(--surface);
-        }
-        .tracker-toolbar {
-          align-items: stretch;
-          margin-bottom: 18px;
-        }
-        .tracker-search {
-          min-width: 220px;
-          flex: 1;
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          padding: 9px 12px;
-          border: 1px solid var(--border);
-          border-radius: 8px;
-          background: var(--surface);
-        }
-        .tracker-search:focus-within {
-          border-color: var(--accent);
-          box-shadow: 0 0 0 3px var(--accent-soft);
-        }
-        .tracker-filters {
-          display: flex;
-          gap: 6px;
-          overflow-x: auto;
-          padding: 1px;
-        }
-        .tracker-list {
-          display: grid;
-          gap: 12px;
-        }
-        .tracker-card {
-          min-width: 0;
-          padding: 18px;
-          border: 1px solid var(--border);
-          border-radius: 8px;
-          background: var(--surface);
-          transition: border-color 150ms ease, box-shadow 150ms ease;
-          outline: none;
-        }
-        .tracker-card--focused {
-          border-color: var(--accent);
-          box-shadow: 0 0 0 3px var(--accent-soft), var(--shadow-sm);
-        }
-        .tracker-card__identity {
-          min-width: 0;
-          display: flex;
-          align-items: center;
-          gap: 12px;
-        }
-        .tracker-card__logo {
-          width: 44px;
-          height: 44px;
-          flex: 0 0 44px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          overflow: hidden;
-          border: 1px solid var(--border);
-          border-radius: 8px;
-          background: var(--surface-2);
-          color: var(--text-secondary);
-          font-weight: 800;
-        }
-        .tracker-card__logo img {
-          width: 100%;
-          height: 100%;
-          object-fit: cover;
-        }
-        .tracker-card__title {
-          margin: 0 0 3px;
-          overflow-wrap: anywhere;
-          color: var(--text-primary);
-          font-size: 15px;
-          font-weight: 750;
-        }
-        .tracker-card__company {
-          overflow-wrap: anywhere;
-          color: var(--text-secondary);
-          font-size: 13px;
-        }
-        .tracker-card__meta {
-          display: flex;
-          align-items: center;
-          flex-wrap: wrap;
-          gap: 8px 16px;
-          margin: 16px 0;
-          color: var(--text-secondary);
-          font-size: 12px;
-        }
-        .tracker-meta-item {
-          min-width: 0;
-          display: inline-flex;
-          align-items: center;
-          gap: 5px;
-          overflow-wrap: anywhere;
-        }
-        .tracker-card__footer {
-          align-items: flex-end;
-          padding-top: 14px;
-          border-top: 1px solid var(--border);
-        }
-        .tracker-processing {
-          display: flex;
-          flex-wrap: wrap;
-          gap: 8px;
-        }
-        .tracker-retry {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          flex-wrap: wrap;
-          gap: 10px;
-          margin-top: 12px;
-          padding: 10px 11px;
-          border: 1px solid #FECACA;
-          border-radius: 7px;
-          background: #FEF2F2;
-        }
-        .tracker-retry__message {
-          min-width: 0;
-          display: flex;
-          align-items: flex-start;
-          gap: 7px;
-          color: #B91C1C;
-          overflow-wrap: anywhere;
-          font-size: 12px;
-        }
-        .tracker-retry__error {
-          width: 100%;
-          margin: 0;
-          color: #B91C1C;
-          font-size: 12px;
-          font-weight: 650;
-        }
-        @media (max-width: 980px) {
-          .tracker-overview {
-            grid-template-columns: repeat(3, minmax(110px, 1fr));
-          }
-          .tracker-toolbar {
-            flex-direction: column;
-          }
-        }
-        @media (max-width: 620px) {
-          .tracker-header,
-          .tracker-card__heading,
-          .tracker-card__footer {
-            align-items: stretch;
-            flex-direction: column;
-          }
-          .tracker-header .fitcv-btn-secondary {
-            align-self: flex-start;
-          }
-          .tracker-overview {
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-          }
-          .tracker-card__meta {
-            align-items: flex-start;
-            flex-direction: column;
-          }
-        }
-      `}</style>
-
-      <header className="tracker-header">
+    <div className="tracker-workspace">
+      <div className="fc-page-head">
         <div>
-          <h1
-            style={{
-              margin: "0 0 4px",
-
-              color: "var(--text-primary)",
-
-              fontSize: 22,
-
-              fontWeight: 800,
-            }}
-          >
-            Application Tracker
-          </h1>
-          <p
-            style={{
-              margin: 0,
-
-              color: "var(--text-secondary)",
-
-              fontSize: 14,
-            }}
-          >
-            Follow every application from submission to final decision.
+          <h1>FitCV Applications</h1>
+          <p>
+            Jobs you applied to on FitCV — CV parsing and matching run
+            automatically after you submit.
           </p>
         </div>
         <button
           type="button"
           className="fitcv-btn-secondary"
-          onClick={() => void loadApplications()}
+          onClick={() => void loadApplications(true)}
           disabled={loading}
         >
-          <ArrowsClockwise size={15} weight="light" />
+          {loading ? (
+            <Spinner className="tracker-spin" size={15} weight="light" />
+          ) : (
+            <ArrowsClockwise size={15} weight="light" />
+          )}
           Refresh
         </button>
-      </header>
-
-      {!loading && applications.length > 0 && (
-        <section aria-label="Application stage overview">
-          <h2 style={sectionHeadingStyle}>Stage overview</h2>
-          <div className="tracker-overview">
-            {stageCounts.map(({ stage, count }) => (
-              <div className="tracker-overview__item" key={stage}>
-                <div
-                  style={{
-                    marginBottom: 7,
-
-                    color: stageConfig[stage].color,
-
-                    fontSize: 12,
-
-                    fontWeight: 700,
-                  }}
-                >
-                  {stage}
-                </div>
-                <div
-                  style={{
-                    color: "var(--text-primary)",
-
-                    fontSize: 22,
-
-                    fontWeight: 800,
-                  }}
-                >
-                  {count}
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
+      </div>
 
       {error && (
-        <div role="alert" style={alertStyle}>
-          <WarningCircle size={18} weight="light" />
-          <span style={{ flex: 1 }}>{error}</span>
-          <button
-            type="button"
-            className="fitcv-btn-secondary"
-            onClick={() => void loadApplications()}
-          >
-            Try again
+        <div className="tracker-alert tracker-alert--error" role="alert">
+          <WarningCircle size={16} weight="light" />
+          <span>{error}</span>
+          <button type="button" onClick={() => void loadApplications(true)}>
+            Retry
           </button>
         </div>
       )}
 
-      {!loading && !error && applications.length > 0 && (
-        <div className="tracker-toolbar">
-          <label className="tracker-search">
-            <MagnifyingGlass
-              size={16}
-              weight="light"
-              color="var(--text-muted)"
-            />
-            <span className="sr-only">Search applications</span>
-            <input
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search job, company, or location"
-              style={{
-                width: "100%",
-
-                minWidth: 0,
-
-                border: 0,
-
-                outline: 0,
-
-                background: "transparent",
-
-                color: "var(--text-primary)",
-
-                fontSize: 13,
-              }}
-            />
-          </label>
-          <div className="tracker-filters" aria-label="Filter by stage">
-            {(["All", ...STAGES] as const).map((stage) => {
-              const active = stageFilter === stage
-
-              return (
-                <button
-                  type="button"
-                  key={stage}
-                  aria-pressed={active}
-                  onClick={() => setStageFilter(stage)}
-                  style={{
-                    flexShrink: 0,
-
-                    padding: "8px 12px",
-
-                    border: `1px solid ${
-                      active ? "var(--accent)" : "var(--border)"
-                    }`,
-
-                    borderRadius: 8,
-
-                    background: active ? "var(--accent)" : "var(--surface)",
-
-                    color: active ? "#FFFFFF" : "var(--text-secondary)",
-
-                    cursor: "pointer",
-
-                    fontSize: 12,
-
-                    fontWeight: 700,
-                  }}
-                >
-                  {stage}
-                </button>
-              )
-            })}
-          </div>
-        </div>
-      )}
-
       {loading ? (
-        <StatePanel>
-          <ArrowsClockwise className="state-spinner" size={30} weight="light" />
-          <strong>Loading your applications</strong>
-        </StatePanel>
-      ) : error ? null : applications.length === 0 ? (
-        <StatePanel>
-          <Tray size={36} weight="light" color="#94A3B8" />
+        <div className="fitcv-card tracker-empty">
+          <Spinner className="tracker-spin" size={24} weight="light" />
+          <strong>Loading your applications…</strong>
+        </div>
+      ) : !error && applications.length === 0 ? (
+        <div className="fitcv-card tracker-empty">
+          <Tray size={34} weight="light" color="#94A3B8" />
           <strong>No applications yet</strong>
-          <span>Your submitted jobs will appear here.</span>
-        </StatePanel>
-      ) : filteredApplications.length === 0 ? (
-        <StatePanel>
-          <MagnifyingGlass size={34} weight="light" color="#94A3B8" />
-          <strong>No matching applications</strong>
-          <span>Try another search term or stage.</span>
-        </StatePanel>
-      ) : (
-        <section className="tracker-list" aria-label="Your applications">
-          {filteredApplications.map((application) => {
-            const focused = application.application_id === focusApplicationId
+          <span>Your submitted FitCV jobs will appear here.</span>
+        </div>
+      ) : !error ? (
+        <>
+          <section className="pt-overview" aria-label="Stage overview">
+            <div className="pt-overview__head">
+              <div>
+                <span className="fc-eyebrow">Stage overview</span>
+                <h2>
+                  {filteredApplications.length} of {applications.length}{" "}
+                  applications
+                </h2>
+              </div>
+              {inProgressCount > 0 && (
+                <span className="pt-due">
+                  <Spinner className="tracker-spin" size={13} weight="light" />
+                  {inProgressCount} analyzing…
+                </span>
+              )}
+            </div>
 
-            const retrying = retryingIds.has(application.application_id)
+            <div className="pt-stages pt-stages--six">
+              {stageCounts.map(({ stage, count }) => {
+                const config = stageConfig[stage]
 
-            const retryError = retryErrors[application.application_id]
+                const active = stageFilter === stage
 
-            const analysisFailed =
-              application.parse_status === "Failed" ||
-              application.analysis_status === "Failed"
-
-            const canReanalyze =
-              analysisFailed || application.analysis_status === "Success"
-
-            const companyInitial =
-              application.job.company.name.trim().charAt(0).toUpperCase() || "C"
-
-            return (
-              <article
-                key={application.application_id}
-                ref={focused ? focusedCardRef : undefined}
-                tabIndex={-1}
-                className={`tracker-card${
-                  focused ? " tracker-card--focused" : ""
-                }`}
-                aria-label={`${application.job.title} at ${application.job.company.name}`}
-              >
-                <div className="tracker-card__heading">
-                  <div className="tracker-card__identity">
-                    <div className="tracker-card__logo" aria-hidden="true">
-                      {application.job.company.logo_url ? (
-                        <img src={application.job.company.logo_url} alt="" />
-                      ) : (
-                        companyInitial
-                      )}
-                    </div>
-                    <div style={{ minWidth: 0 }}>
-                      <h3 className="tracker-card__title">
-                        {application.job.title}
-                      </h3>
-                      <div className="tracker-card__company">
-                        {application.job.company.name}
-                      </div>
-                    </div>
-                  </div>
-                  <div
-                    style={{
-                      display: "flex",
-
-                      alignItems: "center",
-
-                      flexWrap: "wrap",
-
-                      gap: 8,
-                    }}
+                return (
+                  <button
+                    type="button"
+                    key={stage}
+                    className="pt-stage"
+                    data-active={active}
+                    aria-pressed={active}
+                    onClick={() =>
+                      setStageFilter((current) =>
+                        current === stage ? "All" : stage,
+                      )
+                    }
                   >
-                    {focused && (
+                    <span className="pt-stage__label">
+                      <i style={{ background: config.solid }} aria-hidden="true" />
+                      {stage}
+                    </span>
+                    <strong className="pt-stage__count">{count}</strong>
+                    <span
+                      className="pt-stage__bar"
+                      role="img"
+                      aria-label={`${count} of ${applications.length}`}
+                    >
                       <span
                         style={{
-                          padding: "4px 9px",
+                          width: `${Math.round(
+                            (count / maxStageCount) * 100,
+                          )}%`,
 
-                          borderRadius: 999,
-
-                          background: "var(--accent-soft)",
-
-                          color: "var(--accent-ink)",
-
-                          fontSize: 11,
-
-                          fontWeight: 700,
+                          background: config.solid,
                         }}
-                      >
-                        Latest application
-                      </span>
-                    )}
-                    <StageBadge stage={application.current_stage} />
-                  </div>
-                </div>
+                      />
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+          </section>
 
-                <div className="tracker-card__meta">
-                  <span className="tracker-meta-item">
-                    <CalendarBlank size={14} weight="light" />
-                    Applied {formatDate(application.applied_at)}
-                  </span>
-                  <span className="tracker-meta-item">
-                    <MapPin size={14} weight="light" />
-                    {application.job.location || "Location not specified"}
-                  </span>
-                  <span className="tracker-meta-item">
-                    <Briefcase size={14} weight="light" />
-                    {application.job.employment_type ||
-                      "Employment type not specified"}
-                  </span>
-                  <span className="tracker-meta-item">
-                    <FileText size={14} weight="light" />
-                    {application.cv.file_name}
-                  </span>
-                </div>
+          <div className="tracker-filters">
+            <label className="fc-search tracker-search">
+              <MagnifyingGlass size={15} weight="light" />
+              <input
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Search job, company, or location..."
+                aria-label="Search applications"
+              />
+            </label>
+            {hasActiveFilters && (
+              <button
+                type="button"
+                className="fc-chip"
+                onClick={clearFilters}
+                aria-label="Clear filters"
+              >
+                <X size={13} weight="light" /> Clear filters
+              </button>
+            )}
+          </div>
 
-                <div className="tracker-card__footer">
-                  <div className="tracker-processing">
-                    <ProcessingBadge
-                      label="CV parsing"
-                      status={application.parse_status}
-                    />
-                    <ProcessingBadge
-                      label="Application analysis"
-                      status={application.analysis_status}
-                    />
-                  </div>
-                  <div
-                    style={{
-                      color: "var(--text-muted)",
+          {filteredApplications.length === 0 ? (
+            <div className="fitcv-card tracker-empty">
+              <MagnifyingGlass size={34} weight="light" color="#94A3B8" />
+              <strong>No matching applications</strong>
+              <span>Try another search term or stage.</span>
+            </div>
+          ) : (
+            <div className="pt-list" aria-label="Your applications">
+              {filteredApplications.map((application) => {
+                const focused =
+                  application.application_id === focusApplicationId
 
-                      fontSize: 12,
+                const retrying = retryingIds.has(application.application_id)
 
-                      textAlign: "right",
-                    }}
+                const retryError = retryErrors[application.application_id]
+
+                const analysisFailed =
+                  application.parse_status === "Failed" ||
+                  application.analysis_status === "Failed"
+
+                const canReanalyze =
+                  analysisFailed || application.analysis_status === "Success"
+
+                const config = stageConfig[application.current_stage]
+
+                const companyInitial =
+                  application.job.company.name.trim().charAt(0).toUpperCase() ||
+                  "C"
+
+                return (
+                  <article
+                    key={application.application_id}
+                    ref={focused ? focusedCardRef : undefined}
+                    tabIndex={-1}
+                    className={`pt-card ft-card${
+                      focused ? " ft-card--focused" : ""
+                    }`}
+                    style={{ borderLeftColor: config.solid }}
+                    aria-label={`${application.job.title} at ${application.job.company.name}`}
                   >
-                    {application.updated_at
-                      ? `Updated ${formatDate(application.updated_at)}`
-                      : `Job ${application.job.job_status}`}
-                  </div>
-                </div>
+                    <div className="ft-card__row">
+                      <div className="pt-card__main">
+                        <div className="pt-card__identity">
+                          <span className="pt-card__logo" aria-hidden="true">
+                            {application.job.company.logo_url ? (
+                              <img
+                                src={application.job.company.logo_url}
+                                alt=""
+                              />
+                            ) : (
+                              companyInitial
+                            )}
+                          </span>
+                          <div className="pt-card__heading">
+                            <div className="pt-card__title-row">
+                              <h3>{application.job.title}</h3>
+                              {focused && (
+                                <span className="pt-reminder">
+                                  Latest application
+                                </span>
+                              )}
+                            </div>
+                            <p>{application.job.company.name}</p>
+                          </div>
+                        </div>
 
-                {canReanalyze && (
-                  <div className="tracker-retry">
-                    <div role="status" className="tracker-retry__message">
-                      {analysisFailed ? (
-                        <WarningCircle size={15} weight="light" />
-                      ) : (
-                        <ArrowsClockwise size={15} weight="light" />
-                      )}
-                      <span>
-                        {analysisFailed
-                          ? application.analysis_error ||
-                            "The CV could not be parsed or compared."
-                          : "Run the latest matching logic for this application."}
-                      </span>
+                        <div className="pt-card__meta">
+                          <span>
+                            <CalendarBlank size={13} weight="light" />
+                            Applied {formatDate(application.applied_at)}
+                          </span>
+                          <span>
+                            <MapPin size={13} weight="light" />
+                            {application.job.location ||
+                              "Location not specified"}
+                          </span>
+                          <span>
+                            <Briefcase size={13} weight="light" />
+                            {application.job.employment_type ||
+                              "Employment type not specified"}
+                          </span>
+                          <span>
+                            <FileText size={13} weight="light" />
+                            {application.cv.file_name}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="ft-card__side">
+                        <span
+                          className="ft-stage-pill"
+                          style={{
+                            background: config.background,
+
+                            color: config.color,
+                          }}
+                        >
+                          <i
+                            aria-hidden="true"
+                            style={{ background: config.solid }}
+                          />
+                          {application.current_stage}
+                        </span>
+                        <div className="ft-processing">
+                          <ProcessingChip
+                            label="CV parsing"
+                            status={application.parse_status}
+                          />
+                          <ProcessingChip
+                            label="Matching"
+                            status={application.analysis_status}
+                          />
+                        </div>
+                        <span className="ft-updated">
+                          {application.updated_at
+                            ? `Updated ${formatDate(application.updated_at)}`
+                            : `Job ${application.job.job_status}`}
+                        </span>
+                      </div>
                     </div>
-                    <button
-                      type="button"
-                      className="fitcv-btn-secondary"
-                      onClick={() =>
-                        void retryAnalysis(application.application_id)
-                      }
-                      disabled={retrying}
-                    >
-                      {retrying ? (
-                        <ArrowsClockwise
-                          className="state-spinner"
-                          size={15}
-                          weight="light"
-                        />
-                      ) : (
-                        <ArrowsClockwise size={15} weight="light" />
-                      )}
-                      {retrying
-                        ? "Analyzing..."
-                        : analysisFailed
-                          ? "Retry analysis"
-                          : "Re-analyze"}
-                    </button>
-                    {retryError && (
-                      <p role="alert" className="tracker-retry__error">
-                        {retryError}
-                      </p>
+
+                    {canReanalyze && (
+                      <div className="ft-retry" role="status">
+                        <div className="ft-retry__message">
+                          {analysisFailed ? (
+                            <WarningCircle size={15} weight="light" />
+                          ) : (
+                            <ArrowsClockwise size={15} weight="light" />
+                          )}
+                          <span>
+                            {analysisFailed
+                              ? application.analysis_error ||
+                                "The CV could not be parsed or compared."
+                              : "Run the latest matching logic for this application."}
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          className="fitcv-btn-secondary"
+                          onClick={() =>
+                            void retryAnalysis(application.application_id)
+                          }
+                          disabled={retrying}
+                        >
+                          {retrying ? (
+                            <Spinner
+                              className="tracker-spin"
+                              size={15}
+                              weight="light"
+                            />
+                          ) : (
+                            <ArrowsClockwise size={15} weight="light" />
+                          )}
+                          {retrying
+                            ? "Analyzing..."
+                            : analysisFailed
+                              ? "Retry analysis"
+                              : "Re-analyze"}
+                        </button>
+                        {retryError && (
+                          <p role="alert" className="ft-retry__error">
+                            {retryError}
+                          </p>
+                        )}
+                      </div>
                     )}
-                  </div>
-                )}
-              </article>
-            )
-          })}
-        </section>
-      )}
+                  </article>
+                )
+              })}
+            </div>
+          )}
+        </>
+      ) : null}
     </div>
   )
 }
 
-function StageBadge({ stage }: { stage: ApplicationStage }) {
-  const config = stageConfig[stage]
-
-  return (
-    <span
-      style={{
-        display: "inline-flex",
-
-        padding: "5px 10px",
-
-        borderRadius: 999,
-
-        background: config.background,
-
-        color: config.color,
-
-        fontSize: 12,
-
-        fontWeight: 750,
-      }}
-    >
-      {stage}
-    </span>
-  )
-}
-
-function ProcessingBadge({
+function ProcessingChip({
   label,
 
   status,
 }: {
   label: string
-
   status: ApplicationProcessingStatus
 }) {
-  const config: Record<ApplicationProcessingStatus, {
-    background: string
+  const config: Record<
+    ApplicationProcessingStatus,
+    { dot: string; failed: boolean }
+  > = {
+    Pending: { dot: "#F59E0B", failed: false },
 
-    color: string
-  }> = {
-    Pending: { background: "#FEF3C7", color: "#92400E" },
+    Processing: { dot: "#2563EB", failed: false },
 
-    Processing: { background: "#DBEAFE", color: "#1D4ED8" },
+    Success: { dot: "#16A34A", failed: false },
 
-    Success: { background: "#DCFCE7", color: "#166534" },
-
-    Failed: { background: "#FEE2E2", color: "#B91C1C" },
+    Failed: { dot: "#DC2626", failed: true },
   }
 
   const tone = config[status]
 
   return (
-    <span
-      style={{
-        display: "inline-flex",
-
-        alignItems: "center",
-
-        gap: 5,
-
-        padding: "4px 8px",
-
-        borderRadius: 6,
-
-        background: tone.background,
-
-        color: tone.color,
-
-        fontSize: 11,
-
-        fontWeight: 700,
-      }}
-    >
-      {label}: {status}
+    <span className={`ft-chip${tone.failed ? " ft-chip--failed" : ""}`}>
+      <i
+        aria-hidden="true"
+        style={{ background: tone.dot }}
+        className={
+          status === "Processing" || status === "Pending" ? "is-live" : ""
+        }
+      />
+      {label} · {status}
     </span>
-  )
-}
-
-function StatePanel({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="fitcv-card" style={statePanelStyle}>
-      {children}
-    </div>
   )
 }
 
@@ -898,58 +670,4 @@ function formatDate(value: string) {
 
     timeStyle: "short",
   }).format(date)
-}
-
-const sectionHeadingStyle: React.CSSProperties = {
-  margin: "0 0 10px",
-
-  color: "var(--text-primary)",
-
-  fontSize: 14,
-
-  fontWeight: 750,
-}
-
-const alertStyle: React.CSSProperties = {
-  display: "flex",
-
-  alignItems: "center",
-
-  flexWrap: "wrap",
-
-  gap: 10,
-
-  marginBottom: 18,
-
-  padding: "12px 14px",
-
-  border: "1px solid #FECACA",
-
-  borderRadius: 8,
-
-  background: "#FEF2F2",
-
-  color: "#B91C1C",
-
-  fontSize: 13,
-}
-
-const statePanelStyle: React.CSSProperties = {
-  minHeight: 230,
-
-  display: "flex",
-
-  flexDirection: "column",
-
-  alignItems: "center",
-
-  justifyContent: "center",
-
-  gap: 8,
-
-  padding: 24,
-
-  color: "var(--text-secondary)",
-
-  textAlign: "center",
 }
