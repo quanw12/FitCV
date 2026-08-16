@@ -1,8 +1,4 @@
-import {
-  useCallback,
-  useEffect,
-  useState,
-} from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 
 import {
   ArrowRight,
@@ -17,58 +13,58 @@ import {
   Upload,
 } from "lucide-react"
 
-import BezelCard from "@/ui/components/BezelCard"
+import KpiStatCard from "@/ui/components/KpiStatCard"
 import RevealStagger from "@/ui/components/RevealStagger"
 
 import type { ScreenId } from "@/types/app"
 import type { ReportJobRow, ReportSummary } from "@/types/reports"
 
+import type { ReportDateWindow } from "@/services/reportMetrics"
+
 import { reportsApi } from "@/api/reportsApi"
 import {
-  getCachedResource,
-  getOrFetchResource,
-} from "@/services/resourceCache"
+  avgScoreColor,
+  comparePeriods,
+  formatScore,
+  formatWindowRange,
+  pendingReviewCount,
+  trailingDaysWindow,
+} from "@/services/reportMetrics"
+import { getMatchLabel } from "@/services/matchScore"
+import { getCachedResource, getOrFetchResource } from "@/services/resourceCache"
 
 interface HRDashboardProps {
   onNavigate: (screen: ScreenId) => void
 }
 
-const pad = (n: number) => String(n).padStart(2, "0")
-const dateInput = (d: Date) =>
-  `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
-
-const trailing30Days = () => {
-  const to = new Date()
-  const from = new Date(to)
-  from.setDate(from.getDate() - 29)
-  return { from: dateInput(from), to: dateInput(to) }
-}
-
-const hrDashboardCacheKey = (range: { from: string; to: string }) =>
+const hrDashboardCacheKey = (range: ReportDateWindow) =>
   `hr-dashboard:summary:${range.from}:${range.to}`
 
-const scoreColor = (score: number | null) =>
-  score == null
-    ? "var(--text-muted)"
-    : score >= 70
-      ? "#16A34A"
-      : score >= 60
-        ? "#2563EB"
-        : "#D97706"
+const statusTone = (status: string) =>
+  status === "Published"
+    ? "var(--success)"
+    : status === "Closed"
+      ? "var(--text-muted)"
+      : "var(--warning)"
 
-const deltaText = (current: number | null, prev: number | null, suffix: string) => {
-  if (current == null) return "—"
-  if (prev == null) return "n/a"
-  const diff = current - prev
-  const sign = diff > 0 ? "+" : ""
-  return `${sign}${Math.round(diff * 10) / 10}${suffix} vs prev. period`
+const progressTone = (progress: number | null) => {
+  if (progress == null) return "var(--border-strong)"
+  if (progress >= 80) return "var(--success)"
+  if (progress >= 50) return "var(--accent)"
+  return "var(--warning)"
 }
 
-const scoreDisplay = (score: number | null) =>
-  score == null ? "—" : `${Math.round(score)}%`
+/** Jobs with the most unreviewed CVs surface first; idle jobs sink. */
+const byReviewUrgency = (a: ReportJobRow, b: ReportJobRow) => {
+  const pendingA = pendingReviewCount(a.cv_count, a.review_progress)
+  const pendingB = pendingReviewCount(b.cv_count, b.review_progress)
+  if (pendingA !== pendingB) return pendingB - pendingA
+  if (a.cv_count !== b.cv_count) return b.cv_count - a.cv_count
+  return a.title.localeCompare(b.title)
+}
 
 export default function HRDashboard({ onNavigate }: HRDashboardProps) {
-  const defaultRange = trailing30Days()
+  const defaultRange = trailingDaysWindow(30)
   const cachedSummary = getCachedResource<ReportSummary>(
     hrDashboardCacheKey(defaultRange),
   )
@@ -78,7 +74,7 @@ export default function HRDashboard({ onNavigate }: HRDashboardProps) {
   const [loadError, setLoadError] = useState("")
 
   const load = useCallback(async (force = false) => {
-    const range = trailing30Days()
+    const range = trailingDaysWindow(30)
     const key = hrDashboardCacheKey(range)
 
     setLoadError("")
@@ -90,7 +86,9 @@ export default function HRDashboard({ onNavigate }: HRDashboardProps) {
       )
     } catch (cause) {
       setLoadError(
-        cause instanceof Error ? cause.message : "Could not load the dashboard.",
+        cause instanceof Error
+          ? cause.message
+          : "Could not load the dashboard.",
       )
     }
   }, [])
@@ -100,48 +98,70 @@ export default function HRDashboard({ onNavigate }: HRDashboardProps) {
   }, [load])
 
   const kpis = summary?.kpis ?? null
-  const empty = summary != null && summary.jobs.length === 0 && kpis?.total_cvs_reviewed === 0
+  const loading = summary == null
+  const empty =
+    summary != null &&
+    summary.jobs.length === 0 &&
+    kpis?.total_cvs_reviewed === 0
+
+  const windowRange = summary?.window ?? null
+  const subtitle = windowRange
+    ? `Last 30 days · ${formatWindowRange(windowRange)}`
+    : "Last 30 days"
+
+  const sortedJobs = useMemo(
+    () => [...(summary?.jobs ?? [])].sort(byReviewUrgency),
+    [summary],
+  )
 
   const statCards = [
     {
       label: "Active Job Posts",
       value: kpis ? String(kpis.active_job_posts) : "…",
-      delta: kpis
-        ? deltaText(kpis.active_job_posts, kpis.prev?.active_job_posts ?? null, " job")
-        : "…",
+      delta: comparePeriods(
+        kpis?.active_job_posts ?? null,
+        kpis?.prev?.active_job_posts ?? null,
+        { suffix: " job" },
+      ),
       icon: <BriefcaseBusiness size={19} aria-hidden="true" />,
-      color: "#2563EB",
-      soft: "var(--accent-soft)",
+      color: "var(--accent)",
     },
     {
       label: "Total CVs Reviewed",
       value: kpis ? String(kpis.total_cvs_reviewed) : "…",
-      delta: kpis
-        ? deltaText(kpis.total_cvs_reviewed, kpis.prev?.total_cvs_reviewed ?? null, " CVs")
-        : "…",
+      delta: comparePeriods(
+        kpis?.total_cvs_reviewed ?? null,
+        kpis?.prev?.total_cvs_reviewed ?? null,
+        { suffix: " CVs" },
+      ),
       icon: <FileCheck2 size={19} aria-hidden="true" />,
-      color: "#16A34A",
-      soft: "var(--success-soft)",
+      color: "var(--success)",
     },
     {
       label: "Avg. Candidate Score",
-      value: kpis ? scoreDisplay(kpis.avg_candidate_score) : "…",
-      delta: kpis
-        ? deltaText(kpis.avg_candidate_score, kpis.prev?.avg_candidate_score ?? null, "pts")
-        : "…",
+      value: kpis ? formatScore(kpis.avg_candidate_score) : "…",
+      delta: comparePeriods(
+        kpis?.avg_candidate_score ?? null,
+        kpis?.prev?.avg_candidate_score ?? null,
+        { suffix: " pts" },
+      ),
       icon: <Sparkles size={19} aria-hidden="true" />,
-      color: "#D97706",
-      soft: "var(--warning-soft)",
+      color: "var(--warning)",
     },
     {
       label: "Review Progress",
-      value: kpis ? (kpis.review_progress == null ? "—" : `${Math.round(kpis.review_progress)}%`) : "…",
-      delta: kpis
-        ? deltaText(kpis.review_progress, kpis.prev?.review_progress ?? null, "%")
+      value: kpis
+        ? kpis.review_progress == null
+          ? "—"
+          : `${Math.round(kpis.review_progress)}%`
         : "…",
+      delta: comparePeriods(
+        kpis?.review_progress ?? null,
+        kpis?.prev?.review_progress ?? null,
+        { suffix: "%" },
+      ),
       icon: <TrendingUp size={19} aria-hidden="true" />,
-      color: "#64748B",
-      soft: "var(--gray-soft)",
+      color: "var(--text-secondary)",
     },
   ]
 
@@ -150,8 +170,11 @@ export default function HRDashboard({ onNavigate }: HRDashboardProps) {
       <RevealStagger>
         <div className="fc-page-head">
           <div>
+            <div className="fc-eyebrow" style={{ marginBottom: 6 }}>
+              HR · Overview
+            </div>
             <h1>HR Dashboard</h1>
-            <p>TechViet Solutions · Recruitment overview</p>
+            <p>{subtitle}</p>
           </div>
           <div style={{ display: "flex", gap: 10 }}>
             <button
@@ -172,7 +195,7 @@ export default function HRDashboard({ onNavigate }: HRDashboardProps) {
 
       {loadError ? (
         <RevealStagger>
-          <BezelCard>
+          <div className="fc-card hr-dashboard__jobs-card">
             <div
               style={{
                 display: "flex",
@@ -194,7 +217,11 @@ export default function HRDashboard({ onNavigate }: HRDashboardProps) {
                   justifyContent: "center",
                 }}
               >
-                <TriangleAlert size={24} color="var(--danger)" aria-hidden="true" />
+                <TriangleAlert
+                  size={24}
+                  color="var(--danger)"
+                  aria-hidden="true"
+                />
               </div>
               <strong style={{ fontSize: 16, color: "var(--text-primary)" }}>
                 Could not load the dashboard.
@@ -208,11 +235,14 @@ export default function HRDashboard({ onNavigate }: HRDashboardProps) {
               >
                 {loadError}
               </span>
-              <button className="fc-btn fc-btn--primary" onClick={() => void load(true)}>
+              <button
+                className="fc-btn fc-btn--primary"
+                onClick={() => void load(true)}
+              >
                 <RefreshCw size={15} aria-hidden="true" /> Retry
               </button>
             </div>
-          </BezelCard>
+          </div>
         </RevealStagger>
       ) : (
         <>
@@ -220,37 +250,14 @@ export default function HRDashboard({ onNavigate }: HRDashboardProps) {
           <div className="hr-dashboard__stats">
             {statCards.map((s, i) => (
               <RevealStagger key={s.label} delay={i * 0.08}>
-                <BezelCard className="hr-dashboard__stat-card">
-                  <div
-                    className="fc-stat"
-                    style={{
-                      display: "flex",
-                      flexDirection: "column",
-                      justifyContent: "space-between",
-                    }}
-                  >
-                    <div className="hr-dashboard__stat-top">
-                      <div
-                        className="fc-stat__icon"
-                        style={{ background: s.soft, color: s.color }}
-                      >
-                          {s.icon}
-                      </div>
-                    </div>
-                    <div style={{ marginTop: 12 }}>
-                      <div className="fc-stat__value" style={{ fontSize: 28 }}>
-                        {s.value}
-                      </div>
-                      <div className="fc-stat__label">{s.label}</div>
-                      <div
-                        className="fc-stat__delta"
-                        style={{ color: s.color, marginTop: 6 }}
-                      >
-                        {s.delta}
-                      </div>
-                    </div>
-                  </div>
-                </BezelCard>
+                <KpiStatCard
+                  label={s.label}
+                  value={s.value}
+                  icon={s.icon}
+                  iconColor={s.color}
+                  delta={kpis ? s.delta : undefined}
+                  loading={loading}
+                />
               </RevealStagger>
             ))}
           </div>
@@ -268,8 +275,12 @@ export default function HRDashboard({ onNavigate }: HRDashboardProps) {
                 }}
               >
                 <div className="fc-section-title">
-                  <ChartColumn size={17} color="var(--accent)" aria-hidden="true" />
-                  <h3>Active Job Posts</h3>
+                  <ChartColumn
+                    size={17}
+                    color="var(--accent)"
+                    aria-hidden="true"
+                  />
+                  <h3>Job Posts by Review Load</h3>
                 </div>
                 <button
                   onClick={() => onNavigate("job-posts")}
@@ -291,7 +302,9 @@ export default function HRDashboard({ onNavigate }: HRDashboardProps) {
                     textAlign: "center",
                   }}
                 >
-                  <strong style={{ fontSize: 15, color: "var(--text-primary)" }}>
+                  <strong
+                    style={{ fontSize: 15, color: "var(--text-primary)" }}
+                  >
                     No recruitment data yet
                   </strong>
                   <span
@@ -305,6 +318,16 @@ export default function HRDashboard({ onNavigate }: HRDashboardProps) {
                     overview here.
                   </span>
                 </div>
+              ) : loading ? (
+                <div className="hr-dashboard__table-skeleton">
+                  {[0, 1, 2, 3].map((row) => (
+                    <div
+                      key={row}
+                      className="fc-skeleton"
+                      style={{ height: 38, borderRadius: 10 }}
+                    />
+                  ))}
+                </div>
               ) : (
                 <div className="hr-dashboard__table-wrap">
                   <table className="fc-table hr-dashboard__table">
@@ -316,112 +339,149 @@ export default function HRDashboard({ onNavigate }: HRDashboardProps) {
                       <col className="hr-dashboard__progress-col" />
                       <col className="hr-dashboard__action-col" />
                     </colgroup>
-                  <thead>
-                    <tr>
-                      {[
-                        "Job Title",
-                        "Department",
-                        "CVs",
-                        "Avg. Score",
-                        "Review Progress",
-                        "Action",
-                      ].map((h) => (
-                        <th key={h}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(summary?.jobs ?? []).map((job: ReportJobRow) => (
-                      <tr key={job.job_id}>
-                        <td>
-                          <div className="hr-dashboard__job-title">
-                            {job.title}
-                          </div>
-                        </td>
-                        <td>
-                          <span className="fc-badge fc-badge--blue">
-                            {job.department ?? "—"}
-                          </span>
-                        </td>
-                        <td>
-                          <div
-                            style={{ display: "flex", alignItems: "center", gap: 6 }}
-                          >
-                            <span
-                              style={{
-                                fontSize: 16,
-                                fontWeight: 700,
-                                color: "var(--text-primary)",
-                                fontFamily: "var(--font-display)",
-                              }}
-                            >
-                              {job.cv_count}
-                            </span>
-                            <span
-                              style={{ fontSize: 12, color: "var(--text-muted)" }}
-                            >
-                              CVs
-                            </span>
-                          </div>
-                        </td>
-                        <td>
-                          <span
-                            style={{
-                              fontSize: 16,
-                              fontWeight: 700,
-                              fontFamily: "var(--font-display)",
-                              color: scoreColor(job.avg_score),
-                            }}
-                          >
-                            {scoreDisplay(job.avg_score)}
-                          </span>
-                        </td>
-                        <td>
-                          <div
-                            style={{ display: "flex", alignItems: "center", gap: 9 }}
-                          >
-                            <div className="fc-progress" style={{ flex: 1 }}>
+                    <thead>
+                      <tr>
+                        {[
+                          "Job Title",
+                          "Department",
+                          "CVs",
+                          "Avg. Score",
+                          "Review Progress",
+                          "Action",
+                        ].map((h) => (
+                          <th key={h}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {sortedJobs.map((job: ReportJobRow) => {
+                        const pending = pendingReviewCount(
+                          job.cv_count,
+                          job.review_progress,
+                        )
+
+                        return (
+                          <tr key={job.job_id}>
+                            <td>
+                              <div className="hr-dashboard__job-title">
+                                {job.title}
+                              </div>
+                              <div className="hr-dashboard__job-sub">
+                                <span
+                                  className="hr-dashboard__status-dot"
+                                  style={{ background: statusTone(job.status) }}
+                                />
+                                {job.status}
+                              </div>
+                            </td>
+                            <td>
+                              <span className="fc-badge fc-badge--blue">
+                                {job.department ?? "—"}
+                              </span>
+                            </td>
+                            <td>
                               <div
                                 style={{
-                                  width: `${job.review_progress ?? 0}%`,
-                                  background:
-                                    (job.review_progress ?? 0) >= 80
-                                      ? "var(--success)"
-                                      : "var(--accent)",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: 6,
                                 }}
-                              />
-                            </div>
-                            <span
-                              style={{
-                                fontSize: 13,
-                                fontWeight: 700,
-                                color: "var(--text-primary)",
-                                width: 38,
-                              }}
-                            >
-                              {job.review_progress == null
-                                ? "—"
-                                : `${Math.round(job.review_progress)}%`}
-                            </span>
-                          </div>
-                        </td>
-                        <td>
-                          <button
-                            onClick={() => onNavigate("cv-ranking")}
-                            className="fc-chip"
-                            style={{
-                              cursor: "pointer",
-                              border: "none",
-                              color: "var(--accent-ink)",
-                              background: "var(--accent-soft)",
-                            }}
-                          >
-                            View CVs <ArrowRight size={13} />
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
+                              >
+                                <span
+                                  style={{
+                                    fontSize: 16,
+                                    fontWeight: 700,
+                                    color: "var(--text-primary)",
+                                    fontFamily: "var(--font-display)",
+                                  }}
+                                >
+                                  {job.cv_count}
+                                </span>
+                                <span
+                                  style={{
+                                    fontSize: 12,
+                                    color: "var(--text-muted)",
+                                  }}
+                                >
+                                  CVs
+                                </span>
+                              </div>
+                              {pending > 0 ? (
+                                <div className="hr-dashboard__job-sub hr-dashboard__pending">
+                                  {pending} to review
+                                </div>
+                              ) : null}
+                            </td>
+                            <td>
+                              <span
+                                style={{
+                                  fontSize: 16,
+                                  fontWeight: 700,
+                                  fontFamily: "var(--font-display)",
+                                  color: avgScoreColor(job.avg_score),
+                                }}
+                              >
+                                {formatScore(job.avg_score)}
+                              </span>
+                              {job.avg_score != null ? (
+                                <div className="hr-dashboard__job-sub">
+                                  {getMatchLabel(job.avg_score)}
+                                </div>
+                              ) : null}
+                            </td>
+                            <td>
+                              <div
+                                style={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: 9,
+                                }}
+                              >
+                                <div
+                                  className="fc-progress"
+                                  style={{ flex: 1 }}
+                                >
+                                  <div
+                                    style={{
+                                      width: `${job.review_progress ?? 0}%`,
+                                      background: progressTone(
+                                        job.review_progress,
+                                      ),
+                                    }}
+                                  />
+                                </div>
+                                <span
+                                  style={{
+                                    fontSize: 13,
+                                    fontWeight: 700,
+                                    color: "var(--text-primary)",
+                                    width: 38,
+                                  }}
+                                >
+                                  {job.review_progress == null
+                                    ? "—"
+                                    : `${Math.round(job.review_progress)}%`}
+                                </span>
+                              </div>
+                            </td>
+                            <td>
+                              <button
+                                onClick={() => onNavigate("cv-ranking")}
+                                className="fc-chip"
+                                style={{
+                                  cursor: "pointer",
+                                  border: "none",
+                                  color: "var(--accent-ink)",
+                                  background: "var(--accent-soft)",
+                                }}
+                              >
+                                View CVs <ArrowRight size={13} />
+                              </button>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
                   </table>
                 </div>
               )}
