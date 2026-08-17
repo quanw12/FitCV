@@ -141,6 +141,10 @@ async def rebuild_cv(
     cv, backfill_warnings = backfill_cv(baseline_cv, cv)
     warnings.extend(backfill_warnings)
 
+    # Backfill can re-add a skill already present in a group; re-normalize so
+    # the Technical Skills section never renders a duplicate line.
+    cv = normalize_cv(cv)
+
     cv = cv.model_copy(update={"name": name})
     avatar_data = maybe_downscale_avatar(avatar, warnings)
     html = render_cv(cv, language=language, avatar=avatar_data)
@@ -223,6 +227,10 @@ async def rebuild_with_improvements(
     cv, backfill_warnings = backfill_cv(original_cv, cv)
     warnings.extend(backfill_warnings)
 
+    # Backfill can re-add a skill already present in a group; re-normalize so
+    # the Technical Skills section never renders a duplicate line.
+    cv = normalize_cv(cv)
+
     cv = cv.model_copy(update={"name": name})
     avatar_data = maybe_downscale_avatar(avatar, warnings)
     html = render_cv(cv, language=output_language, avatar=avatar_data)
@@ -273,6 +281,10 @@ async def build_cv(
     # Deterministic backfill of anything the polished output lost.
     polished, backfill_warnings = backfill_cv(original_cv, polished)
     warnings.extend(backfill_warnings)
+
+    # Backfill can re-add a skill already present in a group; re-normalize so
+    # the Technical Skills section never renders a duplicate line.
+    polished = normalize_cv(polished)
 
     polished = polished.model_copy(update={"name": name})
     avatar_data = maybe_downscale_avatar(avatar, warnings)
