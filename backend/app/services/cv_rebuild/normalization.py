@@ -131,16 +131,108 @@ def _normalize_publication(item: CvPublicationItem) -> CvPublicationItem:
     )
 
 
+def _dedupe_key(value: str) -> str:
+    """Case/space-insensitive identity used to detect duplicate skills."""
+
+    return _WHITESPACE_RE.sub(" ", value).strip().lower()
+
+
+def _dedupe_skill_groups(groups):
+    """Return groups with duplicate items removed within and across groups.
+
+    Items already seen in a previous group are dropped so the same skill never
+    repeats across category lines.  Repeated category labels are merged into the
+    first occurrence (items appended, still de-duplicated) so no skill and no
+    category heading is lost.
+    """
+
+    seen_items: set[str] = set()
+    merged: dict[str, int] = {}
+    cleaned = []
+    for group in groups:
+        category = _strip_symbols(group.category)
+        if not category:
+            continue
+        cat_key = _dedupe_key(category)
+        items = []
+        for item in group.items:
+            clean = _strip_symbols(item)
+            if not clean:
+                continue
+            key = _dedupe_key(clean)
+            if key in seen_items:
+                continue
+            seen_items.add(key)
+            items.append(clean)
+        if not items:
+            continue
+        if cat_key in merged:
+            index = merged[cat_key]
+            existing = cleaned[index]
+            cleaned[index] = existing.model_copy(
+                update={"items": list(existing.items) + items}
+            )
+            continue
+        built = group.model_copy(update={"category": category, "items": items})
+        merged[cat_key] = len(cleaned)
+        cleaned.append(built)
+    return cleaned
+
+
+def _flat_skill_already_in_groups(skill_key: str, grouped_text: list[str]) -> bool:
+    """True when ``skill_key`` already appears as a whole word inside a group
+    item.  Group items often bundle several skills into one string (e.g.
+    ``"Python (Pandas, NumPy, Matplotlib)"``), so a flat skill like ``"Python"``
+    must not be re-listed on its own line just because it is not an exact match.
+    """
+
+    pattern = r"(?<![\w])" + re.escape(skill_key) + r"(?![\w])"
+    return any(re.search(pattern, text) for text in grouped_text)
+
+
+def _dedupe_flat_skills(skills, occupied: set[str], grouped_text: list[str]):
+    """Return ``skills`` with duplicates removed and any already represented
+    inside skill groups excluded (exact match *or* whole-word match inside a
+    grouped item string)."""
+
+    seen: set[str] = set()
+    cleaned = []
+    for skill in skills:
+        clean = _strip_symbols(skill)
+        if not clean:
+            continue
+        key = _dedupe_key(clean)
+        if key in seen or key in occupied:
+            continue
+        if _flat_skill_already_in_groups(key, grouped_text):
+            continue
+        seen.add(key)
+        cleaned.append(clean)
+    return cleaned
+
+
 def normalize_cv(cv: CVData) -> CVData:
-    """Return a copy of ``cv`` with symbols removed and ratings spelled out."""
+    """Return a copy of ``cv`` with symbols removed and ratings spelled out.
+
+    Skills are also de-duplicated: a skill never appears twice across the flat
+    ``skills`` list and the ``skill_groups`` items, which prevents the
+    Technical Skills section from rendering a repeated extra line.
+    """
     language = detect_cv_language(cv)
+    skill_groups = _dedupe_skill_groups(cv.skill_groups)
+    grouped_keys = {
+        _dedupe_key(item) for group in skill_groups for item in group.items
+    }
+    grouped_text = [
+        _dedupe_key(item) for group in skill_groups for item in group.items
+    ]
     return cv.model_copy(
         update={
             "name": _strip_symbols(cv.name),
             "email": _strip_symbols(cv.email),
             "phone": _strip_symbols(cv.phone),
             "summary": _strip_symbols(cv.summary),
-            "skills": [s for s in (_strip_symbols(s) for s in cv.skills) if s],
+            "skills": _dedupe_flat_skills(cv.skills, grouped_keys, grouped_text),
             "certifications": [
                 c for c in (_strip_symbols(c) for c in cv.certifications) if c
             ],
@@ -167,14 +259,6 @@ def normalize_cv(cv: CVData) -> CVData:
                 )
                 for item in cv.core_competencies
             ],
-            "skill_groups": [
-                group.model_copy(
-                    update={
-                        "category": _strip_symbols(group.category),
-                        "items": [s for s in (_strip_symbols(s) for s in group.items) if s],
-                    }
-                )
-                for group in cv.skill_groups
-            ],
+            "skill_groups": skill_groups,
         }
     )

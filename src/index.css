@@ -3476,25 +3476,6 @@ h1, h2, h3, h4, h5, h6 {
   gap: 24px;
   margin-bottom: 28px;
 }
-.hr-dashboard__stat-card .fc-bezel__inner {
-  min-height: 174px;
-  padding: 24px;
-  border: 1px solid var(--border);
-  border-radius: 18px;
-  background: var(--surface);
-}
-.hr-dashboard__stat-top {
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-}
-.hr-dashboard__stat-card .fc-stat__icon {
-  width: auto;
-  height: auto;
-  padding: 0;
-  border-radius: 0;
-  background: transparent !important;
-}
 .hr-dashboard__jobs-card {
   overflow: hidden;
   border-radius: 18px;
@@ -3526,12 +3507,81 @@ h1, h2, h3, h4, h5, h6 {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.hr-dashboard__job-sub {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 3px;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.hr-dashboard__status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.hr-dashboard__pending { color: var(--accent-ink); }
+.hr-dashboard__table-skeleton {
+  display: grid;
+  gap: 10px;
+  padding: 20px 22px;
+}
+
+/* Shared KPI stat card used by the HR dashboard and reports. */
+.kpi-stat-card .fc-bezel__inner {
+  min-height: 174px;
+  padding: 24px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: var(--surface);
+}
+.kpi-stat-card__body {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  height: 100%;
+  min-height: 126px;
+}
+.kpi-stat-card__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+}
+.kpi-stat-card__metrics { margin-top: 12px; }
+.kpi-stat-card__value {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 28px;
+  line-height: 1;
+  color: var(--text-primary);
+}
+.kpi-stat-card__label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  margin-top: 4px;
+}
+.kpi-stat-card__delta {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  margin-top: 6px;
+}
+.kpi-stat-card__value-skeleton { height: 28px; width: 76px; margin-bottom: 10px; }
+.kpi-stat-card__label-skeleton { height: 13px; width: 118px; margin-bottom: 12px; }
+.kpi-stat-card__delta-skeleton { height: 12px; width: 152px; }
+
 @media (max-width: 1120px) {
   .hr-dashboard__stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 640px) {
   .hr-dashboard__stats { grid-template-columns: 1fr; gap: 16px; }
-  .hr-dashboard__stat-card .fc-bezel__inner { min-height: 152px; padding: 20px; }
+  .kpi-stat-card .fc-bezel__inner { min-height: 152px; padding: 20px; }
   .hr-dashboard__table th,
   .hr-dashboard__table td { padding-right: 18px; padding-left: 18px; }
 }
@@ -3570,27 +3620,10 @@ h1, h2, h3, h4, h5, h6 {
 .reports-page { max-width: 1440px; margin-inline: auto; }
 .reports-kpi-grid {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 20px;
   margin-bottom: 24px;
 }
-.reports-kpi-grid .fc-stat {
-  min-height: 158px;
-  padding: 22px;
-  border: 1px solid var(--border);
-  border-radius: 18px;
-  background: var(--surface);
-  box-shadow: none;
-  transform: none;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  justify-content: flex-start;
-  text-align: left;
-}
-.reports-kpi-grid .fc-stat:hover { box-shadow: none; transform: none; }
-.reports-kpi-grid .fc-stat::before { display: none; }
-.reports-kpi-card .fc-stat__icon,
 .job-posts-page .fc-stat__icon {
   width: auto;
   height: auto;
@@ -3611,8 +3644,67 @@ h1, h2, h3, h4, h5, h6 {
 .reports-chart-card .fc-section-title { min-height: 22px; }
 .reports-chart-card .recharts-responsive-container { min-width: 0; }
 
+.reports-month-nav { padding: 9px 10px; }
+.reports-month-chip { cursor: default; }
+.reports-chart-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+  padding: 0 12px;
+  color: var(--text-muted);
+  font-size: 13px;
+  text-align: center;
+}
+.reports-donut {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 24px;
+}
+.reports-donut__ring { position: relative; width: 170px; height: 170px; }
+.reports-donut__center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+.reports-donut__percent {
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--success);
+  font-family: var(--font-display);
+  line-height: 1;
+}
+.reports-donut__caption { font-size: 11px; color: var(--text-muted); }
+.reports-donut__legend { display: grid; gap: 8px; }
+.reports-donut__legend-row { display: flex; align-items: center; gap: 8px; }
+.reports-donut__legend-label { font-size: 13px; color: var(--text-secondary); }
+.reports-donut__legend-label strong { color: var(--text-primary); }
+.reports-donut__dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.reports-donut__dot--passed { background: var(--success); }
+.reports-donut__dot--failed { background: var(--gray-soft); border: 1px solid var(--border); }
+
+.reports-jobs-card { overflow: hidden; border-radius: 18px; margin-top: 20px; }
+.reports-jobs-card__head {
+  padding: 18px 22px;
+  border-bottom: 1px solid var(--border);
+}
+.reports-jobs-card__skeleton { display: grid; gap: 10px; padding: 20px 22px; }
+.reports-jobs-card__count {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-primary);
+  font-family: var(--font-display);
+}
+
 @media (max-width: 1180px) {
-  .reports-kpi-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .reports-kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .reports-chart-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 

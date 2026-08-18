@@ -42,7 +42,6 @@ const icon = (src: string) => (
 
 export const seekerNavItems: NavItem[] = [
   { icon: icon(documentText), label: "CV Build", screen: "cv-rebuild" },
-  { icon: icon(briefcase), label: "Job Search", screen: "job-search" },
   { icon: icon(magnifyingGlass), label: "Match Analyzer", screen: "analyzer" },
   { icon: icon(lightBulb), label: "Improvement Tips", screen: "improvement" },
 
@@ -55,6 +54,7 @@ export const seekerNavItems: NavItem[] = [
   },
 
   { icon: icon(bookOpen), label: "JD Library", screen: "jd-library" },
+  { icon: icon(briefcase), label: "Job Search", screen: "job-search" },
 
   { icon: icon(userCircle), label: "Profile", screen: "profile" },
 ]
