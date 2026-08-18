@@ -106,3 +106,75 @@ class TestSymbolStripping:
         out = normalize_cv(CVData())
         assert out.languages == []
         assert out.skills == []
+
+
+class TestSkillDeduplication:
+    def test_flat_skill_duplicates_removed(self) -> None:
+        cv = CVData(name="A", skills=["Python", "python", " Python ", "Docker"])
+        out = normalize_cv(cv)
+        assert out.skills == ["Python", "Docker"]
+
+    def test_skill_in_group_not_duplicated_in_flat_list(self) -> None:
+        cv = CVData(
+            name="A",
+            skills=["Python", "Docker"],
+            skill_groups=[{"category": "Languages", "items": ["Python", "Go"]}],
+        )
+        out = normalize_cv(cv)
+        # Python is already represented inside the group, so it stays only there.
+        assert out.skill_groups[0].items == ["Python", "Go"]
+        assert out.skills == ["Docker"]
+
+    def test_flat_skill_inside_group_item_string_is_dropped(self) -> None:
+        # Real LLM output bundles several skills into one group-item string while
+        # also returning the same skills as a flat list. The flat list must not
+        # repeat skills already embedded in the grouped items.
+        cv = CVData(
+            name="A",
+            skills=["Excel", "Power BI", "Tableau", "SQL", "Python", "Pandas", "NumPy", "Matplotlib", "VBA"],
+            skill_groups=[
+                {
+                    "category": "Công cụ & Công nghệ",
+                    "items": [
+                        "MS Excel (Pivot Table, VLOOKUP, VBA)",
+                        "Power BI & Tableau Dashboard",
+                        "Truy vấn dữ liệu SQL",
+                        "Python (Pandas, NumPy, Matplotlib)",
+                    ],
+                }
+            ],
+        )
+        out = normalize_cv(cv)
+        assert out.skills == []
+        assert len(out.skill_groups[0].items) == 4
+
+    def test_whole_word_match_avoids_false_substring_drop(self) -> None:
+        # "Java" must NOT be dropped just because a group item contains
+        # "JavaScript" (no whole-word boundary).
+        cv = CVData(
+            name="A",
+            skills=["Java", "Go"],
+            skill_groups=[{"category": "Languages", "items": ["JavaScript", "TypeScript"]}],
+        )
+        out = normalize_cv(cv)
+        assert out.skills == ["Java", "Go"]
+
+    def test_duplicate_items_within_group_removed(self) -> None:
+        cv = CVData(
+            name="A",
+            skill_groups=[{"category": "Tools", "items": ["Nmap", "nmap", "Wireshark"]}],
+        )
+        out = normalize_cv(cv)
+        assert out.skill_groups[0].items == ["Nmap", "Wireshark"]
+
+    def test_duplicate_category_groups_collapsed(self) -> None:
+        cv = CVData(
+            name="A",
+            skill_groups=[
+                {"category": "Tools", "items": ["Nmap"]},
+                {"category": "tools", "items": ["Wireshark"]},
+            ],
+        )
+        out = normalize_cv(cv)
+        assert len(out.skill_groups) == 1
+        assert out.skill_groups[0].items == ["Nmap", "Wireshark"]
