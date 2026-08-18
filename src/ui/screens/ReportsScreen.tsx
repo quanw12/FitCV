@@ -1,17 +1,20 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 
 import {
-  ArrowClockwise,
-  Briefcase,
-  Calendar,
+  CalendarDays,
   ChartBar,
+  ChartColumnBig,
   ChartPie as PieIcon,
+  ChevronLeft,
+  ChevronRight,
+  CircleAlert,
   Clock,
   Download,
-  FileText,
-  TrendUp,
-  WarningCircle,
-} from "@phosphor-icons/react"
+  FileCheck2,
+  RefreshCw,
+  Table,
+  TrendingUp,
+} from "lucide-react"
 
 import {
   Bar,
@@ -28,19 +31,25 @@ import {
   YAxis,
 } from "recharts"
 
-import BezelCard from "@/ui/components/BezelCard"
+import KpiStatCard from "@/ui/components/KpiStatCard"
+import RevealStagger from "@/ui/components/RevealStagger"
 
-import type { ReportSummary } from "@/types/reports"
+import type { ReportJobRow, ReportSummary } from "@/types/reports"
+
+import type { ReportDateWindow } from "@/services/reportMetrics"
 
 import { reportsApi } from "@/api/reportsApi"
 import {
-  getCachedResource,
-  getOrFetchResource,
-} from "@/services/resourceCache"
-
-const pad = (n: number) => String(n).padStart(2, "0")
-const dateInput = (d: Date) =>
-  `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+  avgScoreColor,
+  comparePeriods,
+  formatDays,
+  formatScore,
+  monthWindow,
+  pendingReviewCount,
+  scoreBucketColor,
+} from "@/services/reportMetrics"
+import { getMatchLabel } from "@/services/matchScore"
+import { getCachedResource, getOrFetchResource } from "@/services/resourceCache"
 
 const tooltipStyle = {
   background: "var(--surface)",
@@ -51,26 +60,35 @@ const tooltipStyle = {
   boxShadow: "var(--shadow-md)",
 }
 
-const scoreFill = (range: string) => {
-  if (range.startsWith("9") || range.startsWith("8")) return "var(--success)"
-  if (range.startsWith("7") || range.startsWith("6")) return "var(--accent)"
-  return "var(--danger)"
-}
-
-const deltaText = (
-  current: number | null,
-  prev: number | null,
-  suffix: string,
-) => {
-  if (current == null) return "—"
-  if (prev == null) return "n/a"
-  const diff = current - prev
-  const sign = diff > 0 ? "+" : ""
-  return `${sign}${Math.round(diff * 10) / 10}${suffix} vs prev. month`
-}
-
-const reportsCacheKey = (range: { from: string; to: string }) =>
+const reportsCacheKey = (range: ReportDateWindow) =>
   `hr-reports:summary:${range.from}:${range.to}`
+
+const statusTone = (status: string) =>
+  status === "Published"
+    ? "var(--success)"
+    : status === "Closed"
+      ? "var(--text-muted)"
+      : "var(--warning)"
+
+const progressTone = (progress: number | null) => {
+  if (progress == null) return "var(--border-strong)"
+  if (progress >= 80) return "var(--success)"
+  if (progress >= 50) return "var(--accent)"
+  return "var(--warning)"
+}
+
+const byCvVolume = (a: ReportJobRow, b: ReportJobRow) => {
+  if (a.cv_count !== b.cv_count) return b.cv_count - a.cv_count
+  return a.title.localeCompare(b.title)
+}
+
+function ChartEmptyState({ message }: { message: string }) {
+  return (
+    <div className="reports-chart-empty" role="status">
+      {message}
+    </div>
+  )
+}
 
 export default function ReportsScreen() {
   const now = new Date()
@@ -78,11 +96,10 @@ export default function ReportsScreen() {
   const minMonth = new Date(now.getFullYear(), now.getMonth() - 11, 1)
 
   const [month, setMonth] = useState(currentMonth)
-  const windowRange = useMemo(() => {
-    const first = new Date(month.year, month.month, 1)
-    const last = new Date(month.year, month.month + 1, 0)
-    return { from: dateInput(first), to: dateInput(last) }
-  }, [month])
+  const windowRange = useMemo(
+    () => monthWindow(month.year, month.month),
+    [month],
+  )
 
   const cachedSummary = getCachedResource<ReportSummary>(
     reportsCacheKey(windowRange),
@@ -103,30 +120,35 @@ export default function ReportsScreen() {
   const canGoBack = monthIndex > minIndex
   const canGoForward = monthIndex < currentIndex
 
-  const load = useCallback(async (force = false) => {
-    const cached = getCachedResource<ReportSummary>(reportsCacheKey(windowRange))
+  const load = useCallback(
+    async (force = false) => {
+      const key = reportsCacheKey(windowRange)
+      const cached = getCachedResource<ReportSummary>(key)
 
-    if (cached && !force) {
-      setSummary(cached)
+      if (cached && !force) {
+        setSummary(cached)
 
-      return
-    }
+        return
+      }
 
-    setLoadError("")
-    try {
-      setSummary(
-        await getOrFetchResource(
-          reportsCacheKey(windowRange),
-          () => reportsApi.summary(windowRange),
-          { force },
-        ),
-      )
-    } catch (cause) {
-      setLoadError(
-        cause instanceof Error ? cause.message : "Could not load reports.",
-      )
-    }
-  }, [windowRange.from, windowRange.to])
+      // Drop the previous month's numbers so they never render under the
+      // newly selected month label while the fetch is in flight.
+      setSummary(null)
+      setLoadError("")
+      try {
+        setSummary(
+          await getOrFetchResource(key, () => reportsApi.summary(windowRange), {
+            force,
+          }),
+        )
+      } catch (cause) {
+        setLoadError(
+          cause instanceof Error ? cause.message : "Could not load reports.",
+        )
+      }
+    },
+    [windowRange.from, windowRange.to],
+  )
 
   useEffect(() => {
     void load()
@@ -136,15 +158,25 @@ export default function ReportsScreen() {
     setMonth((current) => {
       const index = current.year * 12 + current.month + direction
       const year = Math.floor(index / 12)
-      const monthIndex = index % 12
-      return { year, month: monthIndex < 0 ? 11 : monthIndex }
+      const monthIdx = index % 12
+      return { year, month: monthIdx < 0 ? 11 : monthIdx }
     })
   }
 
   const exportCsv = () => {
     if (!summary) return
     const kpi = summary.kpis
+    const passTotal =
+      summary.charts.screening_pass_rate.passed_count +
+      summary.charts.screening_pass_rate.not_passed_count
+    const passRate =
+      passTotal > 0
+        ? Math.round(
+            (summary.charts.screening_pass_rate.passed_count * 100) / passTotal,
+          )
+        : null
     const kpiLines = [
+      `Window,${summary.window.from} to ${summary.window.to}`,
       `Active Job Posts,${kpi.active_job_posts}`,
       `Total CVs Reviewed,${kpi.total_cvs_reviewed}`,
       `Avg Candidate Score,${kpi.avg_candidate_score ?? ""}`,
@@ -152,6 +184,7 @@ export default function ReportsScreen() {
       `Time to Shortlist (days),${kpi.time_to_shortlist_days ?? ""}`,
       `Time to Hire (days),${kpi.time_to_hire_days ?? ""}`,
       `Offer Acceptance Rate %,${kpi.offer_acceptance_rate ?? ""}`,
+      `Screening Pass Rate %,${passRate ?? ""}`,
     ]
     const header = [
       "job_id",
@@ -178,16 +211,21 @@ export default function ReportsScreen() {
     const url = URL.createObjectURL(blob)
     const anchor = document.createElement("a")
     anchor.href = url
-    anchor.download = `fitcv-reports-${summary.window.from}.csv`
+    anchor.download = `fitcv-reports-${summary.window.from}-to-${summary.window.to}.csv`
     anchor.click()
     URL.revokeObjectURL(url)
   }
 
   const kpis = summary?.kpis ?? null
+  const loading = summary == null
   const empty =
     summary != null &&
     summary.jobs.length === 0 &&
     kpis?.total_cvs_reviewed === 0
+
+  const subtitle = summary?.window.label
+    ? `Recruitment performance · ${summary.window.label}`
+    : `Recruitment performance · ${monthLabel}`
 
   const passTotal = summary
     ? summary.charts.screening_pass_rate.passed_count +
@@ -200,36 +238,59 @@ export default function ReportsScreen() {
         )
       : null
 
+  const passSlices = summary
+    ? [
+        {
+          name: "Passed Screening",
+          value: summary.charts.screening_pass_rate.passed_count,
+        },
+        {
+          name: "Not Passed",
+          value: summary.charts.screening_pass_rate.not_passed_count,
+        },
+      ]
+    : []
+
+  const applicationsTotal = summary
+    ? summary.charts.applications_over_time.reduce(
+        (sum, bucket) => sum + bucket.count,
+        0,
+      )
+    : 0
+  const scoreTotal = summary
+    ? summary.charts.score_distribution.reduce(
+        (sum, bucket) => sum + bucket.count,
+        0,
+      )
+    : 0
+
+  const sortedJobs = useMemo(
+    () => [...(summary?.jobs ?? [])].sort(byCvVolume),
+    [summary],
+  )
+
   const kpiCards = [
     {
       label: "Avg. Time-to-Shortlist",
-      value:
-        kpis?.time_to_shortlist_days == null
-          ? "—"
-          : `${kpis.time_to_shortlist_days} days`,
-      delta: kpis
-        ? deltaText(
-            kpis.time_to_shortlist_days,
-            kpis.prev?.time_to_shortlist_days ?? null,
-            " days",
-          )
-        : "…",
-      icon: <Clock size={19} weight="light" />,
-      color: "#4F46E5",
-      bg: "#EEF2FF",
+      value: kpis ? formatDays(kpis.time_to_shortlist_days) : "…",
+      delta: comparePeriods(
+        kpis?.time_to_shortlist_days ?? null,
+        kpis?.prev?.time_to_shortlist_days ?? null,
+        { suffix: " days", lowerIsBetter: true },
+      ),
+      icon: <Clock size={19} aria-hidden="true" />,
+      color: "var(--accent)",
     },
     {
       label: "Avg. Time-to-Hire",
-      value:
-        kpis?.time_to_hire_days == null
-          ? "—"
-          : `${kpis.time_to_hire_days} days`,
-      delta: kpis
-        ? deltaText(kpis.time_to_hire_days, kpis.prev?.time_to_hire_days ?? null, " days")
-        : "…",
-      icon: <Calendar size={19} weight="light" />,
-      color: "#10B981",
-      bg: "#D1FAE5",
+      value: kpis ? formatDays(kpis.time_to_hire_days) : "…",
+      delta: comparePeriods(
+        kpis?.time_to_hire_days ?? null,
+        kpis?.prev?.time_to_hire_days ?? null,
+        { suffix: " days", lowerIsBetter: true },
+      ),
+      icon: <CalendarDays size={19} aria-hidden="true" />,
+      color: "var(--text-secondary)",
     },
     {
       label: "Offer Acceptance Rate",
@@ -237,36 +298,24 @@ export default function ReportsScreen() {
         kpis?.offer_acceptance_rate == null
           ? "—"
           : `${Math.round(kpis.offer_acceptance_rate)}%`,
-      delta: kpis
-        ? deltaText(
-            kpis.offer_acceptance_rate,
-            kpis.prev?.offer_acceptance_rate ?? null,
-            "%",
-          )
-        : "…",
-      icon: <TrendUp size={19} weight="light" />,
-      color: "#F59E0B",
-      bg: "#FEF3C7",
-    },
-    {
-      label: "Active Job Posts",
-      value: kpis ? String(kpis.active_job_posts) : "…",
-      delta: kpis
-        ? deltaText(kpis.active_job_posts, kpis.prev?.active_job_posts ?? null, " job")
-        : "…",
-      icon: <Briefcase size={19} weight="light" />,
-      color: "#6B7280",
-      bg: "#F3F4F6",
+      delta: comparePeriods(
+        kpis?.offer_acceptance_rate ?? null,
+        kpis?.prev?.offer_acceptance_rate ?? null,
+        { suffix: "%" },
+      ),
+      icon: <TrendingUp size={19} aria-hidden="true" />,
+      color: "var(--success)",
     },
     {
       label: "Total CVs Reviewed",
       value: kpis ? String(kpis.total_cvs_reviewed) : "…",
-      delta: kpis
-        ? deltaText(kpis.total_cvs_reviewed, kpis.prev?.total_cvs_reviewed ?? null, " CVs")
-        : "…",
-      icon: <FileText size={19} weight="light" />,
-      color: "#16A34A",
-      bg: "#DCFCE7",
+      delta: comparePeriods(
+        kpis?.total_cvs_reviewed ?? null,
+        kpis?.prev?.total_cvs_reviewed ?? null,
+        { suffix: " CVs" },
+      ),
+      icon: <FileCheck2 size={19} aria-hidden="true" />,
+      color: "#2563EB",
     },
   ]
 
@@ -278,43 +327,42 @@ export default function ReportsScreen() {
             HR · Performance
           </div>
           <h1>Reports &amp; Analytics</h1>
-          <p>Recruitment performance overview for TechViet Solutions.</p>
+          <p>{subtitle}</p>
         </div>
         <div style={{ display: "flex", gap: 10 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
             <button
-              className="fc-btn fc-btn--secondary"
+              className="fc-btn fc-btn--secondary reports-month-nav"
               aria-label="Previous month"
               disabled={!canGoBack}
               onClick={() => moveMonth(-1)}
-              style={canGoBack ? undefined : { opacity: 0.4, cursor: "not-allowed" }}
             >
-              ‹
+              <ChevronLeft size={16} aria-hidden="true" />
             </button>
+            <span className="fc-chip reports-month-chip">
+              <CalendarDays size={14} aria-hidden="true" /> {monthLabel}
+            </span>
             <button
-              className="fc-btn fc-btn--secondary"
-              style={{ cursor: "default" }}
-            >
-              <Calendar size={15} /> {monthLabel}
-            </button>
-            <button
-              className="fc-btn fc-btn--secondary"
+              className="fc-btn fc-btn--secondary reports-month-nav"
               aria-label="Next month"
               disabled={!canGoForward}
               onClick={() => moveMonth(1)}
-              style={canGoForward ? undefined : { opacity: 0.4, cursor: "not-allowed" }}
             >
-              ›
+              <ChevronRight size={16} aria-hidden="true" />
             </button>
           </div>
-          <button className="fc-btn fc-btn--primary" onClick={exportCsv}>
+          <button
+            className="fc-btn fc-btn--primary"
+            onClick={exportCsv}
+            disabled={loading || empty}
+          >
             <Download size={15} /> Export CSV
           </button>
         </div>
       </div>
 
       {loadError ? (
-        <BezelCard>
+        <div className="fc-card reports-panel">
           <div
             style={{
               display: "flex",
@@ -336,7 +384,7 @@ export default function ReportsScreen() {
                 justifyContent: "center",
               }}
             >
-              <WarningCircle size={24} weight="light" color="var(--danger)" />
+              <CircleAlert size={24} color="var(--danger)" aria-hidden="true" />
             </div>
             <strong style={{ fontSize: 16, color: "var(--text-primary)" }}>
               Could not load reports.
@@ -350,13 +398,16 @@ export default function ReportsScreen() {
             >
               {loadError}
             </span>
-            <button className="fc-btn fc-btn--primary" onClick={() => void load(true)}>
-              <ArrowClockwise size={15} /> Retry
+            <button
+              className="fc-btn fc-btn--primary"
+              onClick={() => void load(true)}
+            >
+              <RefreshCw size={15} aria-hidden="true" /> Retry
             </button>
           </div>
-        </BezelCard>
+        </div>
       ) : empty ? (
-        <BezelCard>
+        <div className="fc-card reports-panel">
           <div
             style={{
               display: "flex",
@@ -378,7 +429,7 @@ export default function ReportsScreen() {
                 justifyContent: "center",
               }}
             >
-              <ChartBar size={24} weight="light" color="var(--accent)" />
+              <ChartBar size={24} color="var(--accent)" aria-hidden="true" />
             </div>
             <strong style={{ fontSize: 16, color: "var(--text-primary)" }}>
               No reports yet
@@ -394,247 +445,367 @@ export default function ReportsScreen() {
               pipeline. Start by creating a job post and reviewing candidates.
             </span>
           </div>
-        </BezelCard>
+        </div>
       ) : (
         <>
           {/* KPI strip */}
           <div className="reports-kpi-grid">
-            {kpiCards.map((k) => (
-              <div key={k.label} className="fc-stat reports-kpi-card">
-                <div className="fc-stat__icon" style={{ color: k.color }}>
-                  {k.icon}
-                </div>
-                <div style={{ marginTop: 14 }}>
-                  <div className="fc-stat__value">{k.value}</div>
-                  <div className="fc-stat__label">{k.label}</div>
-                  <div
-                    className="fc-stat__delta"
-                    style={{ color: k.color, marginTop: 8 }}
-                  >
-                    {k.delta}
-                  </div>
-                </div>
-              </div>
+            {kpiCards.map((k, i) => (
+              <RevealStagger key={k.label} delay={i * 0.06}>
+                <KpiStatCard
+                  label={k.label}
+                  value={k.value}
+                  icon={k.icon}
+                  iconColor={k.color}
+                  delta={kpis ? k.delta : undefined}
+                  loading={loading}
+                />
+              </RevealStagger>
             ))}
           </div>
 
-          {/* 2x2 chart grid */}
+          {/* Charts */}
           <div className="fc-stagger reports-chart-grid">
             {/* Line — applications over time */}
             <div className="fc-card fc-card--pad reports-chart-card">
               <div className="fc-section-title" style={{ marginBottom: 16 }}>
-                <TrendUp size={17} color="var(--accent)" />
+                <TrendingUp
+                  size={17}
+                  color="var(--accent)"
+                  aria-hidden="true"
+                />
                 <h3>Applications Over Time</h3>
                 <span>{monthLabel}</span>
               </div>
-              <ResponsiveContainer width="100%" height={200}>
-                <LineChart data={summary?.charts.applications_over_time ?? []}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                  <XAxis
-                    dataKey="label"
-                    tick={{ fontSize: 12, fill: "var(--text-muted)" }}
-                    axisLine={false}
-                    tickLine={false}
-                  />
-                  <YAxis
-                    tick={{ fontSize: 12, fill: "var(--text-muted)" }}
-                    axisLine={false}
-                    tickLine={false}
-                  />
-                  <Tooltip
-                    contentStyle={tooltipStyle}
-                    cursor={{ stroke: "var(--border)" }}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="count"
-                    stroke="var(--accent)"
-                    strokeWidth={3}
-                    dot={{
-                      r: 4,
-                      fill: "var(--accent)",
-                      stroke: "var(--surface)",
-                      strokeWidth: 2,
-                    }}
-                    activeDot={{ r: 6 }}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
+              {loading ? (
+                <div
+                  className="fc-skeleton"
+                  style={{ height: 200, borderRadius: 12 }}
+                />
+              ) : applicationsTotal === 0 ? (
+                <ChartEmptyState message="No applications received in this month." />
+              ) : (
+                <ResponsiveContainer width="100%" height={200}>
+                  <LineChart
+                    data={summary?.charts.applications_over_time ?? []}
+                  >
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      stroke="var(--border)"
+                    />
+                    <XAxis
+                      dataKey="label"
+                      tick={{ fontSize: 12, fill: "var(--text-muted)" }}
+                      axisLine={false}
+                      tickLine={false}
+                    />
+                    <YAxis
+                      allowDecimals={false}
+                      tick={{ fontSize: 12, fill: "var(--text-muted)" }}
+                      axisLine={false}
+                      tickLine={false}
+                    />
+                    <Tooltip
+                      contentStyle={tooltipStyle}
+                      cursor={{ stroke: "var(--border)" }}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="count"
+                      name="Applications"
+                      stroke="var(--accent)"
+                      strokeWidth={3}
+                      dot={{
+                        r: 4,
+                        fill: "var(--accent)",
+                        stroke: "var(--surface)",
+                        strokeWidth: 2,
+                      }}
+                      activeDot={{ r: 6 }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              )}
             </div>
 
             {/* Donut — pass rate */}
-            <div
-              className="fc-card fc-card--pad reports-chart-card"
-              style={{ display: "flex", flexDirection: "column" }}
-            >
+            <div className="fc-card fc-card--pad reports-chart-card">
               <div className="fc-section-title" style={{ marginBottom: 16 }}>
-                <PieIcon size={17} color="var(--accent)" />
+                <PieIcon size={17} color="var(--accent)" aria-hidden="true" />
                 <h3>Screening Pass Rate</h3>
               </div>
-              <div
-                style={{
-                  flex: 1,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: 24,
-                }}
-              >
-                <div style={{ position: "relative" }}>
-                  <PieChart width={160} height={160}>
-                    <Pie
-                      data={[
-                        {
-                          name: "Passed Screening",
-                          value:
-                            summary?.charts.screening_pass_rate.passed_count ?? 0,
-                          color: "#10B981",
-                        },
-                        {
-                          name: "Not Passed",
-                          value:
-                            summary?.charts.screening_pass_rate.not_passed_count ??
-                            0,
-                          color: "#F3F4F6",
-                        },
-                      ]}
-                      cx={75}
-                      cy={75}
-                      innerRadius={48}
-                      outerRadius={68}
-                      dataKey="value"
-                      startAngle={90}
-                      endAngle={-270}
-                      stroke="var(--surface)"
-                      strokeWidth={2}
-                    >
-                      {[
-                        {
-                          name: "Passed Screening",
-                          value:
-                            summary?.charts.screening_pass_rate.passed_count ?? 0,
-                          color: "#10B981",
-                        },
-                        {
-                          name: "Not Passed",
-                          value:
-                            summary?.charts.screening_pass_rate.not_passed_count ??
-                            0,
-                          color: "#F3F4F6",
-                        },
-                      ].map((entry, i) => (
-                        <Cell key={i} fill={entry.color} />
-                      ))}
-                    </Pie>
-                  </PieChart>
+              <div className="reports-donut">
+                {loading ? (
                   <div
-                    style={{
-                      position: "absolute",
-                      inset: 0,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      flexDirection: "column",
-                    }}
-                  >
-                    <span
-                      style={{
-                        fontSize: 24,
-                        fontWeight: 800,
-                        color: "var(--success)",
-                        fontFamily: "var(--font-display)",
-                        lineHeight: 1,
-                      }}
-                    >
-                      {passPercent == null ? "—" : `${passPercent}%`}
-                    </span>
-                    <span style={{ fontSize: 11, color: "var(--text-muted)" }}>
-                      Pass Rate
-                    </span>
-                  </div>
-                </div>
-                <div>
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 8,
-                      marginBottom: 8,
-                    }}
-                  >
-                    <div
-                      style={{
-                        width: 10,
-                        height: 10,
-                        borderRadius: "50%",
-                        background: "var(--success)",
-                      }}
-                    />
-                    <span style={{ fontSize: 13, color: "var(--text-secondary)" }}>
-                      Passed —{" "}
-                      <strong style={{ color: "var(--text-primary)" }}>
-                        {summary?.charts.screening_pass_rate.passed_count ?? 0}
-                      </strong>
-                    </span>
-                  </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <div
-                      style={{
-                        width: 10,
-                        height: 10,
-                        borderRadius: "50%",
-                        background: "var(--gray-soft)",
-                        border: "1px solid var(--border)",
-                      }}
-                    />
-                    <span style={{ fontSize: 13, color: "var(--text-secondary)" }}>
-                      Not Passed —{" "}
-                      <strong style={{ color: "var(--text-primary)" }}>
-                        {summary?.charts.screening_pass_rate.not_passed_count ?? 0}
-                      </strong>
-                    </span>
-                  </div>
-                </div>
+                    className="fc-skeleton"
+                    style={{ height: 160, borderRadius: 12, flex: 1 }}
+                  />
+                ) : passTotal === 0 ? (
+                  <ChartEmptyState message="No screening decisions recorded yet." />
+                ) : (
+                  <>
+                    <div className="reports-donut__ring">
+                      <ResponsiveContainer width="100%" height={170}>
+                        <PieChart>
+                          <Pie
+                            data={passSlices}
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={52}
+                            outerRadius={72}
+                            dataKey="value"
+                            startAngle={90}
+                            endAngle={-270}
+                            stroke="var(--surface)"
+                            strokeWidth={2}
+                          >
+                            <Cell fill="var(--success)" />
+                            <Cell
+                              fill="var(--gray-soft)"
+                              stroke="var(--border)"
+                            />
+                          </Pie>
+                        </PieChart>
+                      </ResponsiveContainer>
+                      <div className="reports-donut__center">
+                        <span className="reports-donut__percent">
+                          {passPercent == null ? "—" : `${passPercent}%`}
+                        </span>
+                        <span className="reports-donut__caption">
+                          Pass Rate
+                        </span>
+                      </div>
+                    </div>
+                    <div className="reports-donut__legend">
+                      <div className="reports-donut__legend-row">
+                        <span className="reports-donut__dot reports-donut__dot--passed" />
+                        <span className="reports-donut__legend-label">
+                          Passed —{" "}
+                          <strong>
+                            {summary?.charts.screening_pass_rate.passed_count ??
+                              0}
+                          </strong>
+                        </span>
+                      </div>
+                      <div className="reports-donut__legend-row">
+                        <span className="reports-donut__dot reports-donut__dot--failed" />
+                        <span className="reports-donut__legend-label">
+                          Not Passed —{" "}
+                          <strong>
+                            {summary?.charts.screening_pass_rate
+                              .not_passed_count ?? 0}
+                          </strong>
+                        </span>
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
 
             {/* Bar — score distribution */}
             <div className="fc-card fc-card--pad reports-chart-card">
               <div className="fc-section-title" style={{ marginBottom: 16 }}>
-                <ChartBar size={17} color="var(--accent)" />
+                <ChartColumnBig
+                  size={17}
+                  color="var(--accent)"
+                  aria-hidden="true"
+                />
                 <h3>Score Distribution</h3>
               </div>
-              <ResponsiveContainer width="100%" height={200}>
-                <BarChart data={summary?.charts.score_distribution ?? []}>
-                  <CartesianGrid
-                    strokeDasharray="3 3"
-                    stroke="var(--border)"
-                    vertical={false}
-                  />
-                  <XAxis
-                    dataKey="range"
-                    tick={{ fontSize: 11, fill: "var(--text-muted)" }}
-                    axisLine={false}
-                    tickLine={false}
-                  />
-                  <YAxis
-                    tick={{ fontSize: 12, fill: "var(--text-muted)" }}
-                    axisLine={false}
-                    tickLine={false}
-                  />
-                  <Tooltip
-                    contentStyle={tooltipStyle}
-                    cursor={{ fill: "var(--accent-soft)" }}
-                  />
-                  <Bar dataKey="count" radius={[6, 6, 0, 0]} barSize={28}>
-                    {(summary?.charts.score_distribution ?? []).map((entry, i) => (
-                      <Cell key={i} fill={scoreFill(entry.range)} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
+              {loading ? (
+                <div
+                  className="fc-skeleton"
+                  style={{ height: 200, borderRadius: 12 }}
+                />
+              ) : scoreTotal === 0 ? (
+                <ChartEmptyState message="No match scores recorded yet." />
+              ) : (
+                <ResponsiveContainer width="100%" height={200}>
+                  <BarChart data={summary?.charts.score_distribution ?? []}>
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      stroke="var(--border)"
+                      vertical={false}
+                    />
+                    <XAxis
+                      dataKey="range"
+                      tick={{ fontSize: 11, fill: "var(--text-muted)" }}
+                      axisLine={false}
+                      tickLine={false}
+                    />
+                    <YAxis
+                      allowDecimals={false}
+                      tick={{ fontSize: 12, fill: "var(--text-muted)" }}
+                      axisLine={false}
+                      tickLine={false}
+                    />
+                    <Tooltip
+                      contentStyle={tooltipStyle}
+                      cursor={{ fill: "var(--accent-soft)" }}
+                    />
+                    <Bar
+                      dataKey="count"
+                      name="Candidates"
+                      radius={[6, 6, 0, 0]}
+                      barSize={28}
+                    >
+                      {(summary?.charts.score_distribution ?? []).map(
+                        (entry, i) => (
+                          <Cell key={i} fill={scoreBucketColor(entry.range)} />
+                        ),
+                      )}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
             </div>
           </div>
+
+          {/* Per-job performance — the same rows the CSV export writes. */}
+          <RevealStagger>
+            <div className="fc-card reports-jobs-card">
+              <div className="reports-jobs-card__head">
+                <div className="fc-section-title">
+                  <Table size={17} color="var(--accent)" aria-hidden="true" />
+                  <h3>Job Performance</h3>
+                  <span>{monthLabel}</span>
+                </div>
+              </div>
+              {loading ? (
+                <div className="reports-jobs-card__skeleton">
+                  {[0, 1, 2].map((row) => (
+                    <div
+                      key={row}
+                      className="fc-skeleton"
+                      style={{ height: 38, borderRadius: 10 }}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div className="hr-dashboard__table-wrap">
+                  <table className="fc-table hr-dashboard__table">
+                    <colgroup>
+                      <col className="hr-dashboard__title-col" />
+                      <col className="hr-dashboard__department-col" />
+                      <col className="hr-dashboard__count-col" />
+                      <col className="hr-dashboard__score-col" />
+                      <col className="hr-dashboard__progress-col" />
+                      <col className="hr-dashboard__action-col" />
+                    </colgroup>
+                    <thead>
+                      <tr>
+                        {[
+                          "Job Title",
+                          "Department",
+                          "CVs",
+                          "Avg. Score",
+                          "Review Progress",
+                          "Status",
+                        ].map((h) => (
+                          <th key={h}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {sortedJobs.map((job) => {
+                        const pending = pendingReviewCount(
+                          job.cv_count,
+                          job.review_progress,
+                        )
+
+                        return (
+                          <tr key={job.job_id}>
+                            <td>
+                              <div className="hr-dashboard__job-title">
+                                {job.title}
+                              </div>
+                              {pending > 0 ? (
+                                <div className="hr-dashboard__job-sub hr-dashboard__pending">
+                                  {pending} to review
+                                </div>
+                              ) : null}
+                            </td>
+                            <td>
+                              <span className="fc-badge fc-badge--blue">
+                                {job.department ?? "—"}
+                              </span>
+                            </td>
+                            <td>
+                              <span className="reports-jobs-card__count">
+                                {job.cv_count}
+                              </span>
+                            </td>
+                            <td>
+                              <span
+                                style={{
+                                  fontSize: 16,
+                                  fontWeight: 700,
+                                  fontFamily: "var(--font-display)",
+                                  color: avgScoreColor(job.avg_score),
+                                }}
+                              >
+                                {formatScore(job.avg_score)}
+                              </span>
+                              {job.avg_score != null ? (
+                                <div className="hr-dashboard__job-sub">
+                                  {getMatchLabel(job.avg_score)}
+                                </div>
+                              ) : null}
+                            </td>
+                            <td>
+                              <div
+                                style={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: 9,
+                                }}
+                              >
+                                <div
+                                  className="fc-progress"
+                                  style={{ flex: 1 }}
+                                >
+                                  <div
+                                    style={{
+                                      width: `${job.review_progress ?? 0}%`,
+                                      background: progressTone(
+                                        job.review_progress,
+                                      ),
+                                    }}
+                                  />
+                                </div>
+                                <span
+                                  style={{
+                                    fontSize: 13,
+                                    fontWeight: 700,
+                                    color: "var(--text-primary)",
+                                    width: 38,
+                                  }}
+                                >
+                                  {job.review_progress == null
+                                    ? "—"
+                                    : `${Math.round(job.review_progress)}%`}
+                                </span>
+                              </div>
+                            </td>
+                            <td>
+                              <span className="hr-dashboard__job-sub">
+                                <span
+                                  className="hr-dashboard__status-dot"
+                                  style={{ background: statusTone(job.status) }}
+                                />
+                                {job.status}
+                              </span>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </RevealStagger>
         </>
       )}
     </div>
