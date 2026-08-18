@@ -502,7 +502,7 @@ export default function ImprovementScreen({
                           checked={selectedSuggestionIds.has(item.suggestionId)}
                           onChange={() => toggleSuggestion(item.suggestionId)}
                         />
-                        Apply only if my CV already proves this skill.
+                        Add this skill to my rebuilt CV.
                       </label>
                     </article>
                   ))}

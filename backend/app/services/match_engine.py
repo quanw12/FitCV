@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import re
 from typing import Any
 
@@ -13,13 +14,17 @@ from app.services.gemini_analyzer import (
     GEMINI_CV_PARSE_VERSION,
     GEMINI_EXTRACTOR_VERSION,
     GeminiAnalyzerError,
+    align_soft_skills,
     extract_match_inputs,
 )
 from app.services.matching_service import (
     ALGORITHM_VERSION,
     SCORING_FRAMEWORK_VERSION,
     match_documents,
+    unmatched_soft_skills,
 )
+
+logger = logging.getLogger(__name__)
 
 LEGACY_DETERMINISTIC_VERSION = "fitcv-deterministic-v1"
 EXCLUDED_JD_SECTION_NAMES = (
@@ -81,7 +86,7 @@ def selected_analyzer_config() -> tuple[str, str | None]:
         if not model_slug:
             raise GeminiAnalyzerError("GEMINI_MODEL must not be empty.")
         return (
-            f"fitcv-gemini-{model_slug[:22]}-{GEMINI_EXTRACTOR_VERSION}-s7",
+            f"fitcv-gemini-{model_slug[:22]}-{GEMINI_EXTRACTOR_VERSION}-s8",
             settings.gemini_model,
         )
     raise GeminiAnalyzerError(
@@ -153,6 +158,7 @@ def score_match(
         score_cv = parsed_cv or parse_cv_text(cv_text)
         score_jd = parsed_jd or parse_jd_text(normalized_jd)
         extraction_provider = "deterministic"
+        soft_skill_matches: list[tuple[str, str]] = []
     elif selected_version.startswith("fitcv-gemini-"):
         semantic_cv, semantic_jd = extract_match_inputs(
             cv_text=cv_text,
@@ -160,7 +166,7 @@ def score_match(
             model_name=model_name,
         )
         # Gemini is authoritative for the Gemini analyzer. The local parser is intentionally
-        # not used to add skills, education, experience, or soft skills to model output.
+        # not used to add skills, education, or experience to model output.
         if (
             isinstance(parsed_cv, dict)
             and parsed_cv.get("_extraction_provider") == "gemini"
@@ -171,11 +177,21 @@ def score_match(
         else:
             score_cv = semantic_cv
         score_jd = semantic_jd
+        # The deterministic parser only supplements soft skills, because vaguely
+        # phrased or non-English soft-skill claims are easy for the model to omit
+        # while the grounded keyword scan still proves they appear in the source.
+        score_cv = _supplement_soft_skills(score_cv, cv_text, is_jd=False)
+        score_jd = _supplement_soft_skills(score_jd, normalized_jd, is_jd=True)
+        soft_skill_matches = _align_unmatched_soft_skills(
+            score_cv, score_jd, model_name
+        )
         extraction_provider = "gemini"
     else:
         raise ValueError(f"Unsupported analyzer version: {selected_version}")
 
-    result = match_documents(score_cv, score_jd, weights=weights)
+    result = match_documents(
+        score_cv, score_jd, weights=weights, soft_skill_matches=soft_skill_matches
+    )
     result["algorithm_version"] = selected_version
     result["matching_inputs"] = {"cv": score_cv, "jd": score_jd}
     result["engine"] = {
@@ -185,6 +201,10 @@ def score_match(
         "weights": result["scoring_weights"],
         "source_scope": source_scope,
         "excluded_jd_sections": list(EXCLUDED_JD_SECTION_NAMES),
+        "soft_skill_matches": [
+            {"jd": jd_label, "cv": cv_label}
+            for jd_label, cv_label in soft_skill_matches
+        ],
         "principles": [
             "source-grounded evidence",
             "deterministic weighted aggregation",
@@ -202,3 +222,49 @@ def score_match(
 
 def _normalized_section_name(value: str) -> str:
     return re.sub(r"\s+", " ", value).strip(" :-").casefold()
+
+
+def _align_unmatched_soft_skills(
+    score_cv: dict[str, Any],
+    score_jd: dict[str, Any],
+    model_name: str | None,
+) -> list[tuple[str, str]]:
+    """Ask Gemini to align soft-skill labels that exact/synonym matching missed.
+
+    The extra call is skipped when every JD soft skill already has a CV
+    counterpart, and any failure falls back to the deterministic matching so a
+    scoring run never depends on the alignment call succeeding.
+    """
+    cv_soft = [value for value in score_cv.get("soft_skills") or [] if isinstance(value, str)]
+    jd_soft = [value for value in score_jd.get("soft_skills") or [] if isinstance(value, str)]
+    if not cv_soft or not jd_soft:
+        return []
+    if not unmatched_soft_skills(cv_soft, jd_soft):
+        return []
+    try:
+        return align_soft_skills(
+            cv_soft_skills=cv_soft,
+            jd_soft_skills=jd_soft,
+            model_name=model_name,
+        )
+    except GeminiAnalyzerError:
+        logger.warning(
+            "Soft-skill alignment failed; falling back to deterministic soft-skill matching."
+        )
+        return []
+
+
+def _supplement_soft_skills(payload: dict[str, Any], source_text: str, *, is_jd: bool) -> dict[str, Any]:
+    """Merge deterministically grounded soft skills the semantic extractor missed."""
+    try:
+        parsed = parse_jd_text(source_text) if is_jd else parse_cv_text(source_text)
+    except ValueError:
+        return payload
+    local_soft_skills = parsed.get("soft_skills") or []
+    if not local_soft_skills:
+        return payload
+    merged: dict[str, str] = {}
+    for value in [*(payload.get("soft_skills") or []), *local_soft_skills]:
+        if isinstance(value, str) and value.strip():
+            merged.setdefault(value.strip().casefold(), value.strip())
+    return {**payload, "soft_skills": sorted(merged.values(), key=str.casefold)}

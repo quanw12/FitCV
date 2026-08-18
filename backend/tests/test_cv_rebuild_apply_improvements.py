@@ -195,6 +195,7 @@ def test_applies_owned_suggestions_from_saved_parse(apply_harness: ApplyHarness,
         jd_text=None,
         language=None,
         avatar=None,
+        allowed_new_skills=None,
     ):
         calls.append(
             {
@@ -249,7 +250,7 @@ def test_request_schema_rejects_empty_selection(apply_harness: ApplyHarness) -> 
     assert response.status_code == 422
 
 
-def test_skill_gap_instruction_never_allows_adding_missing_skill() -> None:
+def test_skill_gap_instruction_approves_adding_missing_skill() -> None:
     row = CvImprovementSuggestion(
         suggestion_type=SuggestionType.skill_gap,
         category=SuggestionCategory.skill,
@@ -257,9 +258,28 @@ def test_skill_gap_instruction_never_allows_adding_missing_skill() -> None:
         explanation="The job description requires it.",
         priority=SuggestionPriority.high,
     )
-    instructions = build_applied_instructions([row])
-    assert "ONLY if current CV already proves it" in instructions
-    assert "SKIP entirely" in instructions
+    instructions, approved_skills = build_applied_instructions([row])
+    assert "[Skill gap · approved]" in instructions
+    assert 'adding "Kubernetes" as a new skill' in instructions
+    assert approved_skills == ["Kubernetes"]
+
+
+def test_approved_skill_passes_grounding_whitelist() -> None:
+    from app.schemas.cv_rebuild import CVData
+    from app.services.cv_rebuild.llm_extractor import _filter_approved_skills
+    from app.services.cv_rebuild.grounding import find_unfounded_skills
+
+    source = CVData(name="A", skills=["Python"]).model_dump_json()
+    polished = CVData(name="A", skills=["Python", "Kubernetes"])
+    unfounded = find_unfounded_skills(source, polished)
+    assert unfounded == ["Kubernetes"]
+    # Approved skill is whitelisted; anything broader is still rejected.
+    assert _filter_approved_skills(unfounded, ["Kubernetes"]) == []
+    broader = CVData(name="A", skills=["Python", "Kubernetes cluster management"])
+    unfounded_broader = find_unfounded_skills(source, broader)
+    assert _filter_approved_skills(unfounded_broader, ["Kubernetes"]) == [
+        "Kubernetes cluster management"
+    ]
 
 
 def test_polish_prompt_applies_only_selected_grounded_changes() -> None:

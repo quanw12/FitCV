@@ -102,7 +102,13 @@ Unified matching engine rules:
   Requirements. Benefits, We Offer, Life at company, Hiring Process, deadline,
   location, employment type, and vacancy count are not weighted requirements.
 - Gemini extracts source-grounded facts only. The deterministic parser then
-  supplements omitted facts for both CV and JD before scoring.
+  supplements omitted soft-skill facts for both CV and JD before scoring
+  (technical skills, experience, and education stay Gemini-authoritative).
+- Soft-skill scoring is not hardcoded: when JD soft skills have no exact or
+  known-synonym CV counterpart, `gemini_analyzer.align_soft_skills` asks
+  Gemini to pair equivalent labels across wording/languages; only pairs that
+  reference the extracted labels verbatim are accepted, and any failure falls
+  back to deterministic matching.
 - Hard eligibility rules must be represented separately from weighted fit.
   FitCV currently reports eligibility as `not_evaluated` because the schema
   does not provide verified work-authorization or other gate data.
@@ -110,6 +116,11 @@ Unified matching engine rules:
   version, rubric, eligibility state, and category evidence for debugging.
 - AI Improvement consumes the completed `match_result`; it must not calculate
   another independent CV/JD score.
+- Applying improvements rebuilds the CV with grounding checks: rewrite,
+  section feedback, and quick win suggestions stay grounded in the source CV,
+  while skill gap suggestions are candidate-approved additions — selected skill
+  gaps are added to the rebuilt CV by exact name and whitelisted from the
+  unfounded-skills grounding check (`allowed_new_skills`).
 
 Candidate email and Smart Reply rules:
 

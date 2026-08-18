@@ -175,12 +175,15 @@ async def rebuild_with_improvements(
     language: str | None = None,
     avatar: str | None = None,
     extractor: CvExtractor | None = None,
+    allowed_new_skills: list[str] | None = None,
 ) -> CvRebuildResponse:
-    """Rebuild a saved parsed CV after the owner chooses grounded improvements.
+    """Rebuild a saved parsed CV after the owner chooses improvements.
 
     The saved parse is deliberately re-extracted and polished server-side.  This
     avoids trusting browser-provided CV data and keeps the existing grounding
     checks in :class:`CvExtractor` as the final guard against invented facts.
+    ``allowed_new_skills`` lists candidate-approved skill-gap additions that the
+    grounding check must not reject.
     """
     if not parsed_text or not parsed_text.strip():
         raise ValueError("CV parse text unavailable. Re-upload the CV and analyse again.")
@@ -204,6 +207,7 @@ async def rebuild_with_improvements(
         jd_text=jd_text,
         applied_improvements=applied_improvements,
         baseline=original_cv,
+        allowed_new_skills=allowed_new_skills,
     )
     cv = normalize_cv(cv)
     warnings.extend(polish_warnings)
@@ -218,6 +222,7 @@ async def rebuild_with_improvements(
             jd_text=jd_text,
             applied_improvements=applied_improvements,
             baseline=original_cv,
+            allowed_new_skills=allowed_new_skills,
         )
         cv = normalize_cv(cv)
         warnings.extend(mixed_warnings)
