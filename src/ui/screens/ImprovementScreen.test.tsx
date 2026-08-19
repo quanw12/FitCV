@@ -344,7 +344,7 @@ describe("ImprovementScreen acceptance states", () => {
 
     await screen.findByText("Docker")
     fireEvent.click(
-      screen.getByLabelText("Apply only if my CV already proves this skill."),
+      screen.getByLabelText("Add this skill to my rebuilt CV."),
     )
     fireEvent.click(
       screen.getByRole("button", { name: /apply 2 improvements & rebuild cv/i }),

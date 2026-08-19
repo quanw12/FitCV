@@ -278,10 +278,14 @@ Rules:
   surrounding content unchanged.
 - For approved section feedback or a quick win, edit only the named section and
   only when the existing CV already contains every fact required by the edit.
-- A skill gap is not permission to claim a skill. Surface it only when the CV
-  already proves that exact skill; otherwise leave the CV unchanged for that item.
+- Instructions marked [Skill gap · approved] name skills the candidate explicitly
+  reviewed and approved to add. Add each approved skill, using its exact name,
+  to "skills" and to the most relevant "skill_groups" category (create a
+  suitable category when none fits). This is the ONLY allowed addition of new
+  skills; every other section stays grounded in the existing CV.
 - Never invent or infer a skill, employer, role, date, number, metric, project,
-  responsibility, achievement, or outcome from the instructions.
+  responsibility, achievement, or outcome from the instructions — beyond the
+  approved skill-gap additions above.
 - Never output placeholders such as [X%], [N users], TBD, or TODO. If an approved
   instruction needs missing information, skip that instruction.
 - Keep the candidate's name, contact details, dates, titles, company names, URLs,

@@ -4,6 +4,8 @@ import FitCVApplicationTracker from "./FitCVApplicationTracker"
 
 import PersonalApplicationTracker from "./PersonalApplicationTracker"
 
+import "./application-tracker.css"
+
 interface AppTrackerScreenProps {
   focusApplicationId?: number | null
 }
@@ -27,29 +29,13 @@ export default function AppTrackerScreen({
         className="tracker-view-tabs"
         role="tablist"
         aria-label="Application tracker views"
-        style={{
-          display: "inline-flex",
-
-          gap: 4,
-
-          marginBottom: 20,
-
-          padding: 4,
-
-          border: "1px solid var(--border)",
-
-          borderRadius: 10,
-
-          background: "var(--surface)",
-        }}
       >
         <button
           type="button"
           role="tab"
           aria-selected={view === "personal"}
-          className={
-            view === "personal" ? "fitcv-btn-primary" : "fitcv-btn-secondary"
-          }
+          className="at-tab"
+          data-active={view === "personal"}
           onClick={() => setView("personal")}
         >
           Personal tracker
@@ -58,9 +44,8 @@ export default function AppTrackerScreen({
           type="button"
           role="tab"
           aria-selected={view === "fitcv"}
-          className={
-            view === "fitcv" ? "fitcv-btn-primary" : "fitcv-btn-secondary"
-          }
+          className="at-tab"
+          data-active={view === "fitcv"}
           onClick={() => setView("fitcv")}
         >
           FitCV applications
