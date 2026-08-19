@@ -184,6 +184,13 @@ describe("Analyzer to Improvement selection", () => {
     ).not.toBeInTheDocument()
   })
 
+  it("renders the authenticated screen immediately without a route loader", () => {
+    render(<App />)
+
+    expect(screen.getByText("CV rebuild screen")).toBeInTheDocument()
+    expect(screen.queryByText("Loading…")).not.toBeInTheDocument()
+  })
+
   it("hydrates the selected match for the current account after a same-tab reload", async () => {
     window.sessionStorage.setItem(
       improvementMatchStorageKey(primarySession.user.accountId),

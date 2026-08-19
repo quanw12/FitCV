@@ -507,9 +507,90 @@ export default function JDLibraryScreen({
       )}
 
       {libraryLoading ? (
-        <div className="fc-card fc-card--pad" style={{ marginBottom: 20 }}>
-          Loading JD insights...
-        </div>
+        <>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))",
+              gap: 14,
+              marginBottom: 18,
+            }}
+            aria-live="polite"
+          >
+            <InsightMetric
+              icon={<BookOpenText size={18} weight="light" />}
+              label="Analyzed JDs"
+              value=""
+              loading
+            />
+            <InsightMetric
+              icon={<Briefcase size={18} weight="light" />}
+              label="Completed matches"
+              value=""
+              loading
+            />
+            <InsightMetric
+              icon={<TrendUp size={18} weight="light" />}
+              label="Average match"
+              value=""
+              loading
+            />
+          </div>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit,minmax(300px,1fr))",
+              gap: 16,
+              marginBottom: 20,
+            }}
+          >
+            <SkillInsightChart
+              title="Most requested skills"
+              description="Share of your analyzed JDs that mention each required skill."
+              data={[]}
+              tone="accent"
+              emptyMessage="Analyze JDs to discover recurring required skills."
+              loading
+            />
+            <SkillInsightChart
+              title="Skills missing most"
+              description="Share of completed CV/JD matches where evidence for the skill was missing."
+              data={[]}
+              tone="warning"
+              emptyMessage="No repeated skill gaps have been found yet."
+              loading
+            />
+          </div>
+          <section
+            className="fc-card fc-card--pad"
+            style={{ marginBottom: 24 }}
+          >
+            <div className="fc-section-title" style={{ marginBottom: 14 }}>
+              <BookOpenText size={16} weight="light" />
+              <h2>Saved analyses</h2>
+            </div>
+            <label style={{ display: "block", marginBottom: 14 }}>
+              <span className="fc-field-label">
+                Search saved job descriptions
+              </span>
+              <div style={{ position: "relative" }}>
+                <MagnifyingGlass
+                  size={16}
+                  weight="light"
+                  style={{ position: "absolute", left: 12, top: 12 }}
+                />
+                <input
+                  className="fc-input"
+                  style={{ paddingLeft: 38 }}
+                  value={libraryQuery}
+                  onChange={(event) => setLibraryQuery(event.target.value)}
+                  placeholder="Search title, skill, or JD text"
+                />
+              </div>
+            </label>
+            <SavedAnalysesSkeleton />
+          </section>
+        </>
       ) : (
         <>
           <div
@@ -842,7 +923,31 @@ export default function JDLibraryScreen({
       )}
 
       {loading ? (
-        <div className="fc-card fc-card--pad">Loading active jobs...</div>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit,minmax(280px,1fr))",
+            gap: 16,
+          }}
+          aria-live="polite"
+        >
+          {[0, 1, 2, 3].map((i) => (
+            <div key={i} className="fc-card fc-card--pad">
+              <div style={{ display: "flex", gap: 12, alignItems: "center", marginBottom: 12 }}>
+                <div className="fc-skeleton" style={{ width: 44, height: 44, borderRadius: 10 }} />
+                <div>
+                  <div className="fc-skeleton" style={{ width: 100, height: 12, borderRadius: 4, marginBottom: 6 }} />
+                  <div className="fc-skeleton" style={{ width: 160, height: 16, borderRadius: 6 }} />
+                </div>
+              </div>
+              <div className="fc-skeleton" style={{ width: "70%", height: 13, borderRadius: 4, marginBottom: 12 }} />
+              <div style={{ display: "flex", gap: 8 }}>
+                <div className="fc-skeleton" style={{ width: 70, height: 22, borderRadius: 999 }} />
+                <div className="fc-skeleton" style={{ width: 80, height: 22, borderRadius: 999 }} />
+              </div>
+            </div>
+          ))}
+        </div>
       ) : filtered.length === 0 ? (
         <BezelCard>
           <div
@@ -1449,12 +1554,16 @@ function InsightMetric({
   label,
 
   value,
+
+  loading = false,
 }: {
   icon: React.ReactNode
 
   label: string
 
   value: string | number
+
+  loading?: boolean
 }) {
   return (
     <div
@@ -1481,7 +1590,17 @@ function InsightMetric({
         {icon}
       </span>
       <span>
-        <strong style={{ display: "block", fontSize: 20 }}>{value}</strong>
+        <strong style={{ display: "block", fontSize: 20, minHeight: 24 }}>
+          {loading ? (
+            <span
+              className="fc-skeleton"
+              aria-label={`Loading ${label}`}
+              style={{ display: "block", width: 58, height: 22, borderRadius: 6 }}
+            />
+          ) : (
+            value
+          )}
+        </strong>
         <small style={{ color: "var(--text-muted)" }}>{label}</small>
       </span>
     </div>
@@ -1498,6 +1617,8 @@ function SkillInsightChart({
   tone,
 
   emptyMessage,
+
+  loading = false,
 }: {
   title: string
 
@@ -1508,6 +1629,8 @@ function SkillInsightChart({
   tone: "accent" | "warning"
 
   emptyMessage: string
+
+  loading?: boolean
 }) {
   return (
     <div className={`fc-card fc-card--pad skill-insight skill-insight--${tone}`}>
@@ -1515,7 +1638,37 @@ function SkillInsightChart({
       <p style={{ color: "var(--text-secondary)", fontSize: 12, marginTop: 3 }}>
         {description}
       </p>
-      {data.length === 0 ? (
+      {loading ? (
+        <div
+          className="skill-insight-list"
+          role="status"
+          aria-label={`Loading ${title}`}
+        >
+          {[0, 1, 2, 3].map((row) => (
+            <div key={row} className="skill-insight-row">
+              <span className="skill-insight-rank">
+                {String(row + 1).padStart(2, "0")}
+              </span>
+              <div className="skill-insight-name">
+                <span
+                  className="fc-skeleton"
+                  style={{ width: `${64 - row * 7}%`, height: 12, borderRadius: 4 }}
+                />
+                <span>
+                  <i
+                    className="fc-skeleton"
+                    style={{ width: `${88 - row * 11}%` }}
+                  />
+                </span>
+              </div>
+              <span
+                className="fc-skeleton"
+                style={{ width: 34, height: 12, borderRadius: 4 }}
+              />
+            </div>
+          ))}
+        </div>
+      ) : data.length === 0 ? (
         <p
           style={{
             color: "var(--text-muted)",
@@ -1541,6 +1694,43 @@ function SkillInsightChart({
           ))}
         </div>
       )}
+    </div>
+  )
+}
+
+function SavedAnalysesSkeleton() {
+  return (
+    <div
+      role="status"
+      aria-label="Loading saved analyses"
+      style={{ display: "grid", gap: 10 }}
+    >
+      {[0, 1].map((row) => (
+        <div
+          key={row}
+          className="fc-panel"
+          style={{ padding: 14, display: "flex", gap: 14, alignItems: "center" }}
+        >
+          <div style={{ flex: 1 }}>
+            <div
+              className="fc-skeleton"
+              style={{ width: row === 0 ? "34%" : "42%", height: 15, borderRadius: 5 }}
+            />
+            <div
+              className="fc-skeleton"
+              style={{ width: "52%", height: 11, borderRadius: 4, marginTop: 7 }}
+            />
+          </div>
+          <div
+            className="fc-skeleton"
+            style={{ width: 110, height: 24, borderRadius: 999 }}
+          />
+          <div
+            className="fc-skeleton"
+            style={{ width: 104, height: 34, borderRadius: 9 }}
+          />
+        </div>
+      ))}
     </div>
   )
 }

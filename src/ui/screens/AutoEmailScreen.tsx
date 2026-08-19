@@ -845,8 +845,30 @@ export default function AutoEmailScreen() {
       )}
 
       {loading ? (
-        <div className="fc-card fc-card--pad" aria-live="polite">
-          Loading templates, candidates, and delivery records...
+        <div aria-live="polite" style={{ display: "grid", gap: 20 }}>
+          <div className="fc-card fc-card--pad" style={{ display: "flex", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
+            <div>
+              <div className="fc-skeleton" style={{ width: 160, height: 12, borderRadius: 4, marginBottom: 8 }} />
+              <div className="fc-skeleton" style={{ width: 240, height: 20, borderRadius: 6 }} />
+            </div>
+            <div className="fc-skeleton" style={{ width: 180, height: 38, borderRadius: 9 }} />
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "minmax(240px,280px) minmax(0,1fr)", gap: 20, alignItems: "start" }}>
+            <div className="fc-card fc-card--pad">
+              <div className="fc-skeleton" style={{ width: "50%", height: 15, borderRadius: 5, marginBottom: 14 }} />
+              {[0, 1, 2].map((i) => (
+                <div key={i} style={{ borderTop: "1px solid var(--border)", paddingTop: 10, marginTop: 10 }}>
+                  <div className="fc-skeleton" style={{ width: "70%", height: 13, borderRadius: 4, marginBottom: 6 }} />
+                  <div className="fc-skeleton" style={{ width: "40%", height: 11, borderRadius: 4 }} />
+                </div>
+              ))}
+            </div>
+            <div className="fc-card fc-card--pad">
+              <div className="fc-skeleton" style={{ width: "40%", height: 15, borderRadius: 5, marginBottom: 14 }} />
+              <div className="fc-skeleton" style={{ width: "100%", height: 38, borderRadius: 9, marginBottom: 12 }} />
+              <div className="fc-skeleton" style={{ width: "100%", height: 180, borderRadius: 12 }} />
+            </div>
+          </div>
         </div>
       ) : error && templates.length === 0 ? (
         <div

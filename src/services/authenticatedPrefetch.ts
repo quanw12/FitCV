@@ -15,7 +15,8 @@ import {
   setCachedResource,
 } from "./resourceCache"
 
-const CV_HISTORY_CACHE_KEY = "cv-history:summary"
+const CV_HISTORY_VERSIONS_CACHE_KEY = "cv-history:versions"
+const CV_HISTORY_COMPARISONS_CACHE_KEY = "cv-history:comparisons"
 const JOB_SEARCH_CVS_CACHE_KEY = "job-search:cvs"
 const JD_OPPORTUNITIES_CACHE_KEY = "jd-library:opportunities"
 const JD_LIBRARY_EMPTY_CACHE_KEY = "jd-library:saved:"
@@ -69,19 +70,6 @@ const stageTemplates: Record<EmailStage, string> = {
   Rejected: "rejection",
 }
 
-type SeekerCvHistorySnapshot = Awaited<
-  ReturnType<typeof prefetchSeekerCvHistory>
->
-
-async function prefetchSeekerCvHistory() {
-  const [cvs, comparisons] = await Promise.all([
-    analyzerApi.listCvs(),
-    analyzerApi.listCvComparisons(),
-  ])
-
-  return { cvs, comparisons }
-}
-
 export async function prefetchAuthenticatedResources(
   session: AuthSession,
 ): Promise<void> {
@@ -90,15 +78,20 @@ export async function prefetchAuthenticatedResources(
   const tasks: Promise<unknown>[] = [profileApi.get()]
 
   if (session.user.role === "Student") {
-    const cvHistory = getOrFetchResource<SeekerCvHistorySnapshot>(
-      CV_HISTORY_CACHE_KEY,
-      prefetchSeekerCvHistory,
+    const cvVersions = getOrFetchResource(
+      CV_HISTORY_VERSIONS_CACHE_KEY,
+      () => analyzerApi.listCvs(),
+    )
+    const cvComparisons = getOrFetchResource(
+      CV_HISTORY_COMPARISONS_CACHE_KEY,
+      () => analyzerApi.listCvComparisons(),
     )
     tasks.push(
-      cvHistory.then((snapshot) => {
-        setCachedResource(JOB_SEARCH_CVS_CACHE_KEY, snapshot.cvs)
-        return snapshot
+      cvVersions.then((versions) => {
+        setCachedResource(JOB_SEARCH_CVS_CACHE_KEY, versions)
+        return versions
       }),
+      cvComparisons,
     )
 
     const opportunities = getOrFetchResource(

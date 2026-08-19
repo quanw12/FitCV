@@ -28,7 +28,9 @@ import type { Portal, ScreenId } from "@/types/app"
 
 import { portalFromAccountRole, type AuthSession } from "@/types/auth"
 
-import FullPageSkeleton from "@/ui/components/FullPageSkeleton"
+import FullPageSkeleton, {
+  ContentAreaLoader,
+} from "@/ui/components/FullPageSkeleton"
 
 import Layout from "@/ui/components/Layout"
 
@@ -36,35 +38,35 @@ import ToastProvider from "@/ui/components/ToastProvider"
 
 import AuthScreen from "@/ui/screens/AuthScreen"
 
+import AnalyzerScreen from "@/ui/screens/AnalyzerScreen"
+
+import AppTrackerScreen from "@/ui/screens/AppTrackerScreen"
+
+import AutoEmailScreen from "@/ui/screens/AutoEmailScreen"
+
+import CVHistoryScreen from "@/ui/screens/CVHistoryScreen"
+
+import CVRankingScreen from "@/ui/screens/CVRankingScreen"
+
+import CVReBuildScreen from "@/ui/screens/CVReBuildScreen"
+
+import HRDashboard from "@/ui/screens/HRDashboard"
+
+import ImprovementScreen from "@/ui/screens/ImprovementScreen"
+
+import JDLibraryScreen from "@/ui/screens/JDLibraryScreen"
+
+import JobPostsScreen from "@/ui/screens/JobPostsScreen"
+
+import JobSearchScreen from "@/ui/screens/JobSearchScreen"
+
 import LandingScreen from "@/ui/screens/LandingScreen"
 
-const CVReBuildScreen = lazy(() => import("@/ui/screens/CVReBuildScreen"))
+import PipelineScreen from "@/ui/screens/PipelineScreen"
 
-const AnalyzerScreen = lazy(() => import("@/ui/screens/AnalyzerScreen"))
+import ProfileScreen from "@/ui/screens/ProfileScreen"
 
-const ImprovementScreen = lazy(() => import("@/ui/screens/ImprovementScreen"))
-
-const CVHistoryScreen = lazy(() => import("@/ui/screens/CVHistoryScreen"))
-
-const AppTrackerScreen = lazy(() => import("@/ui/screens/AppTrackerScreen"))
-
-const JDLibraryScreen = lazy(() => import("@/ui/screens/JDLibraryScreen"))
-
-const JobSearchScreen = lazy(() => import("@/ui/screens/JobSearchScreen"))
-
-const HRDashboard = lazy(() => import("@/ui/screens/HRDashboard"))
-
-const JobPostsScreen = lazy(() => import("@/ui/screens/JobPostsScreen"))
-
-const CVRankingScreen = lazy(() => import("@/ui/screens/CVRankingScreen"))
-
-const PipelineScreen = lazy(() => import("@/ui/screens/PipelineScreen"))
-
-const AutoEmailScreen = lazy(() => import("@/ui/screens/AutoEmailScreen"))
-
-const ReportsScreen = lazy(() => import("@/ui/screens/ReportsScreen"))
-
-const ProfileScreen = lazy(() => import("@/ui/screens/ProfileScreen"))
+import ReportsScreen from "@/ui/screens/ReportsScreen"
 
 const PublicJobScreen = lazy(() => import("@/ui/screens/PublicJobScreen"))
 
@@ -411,21 +413,16 @@ export default function App() {
   if (requiresCompanyProfile(session.user.role)) {
     if (companyProfileGate === "checking") {
       return (
-        <div
-          style={{
-            minHeight: "100vh",
-
-            display: "grid",
-
-            placeItems: "center",
-
-            background: "var(--bg)",
-
-            color: "var(--text-secondary)",
-          }}
+        <Layout
+          portal={portal}
+          currentScreen={screen}
+          onNavigate={handleNavigate}
+          onLogout={handleLogout}
+          userName={session.user.fullName}
+          userAvatarUrl={session.user.avatarUrl}
         >
-          Checking company profile...
-        </div>
+          <ContentAreaLoader />
+        </Layout>
       )
     }
 
@@ -478,18 +475,16 @@ export default function App() {
             </button>
           </header>
           <main style={{ padding: "28px 20px 48px" }}>
-            <Suspense fallback={<FullPageSkeleton />}>
-              <ProfileScreen
-                session={session}
-                onSessionChange={setSession}
-                companyOnboarding
-                onProfileSaved={(profile) => {
-                  if (isCompanyProfileComplete(profile)) {
-                    setCompanyProfileGate("complete")
-                  }
-                }}
-              />
-            </Suspense>
+            <ProfileScreen
+              session={session}
+              onSessionChange={setSession}
+              companyOnboarding
+              onProfileSaved={(profile) => {
+                if (isCompanyProfileComplete(profile)) {
+                  setCompanyProfileGate("complete")
+                }
+              }}
+            />
           </main>
         </div>
       )
@@ -600,9 +595,7 @@ export default function App() {
         userAvatarUrl={session.user.avatarUrl}
       >
         <AnimatePresence mode="wait">
-          <Suspense fallback={<FullPageSkeleton />}>
-            <div key={screen}>{renderScreen()}</div>
-          </Suspense>
+          <div key={screen}>{renderScreen()}</div>
         </AnimatePresence>
       </Layout>
     </>

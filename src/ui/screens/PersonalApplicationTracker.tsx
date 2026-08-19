@@ -29,7 +29,6 @@ import { applicationApi } from "@/api/applicationApi"
 import {
   getCachedResource,
   getOrFetchResource,
-  setCachedResource,
 } from "@/services/resourceCache"
 
 import {
@@ -1057,9 +1056,29 @@ export default function PersonalApplicationTracker() {
 
       {/* ---- Application list ---- */}
       {loading ? (
-        <div className="fitcv-card tracker-empty">
-          <Spinner className="tracker-spin" size={24} weight="light" />
-          <strong>Loading applications…</strong>
+        <div className="pt-list" aria-live="polite">
+          {[0, 1, 2].map((row) => (
+            <article key={row} className="pt-card" style={{ borderLeftColor: "var(--border)" }}>
+              <div className="pt-card__main">
+                <div className="pt-card__identity">
+                  <div className="fc-skeleton" style={{ width: 40, height: 40, borderRadius: "50%" }} />
+                  <div className="pt-card__heading">
+                    <div className="pt-card__title-row">
+                      <div className="fc-skeleton" style={{ width: 180, height: 16, borderRadius: 6 }} />
+                    </div>
+                    <div className="fc-skeleton" style={{ width: 120, height: 13, borderRadius: 4, marginTop: 4 }} />
+                  </div>
+                </div>
+                <div className="pt-card__meta">
+                  <div className="fc-skeleton" style={{ width: 140, height: 13, borderRadius: 4 }} />
+                  <div className="fc-skeleton" style={{ width: 100, height: 13, borderRadius: 4 }} />
+                </div>
+              </div>
+              <div className="pt-card__side">
+                <div className="fc-skeleton" style={{ width: 80, height: 24, borderRadius: 999 }} />
+              </div>
+            </article>
+          ))}
         </div>
       ) : filtered.length === 0 ? (
         <div className="fitcv-card tracker-empty">
