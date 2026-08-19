@@ -43,12 +43,12 @@ describe("human idle monitoring", () => {
     vi.useRealTimers()
   })
 
-  it("expires after one hour without human activity", () => {
+  it("expires after three hours without human activity", () => {
     const listener = vi.fn()
     const unsubscribe = subscribeToSessionExpired(listener)
     const stop = startSessionActivityMonitoring()
 
-    vi.advanceTimersByTime(60 * 60 * 1000 + 1)
+    vi.advanceTimersByTime(3 * 60 * 60 * 1000 + 1)
 
     expect(getStoredSession()).toBeNull()
     expect(listener).toHaveBeenCalledOnce()
@@ -56,20 +56,43 @@ describe("human idle monitoring", () => {
     unsubscribe()
   })
 
+  it("reports the first valid activity immediately", () => {
+    const stop = startSessionActivityMonitoring()
+
+    window.dispatchEvent(new Event("pointerdown"))
+
+    expect(requestMocks.requestJson).toHaveBeenCalledOnce()
+    stop()
+  })
+
+  it.each(["wheel", "scroll", "input", "change", "click"])(
+    "treats %s as human activity",
+    (eventName) => {
+      const stop = startSessionActivityMonitoring()
+
+      vi.advanceTimersByTime(2 * 60 * 60 * 1000)
+      window.dispatchEvent(new Event(eventName))
+      vi.advanceTimersByTime(2 * 60 * 60 * 1000)
+
+      expect(getStoredSession()).toEqual(session)
+      stop()
+    },
+  )
+
   it("slides the deadline from pointer activity and reports it at most once a minute", () => {
     const listener = vi.fn()
     const unsubscribe = subscribeToSessionExpired(listener)
     const stop = startSessionActivityMonitoring()
 
-    vi.advanceTimersByTime(30 * 60 * 1000)
+    vi.advanceTimersByTime(90 * 60 * 1000)
     window.dispatchEvent(new Event("pointerdown"))
     window.dispatchEvent(new Event("keydown"))
     expect(requestMocks.requestJson).toHaveBeenCalledOnce()
 
-    vi.advanceTimersByTime(50 * 60 * 1000)
+    vi.advanceTimersByTime(2 * 60 * 60 * 1000)
     expect(getStoredSession()).toEqual(session)
 
-    vi.advanceTimersByTime(10 * 60 * 1000 + 1)
+    vi.advanceTimersByTime(60 * 60 * 1000 + 1)
     expect(getStoredSession()).toBeNull()
     expect(listener).toHaveBeenCalledOnce()
     stop()

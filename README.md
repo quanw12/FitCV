@@ -110,7 +110,7 @@ DATABASE_URL=mysql+pymysql://<db_user>:<url_encoded_password>@<db_host>:3306/fit
 JWT_SECRET_KEY=<local-secret>
 ACCESS_TOKEN_EXPIRE_MINUTES=15
 REFRESH_TOKEN_EXPIRE_DAYS=30
-SESSION_IDLE_TIMEOUT_MINUTES=60
+SESSION_IDLE_TIMEOUT_MINUTES=180
 REFRESH_COOKIE_SECURE=false
 GOOGLE_CLIENT_ID=<google-oauth-client-id>
 CORS_ORIGINS=["http://localhost:5173","http://127.0.0.1:5173","https://fit-cv.vercel.app"]
@@ -154,7 +154,7 @@ DATABASE_URL=mysql+pymysql://<db_user>:<url_encoded_password>@<db_host>:3306/fit
 JWT_SECRET_KEY=<replace-me>
 ACCESS_TOKEN_EXPIRE_MINUTES=15
 REFRESH_TOKEN_EXPIRE_DAYS=30
-SESSION_IDLE_TIMEOUT_MINUTES=60
+SESSION_IDLE_TIMEOUT_MINUTES=180
 REFRESH_COOKIE_SECURE=true
 GOOGLE_CLIENT_ID=<google-oauth-client-id>
 CORS_ORIGINS=["http://localhost:5173","http://127.0.0.1:5173","https://fit-cv.vercel.app"]
@@ -572,10 +572,11 @@ JavaScript. Logout thu hồi session phía server; reset password thu hồi toà
 session của tài khoản. Các endpoint auth nhạy cảm dùng rate limit lưu trong
 MySQL nên giới hạn vẫn còn hiệu lực sau khi API restart.
 
-Phiên đăng nhập tự hết hạn sau 60 phút không có tương tác thật của người dùng
-(`SESSION_IDLE_TIMEOUT_MINUTES=60`). Frontend chỉ gửi `/api/auth/activity` từ
-pointer, bàn phím, touch hoặc khi người dùng quay lại tab; refresh token và các
-request polling nền không kéo dài thời gian idle. Khi hết hạn, frontend xóa trạng
+Phiên đăng nhập tự hết hạn sau 3 giờ không có tương tác thật của người dùng
+(`SESSION_IDLE_TIMEOUT_MINUTES=180`). Frontend ghi nhận pointer, bàn phím, touch,
+wheel/scroll, click, input/change hoặc khi người dùng quay lại tab; heartbeat được
+gửi ngay ở thao tác hợp lệ đầu tiên, sau đó tối đa một lần mỗi phút. Refresh token
+và các request polling nền không kéo dài thời gian idle. Khi hết hạn, frontend xóa trạng
 thái đăng nhập và trở về Landing mà không gọi logout. Logout thủ công vẫn thu hồi
 session phía server. Refresh token có thời hạn tuyệt đối 30 ngày và không được
 gia hạn thêm khi xoay token.

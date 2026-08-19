@@ -6,7 +6,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
-from app.core.config import settings
+from app.core.config import Settings, settings
 from app.core.security import create_refresh_token
 from app.db.session import Base
 from app.models.account import Account, AuthProvider
@@ -31,8 +31,20 @@ def db() -> Session:
 
 
 @pytest.fixture(autouse=True)
-def one_hour_idle_timeout(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(settings, "session_idle_timeout_minutes", 60, raising=False)
+def three_hour_idle_timeout(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(settings, "session_idle_timeout_minutes", 180, raising=False)
+
+
+def test_default_idle_timeout_is_three_hours(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("SESSION_IDLE_TIMEOUT_MINUTES", raising=False)
+
+    configured = Settings(
+        _env_file=None,
+        database_url="sqlite+pysqlite:///:memory:",
+        jwt_secret_key="test-only-secret",
+    )
+
+    assert configured.session_idle_timeout_minutes == 180
 
 
 def _account(db: Session) -> Account:
@@ -59,7 +71,7 @@ def _session(db: Session, *, now: datetime):
     )
 
 
-def test_idle_boundary_accepts_59_59_and_rejects_60_01(db: Session) -> None:
+def test_idle_boundary_accepts_2_59_59_and_rejects_3_00_01(db: Session) -> None:
     started_at = datetime(2026, 8, 10, 8, 0, 0)
     record = _session(db, now=started_at)
 
@@ -67,7 +79,7 @@ def test_idle_boundary_accepts_59_59_and_rejects_60_01(db: Session) -> None:
         auth_sessions.get_active_by_id(
             db,
             record.session_id,
-            now=started_at + timedelta(minutes=59, seconds=59),
+            now=started_at + timedelta(hours=2, minutes=59, seconds=59),
         )
         is not None
     )
@@ -75,7 +87,7 @@ def test_idle_boundary_accepts_59_59_and_rejects_60_01(db: Session) -> None:
         auth_sessions.get_active_by_id(
             db,
             record.session_id,
-            now=started_at + timedelta(hours=1, seconds=1),
+            now=started_at + timedelta(hours=3, seconds=1),
         )
         is None
     )
@@ -88,13 +100,13 @@ def test_human_activity_slides_idle_window(db: Session) -> None:
     assert auth_sessions.touch_activity(
         db,
         record.session_id,
-        now=started_at + timedelta(minutes=30),
+        now=started_at + timedelta(minutes=90),
     )
     assert (
         auth_sessions.get_active_by_id(
             db,
             record.session_id,
-            now=started_at + timedelta(minutes=80),
+            now=started_at + timedelta(hours=4, minutes=29),
         )
         is not None
     )
@@ -110,7 +122,7 @@ def test_human_activity_slides_idle_window(db: Session) -> None:
         auth_sessions.get_active_by_id(
             db,
             untouched.session_id,
-            now=started_at + timedelta(minutes=61),
+            now=started_at + timedelta(hours=3, minutes=1),
         )
         is None
     )
@@ -127,7 +139,7 @@ def test_legacy_null_last_used_at_falls_back_to_created_at(db: Session) -> None:
         auth_sessions.get_active_by_id(
             db,
             record.session_id,
-            now=started_at + timedelta(minutes=59),
+            now=started_at + timedelta(hours=2, minutes=59),
         )
         is not None
     )
@@ -135,7 +147,7 @@ def test_legacy_null_last_used_at_falls_back_to_created_at(db: Session) -> None:
         auth_sessions.get_active_by_id(
             db,
             record.session_id,
-            now=started_at + timedelta(minutes=61),
+            now=started_at + timedelta(hours=3, minutes=1),
         )
         is None
     )
@@ -184,7 +196,7 @@ def test_refresh_rejects_an_idle_session(
     monkeypatch.setattr(
         auth_service,
         "utc_now_naive",
-        lambda: started_at + timedelta(minutes=61),
+        lambda: started_at + timedelta(hours=3, minutes=1),
     )
     monkeypatch.setattr(auth_service, "hash_refresh_token", lambda _: "a" * 64)
 

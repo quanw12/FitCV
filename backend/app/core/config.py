@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 15
     refresh_token_expire_days: int = 30
-    session_idle_timeout_minutes: int = 60
+    session_idle_timeout_minutes: int = 180
     refresh_cookie_name: str = "fitcv_refresh"
     refresh_cookie_secure: bool = False
     reset_token_expire_minutes: int = 30
