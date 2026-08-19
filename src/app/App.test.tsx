@@ -1,12 +1,14 @@
 import type { ReactNode } from "react"
 
-import { act, fireEvent, render, screen } from "@testing-library/react"
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
 
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import type { ScreenId } from "@/types/app"
 
 import type { AuthSession } from "@/types/auth"
+
+import type { UserProfile } from "@/types/profile"
 
 import { improvementMatchStorageKey } from "@/services/improvementSelection"
 
@@ -24,7 +26,20 @@ const authMocks = vi.hoisted(() => ({
   onSessionExpired: vi.fn(),
 }))
 
+const profileMocks = vi.hoisted(() => ({
+  get: vi.fn(),
+  clearCache: vi.fn(),
+}))
+
+const prefetchMocks = vi.hoisted(() => ({
+  prefetchAuthenticatedResources: vi.fn(),
+}))
+
 vi.mock("@/api", () => ({ authApi: authMocks }))
+
+vi.mock("@/api/profileApi", () => ({ profileApi: profileMocks }))
+
+vi.mock("@/services/authenticatedPrefetch", () => prefetchMocks)
 
 interface LayoutProps {
   children: ReactNode
@@ -75,6 +90,10 @@ vi.mock("@/ui/screens/ImprovementScreen", () => ({
 
 vi.mock("@/ui/screens/CVReBuildScreen", () => ({
   default: () => <div>CV rebuild screen</div>,
+}))
+
+vi.mock("@/ui/screens/ProfileScreen", () => ({
+  default: () => <div>Company profile onboarding</div>,
 }))
 
 vi.mock("@/ui/screens/PublicJobScreen", () => ({
@@ -135,6 +154,51 @@ const secondarySession: AuthSession = {
   requiresRoleSelection: false,
 }
 
+const hrSession: AuthSession = {
+  accessToken: "hr-token",
+
+  tokenType: "bearer",
+
+  user: {
+    accountId: "hr-account",
+
+    email: "hr@example.com",
+
+    fullName: "HR User",
+
+    role: "HR",
+
+    authProvider: "Google",
+  },
+
+  requiresRoleSelection: false,
+}
+
+const incompleteHrProfile: UserProfile = {
+  accountId: "hr-account",
+  email: "hr@example.com",
+  fullName: "HR User",
+  role: "HR",
+  avatarUrl: null,
+  authProvider: "Google",
+  createdAt: "2026-08-19T00:00:00Z",
+  updatedAt: null,
+  phone: null,
+  company: null,
+}
+
+const completeHrProfile: UserProfile = {
+  ...incompleteHrProfile,
+  company: {
+    companyId: "12",
+    companyName: "Northwind Labs",
+    industryId: "3",
+    industryName: "Technology",
+    websiteUrl: null,
+    logoUrl: null,
+  },
+}
+
 interface AuthMockProps {
   onAuth: (session: AuthSession) => void
   initialMode?: "login" | "register"
@@ -157,11 +221,19 @@ describe("Analyzer to Improvement selection", () => {
   let expireSession: (() => void) | undefined
 
   beforeEach(() => {
+    vi.clearAllMocks()
+
+    expireSession = undefined
+
     window.history.replaceState({}, "", "/")
 
     authMocks.getSession.mockReturnValue(primarySession)
 
     authMocks.refresh.mockResolvedValue(primarySession)
+
+    profileMocks.get.mockResolvedValue(incompleteHrProfile)
+
+    prefetchMocks.prefetchAuthenticatedResources.mockResolvedValue(undefined)
 
     authMocks.onSessionExpired.mockImplementation((listener: () => void) => {
       expireSession = listener
@@ -213,6 +285,36 @@ describe("Analyzer to Improvement selection", () => {
     expect(await screen.findByText("CV rebuild screen")).toBeInTheDocument()
 
     expect(authMocks.refresh).toHaveBeenCalledOnce()
+  })
+
+  it("does not prefetch company-scoped HR data before onboarding is complete", async () => {
+    authMocks.getSession.mockReturnValue(hrSession)
+    authMocks.refresh.mockResolvedValue(hrSession)
+    profileMocks.get.mockResolvedValue(incompleteHrProfile)
+
+    render(<App />)
+
+    expect(
+      await screen.findByText("Company profile onboarding"),
+    ).toBeInTheDocument()
+    expect(profileMocks.get).toHaveBeenCalledOnce()
+    expect(
+      prefetchMocks.prefetchAuthenticatedResources,
+    ).not.toHaveBeenCalled()
+  })
+
+  it("prefetches HR data after the linked company profile is complete", async () => {
+    authMocks.getSession.mockReturnValue(hrSession)
+    authMocks.refresh.mockResolvedValue(hrSession)
+    profileMocks.get.mockResolvedValue(completeHrProfile)
+
+    render(<App />)
+
+    await waitFor(() =>
+      expect(prefetchMocks.prefetchAuthenticatedResources).toHaveBeenCalledWith(
+        hrSession,
+      ),
+    )
   })
 
   it("opens create account mode from Landing Get started", async () => {

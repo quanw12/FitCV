@@ -167,8 +167,20 @@ export default function App() {
   useEffect(() => {
     if (!session) return
 
+    if (
+      requiresCompanyProfile(session.user.role) &&
+      companyProfileGate !== "complete"
+    ) {
+      return
+    }
+
     void prefetchAuthenticatedResources(session)
-  }, [session?.accessToken, session?.user.accountId])
+  }, [
+    companyProfileGate,
+    session?.accessToken,
+    session?.user.accountId,
+    session?.user.role,
+  ])
 
   useEffect(() => {
     if (session) {
