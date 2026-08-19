@@ -267,7 +267,7 @@ export default function AppTrackerScreen({
       await applicationsApi.retryAnalysis(applicationId)
 
       setApplications((current) => {
-        const next = current.map((application) =>
+        const next = current.map<StudentApplication>((application) =>
           application.application_id === applicationId
             ? {
                 ...application,

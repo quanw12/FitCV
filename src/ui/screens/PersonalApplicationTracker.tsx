@@ -29,7 +29,6 @@ import { applicationApi } from "@/api/applicationApi"
 import {
   getCachedResource,
   getOrFetchResource,
-  setCachedResource,
 } from "@/services/resourceCache"
 
 import {
