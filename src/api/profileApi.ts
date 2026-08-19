@@ -2,10 +2,7 @@ import type { ProfileUpdate, UserProfile } from "@/types/profile"
 
 import { authApi } from "./authApi"
 
-import { API_BASE_URL } from "./config"
 import { requestJson } from "./httpClient"
-
-const LOCAL_PROFILE_KEY = "fitcv.profile.records"
 
 let profileCache: UserProfile | null = null
 
@@ -14,56 +11,6 @@ let profileCacheAccountId: string | null = null
 let profileFetchInFlight: Promise<UserProfile> | null = null
 
 let profileFetchAccountId: string | null = null
-
-function readRecords(): Record<string, UserProfile> {
-  if (typeof window === "undefined") return {}
-
-  try {
-    return JSON.parse(
-      window.localStorage.getItem(LOCAL_PROFILE_KEY) ?? "{}",
-    ) as Record<string, UserProfile>
-  } catch {
-    return {}
-  }
-}
-
-function writeRecords(records: Record<string, UserProfile>) {
-  window.localStorage.setItem(LOCAL_PROFILE_KEY, JSON.stringify(records))
-}
-
-function emptyLocalProfile(): UserProfile {
-  const session = authApi.getSession()
-
-  if (!session) throw new Error("Authentication required.")
-
-  return {
-    accountId: session.user.accountId,
-
-    email: session.user.email,
-
-    fullName: session.user.fullName,
-
-    role: session.user.role,
-
-    avatarUrl: session.user.avatarUrl ?? null,
-
-    authProvider: session.user.authProvider,
-
-    createdAt: new Date().toISOString(),
-
-    updatedAt: null,
-
-    phone: null,
-
-    company: null,
-  }
-}
-
-function getLocalProfile(): UserProfile {
-  const base = emptyLocalProfile()
-
-  return readRecords()[base.accountId] ?? base
-}
 
 function normalize(payload: any): UserProfile {
   return {
@@ -154,34 +101,6 @@ async function avatarRequest(
   return normalize(payload)
 }
 
-function fileAsDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-
-    reader.onload = () => resolve(String(reader.result))
-
-    reader.onerror = () => reject(new Error("Unable to read this image."))
-
-    reader.readAsDataURL(file)
-  })
-}
-
-function persistLocal(profile: UserProfile): UserProfile {
-  const records = readRecords()
-
-  records[profile.accountId] = profile
-
-  writeRecords(records)
-
-  authApi.updateCurrentUser({
-    fullName: profile.fullName,
-
-    avatarUrl: profile.avatarUrl,
-  })
-
-  return profile
-}
-
 export const profileApi = {
   async get(): Promise<UserProfile> {
     const session = authApi.getSession()
@@ -203,10 +122,7 @@ export const profileApi = {
     }
 
     profileFetchAccountId = session.user.accountId
-    profileFetchInFlight = (API_BASE_URL
-      ? backendRequest("GET")
-      : Promise.resolve(getLocalProfile())
-    ).then((profile) => {
+    profileFetchInFlight = backendRequest("GET").then((profile) => {
       profileCache = profile
       profileCacheAccountId = profile.accountId
 
@@ -227,93 +143,7 @@ export const profileApi = {
   },
 
   async update(update: ProfileUpdate): Promise<UserProfile> {
-    let profile: UserProfile
-
-    if (API_BASE_URL) profile = await backendRequest("PATCH", update)
-    else {
-      const current = getLocalProfile()
-
-      const hasCompanyUpdate = [
-        update.companyName,
-
-        update.industryName,
-
-        update.companyWebsiteUrl,
-
-        update.companyLogoUrl,
-      ].some((value) => value !== undefined)
-
-      const hasCompanyRole =
-        current.role === "HR" ||
-        current.role === "HiringManager" ||
-        current.role === "Admin"
-
-      if (update.phone !== undefined && current.role !== "Student")
-        throw new Error("Phone can only be updated by Student accounts.")
-
-      if (hasCompanyUpdate && !hasCompanyRole)
-        throw new Error(
-          "Company fields can only be updated by HR, HiringManager, or Admin accounts.",
-        )
-
-      if (hasCompanyUpdate && !current.company && !update.companyName?.trim())
-        throw new Error("Company name is required when creating a company.")
-
-      if (update.companyName !== undefined && !update.companyName?.trim())
-        throw new Error("Company name cannot be empty.")
-
-      const now = new Date().toISOString()
-
-      profile = {
-        ...current,
-
-        fullName: update.fullName ?? current.fullName,
-
-        avatarUrl:
-          update.avatarUrl === undefined ? current.avatarUrl : update.avatarUrl,
-
-        phone:
-          current.role === "Student" && update.phone !== undefined
-            ? update.phone
-            : current.phone,
-
-        company:
-          !hasCompanyRole || !hasCompanyUpdate
-            ? current.company
-            : {
-                companyId:
-                  current.company?.companyId ?? `local-${current.accountId}`,
-
-                companyName:
-                  update.companyName ?? current.company?.companyName ?? "",
-
-                industryId: current.company?.industryId ?? null,
-
-                industryName:
-                  update.industryName === undefined
-                    ? (current.company?.industryName ?? null)
-                    : update.industryName,
-
-                websiteUrl:
-                  update.companyWebsiteUrl === undefined
-                    ? (current.company?.websiteUrl ?? null)
-                    : update.companyWebsiteUrl,
-
-                logoUrl:
-                  update.companyLogoUrl === undefined
-                    ? (current.company?.logoUrl ?? null)
-                    : update.companyLogoUrl,
-              },
-
-        updatedAt: now,
-      }
-
-      const records = readRecords()
-
-      records[profile.accountId] = profile
-
-      writeRecords(records)
-    }
+    const profile = await backendRequest("PATCH", update)
 
     authApi.updateCurrentUser({
       fullName: profile.fullName,
@@ -334,17 +164,7 @@ export const profileApi = {
     if (file.size > 5 * 1024 * 1024)
       throw new Error("Avatar must be 5MB or smaller.")
 
-    let profile: UserProfile
-
-    if (API_BASE_URL) profile = await avatarRequest("POST", file)
-    else
-      profile = persistLocal({
-        ...getLocalProfile(),
-
-        avatarUrl: await fileAsDataUrl(file),
-
-        updatedAt: new Date().toISOString(),
-      })
+    const profile = await avatarRequest("POST", file)
 
     authApi.updateCurrentUser({ avatarUrl: profile.avatarUrl })
 
@@ -355,17 +175,7 @@ export const profileApi = {
   },
 
   async deleteAvatar(): Promise<UserProfile> {
-    let profile: UserProfile
-
-    if (API_BASE_URL) profile = await avatarRequest("DELETE")
-    else
-      profile = persistLocal({
-        ...getLocalProfile(),
-
-        avatarUrl: null,
-
-        updatedAt: new Date().toISOString(),
-      })
+    const profile = await avatarRequest("DELETE")
 
     authApi.updateCurrentUser({ avatarUrl: null })
 
