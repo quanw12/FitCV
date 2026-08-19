@@ -76,13 +76,14 @@ async def apply_improvements(
         suggestion_ids=payload.suggestion_ids,
     )
     try:
-        instructions = build_applied_instructions(selected_rows)
+        instructions, approved_skills = build_applied_instructions(selected_rows)
         return await orchestrator.rebuild_with_improvements(
             parsed_text,
             applied_improvements=instructions,
             jd_text=jd_text,
             language=payload.language,
             avatar=safe_avatar,
+            allowed_new_skills=approved_skills,
         )
     except ValueError as exc:
         logger.exception("Improvement rebuild validation failed: %s", exc)

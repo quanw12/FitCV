@@ -1,5 +1,8 @@
 import re
+import unicodedata
 from typing import Any
+
+from app.services.document_parser import SOFT_SKILLS
 
 ALGORITHM_VERSION = "fitcv-evidence-v2"
 SCORING_FRAMEWORK_VERSION = "fitcv-source-grounded-v2"
@@ -12,6 +15,7 @@ def match_documents(
     jd: dict[str, Any],
     *,
     weights: dict[str, float] | None = None,
+    soft_skill_matches: list[tuple[str, str]] | None = None,
 ) -> dict[str, Any]:
     scoring_weights = _validated_weights(weights)
     breakdown: dict[str, dict[str, Any]] = {}
@@ -90,10 +94,23 @@ def match_documents(
             f"CV education: {cv_education or 'not found'}; JD requirement: {required_education}.",
         )
 
-    required_soft_labels = _term_index(jd.get("soft_skills") or [])
+    required_soft_labels = {
+        _soft_skill_key(key): label
+        for key, label in _term_index(jd.get("soft_skills") or []).items()
+    }
     required_soft_skills = set(required_soft_labels)
     if required_soft_skills:
-        cv_soft_skills = set(_term_index(cv.get("soft_skills") or []))
+        cv_soft_skills = {
+            _soft_skill_key(key)
+            for key in _term_index(cv.get("soft_skills") or [])
+        }
+        # AI-aligned equivalents count as CV evidence for the JD label, without
+        # changing which JD labels are reported as matched or missing.
+        for jd_label, cv_label in soft_skill_matches or []:
+            if not isinstance(jd_label, str) or not isinstance(cv_label, str):
+                continue
+            if _soft_skill_key(_term_key(cv_label)) in cv_soft_skills:
+                cv_soft_skills.add(_soft_skill_key(_term_key(jd_label)))
         matched_soft = cv_soft_skills & required_soft_skills
         missing_soft = required_soft_skills - cv_soft_skills
         breakdown["soft_skills"] = _evidence(
@@ -314,12 +331,45 @@ def _term_index(values: list[str]) -> dict[str, str]:
 
 
 def _term_key(value: str) -> str:
-    key = re.sub(r"[^a-z0-9+#.]+", " ", value.casefold()).strip()
+    stripped = unicodedata.normalize("NFKD", value).encode("ascii", "ignore").decode("ascii")
+    key = re.sub(r"[^a-z0-9+#.]+", " ", stripped.casefold()).strip()
     return {
         "rest apis": "rest api",
         "restful api": "rest api",
         "restful apis": "rest api",
     }.get(key, key)
+
+
+def _build_soft_skill_keys() -> dict[str, str]:
+    """Map every known soft-skill alias (including Vietnamese phrasing) to its canonical key."""
+    keys: dict[str, str] = {}
+    for canonical, aliases in SOFT_SKILLS.items():
+        canonical_key = _term_key(canonical)
+        if not canonical_key:
+            continue
+        keys[canonical_key] = canonical_key
+        for alias in aliases:
+            alias_key = _term_key(alias)
+            if alias_key:
+                keys.setdefault(alias_key, canonical_key)
+    return keys
+
+
+_SOFT_SKILL_CANONICAL_KEYS = _build_soft_skill_keys()
+
+
+def _soft_skill_key(key: str) -> str:
+    return _SOFT_SKILL_CANONICAL_KEYS.get(key, key)
+
+
+def unmatched_soft_skills(cv_soft_skills: list[str], jd_soft_skills: list[str]) -> list[str]:
+    """Return JD soft-skill labels with no exact or known-synonym CV counterpart."""
+    required = {
+        _soft_skill_key(key): label
+        for key, label in _term_index(jd_soft_skills).items()
+    }
+    cv_keys = {_soft_skill_key(key) for key in _term_index(cv_soft_skills)}
+    return [label for key, label in required.items() if key not in cv_keys]
 
 
 def _number(value: object) -> float | None:

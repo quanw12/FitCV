@@ -90,7 +90,9 @@ def test_moderate_match_gets_richer_grounded_coverage() -> None:
 
     assert len(enriched.skill_gaps) == 4
     assert len(enriched.section_feedback) == 3
-    assert len(enriched.rewrite_suggestions) == 2
+    # Rewrites are never fabricated by the enricher; only the AI provider may
+    # propose them, so a sparse provider report keeps zero rewrites.
+    assert len(enriched.rewrite_suggestions) == 0
     assert len(enriched.quick_wins) == 4
     assert {item.skill.casefold() for item in enriched.skill_gaps} == {
         "aws",
@@ -98,15 +100,6 @@ def test_moderate_match_gets_richer_grounded_coverage() -> None:
         "redis",
         "teamwork",
     }
-    assert all(
-        item.original_text in RAW_CV
-        for item in enriched.rewrite_suggestions
-    )
-    assert all("[" not in item.suggested_text for item in enriched.rewrite_suggestions)
-    assert all(
-        item.suggested_text != item.original_text
-        for item in enriched.rewrite_suggestions
-    )
     validate_report_grounding(
         enriched,
         PARSED_CV,
@@ -139,7 +132,7 @@ def test_enrichment_does_not_invent_skill_gaps_without_analyzer_evidence() -> No
 
     assert enriched.skill_gaps == []
     assert len(enriched.section_feedback) == 3
-    assert len(enriched.rewrite_suggestions) == 2
+    assert len(enriched.rewrite_suggestions) == 0
     assert len(enriched.quick_wins) == 4
     validate_report_grounding(
         enriched,
@@ -159,7 +152,7 @@ def test_strong_match_uses_lower_coverage_targets() -> None:
     )
 
     assert len(enriched.section_feedback) == 2
-    assert len(enriched.rewrite_suggestions) == 1
+    assert len(enriched.rewrite_suggestions) == 0
     assert len(enriched.quick_wins) == 3
     validate_report_grounding(
         enriched,
@@ -180,7 +173,7 @@ def test_unstructured_cv_still_gets_moderate_match_feedback() -> None:
 
     assert len(enriched.section_feedback) == 3
     assert {item.section.value for item in enriched.section_feedback} == {"Other"}
-    assert len(enriched.rewrite_suggestions) == 2
+    assert len(enriched.rewrite_suggestions) == 0
     assert len(enriched.quick_wins) == 4
     validate_report_grounding(
         enriched,
@@ -227,5 +220,5 @@ def test_empty_provider_report_can_be_enriched_before_final_validation() -> None
     )
 
     assert len(final.section_feedback) == 3
-    assert len(final.rewrite_suggestions) == 2
+    assert len(final.rewrite_suggestions) == 0
     assert len(final.quick_wins) == 4

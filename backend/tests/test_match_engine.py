@@ -3,6 +3,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 from app.services.document_parser import parse_cv_text, parse_jd_text
+from app.services.gemini_analyzer import GeminiAnalyzerError
 from app.services.match_engine import (
     build_structured_job_scoring_text,
     normalize_scoring_jd_text,
@@ -11,6 +12,7 @@ from app.services.match_engine import (
 from app.services.matching_service import (
     ALGORITHM_VERSION,
     SCORING_FRAMEWORK_VERSION,
+    match_documents,
     supplement_semantic_jd,
 )
 from app.services.improvement_service import _match_context_payload
@@ -249,6 +251,178 @@ Candidates meet the teamwork panel in three interviews.
             )
 
         self.assertEqual(result["matching_inputs"]["cv"]["skills"], ["C#", "JWT", "VNPay"])
+
+    def test_gemini_matching_supplements_grounded_soft_skills(self) -> None:
+        cv_text = (
+            "An Nguyen\n"
+            "Kỹ năng mềm: giao tiếp tốt, làm việc nhóm, chịu được áp lực.\n"
+            "Kinh nghiệm thực tế tại các dự án nhóm của trường đại học."
+        )
+        jd_text = (
+            "Requirements: teamwork and communication are required for this "
+            "role in daily project work."
+        )
+        semantic_cv = {
+            "skills": [],
+            "experience_years": None,
+            "education": None,
+            "soft_skills": [],
+        }
+        semantic_jd = {
+            "required_skills": [],
+            "preferred_skills": [],
+            "required_skill_groups": [],
+            "preferred_skill_groups": [],
+            "experience_years": None,
+            "education": None,
+            "soft_skills": ["Teamwork"],
+        }
+
+        with patch(
+            "app.services.match_engine.extract_match_inputs",
+            return_value=(semantic_cv, semantic_jd),
+        ):
+            result = score_match(
+                cv_text=cv_text,
+                jd_text=jd_text,
+                algorithm_version="fitcv-gemini-test-v8-s7",
+                source_scope="test-soft-skill-supplement",
+            )
+
+        cv_soft_skills = result["matching_inputs"]["cv"]["soft_skills"]
+        self.assertIn("Communication", cv_soft_skills)
+        self.assertIn("Teamwork", cv_soft_skills)
+        self.assertEqual(result["breakdown"]["soft_skills"]["score"], 100.0)
+
+    def test_soft_skill_synonyms_match_canonically(self) -> None:
+        result = match_documents(
+            {
+                "skills": [],
+                "experience_years": None,
+                "education": None,
+                "soft_skills": ["Collaboration", "Giao tiếp"],
+            },
+            {
+                "required_skills": [],
+                "preferred_skills": [],
+                "required_skill_groups": [],
+                "preferred_skill_groups": [],
+                "experience_years": None,
+                "education": None,
+                "soft_skills": ["Teamwork", "Communication"],
+            },
+        )
+        self.assertEqual(result["breakdown"]["soft_skills"]["score"], 100.0)
+        self.assertEqual(result["breakdown"]["soft_skills"]["missing"], [])
+
+    def test_gemini_matching_aligns_unmatched_soft_skills_with_ai(self) -> None:
+        cv_text = "CV text sample with enough characters for the local parser."
+        jd_text = "JD: Conflict Resolution"
+        semantic_cv = {
+            "skills": [],
+            "experience_years": None,
+            "education": None,
+            "soft_skills": ["Giải quyết mâu thuẫn nội bộ"],
+        }
+        semantic_jd = {
+            "required_skills": [],
+            "preferred_skills": [],
+            "required_skill_groups": [],
+            "preferred_skill_groups": [],
+            "experience_years": None,
+            "education": None,
+            "soft_skills": ["Conflict Resolution"],
+        }
+
+        with (
+            patch(
+                "app.services.match_engine.extract_match_inputs",
+                return_value=(semantic_cv, semantic_jd),
+            ),
+            patch(
+                "app.services.match_engine.align_soft_skills",
+                return_value=[("Conflict Resolution", "Giải quyết mâu thuẫn nội bộ")],
+            ) as align_mock,
+        ):
+            result = score_match(
+                cv_text=cv_text,
+                jd_text=jd_text,
+                algorithm_version="fitcv-gemini-test-v9-s8",
+                source_scope="test-soft-skill-alignment",
+            )
+
+        align_mock.assert_called_once()
+        soft = result["breakdown"]["soft_skills"]
+        self.assertEqual(soft["score"], 100.0)
+        self.assertEqual(soft["matched"], ["Conflict Resolution"])
+        self.assertEqual(
+            result["engine"]["soft_skill_matches"],
+            [{"jd": "Conflict Resolution", "cv": "Giải quyết mâu thuẫn nội bộ"}],
+        )
+
+    def test_gemini_matching_falls_back_when_soft_skill_alignment_fails(self) -> None:
+        semantic_cv = {
+            "skills": [],
+            "experience_years": None,
+            "education": None,
+            "soft_skills": ["Giải quyết mâu thuẫn nội bộ"],
+        }
+        semantic_jd = {
+            "required_skills": [],
+            "preferred_skills": [],
+            "required_skill_groups": [],
+            "preferred_skill_groups": [],
+            "experience_years": None,
+            "education": None,
+            "soft_skills": ["Conflict Resolution"],
+        }
+
+        with (
+            patch(
+                "app.services.match_engine.extract_match_inputs",
+                return_value=(semantic_cv, semantic_jd),
+            ),
+            patch(
+                "app.services.match_engine.align_soft_skills",
+                side_effect=GeminiAnalyzerError("alignment unavailable"),
+            ),
+        ):
+            result = score_match(
+                cv_text="CV text sample with enough characters for the local parser.",
+                jd_text="JD: Conflict Resolution",
+                algorithm_version="fitcv-gemini-test-v9-s8",
+                source_scope="test-soft-skill-alignment-failure",
+            )
+
+        self.assertEqual(result["breakdown"]["soft_skills"]["score"], 0.0)
+        self.assertEqual(result["engine"]["soft_skill_matches"], [])
+
+    def test_match_documents_accepts_grounded_soft_skill_matches(self) -> None:
+        result = match_documents(
+            {
+                "skills": [],
+                "experience_years": None,
+                "education": None,
+                "soft_skills": ["Giải quyết mâu thuẫn nội bộ"],
+            },
+            {
+                "required_skills": [],
+                "preferred_skills": [],
+                "required_skill_groups": [],
+                "preferred_skill_groups": [],
+                "experience_years": None,
+                "education": None,
+                "soft_skills": ["Conflict Resolution", "Stakeholder Management"],
+            },
+            soft_skill_matches=[
+                ("Conflict Resolution", "Giải quyết mâu thuẫn nội bộ"),
+                ("Stakeholder Management", "Invented CV label"),
+            ],
+        )
+        soft = result["breakdown"]["soft_skills"]
+        self.assertEqual(soft["score"], 50.0)
+        self.assertEqual(soft["matched"], ["Conflict Resolution"])
+        self.assertEqual(soft["missing"], ["Stakeholder Management"])
 
     def test_improvement_consumes_the_same_persisted_engine_result(self) -> None:
         result = score_match(

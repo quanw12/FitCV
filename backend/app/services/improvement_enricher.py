@@ -7,7 +7,6 @@ from app.schemas.improvement import (
     CvSection,
     ImprovementReportData,
     QuickWin,
-    RewriteSuggestion,
     SectionFeedback,
     SkillGap,
 )
@@ -19,7 +18,6 @@ from app.services.improvement_validator import cv_quote_leaves
 class _CoverageTargets:
     skill_gaps: int
     section_feedback: int
-    rewrites: int
     quick_wins: int
 
 
@@ -35,28 +33,6 @@ _SECTION_BY_KEY = {
     "technical_skills": CvSection.skills,
     "education": CvSection.education,
     "projects": CvSection.projects,
-}
-_REWRITE_SECTION_ORDER = (
-    CvSection.work_experience,
-    CvSection.projects,
-    CvSection.summary,
-    CvSection.other,
-)
-_CV_HEADINGS = {
-    "about",
-    "achievements",
-    "certifications",
-    "contact",
-    "education",
-    "experience",
-    "interests",
-    "objective",
-    "profile",
-    "projects",
-    "skills",
-    "summary",
-    "technical skills",
-    "work experience",
 }
 
 
@@ -90,13 +66,6 @@ def enrich_improvement_report(
         available_sections=available_sections,
     )
 
-    rewrite_suggestions = list(report.rewrite_suggestions)
-    _add_rewrites(
-        rewrite_suggestions,
-        target=targets.rewrites,
-        section_lines=section_lines,
-    )
-
     quick_wins = list(report.quick_wins)
     _add_quick_wins(
         quick_wins,
@@ -106,11 +75,12 @@ def enrich_improvement_report(
         available_sections=available_sections,
     )
 
+    # Rewrite suggestions are never fabricated here: only the AI provider may
+    # propose a rewrite, because a regex word swap is not a real improvement.
     return report.model_copy(
         update={
             "skill_gaps": skill_gaps,
             "section_feedback": section_feedback,
-            "rewrite_suggestions": rewrite_suggestions,
             "quick_wins": quick_wins,
         }
     )
@@ -118,10 +88,10 @@ def enrich_improvement_report(
 
 def _coverage_targets(score: float) -> _CoverageTargets:
     if score < 50:
-        return _CoverageTargets(5, 4, 3, 5)
+        return _CoverageTargets(5, 4, 5)
     if score < 80:
-        return _CoverageTargets(4, 3, 2, 4)
-    return _CoverageTargets(2, 2, 1, 3)
+        return _CoverageTargets(4, 3, 4)
+    return _CoverageTargets(2, 2, 3)
 
 
 def _score(value: object, default: float = 100.0) -> float:
@@ -419,88 +389,6 @@ def _add_section_feedback(
         existing.add(identity)
 
 
-def _add_rewrites(
-    rewrites: list[RewriteSuggestion],
-    *,
-    target: int,
-    section_lines: dict[CvSection, list[str]],
-) -> None:
-    existing = {_normalize(item.original_text) for item in rewrites}
-    for section in _REWRITE_SECTION_ORDER:
-        for original in section_lines.get(section, []):
-            if len(rewrites) >= target:
-                return
-            if not _is_rewrite_candidate(original):
-                continue
-            identity = _normalize(original)
-            if identity in existing:
-                continue
-            suggested = _safe_grounded_rewrite(original)
-            if suggested is None:
-                continue
-            rewrites.append(
-                RewriteSuggestion(
-                    section=section,
-                    original_text=original,
-                    issue=(
-                        "The entry can be more direct and easier to scan without changing its facts."
-                    ),
-                    suggested_text=suggested,
-                    framework="Action → Scope",
-                )
-            )
-            existing.add(identity)
-
-
-def _safe_grounded_rewrite(value: str) -> str | None:
-    """Return a modest wording improvement using only facts in one source line."""
-    original = re.sub(r"^[\s•●▪◦*-]+", "", value).strip()
-    revised = re.sub(
-        r"\bfixed\b",
-        lambda match: (
-            "Resolved" if match.group(0)[0].isupper() else "resolved"
-        ),
-        original,
-        flags=re.IGNORECASE,
-    )
-    revised = re.sub(
-        r"\bthat processes\b",
-        "to process",
-        revised,
-        flags=re.IGNORECASE,
-    )
-
-    responsibility = re.match(
-        r"^(?:was\s+)?responsible\s+for\s+(.+)$",
-        revised,
-        flags=re.IGNORECASE,
-    )
-    if responsibility:
-        action = responsibility.group(1)
-        gerund_to_past = {
-            "building": "Built",
-            "creating": "Created",
-            "developing": "Developed",
-            "designing": "Designed",
-            "implementing": "Implemented",
-            "maintaining": "Maintained",
-            "managing": "Managed",
-            "supporting": "Supported",
-            "testing": "Tested",
-        }
-        lowered = action.casefold()
-        for gerund, past in gerund_to_past.items():
-            if lowered.startswith(f"{gerund} "):
-                revised = f"{past} {action[len(gerund) + 1:]}"
-                break
-
-    if _normalize(revised) == _normalize(original):
-        return None
-    if original.endswith(".") and not revised.endswith("."):
-        revised += "."
-    return revised
-
-
 def _add_quick_wins(
     quick_wins: list[QuickWin],
     *,
@@ -644,21 +532,6 @@ def _append_unique(
     items = destination.setdefault(section, [])
     if _normalize(value) not in {_normalize(item) for item in items}:
         items.append(value)
-
-
-def _is_rewrite_candidate(value: str) -> bool:
-    text = re.sub(r"^[\s•●▪◦*-]+", "", value).strip()
-    normalized = _normalize(text).rstrip(":")
-    if not 25 <= len(text) <= 600 or normalized in _CV_HEADINGS:
-        return False
-    if "@" in text or re.search(r"https?://|www\.", text, re.IGNORECASE):
-        return False
-    words = re.findall(r"[A-Za-zÀ-ỹ]+", text)
-    if len(words) < 5:
-        return False
-    if text.isupper() and len(words) <= 10:
-        return False
-    return True
 
 
 def _non_empty_lines(value: str) -> list[str]:

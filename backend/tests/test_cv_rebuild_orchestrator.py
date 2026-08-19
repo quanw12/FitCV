@@ -75,6 +75,7 @@ class FakeExtractor:
         jd_text: str | None = None,
         applied_improvements: str | None = None,
         baseline: CVData | None = None,
+        allowed_new_skills: list[str] | None = None,
     ) -> tuple[CVData, list[str]]:
         self.last_polish_language = language
         self.last_applied_improvements = applied_improvements
@@ -443,6 +444,7 @@ class FakeSequenceExtractor:
         jd_text: str | None = None,
         applied_improvements: str | None = None,
         baseline: CVData | None = None,
+        allowed_new_skills: list[str] | None = None,
     ) -> tuple[CVData, list[str]]:
         return cv, []
 

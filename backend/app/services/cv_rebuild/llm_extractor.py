@@ -7,6 +7,8 @@ from app.schemas.cv_rebuild import CVData
 from app.services.cv_rebuild.grounding import (
     _ENTRY_COUNT_SECTIONS,
     _find_title_inflation_details,
+    _normalize_token,
+    _tokenize,
     find_missing_sections,
     find_project_description_overlap,
     find_title_inflation,
@@ -127,6 +129,31 @@ def _fix_title_inflation(entered: CVData, polished: CVData) -> CVData:
     return polished.model_copy(update={"experience": fixed_experiences})
 
 
+def _is_approved_skill(term: str, allowed: list[str]) -> bool:
+    """Return True when ``term`` is covered by an approved skill-gap addition.
+
+    Subset matching on normalized tokens: "Kubernetes" is covered by the
+    approved "Kubernetes", but "Kubernetes cluster management" is not — the
+    LLM may add the approved skill name, nothing broader.
+    """
+    term_tokens = {_normalize_token(t) for t in _tokenize(term)}
+    if not term_tokens:
+        return False
+    for allowed_skill in allowed:
+        allowed_tokens = {_normalize_token(t) for t in _tokenize(allowed_skill)}
+        if allowed_tokens and term_tokens <= allowed_tokens:
+            return True
+    return False
+
+
+def _filter_approved_skills(
+    unfounded: list[str], allowed: list[str] | None
+) -> list[str]:
+    if not allowed:
+        return unfounded
+    return [s for s in unfounded if not _is_approved_skill(s, allowed)]
+
+
 class CvExtractor:
     def __init__(self, client: GeminiClient | None = None) -> None:
         self._client = client or GeminiClient()
@@ -171,6 +198,7 @@ class CvExtractor:
         jd_text: str | None = None,
         applied_improvements: str | None = None,
         baseline: CVData | None = None,
+        allowed_new_skills: list[str] | None = None,
     ) -> tuple[CVData, list[str]]:
         last_error: str | None = None
         entered = baseline or cv
@@ -209,7 +237,9 @@ class CvExtractor:
                 )
                 continue
             unfounded_nums = find_unfounded_numbers(source_text, polished)
-            unfounded_skills = find_unfounded_skills(source_text, polished)
+            unfounded_skills = _filter_approved_skills(
+                find_unfounded_skills(source_text, polished), allowed_new_skills
+            )
             missing = find_missing_sections(entered, polished)
             title_issues = find_title_inflation(entered, polished)
             verb_issues = find_verb_tense_issues(polished)
@@ -269,7 +299,9 @@ class CvExtractor:
         warnings: list[str] = []
         if best_cv is not None:
             unfounded_nums = find_unfounded_numbers(source_text, best_cv)
-            unfounded_skills = find_unfounded_skills(source_text, best_cv)
+            unfounded_skills = _filter_approved_skills(
+                find_unfounded_skills(source_text, best_cv), allowed_new_skills
+            )
             missing = find_missing_sections(entered, best_cv)
             title_issues = find_title_inflation(entered, best_cv)
             verb_issues = find_verb_tense_issues(best_cv)
