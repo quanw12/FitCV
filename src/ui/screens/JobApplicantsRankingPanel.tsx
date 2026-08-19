@@ -748,8 +748,23 @@ export default function JobApplicantsRankingPanel() {
         ))}
 
       {jobsLoading ? (
-        <div className="fc-panel" style={{ padding: 24 }}>
-          Loading managed jobs...
+        <div style={{ display: "grid", gap: 12 }} aria-live="polite">
+          {[0, 1, 2].map((row) => (
+            <div
+              key={row}
+              className="fc-panel"
+              style={{ padding: 18, display: "flex", justifyContent: "space-between", gap: 16, alignItems: "center" }}
+            >
+              <div style={{ flex: "1 1 auto", minWidth: 0 }}>
+                <div className="fc-skeleton" style={{ width: 220, height: 18, borderRadius: 6, marginBottom: 6 }} />
+                <div style={{ display: "flex", gap: 12 }}>
+                  <div className="fc-skeleton" style={{ width: 100, height: 12, borderRadius: 4 }} />
+                  <div className="fc-skeleton" style={{ width: 80, height: 12, borderRadius: 4 }} />
+                </div>
+              </div>
+              <div className="fc-skeleton" style={{ width: 70, height: 26, borderRadius: 999 }} />
+            </div>
+          ))}
         </div>
       ) : jobs.length === 0 ? (
         <div className="fc-panel" style={{ padding: 32, textAlign: "center" }}>
@@ -765,18 +780,21 @@ export default function JobApplicantsRankingPanel() {
           </p>
         </div>
       ) : applicationsLoading ? (
-        <div className="fc-panel" style={{ padding: 32, textAlign: "center" }}>
-          <Spinner
-            size={28}
-            weight="light"
-            color="var(--accent)"
-            style={{
-              margin: "0 auto 10px",
-
-              animation: "fc-spin .8s linear infinite",
-            }}
-          />
-          Loading applicants for {selectedJob?.title}...
+        <div style={{ display: "grid", gap: 10 }} aria-live="polite">
+          {[0, 1, 2, 3].map((row) => (
+            <div
+              key={row}
+              className="fc-panel"
+              style={{ padding: 16, display: "flex", gap: 14, alignItems: "center" }}
+            >
+              <div className="fc-skeleton" style={{ width: 48, height: 48, borderRadius: "50%", flexShrink: 0 }} />
+              <div style={{ flex: "1 1 auto", minWidth: 0 }}>
+                <div className="fc-skeleton" style={{ width: "50%", height: 15, borderRadius: 5, marginBottom: 6 }} />
+                <div className="fc-skeleton" style={{ width: "70%", height: 12, borderRadius: 4 }} />
+              </div>
+              <div className="fc-skeleton" style={{ width: 56, height: 56, borderRadius: "50%", flexShrink: 0 }} />
+            </div>
+          ))}
         </div>
       ) : rankedApplications.length === 0 ? (
         <div className="fc-panel" style={{ padding: 32, textAlign: "center" }}>

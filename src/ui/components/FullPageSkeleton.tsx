@@ -1,3 +1,39 @@
+/**
+ * Minimal gate loader for the short period where HR company-profile access is
+ * still unresolved. Authenticated route navigation must render the actual
+ * screen immediately and must not use this as a page-level fallback.
+ */
+export function ContentAreaLoader() {
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        minHeight: 240,
+        color: "var(--text-secondary)",
+        fontSize: 13,
+        gap: 10,
+      }}
+      aria-live="polite"
+    >
+      <span
+        className="fitcv-spin"
+        style={{
+          width: 18,
+          height: 18,
+          borderRadius: "50%",
+          border: "2px solid var(--border)",
+          borderTopColor: "var(--accent, var(--text-secondary))",
+          animation: "fc-spin 0.8s linear infinite",
+          display: "inline-block",
+        }}
+      />
+      Loading…
+    </div>
+  )
+}
+
 export default function FullPageSkeleton() {
   return (
     <div

@@ -4,6 +4,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import type { ReportSummary } from "@/types/reports"
 
+import { setCachedResource } from "@/services/resourceCache"
+import { trailingDaysWindow } from "@/services/reportMetrics"
+
 const reportsMocks = vi.hoisted(() => ({ summary: vi.fn() }))
 
 vi.mock("@/api/reportsApi", () => ({ reportsApi: reportsMocks }))
@@ -125,6 +128,22 @@ describe("HRDashboard", () => {
     reportsMocks.summary.mockResolvedValue(summary)
   })
 
+  it("renders the hero immediately before data arrives", () => {
+    // Synchronous render — data has not resolved yet.
+    const unresolved = vi.fn().mockImplementation(
+      () => new Promise(() => {}),
+    )
+    reportsMocks.summary.mockImplementation(unresolved)
+
+    render(<HRDashboard onNavigate={onNavigate} />)
+
+    // Hero title and description must be visible immediately, not hidden
+    // behind a full-page skeleton.
+    expect(screen.getByText("HR Dashboard")).toBeInTheDocument()
+
+    expect(screen.getByText(/Last 30 days/)).toBeInTheDocument()
+  })
+
   it("renders real KPI values and job rows", async () => {
     render(<HRDashboard onNavigate={onNavigate} />)
 
@@ -185,7 +204,7 @@ describe("HRDashboard", () => {
     ).toBeInTheDocument()
   })
 
-  it("shows an error and retries", async () => {
+  it("shows an error and retries, but the hero stays visible during error", async () => {
     reportsMocks.summary
 
       .mockRejectedValueOnce(new Error("Reports API unavailable."))
@@ -198,10 +217,30 @@ describe("HRDashboard", () => {
       await screen.findByText("Could not load the dashboard."),
     ).toBeInTheDocument()
 
+    // Hero must remain visible even when the data section shows an error.
+    expect(screen.getByText("HR Dashboard")).toBeInTheDocument()
+
     fireEvent.click(screen.getByRole("button", { name: "Retry" }))
 
     expect(
       await screen.findByText("Senior Backend Developer"),
     ).toBeInTheDocument()
+  })
+
+  it("renders cached data immediately on revisit (no skeleton flash)", () => {
+    const range = trailingDaysWindow(30)
+    const cacheKey = `hr-dashboard:summary:${range.from}:${range.to}`
+
+    // Pre-populate the cache as if the user already visited this screen.
+    setCachedResource(cacheKey, summary)
+
+    // The API should NOT be called again on initial render when cache exists.
+    reportsMocks.summary.mockClear()
+
+    render(<HRDashboard onNavigate={onNavigate} />)
+
+    // Cached KPI data must be visible synchronously — no loading skeleton.
+    expect(screen.getByText("119")).toBeInTheDocument()
+    expect(screen.getByText("HR Dashboard")).toBeInTheDocument()
   })
 })

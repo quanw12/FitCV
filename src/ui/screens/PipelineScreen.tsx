@@ -893,8 +893,36 @@ export default function PipelineScreen() {
       )}
 
       {loading ? (
-        <div className="fc-card fc-card--pad" aria-live="polite">
-          Loading candidate pipeline...
+        <div
+          aria-live="polite"
+          style={{
+            display: "flex",
+            gap: 14,
+            overflowX: "auto",
+            padding: "4px 2px 12px",
+          }}
+        >
+          {stages.map((stage) => (
+            <section key={stage} style={{ minWidth: 210, flex: "0 0 210px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, padding: "0 2px" }}>
+                <div className="fc-skeleton" style={{ width: 8, height: 8, borderRadius: "50%" }} />
+                <div className="fc-skeleton" style={{ width: 60, height: 12, borderRadius: 4 }} />
+                <div className="fc-skeleton" style={{ width: 24, height: 18, borderRadius: 999, marginLeft: "auto" }} />
+              </div>
+              <div style={{ display: "grid", gap: 10 }}>
+                {[0, 1].map((card) => (
+                  <div key={card} className="fc-card fc-card--pad" style={{ minHeight: 100 }}>
+                    <div className="fc-skeleton" style={{ width: "60%", height: 15, borderRadius: 6, marginBottom: 8 }} />
+                    <div className="fc-skeleton" style={{ width: "40%", height: 12, borderRadius: 4, marginBottom: 12 }} />
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <div className="fc-skeleton" style={{ width: 50, height: 22, borderRadius: 999 }} />
+                      <div className="fc-skeleton" style={{ width: 60, height: 22, borderRadius: 999 }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          ))}
         </div>
       ) : error ? (
         <div

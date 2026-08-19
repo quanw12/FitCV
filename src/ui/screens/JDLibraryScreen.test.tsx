@@ -1,5 +1,7 @@
-import { render, screen } from "@testing-library/react"
+import { render, screen, waitFor } from "@testing-library/react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
+
+import { clearResourceCache } from "@/services/resourceCache"
 
 const apiMocks = vi.hoisted(() => ({
   listPublicJobs: vi.fn(),
@@ -32,6 +34,7 @@ import JDLibraryScreen from "./JDLibraryScreen"
 describe("JDLibraryScreen", () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    clearResourceCache()
     apiMocks.listPublicJobs.mockResolvedValue([])
     apiMocks.listApplications.mockResolvedValue([])
     apiMocks.listJds.mockResolvedValue([
@@ -60,6 +63,27 @@ describe("JDLibraryScreen", () => {
       preferredSkills: [{ skill: "Nessus", count: 1, percentage: 100 }],
       missingSkills: [{ skill: "Nessus", count: 2, percentage: 100 }],
     })
+  })
+
+  it("keeps real KPI and insight shells visible while values load", async () => {
+    apiMocks.getInsights.mockReturnValueOnce(new Promise(() => {}))
+
+    render(<JDLibraryScreen onViewTracking={vi.fn()} onUseJd={vi.fn()} />)
+
+    expect(screen.getByText("JD Library & Market Insights")).toBeInTheDocument()
+    expect(screen.getByText("Analyzed JDs")).toBeInTheDocument()
+    expect(screen.getByText("Completed matches")).toBeInTheDocument()
+    expect(screen.getByText("Average match")).toBeInTheDocument()
+    expect(screen.getByText("Most requested skills")).toBeInTheDocument()
+    expect(screen.getByText("Skills missing most")).toBeInTheDocument()
+    expect(screen.getByText("Saved analyses")).toBeInTheDocument()
+
+    expect(screen.getByLabelText("Loading Analyzed JDs")).toBeInTheDocument()
+    expect(
+      screen.getByLabelText("Loading Most requested skills"),
+    ).toBeInTheDocument()
+
+    await waitFor(() => expect(apiMocks.getInsights).toHaveBeenCalledOnce())
   })
 
   it("renders personal JD stats, requested skills, and recurring gaps", async () => {
