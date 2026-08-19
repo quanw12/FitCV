@@ -153,11 +153,45 @@ export default function HammerMascot({
       rafId = window.requestAnimationFrame(step)
     }
 
-    rafId = window.requestAnimationFrame(step)
+    /* The loop stops while the hero is off-screen: the sprite is invisible,
+       so its ticks are pure cost. Resuming resets the clock base so the first
+       delta after the pause is not the whole time away. */
+
+    let running = false
+
+    const startLoop = () => {
+      if (running) return
+      running = true
+      previous = performance.now()
+      rafId = window.requestAnimationFrame(step)
+    }
+
+    const stopLoop = () => {
+      if (!running) return
+      running = false
+      window.cancelAnimationFrame(rafId)
+    }
+
+    const observer =
+      typeof IntersectionObserver === "undefined"
+        ? null
+        : new IntersectionObserver(
+            (entries) => {
+              for (const entry of entries) {
+                if (entry.isIntersecting) startLoop()
+                else stopLoop()
+              }
+            },
+            { threshold: 0 },
+          )
+
+    startLoop()
+    observer?.observe(track)
     stage?.addEventListener("pointermove", onPointerMove)
 
     return () => {
-      window.cancelAnimationFrame(rafId)
+      stopLoop()
+      observer?.disconnect()
       stage?.removeEventListener("pointermove", onPointerMove)
     }
   }, [height, stageRef])

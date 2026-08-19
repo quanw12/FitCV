@@ -39,27 +39,6 @@
   transform: translateY(4px);
 }
 
-.lp-hs-note {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 4px;
-  border-radius: var(--lp-radius);
-  color: var(--lp-muted);
-  font-size: 13px;
-  text-decoration: none;
-  transition: color 160ms var(--lp-ease);
-}
-
-.lp-hs-note:hover {
-  color: var(--lp-accent);
-}
-
-.lp-hs-note:focus-visible {
-  outline: 2px solid var(--lp-accent);
-  outline-offset: 2px;
-}
-
 /* ---------- tag marquee ---------- */
 
 /* The rule spans the full shell width, so the padding lives on the strip
