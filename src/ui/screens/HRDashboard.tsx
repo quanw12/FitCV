@@ -5,12 +5,15 @@ import {
   BriefcaseBusiness,
   ChartColumn,
   FileCheck2,
+  Layers,
   Plus,
   RefreshCw,
+  Search,
   Sparkles,
   TrendingUp,
   TriangleAlert,
   Upload,
+  Zap,
 } from "lucide-react"
 
 import KpiStatCard from "@/ui/components/KpiStatCard"
@@ -63,6 +66,13 @@ const byReviewUrgency = (a: ReportJobRow, b: ReportJobRow) => {
   return a.title.localeCompare(b.title)
 }
 
+function getTimeOfDayGreeting() {
+  const hour = new Date().getHours()
+  if (hour < 12) return "Good morning"
+  if (hour < 18) return "Good afternoon"
+  return "Good evening"
+}
+
 export default function HRDashboard({ onNavigate }: HRDashboardProps) {
   const defaultRange = trailingDaysWindow(30)
   const cachedSummary = getCachedResource<ReportSummary>(
@@ -72,6 +82,8 @@ export default function HRDashboard({ onNavigate }: HRDashboardProps) {
     cachedSummary ?? null,
   )
   const [loadError, setLoadError] = useState("")
+  const [searchQuery, setSearchQuery] = useState("")
+  const [departmentFilter, setDepartmentFilter] = useState("all")
 
   const load = useCallback(async (force = false) => {
     const range = trailingDaysWindow(30)
@@ -109,10 +121,36 @@ export default function HRDashboard({ onNavigate }: HRDashboardProps) {
     ? `Last 30 days · ${formatWindowRange(windowRange)}`
     : "Last 30 days"
 
-  const sortedJobs = useMemo(
-    () => [...(summary?.jobs ?? [])].sort(byReviewUrgency),
-    [summary],
-  )
+  const departments = useMemo(() => {
+    const set = new Set<string>()
+    summary?.jobs.forEach((job) => {
+      if (job.department) set.add(job.department)
+    })
+    return Array.from(set)
+  }, [summary])
+
+  const sortedJobs = useMemo(() => {
+    let list = [...(summary?.jobs ?? [])].sort(byReviewUrgency)
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim()
+      list = list.filter(
+        (job) =>
+          job.title.toLowerCase().includes(q) ||
+          job.department?.toLowerCase().includes(q),
+      )
+    }
+    if (departmentFilter !== "all") {
+      list = list.filter((job) => job.department === departmentFilter)
+    }
+    return list
+  }, [summary, searchQuery, departmentFilter])
+
+  const pendingReviewTotal = useMemo(() => {
+    return (summary?.jobs ?? []).reduce(
+      (acc, job) => acc + pendingReviewCount(job.cv_count, job.review_progress),
+      0,
+    )
+  }, [summary])
 
   const statCards = [
     {
@@ -165,33 +203,198 @@ export default function HRDashboard({ onNavigate }: HRDashboardProps) {
     },
   ]
 
+  const greeting = getTimeOfDayGreeting()
+
   return (
     <div className="fc-stagger hr-dashboard">
+      {/* Inspiring Hero Banner */}
       <RevealStagger>
-        <div className="fc-page-head">
-          <div>
-            <div className="fc-eyebrow" style={{ marginBottom: 6 }}>
-              HR · Overview
+        <div className="hr-hero-banner">
+          <div className="hr-hero-banner__content">
+            <div className="hr-hero-banner__greeting">
+              <Sparkles size={14} />
+              Talent Intelligence Console
             </div>
-            <h1>HR Dashboard</h1>
-            <p>{subtitle}</p>
+            <h1>{greeting} · Ready to discover top talent?</h1>
+            <p>
+              AI-assisted screening is active across your recruitment cycles.{" "}
+              {pendingReviewTotal > 0
+                ? `You have ${pendingReviewTotal} candidate CVs awaiting review.`
+                : "All candidate CV reviews are currently up to date."}
+            </p>
           </div>
-          <div style={{ display: "flex", gap: 10 }}>
-            <button
-              className="fc-btn fc-btn--secondary"
-              onClick={() => onNavigate("cv-ranking")}
-            >
-              <Upload size={15} /> Upload CVs
-            </button>
-            <button
-              className="fc-btn fc-btn--primary"
-              onClick={() => onNavigate("job-posts")}
-            >
-              <Plus size={15} /> Create Job Post
-            </button>
+          <div className="hr-hero-banner__metrics">
+            <div className="hr-hero-banner__ai-pill">
+              <div
+                style={{
+                  width: 38,
+                  height: 38,
+                  borderRadius: 10,
+                  background: "var(--accent-soft)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  color: "var(--accent)",
+                }}
+              >
+                <Zap size={20} />
+              </div>
+              <div>
+                <strong>~14h Saved</strong>
+                <span>AI Automated Match</span>
+              </div>
+            </div>
           </div>
         </div>
       </RevealStagger>
+
+      {/* Quick Action Hub */}
+      <RevealStagger>
+        <div className="hr-quick-actions">
+          <button
+            type="button"
+            className="hr-quick-card"
+            onClick={() => onNavigate("cv-ranking")}
+          >
+            <div
+              className="hr-quick-card__icon"
+              style={{
+                background: "var(--accent-soft)",
+                color: "var(--accent)",
+              }}
+            >
+              <Upload size={22} />
+            </div>
+            <div className="hr-quick-card__info">
+              <span className="hr-quick-card__title">Upload &amp; Rank CVs</span>
+              <span className="hr-quick-card__desc">
+                Score up to 20 external CVs against a JD in seconds
+              </span>
+            </div>
+            <ArrowRight size={16} className="hr-quick-card__arrow" />
+          </button>
+
+          <button
+            type="button"
+            className="hr-quick-card"
+            onClick={() => onNavigate("job-posts")}
+          >
+            <div
+              className="hr-quick-card__icon"
+              style={{
+                background: "var(--success-soft)",
+                color: "var(--success)",
+              }}
+            >
+              <Plus size={22} />
+            </div>
+            <div className="hr-quick-card__info">
+              <span className="hr-quick-card__title">Create AI Job Post</span>
+              <span className="hr-quick-card__desc">
+                Paste raw JD or select 1-click popular role templates
+              </span>
+            </div>
+            <ArrowRight size={16} className="hr-quick-card__arrow" />
+          </button>
+
+          <button
+            type="button"
+            className="hr-quick-card"
+            onClick={() => onNavigate("pipeline")}
+          >
+            <div
+              className="hr-quick-card__icon"
+              style={{
+                background: "var(--warning-soft)",
+                color: "#92400e",
+              }}
+            >
+              <Layers size={22} />
+            </div>
+            <div className="hr-quick-card__info">
+              <span className="hr-quick-card__title">Candidate Pipeline</span>
+              <span className="hr-quick-card__desc">
+                Drag-and-drop candidates across screening to offer
+              </span>
+            </div>
+            <ArrowRight size={16} className="hr-quick-card__arrow" />
+          </button>
+        </div>
+      </RevealStagger>
+
+      {empty && !loadError ? (
+        <RevealStagger>
+          <div className="fc-card hr-getting-started">
+            <div className="hr-getting-started__head">
+              <span className="hr-getting-started__badge">Start here</span>
+              <div>
+                <h2>Your hiring workspace is ready</h2>
+                <p>
+                  Follow these steps to post a role, review candidates, and run
+                  your first hiring cycle.
+                </p>
+              </div>
+            </div>
+            <ol className="hr-getting-started__steps">
+              <li>
+                <span className="hr-getting-started__num">1</span>
+                <div>
+                  <strong>Create a job post</strong>
+                  <span>Publish the role you are hiring for.</span>
+                </div>
+                <button
+                  className="fc-btn fc-btn--primary hr-getting-started__cta"
+                  onClick={() => onNavigate("job-posts")}
+                >
+                  <Plus size={15} /> Create Job Post
+                </button>
+              </li>
+              <li>
+                <span className="hr-getting-started__num">2</span>
+                <div>
+                  <strong>Review candidates</strong>
+                  <span>
+                    Upload externally-sourced CVs or score applicants to your
+                    posts.
+                  </span>
+                </div>
+                <button
+                  className="fc-btn fc-btn--secondary hr-getting-started__cta"
+                  onClick={() => onNavigate("cv-ranking")}
+                >
+                  <Upload size={15} /> Go to CV Ranking
+                </button>
+              </li>
+              <li>
+                <span className="hr-getting-started__num">3</span>
+                <div>
+                  <strong>Move matches to Pipeline</strong>
+                  <span>Track shortlisted candidates through hiring stages.</span>
+                </div>
+                <button
+                  className="fc-btn fc-btn--secondary hr-getting-started__cta"
+                  onClick={() => onNavigate("pipeline")}
+                >
+                  Open Pipeline
+                </button>
+              </li>
+              <li>
+                <span className="hr-getting-started__num">4</span>
+                <div>
+                  <strong>Email shortlisted candidates</strong>
+                  <span>Send stage-aware messages from one place.</span>
+                </div>
+                <button
+                  className="fc-btn fc-btn--secondary hr-getting-started__cta"
+                  onClick={() => onNavigate("auto-email")}
+                >
+                  Open Auto Email
+                </button>
+              </li>
+            </ol>
+          </div>
+        </RevealStagger>
+      ) : null}
 
       {loadError ? (
         <RevealStagger>
@@ -282,13 +485,58 @@ export default function HRDashboard({ onNavigate }: HRDashboardProps) {
                   />
                   <h3>Job Posts by Review Load</h3>
                 </div>
-                <button
-                  onClick={() => onNavigate("job-posts")}
-                  className="fc-chip"
-                  style={{ cursor: "pointer", border: "none" }}
+
+                {/* Search & Department Filters */}
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 10,
+                    flexWrap: "wrap",
+                  }}
                 >
-                  View all <ArrowRight size={13} />
-                </button>
+                  <div className="fc-search" style={{ maxWidth: 220, padding: "6px 12px" }}>
+                    <Search size={14} color="var(--text-muted)" />
+                    <input
+                      type="text"
+                      placeholder="Search roles..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      style={{
+                        border: "none",
+                        background: "transparent",
+                        outline: "none",
+                        fontSize: 13,
+                        width: "100%",
+                        color: "var(--text-primary)",
+                      }}
+                    />
+                  </div>
+
+                  {departments.length > 0 && (
+                    <select
+                      className="fc-input"
+                      style={{ padding: "6px 10px", fontSize: 13, width: "auto" }}
+                      value={departmentFilter}
+                      onChange={(e) => setDepartmentFilter(e.target.value)}
+                    >
+                      <option value="all">All Departments</option>
+                      {departments.map((dep) => (
+                        <option key={dep} value={dep}>
+                          {dep}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+
+                  <button
+                    onClick={() => onNavigate("job-posts")}
+                    className="fc-chip"
+                    style={{ cursor: "pointer", border: "none" }}
+                  >
+                    View all <ArrowRight size={13} />
+                  </button>
+                </div>
               </div>
 
               {empty ? (
@@ -327,6 +575,17 @@ export default function HRDashboard({ onNavigate }: HRDashboardProps) {
                       style={{ height: 38, borderRadius: 10 }}
                     />
                   ))}
+                </div>
+              ) : sortedJobs.length === 0 ? (
+                <div
+                  style={{
+                    padding: "36px 20px",
+                    textAlign: "center",
+                    color: "var(--text-muted)",
+                    fontSize: 13,
+                  }}
+                >
+                  No job posts matched your search filters.
                 </div>
               ) : (
                 <div className="hr-dashboard__table-wrap">

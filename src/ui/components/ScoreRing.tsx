@@ -1,3 +1,5 @@
+import { memo } from "react"
+
 import { motion, useReducedMotion } from "motion/react"
 
 import { getScoreTone } from "@/services/matchScore"
@@ -14,7 +16,7 @@ interface ScoreRingProps {
   showLabel?: boolean
 }
 
-export default function ScoreRing({
+function ScoreRing({
   score,
   size = 100,
   strokeWidth = 10,
@@ -112,3 +114,5 @@ export default function ScoreRing({
     </motion.div>
   )
 }
+
+export default memo(ScoreRing)

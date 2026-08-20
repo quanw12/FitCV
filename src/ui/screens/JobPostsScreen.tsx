@@ -93,6 +93,95 @@ const requiredJobFields: Array<[keyof JobWrite, string]> = [
   ["requirements", "Requirements"],
 ]
 
+interface RoleTemplate {
+  name: string
+  icon: string
+  title: string
+  location: string
+  employment_type: string
+  about_job: string
+  responsibilities: string
+  requirements: string
+  we_offer: string
+  life_at_company: string
+  hiring_process: string
+  skill_weight: number
+  experience_weight: number
+  education_weight: number
+  soft_skill_weight: number
+}
+
+const ROLE_TEMPLATES: RoleTemplate[] = [
+  {
+    name: "Senior Frontend Engineer",
+    icon: "💻",
+    title: "Senior Frontend Engineer (React / TypeScript)",
+    location: "Ho Chi Minh City / Hybrid",
+    employment_type: "Full-time",
+    about_job: "We are seeking an experienced Senior Frontend Engineer to architect, build, and optimize next-generation web interfaces with high performance and accessibility.",
+    responsibilities: "• Architect responsive, scalable web applications using React, TypeScript, and modern CSS/Tailwind.\n• Collaborate with UX/UI designers and product managers to craft seamless user experiences.\n• Optimize web performance, Core Web Vitals, and client-side caching strategies.\n• Mentor junior developers and drive engineering best practices.",
+    requirements: "• 4+ years of professional experience with React, TypeScript, and modern frontend tools (Vite/Webpack).\n• Deep understanding of state management, browser rendering performance, and DOM optimization.\n• Solid experience with automated testing (Jest, Vitest, Playwright/Cypress).\n• Strong communication skills and collaborative team mindset.",
+    we_offer: "• Competitive salary package + 13th month bonus & equity options.\n• Flexible hybrid working model and high-end workstation gear.\n• Premium health insurance for employee & family.\n• Annual training budget & clear promotion paths.",
+    life_at_company: "A fast-paced, product-driven culture where innovation is rewarded and work-life balance is prioritized.",
+    hiring_process: "1. Initial screening chat (30 mins)\n2. Technical & architecture interview (60 mins)\n3. Culture fit with founders/engineering leads (45 mins)\n4. Offer & onboarding",
+    skill_weight: 45,
+    experience_weight: 30,
+    education_weight: 15,
+    soft_skill_weight: 10,
+  },
+  {
+    name: "Backend Engineer",
+    icon: "⚙️",
+    title: "Senior Backend Engineer (Node.js / Python)",
+    location: "Ho Chi Minh City / Remote",
+    employment_type: "Full-time",
+    about_job: "Join our core engineering team to build scalable microservices, resilient APIs, and data pipelines processing thousands of transactions daily.",
+    responsibilities: "• Design and maintain robust RESTful & GraphQL APIs using Node.js/Python.\n• Optimize SQL queries, database indexing (PostgreSQL/MySQL), and Redis caching.\n• Implement CI/CD automation and containerized deployments via Docker & Kubernetes.\n• Ensure system reliability, security compliance, and sub-100ms response times.",
+    requirements: "• 3+ years experience designing backend services in Python (FastAPI/Django) or Node.js/TypeScript.\n• Strong database proficiency with relational (PostgreSQL/MySQL) and NoSQL stores.\n• Experience with message queues (Kafka/RabbitMQ) and distributed caching.\n• Familiarity with cloud services (AWS/GCP) and CI/CD pipelines.",
+    we_offer: "• Top-tier compensation package.\n• Fully remote work option.\n• Comprehensive health and dental coverage.\n• Yearly wellness and home-office stipends.",
+    life_at_company: "Transparent engineering culture focused on code quality, automated testing, and continuous learning.",
+    hiring_process: "1. Phone screening (30 mins)\n2. System design & coding session (75 mins)\n3. Team fit discussion (45 mins)\n4. Offer letter",
+    skill_weight: 45,
+    experience_weight: 35,
+    education_weight: 10,
+    soft_skill_weight: 10,
+  },
+  {
+    name: "AI / ML Engineer",
+    icon: "🧠",
+    title: "AI / Machine Learning Engineer (LLMs & NLP)",
+    location: "Ho Chi Minh City / Hybrid",
+    employment_type: "Full-time",
+    about_job: "Looking for an innovative AI/ML Engineer to build intelligent pipelines, RAG systems, and LLM-powered features for our Talent Intelligence platform.",
+    responsibilities: "• Develop and fine-tune NLP/LLM models, prompt pipelines, and embeddings for text extraction.\n• Implement efficient Retrieval-Augmented Generation (RAG) architectures with Vector DBs.\n• Deploy, monitor, and optimize inference latency of generative AI microservices.\n• Conduct experimentations and benchmark AI performance against rubric metrics.",
+    requirements: "• Strong Python background and experience with PyTorch, LangChain/LlamaIndex, and HuggingFace.\n• Hands-on experience with OpenAI/Gemini/Claude APIs and vector search (Qdrant/Pinecone/Milvus).\n• Solid understanding of OCR, NER, text parsing, and classification algorithms.\n• BS/MS in Computer Science, Data Science, or related quantitative field.",
+    we_offer: "• Highly competitive compensation + AI compute credits & resources.\n• Direct impact on core AI products used by thousands.\n• Sponsorship for attending top AI/ML research conferences.\n• Full health insurance and flexible hours.",
+    life_at_company: "Pioneering AI-first team with open research sharing and fast execution velocity.",
+    hiring_process: "1. Intro call (30 mins)\n2. ML & architecture deep-dive (60 mins)\n3. Product alignment discussion (45 mins)\n4. Offer",
+    skill_weight: 50,
+    experience_weight: 30,
+    education_weight: 10,
+    soft_skill_weight: 10,
+  },
+  {
+    name: "Product Designer (UI/UX)",
+    icon: "🎨",
+    title: "Senior Product Designer (UI/UX & Design Systems)",
+    location: "Ho Chi Minh City",
+    employment_type: "Full-time",
+    about_job: "We are seeking a talented Product Designer with strong visual craft and user empathy to create intuitive, delightful digital experiences.",
+    responsibilities: "• Own end-to-end design workflows: user research, wireframing, high-fidelity UI, and interactive prototypes.\n• Maintain and expand our multi-brand design system in Figma.\n• Work closely with frontend engineers to ensure pixel-perfect implementation.\n• Conduct user testing and synthesize qualitative feedback into actionable design iterations.",
+    requirements: "• 3+ years in UX/UI and product design for SaaS or consumer apps.\n• Expert mastery of Figma, auto-layout, design tokens, and prototyping.\n• Proven portfolio demonstrating aesthetic excellence, typography hierarchy, and UX rigor.\n• Understanding of modern web capabilities (CSS/Tailwind, mobile responsiveness).",
+    we_offer: "• Competitive salary & creative bonus.\n• Latest MacBook Pro & 4K monitor setup.\n• Creative workshop and conference allowances.\n• Generous annual leave & wellness benefits.",
+    life_at_company: "Design-centric environment where every pixel matters and creative ideas are celebrated.",
+    hiring_process: "1. Portfolio review & intro (45 mins)\n2. Design challenge walkthrough (60 mins)\n3. Team culture chat (30 mins)\n4. Offer",
+    skill_weight: 45,
+    experience_weight: 30,
+    education_weight: 10,
+    soft_skill_weight: 15,
+  },
+]
+
 const hasTimezone = (value: string) => /(?:Z|[+-]\d{2}:?\d{2})$/i.test(value)
 const padDatePart = (value: number) => String(value).padStart(2, "0")
 
@@ -165,6 +254,7 @@ export default function JobPostsScreen() {
   } | null>(null)
   const [loadError, setLoadError] = useState("")
   const [formError, setFormError] = useState("")
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [actionError, setActionError] = useState("")
   const [success, setSuccess] = useState("")
   const [previewJob, setPreviewJob] = useState<JobPost | null>(null)
@@ -243,6 +333,13 @@ export default function JobPostsScreen() {
 
   const setField = (key: keyof JobWrite, value: string | number) => {
     setForm((current) => ({ ...current, [key]: value }))
+    if (fieldErrors[key]) {
+      setFieldErrors((current) => {
+        const next = { ...current }
+        delete next[key]
+        return next
+      })
+    }
   }
 
   const scrollToEditor = () => {
@@ -293,11 +390,61 @@ export default function JobPostsScreen() {
     scrollToEditor()
   }
 
+  const applyTemplate = (tpl: RoleTemplate) => {
+    setForm((current) => ({
+      ...current,
+      title: tpl.title,
+      location: tpl.location,
+      employment_type: tpl.employment_type,
+      about_job: tpl.about_job,
+      responsibilities: tpl.responsibilities,
+      requirements: tpl.requirements,
+      we_offer: tpl.we_offer,
+      life_at_company: tpl.life_at_company,
+      hiring_process: tpl.hiring_process,
+      skill_weight: tpl.skill_weight,
+      experience_weight: tpl.experience_weight,
+      education_weight: tpl.education_weight,
+      soft_skill_weight: tpl.soft_skill_weight,
+    }))
+    setSuccess(`Applied starter template: “${tpl.name}”. Review and adjust as needed!`)
+    setFormError("")
+  }
+
+  const applyWeightPreset = (preset: "standard" | "tech" | "experience") => {
+    if (preset === "standard") {
+      setForm((cur) => ({
+        ...cur,
+        skill_weight: 40,
+        experience_weight: 30,
+        education_weight: 20,
+        soft_skill_weight: 10,
+      }))
+    } else if (preset === "tech") {
+      setForm((cur) => ({
+        ...cur,
+        skill_weight: 50,
+        experience_weight: 30,
+        education_weight: 10,
+        soft_skill_weight: 10,
+      }))
+    } else if (preset === "experience") {
+      setForm((cur) => ({
+        ...cur,
+        skill_weight: 30,
+        experience_weight: 45,
+        education_weight: 15,
+        soft_skill_weight: 10,
+      }))
+    }
+  }
+
   const closeEditor = () => {
     setForm(createEmptyForm())
     setEditingId(null)
     setEditorOpen(false)
     setFormError("")
+    setFieldErrors({})
     setRawJobDescription("")
     setExtractionWarnings([])
   }
@@ -318,19 +465,19 @@ export default function JobPostsScreen() {
       const result = await jobsApi.extract(value)
       setForm((current) => ({
         ...current,
-        title: result.title || current.title,
-        about_job: result.about_job,
-        responsibilities: result.responsibilities,
-        requirements: result.requirements,
-        we_offer: result.we_offer,
-        life_at_company: result.life_at_company,
-        hiring_process: result.hiring_process,
-        location: result.location,
-        employment_type: result.employment_type,
+        title: current.title.trim() ? current.title : (result.title || ""),
+        about_job: current.about_job.trim() ? current.about_job : (result.about_job || ""),
+        responsibilities: current.responsibilities.trim() ? current.responsibilities : (result.responsibilities || ""),
+        requirements: current.requirements.trim() ? current.requirements : (result.requirements || ""),
+        we_offer: current.we_offer.trim() ? current.we_offer : (result.we_offer || ""),
+        life_at_company: current.life_at_company.trim() ? current.life_at_company : (result.life_at_company || ""),
+        hiring_process: current.hiring_process.trim() ? current.hiring_process : (result.hiring_process || ""),
+        location: current.location?.trim() ? current.location : (result.location || ""),
+        employment_type: current.employment_type?.trim() ? current.employment_type : (result.employment_type || ""),
       }))
       setExtractionWarnings(result.warnings)
       setSuccess(
-        "AI extracted a draft. Review every field before saving or publishing.",
+        "AI đã trích xuất thông tin. Các ô bạn đã nhập nội dung trước đó được giữ nguyên, chỉ các ô trống mới được điền tự động.",
       )
     } catch (cause) {
       setFormError(
@@ -343,34 +490,38 @@ export default function JobPostsScreen() {
 
   const save = async (event: FormEvent) => {
     event.preventDefault()
-    const missingRequiredFields = requiredJobFields
-      .filter(([key]) => !String(form[key] ?? "").trim())
-      .map(([, label]) => label)
-    if (missingRequiredFields.length > 0) {
-      setFormError(
-        `Complete the required fields before creating a job post: ${missingRequiredFields.join(", ")}.`,
-      )
-      return
-    }
-    if (Number(form.openings_count) < 1) {
-      setFormError("Openings must be at least 1.")
-      return
-    }
-    if (!weightsValid) {
-      setFormError(
-        "Each scoring weight must be between 0 and 100, with a total of 100%.",
-      )
-      return
-    }
+
+    const errors: Record<string, string> = {}
+    if (!form.title.trim()) errors.title = "Vui lòng nhập Chức danh tuyển dụng (Title)"
+    if (!form.about_job.trim()) errors.about_job = "Vui lòng nhập Giới thiệu công việc (About the job)"
+    if (!form.responsibilities.trim()) errors.responsibilities = "Vui lòng nhập Trách nhiệm công việc (Responsibilities)"
+    if (!form.requirements.trim()) errors.requirements = "Vui lòng nhập Yêu cầu công việc (Requirements)"
+    if (Number(form.openings_count) < 1) errors.openings_count = "Số lượng tuyển dụng phải từ 1 trở lên"
+    if (!weightsValid) errors.weights = "Tổng 4 trọng số chấm điểm phải bằng đúng 100%"
 
     const deadline = toUtcIso(form.deadline)
     if (deadline === undefined) {
-      setFormError("Enter a valid deadline.")
+      errors.deadline = "Vui lòng nhập hạn chót nhận hồ sơ hợp lệ"
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors)
+      setFormError("Vui lòng kiểm tra và điền các trường còn thiếu (được đánh dấu đỏ bên dưới).")
+      const firstKey = Object.keys(errors)[0]
+      const targetId = firstKey === "weights" ? "job-scoring-title" : `job-field-${firstKey}`
+      const fieldElem = document.getElementById(targetId)
+      if (fieldElem) {
+        fieldElem.scrollIntoView({ behavior: "smooth", block: "center" })
+        if ("focus" in fieldElem && typeof fieldElem.focus === "function") {
+          fieldElem.focus()
+        }
+      }
       return
     }
 
     setSaving(true)
     setFormError("")
+    setFieldErrors({})
     setActionError("")
     setSuccess("")
     try {
@@ -388,7 +539,7 @@ export default function JobPostsScreen() {
             job.job_id === updated.job_id ? updated : job,
           ),
         }))
-        setSuccess(`Saved changes to “${updated.title}”.`)
+        setSuccess(`Đã lưu thay đổi cho “${updated.title}”.`)
       } else {
         const created = await jobsApi.create(payload)
         commitManagedJobs((current) => ({
@@ -396,11 +547,18 @@ export default function JobPostsScreen() {
           active: [created, ...current.active],
         }))
         setListView("active")
-        setSuccess(`Created draft “${created.title}”.`)
+        setSuccess(`Đã tạo bài tuyển dụng “${created.title}”.`)
       }
       closeEditor()
     } catch (cause) {
-      setFormError(errorMessage(cause, "Could not save this job."))
+      const rawMsg = errorMessage(cause, "Could not save this job.")
+      if (rawMsg.toLowerCase().includes("company")) {
+        setFormError(
+          "Tài khoản HR của bạn chưa được liên kết với Công ty nào. Vui lòng vào Cài đặt / Hồ sơ HR (Profile) để cập nhật Tên công ty trước khi tạo bài đăng tuyển dụng.",
+        )
+      } else {
+        setFormError(rawMsg)
+      }
     } finally {
       setSaving(false)
     }
@@ -677,6 +835,29 @@ export default function JobPostsScreen() {
             </div>
           )}
 
+          {/* 1-Click Starter Role Templates */}
+          <div className="hr-template-group">
+            <div className="hr-template-group__head">
+              <span>⚡ 1-Click Starter Role Templates</span>
+              <small style={{ color: "var(--text-muted)", fontSize: 11 }}>
+                Instant complete JD, weights &amp; requirements
+              </small>
+            </div>
+            <div className="hr-template-chips">
+              {ROLE_TEMPLATES.map((tpl) => (
+                <button
+                  type="button"
+                  key={tpl.name}
+                  className="hr-template-chip"
+                  onClick={() => applyTemplate(tpl)}
+                >
+                  <span>{tpl.icon}</span>
+                  {tpl.name}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <section
             className="fc-panel"
             style={{ padding: 16, marginBottom: 18 }}
@@ -758,16 +939,38 @@ export default function JobPostsScreen() {
               <label style={{ gridColumn: "span 2" }}>
                 <span className="fc-field-label">Title *</span>
                 <input
+                  id="job-field-title"
                   className="fc-input"
+                  style={
+                    fieldErrors.title
+                      ? {
+                          borderColor: "var(--danger)",
+                          boxShadow: "0 0 0 2px var(--danger-soft)",
+                        }
+                      : undefined
+                  }
                   value={form.title}
                   onChange={(event) => setField("title", event.target.value)}
                   placeholder="e.g. Senior Backend Engineer"
                   required
                 />
+                {fieldErrors.title && (
+                  <span
+                    style={{
+                      color: "var(--danger)",
+                      fontSize: 12,
+                      marginTop: 4,
+                      display: "block",
+                    }}
+                  >
+                    {fieldErrors.title}
+                  </span>
+                )}
               </label>
               <label>
                 <span className="fc-field-label">Location</span>
                 <input
+                  id="job-field-location"
                   className="fc-input"
                   value={form.location ?? ""}
                   onChange={(event) => setField("location", event.target.value)}
@@ -777,6 +980,7 @@ export default function JobPostsScreen() {
               <label>
                 <span className="fc-field-label">Employment type</span>
                 <input
+                  id="job-field-employment_type"
                   className="fc-input"
                   value={form.employment_type ?? ""}
                   onChange={(event) =>
@@ -795,16 +999,46 @@ export default function JobPostsScreen() {
               <label>
                 <span className="fc-field-label">Deadline</span>
                 <input
+                  id="job-field-deadline"
                   className="fc-input"
+                  style={
+                    fieldErrors.deadline
+                      ? {
+                          borderColor: "var(--danger)",
+                          boxShadow: "0 0 0 2px var(--danger-soft)",
+                        }
+                      : undefined
+                  }
                   type="datetime-local"
                   value={form.deadline ?? ""}
                   onChange={(event) => setField("deadline", event.target.value)}
                 />
+                {fieldErrors.deadline && (
+                  <span
+                    style={{
+                      color: "var(--danger)",
+                      fontSize: 12,
+                      marginTop: 4,
+                      display: "block",
+                    }}
+                  >
+                    {fieldErrors.deadline}
+                  </span>
+                )}
               </label>
               <label>
                 <span className="fc-field-label">Openings</span>
                 <input
+                  id="job-field-openings_count"
                   className="fc-input"
+                  style={
+                    fieldErrors.openings_count
+                      ? {
+                          borderColor: "var(--danger)",
+                          boxShadow: "0 0 0 2px var(--danger-soft)",
+                        }
+                      : undefined
+                  }
                   type="number"
                   min={1}
                   value={form.openings_count ?? 1}
@@ -812,6 +1046,18 @@ export default function JobPostsScreen() {
                     setField("openings_count", Number(event.target.value))
                   }
                 />
+                {fieldErrors.openings_count && (
+                  <span
+                    style={{
+                      color: "var(--danger)",
+                      fontSize: 12,
+                      marginTop: 4,
+                      display: "block",
+                    }}
+                  >
+                    {fieldErrors.openings_count}
+                  </span>
+                )}
               </label>
             </div>
           </section>
@@ -828,18 +1074,42 @@ export default function JobPostsScreen() {
                 gap: 14,
               }}
             >
-              {sections.map(([key, label]) => (
-                <label key={key}>
-                  <span className="fc-field-label">{label}</span>
-                  <textarea
-                    className="fc-input"
-                    style={{ minHeight: 120 }}
-                    value={form[key] ?? ""}
-                    onChange={(event) => setField(key, event.target.value)}
-                    required={label.endsWith("*")}
-                  />
-                </label>
-              ))}
+              {sections.map(([key, label]) => {
+                const hasError = Boolean(fieldErrors[key])
+                return (
+                  <label key={key}>
+                    <span className="fc-field-label">{label}</span>
+                    <textarea
+                      id={`job-field-${key}`}
+                      className="fc-input"
+                      style={{
+                        minHeight: 120,
+                        ...(hasError
+                          ? {
+                              borderColor: "var(--danger)",
+                              boxShadow: "0 0 0 2px var(--danger-soft)",
+                            }
+                          : {}),
+                      }}
+                      value={form[key] ?? ""}
+                      onChange={(event) => setField(key, event.target.value)}
+                      required={label.endsWith("*")}
+                    />
+                    {hasError && (
+                      <span
+                        style={{
+                          color: "var(--danger)",
+                          fontSize: 12,
+                          marginTop: 4,
+                          display: "block",
+                        }}
+                      >
+                        {fieldErrors[key]}
+                      </span>
+                    )}
+                  </label>
+                )
+              })}
             </div>
           </section>
 
@@ -909,6 +1179,47 @@ export default function JobPostsScreen() {
                 </label>
               ))}
             </div>
+
+            <div className="hr-weight-presets">
+              <span style={{ fontSize: 11.5, fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase" }}>
+                1-Click Presets:
+              </span>
+              <button
+                type="button"
+                className="hr-weight-preset-btn"
+                onClick={() => applyWeightPreset("standard")}
+              >
+                ⚖️ Standard (40/30/20/10)
+              </button>
+              <button
+                type="button"
+                className="hr-weight-preset-btn"
+                onClick={() => applyWeightPreset("tech")}
+              >
+                ⚡ Technical (50/30/10/10)
+              </button>
+              <button
+                type="button"
+                className="hr-weight-preset-btn"
+                onClick={() => applyWeightPreset("experience")}
+              >
+                💼 Experience (30/45/15/10)
+              </button>
+            </div>
+
+            {fieldErrors.weights && (
+              <span
+                style={{
+                  color: "var(--danger)",
+                  fontSize: 12,
+                  marginTop: 8,
+                  display: "block",
+                  fontWeight: 600,
+                }}
+              >
+                {fieldErrors.weights}
+              </span>
+            )}
           </section>
 
           <div style={{ display: "flex", gap: 10 }}>

@@ -86,9 +86,16 @@ def save_profile(
                 if not company_name:
                     raise ValueError("Company name is required when creating a company.")
                 result = db.execute(insert(company).values(company_name=company_name))
-                company_id = result.inserted_primary_key[0]
+                inserted_pk = getattr(result, "inserted_primary_key", None)
+                company_id = inserted_pk[0] if (inserted_pk and len(inserted_pk) > 0 and inserted_pk[0]) else getattr(result, "lastrowid", None)
+                if company_id is None:
+                    # Fallback query if lastrowid is not exposed by driver
+                    company_id = db.execute(
+                        select(company.c.company_id).where(company.c.company_name == company_name).order_by(company.c.company_id.desc()).limit(1)
+                    ).scalar_one_or_none()
                 account.company_id = company_id
                 db.add(account)
+                db.flush()
 
             company_values: dict[str, object] = {}
             if company_name is not None:
@@ -108,9 +115,14 @@ def save_profile(
                     ).scalar_one_or_none()
                     if industry_id is None:
                         result = db.execute(insert(industry).values(industry_name=industry_name))
-                        industry_id = result.inserted_primary_key[0]
+                        inserted_ind_pk = getattr(result, "inserted_primary_key", None)
+                        industry_id = inserted_ind_pk[0] if (inserted_ind_pk and len(inserted_ind_pk) > 0 and inserted_ind_pk[0]) else getattr(result, "lastrowid", None)
+                        if industry_id is None:
+                            industry_id = db.execute(
+                                select(industry.c.industry_id).where(industry.c.industry_name == industry_name).order_by(industry.c.industry_id.desc()).limit(1)
+                            ).scalar_one_or_none()
                 company_values["industry_id"] = industry_id
-            if company_values:
+            if company_values and company_id is not None:
                 db.execute(update(company).where(company.c.company_id == company_id).values(**company_values))
 
         db.commit()
