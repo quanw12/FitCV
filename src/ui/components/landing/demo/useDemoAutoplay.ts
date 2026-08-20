@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react"
-import { useReducedMotion } from "framer-motion"
+
+import usePrefersReducedMotion from "./usePrefersReducedMotion"
 
 import type { DemoScene } from "./scenes"
 
@@ -37,7 +38,7 @@ export default function useDemoAutoplay({
   const [runId, setRunId] = useState(0)
   const [isUserPaused, setIsUserPaused] = useState(false)
   const [isVisible, setIsVisible] = useState(false)
-  const prefersReducedMotion = useReducedMotion()
+  const prefersReducedMotion = usePrefersReducedMotion()
 
   /* Guards the write-back in cleanup: a scene that already advanced must not
      have its successor's budget overwritten by the outgoing effect. */

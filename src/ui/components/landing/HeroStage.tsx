@@ -1,5 +1,5 @@
 import { useRef, useState, type CSSProperties, type RefObject } from "react"
-import { ArrowRight, ChartBar } from "@phosphor-icons/react"
+import { ArrowRight } from "@phosphor-icons/react"
 
 import HammerMascot from "./HammerMascot"
 
@@ -104,11 +104,6 @@ export default function HeroStage({ onGetStarted }: HeroStageProps) {
             </a>
           </div>
         </div>
-
-        <a className="lp-hs-note" href="#seekers">
-          <ChartBar size={14} weight="bold" />
-          See how the four category scores are built
-        </a>
       </div>
 
       <div className="lp-hero-foot">
