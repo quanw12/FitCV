@@ -624,26 +624,26 @@ export default function JobApplicantsRankingPanel() {
     : null
 
   return (
-    <div className="fc-stagger">
-      <div className="fc-page-head">
-        <div>
-          <div className="fc-eyebrow" style={{ marginBottom: 6 }}>
-            Job pipeline
-          </div>
-          <h1>Job Applicants</h1>
-          <p>Rank CVs already submitted to your company job posts.</p>
-        </div>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <button
-            type="button"
-            className="fc-btn fc-btn--primary"
-            onClick={() => void downloadAllCvs()}
-            disabled={
-              selectedJobId == null ||
-              applications.length === 0 ||
-              archiveLoading
-            }
-          >
+    <div className="fc-stagger job-applicants-ranking-panel">
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "flex-end",
+          gap: 8,
+          marginBottom: 16,
+          flexWrap: "wrap",
+        }}
+      >
+        <button
+          type="button"
+          className="fc-btn fc-btn--primary"
+          onClick={() => void downloadAllCvs()}
+          disabled={
+            selectedJobId == null ||
+            applications.length === 0 ||
+            archiveLoading
+          }
+        >
             {archiveLoading ? (
               <Spinner
                 size={15}
@@ -672,7 +672,6 @@ export default function JobApplicantsRankingPanel() {
             Refresh
           </button>
         </div>
-      </div>
 
       <section
         style={{

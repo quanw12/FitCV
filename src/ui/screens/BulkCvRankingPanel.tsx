@@ -454,19 +454,7 @@ export default function BulkCvRankingPanel() {
   }
 
   return (
-    <div className="fc-stagger">
-      <div className="fc-page-head">
-        <div>
-          <div className="fc-eyebrow" style={{ marginBottom: 6 }}>
-            Talent screening
-          </div>
-          <h1>Bulk CV Ranking</h1>
-          <p>
-            Screen an uploaded candidate batch against the JD supplied by HR.
-          </p>
-        </div>
-      </div>
-
+    <div className="fc-stagger bulk-cv-ranking-panel">
       <div style={{ marginBottom: 18 }}>
         <BezelCard>
           <section aria-labelledby="screening-history-title">

@@ -122,7 +122,7 @@ export default function App() {
   const [trackerFocusApplicationId, setTrackerFocusApplicationId] =
     useState<number | null>(null)
 
-  const [showLanding, setShowLanding] = useState(() => !authApi.getSession())
+  const [showLanding, setShowLanding] = useState(true)
   const [authEntryMode, setAuthEntryMode] = useState<AuthEntryMode>("login")
 
   const [companyProfileGate, setCompanyProfileGate] =
@@ -378,7 +378,7 @@ export default function App() {
 
   if (!authReady) return <FullPageSkeleton />
 
-  if (showLanding && !session) {
+  if (showLanding) {
     return (
       <Suspense fallback={<FullPageSkeleton />}>
         <LandingScreen
@@ -551,7 +551,17 @@ export default function App() {
         return <JobSearchScreen />
 
       case "profile":
-        return <ProfileScreen session={session} onSessionChange={setSession} />
+        return (
+          <ProfileScreen
+            session={session}
+            onSessionChange={setSession}
+            onProfileSaved={(profile) => {
+              if (isCompanyProfileComplete(profile)) {
+                setCompanyProfileGate("complete")
+              }
+            }}
+          />
+        )
 
       case "hr-dashboard":
         return <HRDashboard onNavigate={handleNavigate} />
@@ -572,7 +582,17 @@ export default function App() {
         return <ReportsScreen />
 
       case "hr-settings":
-        return <ProfileScreen session={session} onSessionChange={setSession} />
+        return (
+          <ProfileScreen
+            session={session}
+            onSessionChange={setSession}
+            onProfileSaved={(profile) => {
+              if (isCompanyProfileComplete(profile)) {
+                setCompanyProfileGate("complete")
+              }
+            }}
+          />
+        )
 
       default:
         return portal === "seeker" ? (

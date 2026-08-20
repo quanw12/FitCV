@@ -20,6 +20,7 @@ import {
 } from "@phosphor-icons/react"
 
 import { authApi, profileApi } from "@/api"
+import { clearResourceCache } from "@/services/resourceCache"
 
 import type { AuthSession } from "@/types/auth"
 
@@ -306,6 +307,8 @@ export default function ProfileScreen({
 
     try {
       const saved = await profileApi.update(update)
+      profileApi.clearCache()
+      clearResourceCache()
 
       setProfile(saved)
 
