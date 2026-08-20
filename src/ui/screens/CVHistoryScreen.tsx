@@ -35,7 +35,11 @@ import BezelCard from "@/ui/components/BezelCard"
 
 const MAX_CV_BYTES = 10 * 1024 * 1024
 
-const CV_HISTORY_CACHE_KEY = "cv-history:summary"
+const LEGACY_CV_HISTORY_CACHE_KEY = "cv-history:summary"
+
+const CV_HISTORY_VERSIONS_CACHE_KEY = "cv-history:versions"
+
+const CV_HISTORY_COMPARISONS_CACHE_KEY = "cv-history:comparisons"
 
 interface CvHistorySnapshot {
   cvs: CvVersion[]
@@ -46,16 +50,28 @@ interface CvHistorySnapshot {
 export default function CVHistoryScreen() {
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const cachedHistory =
-    getCachedResource<CvHistorySnapshot>(CV_HISTORY_CACHE_KEY)
-
-  const [cvs, setCvs] = useState<CvVersion[]>(cachedHistory?.cvs ?? [])
-
-  const [comparisons, setComparisons] = useState<CvComparisonSeries[]>(
-    cachedHistory?.comparisons ?? [],
+  const legacyCachedHistory = getCachedResource<CvHistorySnapshot>(
+    LEGACY_CV_HISTORY_CACHE_KEY,
   )
 
-  const [selectedJdId, setSelectedJdId] = useState<number | null>(null)
+  const cachedCvs =
+    getCachedResource<CvVersion[]>(CV_HISTORY_VERSIONS_CACHE_KEY) ??
+    legacyCachedHistory?.cvs
+
+  const cachedComparisons =
+    getCachedResource<CvComparisonSeries[]>(
+      CV_HISTORY_COMPARISONS_CACHE_KEY,
+    ) ?? legacyCachedHistory?.comparisons
+
+  const [cvs, setCvs] = useState<CvVersion[]>(cachedCvs ?? [])
+
+  const [comparisons, setComparisons] = useState<CvComparisonSeries[]>(
+    cachedComparisons ?? [],
+  )
+
+  const [selectedJdId, setSelectedJdId] = useState<number | null>(
+    cachedComparisons?.[0]?.jobDescriptionId ?? null,
+  )
 
   const [selected, setSelected] = useState<number[]>([])
 
@@ -64,7 +80,11 @@ export default function CVHistoryScreen() {
 
   const [comparisonLoading, setComparisonLoading] = useState(false)
 
-  const [loading, setLoading] = useState(() => !cachedHistory)
+  const [versionsLoading, setVersionsLoading] = useState(() => !cachedCvs)
+
+  const [comparisonsLoading, setComparisonsLoading] = useState(
+    () => !cachedComparisons,
+  )
 
   const [uploading, setUploading] = useState(false)
 
@@ -72,60 +92,100 @@ export default function CVHistoryScreen() {
 
   const [error, setError] = useState<string | null>(null)
 
-  const loadCvs = useCallback(async (force = false) => {
-    const cached = getCachedResource<CvHistorySnapshot>(CV_HISTORY_CACHE_KEY)
+  const loadVersions = useCallback(async (force = false) => {
+    const cached = getCachedResource<CvVersion[]>(
+      CV_HISTORY_VERSIONS_CACHE_KEY,
+    )
 
     if (cached && !force) {
-      setCvs(cached.cvs)
+      setCvs(cached)
 
-      setComparisons(cached.comparisons)
-
-      setLoading(false)
+      setVersionsLoading(false)
 
       return
     }
 
-    setLoading(!cached)
+    setVersionsLoading(!cached)
 
     setError(null)
 
     try {
-      const snapshot = await getOrFetchResource(
-        CV_HISTORY_CACHE_KEY,
-        async () => {
-          const [versions, scoreComparisons] = await Promise.all([
-            analyzerApi.listCvs(),
-
-            analyzerApi.listCvComparisons(),
-          ])
-
-          return { cvs: versions, comparisons: scoreComparisons }
-        },
+      const versions = await getOrFetchResource(
+        CV_HISTORY_VERSIONS_CACHE_KEY,
+        () => analyzerApi.listCvs(),
         { force },
       )
 
-      setCvs(snapshot.cvs)
-
-      setComparisons(snapshot.comparisons)
-
-      setSelectedJdId((current) =>
-        current != null &&
-        snapshot.comparisons.some((item) => item.jobDescriptionId === current)
-          ? current
-          : (snapshot.comparisons[0]?.jobDescriptionId ?? null),
-      )
+      setCvs(versions)
     } catch (caught) {
       setError(
         caught instanceof Error ? caught.message : "Unable to load CV history.",
       )
     } finally {
-      setLoading(false)
+      setVersionsLoading(false)
     }
   }, [])
 
+  const loadComparisons = useCallback(async (force = false) => {
+    const cached = getCachedResource<CvComparisonSeries[]>(
+      CV_HISTORY_COMPARISONS_CACHE_KEY,
+    )
+
+    if (cached && !force) {
+      setComparisons(cached)
+
+      setSelectedJdId((current) =>
+        current != null &&
+        cached.some((item) => item.jobDescriptionId === current)
+          ? current
+          : (cached[0]?.jobDescriptionId ?? null),
+      )
+
+      setComparisonsLoading(false)
+
+      return
+    }
+
+    setComparisonsLoading(!cached)
+
+    setError(null)
+
+    try {
+      const scoreComparisons = await getOrFetchResource(
+        CV_HISTORY_COMPARISONS_CACHE_KEY,
+        () => analyzerApi.listCvComparisons(),
+        { force },
+      )
+
+      setComparisons(scoreComparisons)
+
+      setSelectedJdId((current) =>
+        current != null &&
+        scoreComparisons.some((item) => item.jobDescriptionId === current)
+          ? current
+          : (scoreComparisons[0]?.jobDescriptionId ?? null),
+      )
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "Unable to load score improvement history.",
+      )
+    } finally {
+      setComparisonsLoading(false)
+    }
+  }, [])
+
+  const refreshHistory = useCallback(
+    async (force = false) => {
+      await Promise.all([loadVersions(force), loadComparisons(force)])
+    },
+    [loadComparisons, loadVersions],
+  )
+
   useEffect(() => {
-    void loadCvs()
-  }, [loadCvs])
+    void refreshHistory()
+  }, [refreshHistory])
 
   useEffect(() => {
     if (selected.length !== 2) {
@@ -196,9 +256,9 @@ export default function CVHistoryScreen() {
 
       toast.success("CV uploaded successfully")
 
-      clearResourceCache(CV_HISTORY_CACHE_KEY)
+      clearResourceCache("cv-history:")
 
-      await loadCvs(true)
+      await refreshHistory(true)
     } catch (caught) {
       setError(
         caught instanceof Error ? caught.message : "Unable to upload this CV.",
@@ -221,9 +281,9 @@ export default function CVHistoryScreen() {
 
       setSelected((current) => current.filter((id) => id !== cv.cvId))
 
-      clearResourceCache(CV_HISTORY_CACHE_KEY)
+      clearResourceCache("cv-history:")
 
-      await loadCvs(true)
+      await refreshHistory(true)
     } catch (caught) {
       setError(
         caught instanceof Error ? caught.message : "Unable to delete this CV.",
@@ -320,8 +380,8 @@ export default function CVHistoryScreen() {
           <button
             type="button"
             className="fitcv-btn-secondary"
-            onClick={() => void loadCvs(true)}
-            disabled={loading}
+            onClick={() => void refreshHistory(true)}
+            disabled={versionsLoading || comparisonsLoading}
           >
             <ArrowsClockwise size={15} weight="light" /> Refresh
           </button>
@@ -359,8 +419,12 @@ export default function CVHistoryScreen() {
         </div>
       )}
 
-      {comparisons.length > 0 && (
-        <div className="fitcv-card" style={{ padding: 24, marginBottom: 20 }}>
+      {(comparisonsLoading || comparisons.length > 0) && (
+        <div
+          className="fitcv-card"
+          style={{ padding: 24, marginBottom: 20 }}
+          aria-busy={comparisonsLoading && !activeComparison}
+        >
           <div
             style={{
               display: "flex",
@@ -392,24 +456,35 @@ export default function CVHistoryScreen() {
             </div>
             <label style={{ minWidth: 240 }}>
               <span className="fc-field-label">Comparison target</span>
-              <select
-                className="fc-input"
-                value={selectedJdId ?? ""}
-                onChange={(event) =>
-                  setSelectedJdId(Number(event.target.value))
-                }
-              >
-                {comparisons.map((item) => (
-                  <option
-                    key={item.jobDescriptionId}
-                    value={item.jobDescriptionId}
-                  >
-                    {item.title}
-                  </option>
-                ))}
-              </select>
+              {comparisonsLoading && comparisons.length === 0 ? (
+                <div
+                  className="fc-skeleton"
+                  aria-label="Loading comparison targets"
+                  style={{ width: "100%", height: 42, borderRadius: 10 }}
+                />
+              ) : (
+                <select
+                  className="fc-input"
+                  value={selectedJdId ?? ""}
+                  onChange={(event) =>
+                    setSelectedJdId(Number(event.target.value))
+                  }
+                >
+                  {comparisons.map((item) => (
+                    <option
+                      key={item.jobDescriptionId}
+                      value={item.jobDescriptionId}
+                    >
+                      {item.title}
+                    </option>
+                  ))}
+                </select>
+              )}
             </label>
           </div>
+          {comparisonsLoading && !activeComparison && (
+            <ScoreImprovementSkeleton />
+          )}
           {activeComparison && (
             <>
               <div
@@ -546,7 +621,7 @@ export default function CVHistoryScreen() {
         </div>
       )}
 
-      {!loading && cvs.length > 0 && comparisons.length === 0 && (
+      {!comparisonsLoading && cvs.length > 0 && comparisons.length === 0 && (
         <div className="mb-4 flex items-center gap-2 text-sm text-zinc-500">
           <ChartBar size={16} weight="light" /> Analyze at least one CV against
           a JD to start the score history. Analyze two versions against the same
@@ -554,9 +629,28 @@ export default function CVHistoryScreen() {
         </div>
       )}
 
-      {loading ? (
-        <div className="fitcv-card" style={emptyStyle}>
-          Loading CV history…
+      {versionsLoading ? (
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+            gap: 14,
+            marginBottom: 24,
+          }}
+          aria-live="polite"
+        >
+          {[0, 1, 2, 3].map((row) => (
+            <div
+              key={row}
+              className="fitcv-card"
+              style={{ padding: 18 }}
+            >
+              <div className="fc-skeleton" style={{ width: "70%", height: 16, borderRadius: 6, marginBottom: 10 }} />
+              <div className="fc-skeleton" style={{ width: "50%", height: 13, borderRadius: 4, marginBottom: 8 }} />
+              <div className="fc-skeleton" style={{ width: "40%", height: 24, borderRadius: 999, marginBottom: 12 }} />
+              <div className="fc-skeleton" style={{ width: "100%", height: 7, borderRadius: 99 }} />
+            </div>
+          ))}
         </div>
       ) : cvs.length === 0 ? (
         <BezelCard>
@@ -975,6 +1069,35 @@ function ChangeLine({
   )
 }
 
+function ScoreImprovementSkeleton() {
+  return (
+    <div
+      role="status"
+      aria-label="Loading score improvement data"
+      style={{ marginTop: 16 }}
+    >
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <div
+          className="fc-skeleton"
+          style={{ width: 92, height: 24, borderRadius: 999 }}
+        />
+        <div
+          className="fc-skeleton"
+          style={{ width: 86, height: 24, borderRadius: 999 }}
+        />
+        <div
+          className="fc-skeleton"
+          style={{ width: 170, height: 24, borderRadius: 999 }}
+        />
+      </div>
+      <div
+        className="fc-skeleton"
+        style={{ width: "100%", height: 250, borderRadius: 12, marginTop: 18 }}
+      />
+    </div>
+  )
+}
+
 function ScoreBaseline({ point }: { point: CvScorePoint }) {
   return (
     <div
@@ -1336,24 +1459,4 @@ const alertStyle: React.CSSProperties = {
   marginBottom: 16,
 
   fontSize: 13,
-}
-
-const emptyStyle: React.CSSProperties = {
-  minHeight: 220,
-
-  display: "flex",
-
-  flexDirection: "column",
-
-  alignItems: "center",
-
-  justifyContent: "center",
-
-  gap: 8,
-
-  color: "var(--text-secondary)",
-
-  textAlign: "center",
-
-  padding: 24,
 }

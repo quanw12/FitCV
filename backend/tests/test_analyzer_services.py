@@ -1035,7 +1035,7 @@ Bachelor student using Splunk, Wireshark, and Python. Communication.""",
         algorithm_version, model_name = _selected_analyzer_config()
         self.assertTrue(algorithm_version.startswith("fitcv-gemini-"))
         self.assertLessEqual(len(algorithm_version), 50)
-        self.assertTrue(algorithm_version.endswith("-v8-s7"))
+        self.assertTrue(algorithm_version.endswith("-v9-s8"))
         self.assertEqual(model_name, "gemini-3.6-flash")
 
     def test_extracts_structured_cv_from_original_file(self) -> None:

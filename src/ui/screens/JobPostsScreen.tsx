@@ -1311,8 +1311,41 @@ export default function JobPostsScreen() {
         </div>
 
         {loading ? (
-          <div className="fc-card fc-card--pad" aria-live="polite">
-            Loading company jobs...
+          <div style={{ display: "grid", gap: 12 }} aria-live="polite">
+            {[0, 1, 2].map((row) => (
+              <div
+                key={row}
+                className="fc-card fc-card--pad"
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  gap: 18,
+                  flexWrap: "wrap",
+                }}
+              >
+                <div style={{ flex: "1 1 440px", minWidth: 0 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+                    <div>
+                      <div className="fc-skeleton" style={{ width: 220, height: 20, borderRadius: 6, marginBottom: 6 }} />
+                      <div style={{ display: "flex", gap: 12 }}>
+                        <div className="fc-skeleton" style={{ width: 100, height: 13, borderRadius: 4 }} />
+                        <div className="fc-skeleton" style={{ width: 130, height: 13, borderRadius: 4 }} />
+                      </div>
+                    </div>
+                    <div className="fc-skeleton" style={{ width: 70, height: 24, borderRadius: 999 }} />
+                  </div>
+                  <div className="fc-skeleton" style={{ width: "85%", height: 14, borderRadius: 4, marginTop: 12 }} />
+                  <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+                    <div className="fc-skeleton" style={{ width: 60, height: 22, borderRadius: 999 }} />
+                    <div className="fc-skeleton" style={{ width: 80, height: 22, borderRadius: 999 }} />
+                  </div>
+                </div>
+                <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+                  <div className="fc-skeleton" style={{ width: 36, height: 36, borderRadius: 9 }} />
+                  <div className="fc-skeleton" style={{ width: 36, height: 36, borderRadius: 9 }} />
+                </div>
+              </div>
+            ))}
           </div>
         ) : loadError ? (
           <div

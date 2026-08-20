@@ -1,6 +1,8 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
+import { clearResourceCache } from "@/services/resourceCache"
+
 const analyzerMocks = vi.hoisted(() => ({
   listCvs: vi.fn(),
   listCvComparisons: vi.fn(),
@@ -18,6 +20,7 @@ import CVHistoryScreen from "./CVHistoryScreen"
 describe("CVHistoryScreen", () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    clearResourceCache()
     analyzerMocks.listCvs.mockResolvedValue([
       {
         cvId: 1,
@@ -128,9 +131,25 @@ describe("CVHistoryScreen", () => {
     fireEvent.click(compareButtons[1])
 
     await waitFor(() => expect(screen.getByText("Version comparison")).toBeInTheDocument())
-    expect(screen.getByText("55.0%")).toBeInTheDocument()
-    expect(screen.getByText("82.0%")).toBeInTheDocument()
+    expect(screen.getAllByText("55.0%").length).toBeGreaterThan(0)
+    expect(screen.getAllByText("82.0%").length).toBeGreaterThan(0)
     expect(screen.getByText("+27.0 points")).toBeInTheDocument()
+  })
+
+  it("keeps the real score section visible while its data loads independently", async () => {
+    analyzerMocks.listCvComparisons.mockReturnValueOnce(new Promise(() => {}))
+
+    render(<CVHistoryScreen />)
+
+    expect(screen.getByText("Progress across CV versions")).toBeInTheDocument()
+    expect(
+      screen.getByLabelText("Loading score improvement data"),
+    ).toBeInTheDocument()
+
+    expect(await screen.findByText("cv-v1.pdf")).toBeInTheDocument()
+    expect(
+      screen.getByLabelText("Loading score improvement data"),
+    ).toBeInTheDocument()
   })
 
   it("shows a useful baseline bar instead of an empty line chart for one scored version", async () => {

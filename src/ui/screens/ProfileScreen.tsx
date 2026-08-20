@@ -432,26 +432,6 @@ export default function ProfileScreen({
 
   const avatarSrc = avatarPreview ?? profile?.avatarUrl ?? null
 
-  if (loading)
-    return (
-      <div
-        style={{
-          minHeight: 300,
-
-          display: "grid",
-
-          placeItems: "center",
-
-          color: "var(--text-muted)",
-        }}
-      >
-        <span style={{ display: "flex", alignItems: "center", gap: 9 }}>
-          <Spinner className="fitcv-spin" size={20} weight="light" /> Loading
-          profile...
-        </span>
-      </div>
-    )
-
   return (
     <div className="fitcv-profile-workspace">
       <style>{`.fitcv-profile-workspace{max-width:1120px;margin:0 auto;padding:34px 28px 64px}.fitcv-profile-workspace *{box-sizing:border-box}.fitcv-profile-grid{display:grid;grid-template-columns:292px minmax(0,1fr);gap:30px;align-items:start}.fitcv-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}.fitcv-profile-sidebar{display:grid;align-content:start;gap:14px;position:sticky;top:18px}.fitcv-profile-card{border:1px solid var(--border);border-radius:16px;background:var(--surface);padding:22px;box-shadow:0 12px 36px -34px rgba(15,23,42,.32)}.fitcv-profile-main{display:grid;gap:16px}.fitcv-profile-section{border:1px solid var(--border);border-radius:16px;background:var(--surface);padding:22px;box-shadow:0 12px 36px -34px rgba(15,23,42,.24)}.fitcv-profile-section h2{margin:0 0 18px;font:700 16px/1.35 var(--font-body);letter-spacing:-.02em}.fitcv-profile-field{display:grid;gap:7px;font-size:12px;font-weight:650;color:var(--text-secondary)}.fitcv-profile-field input{border-radius:9px!important;padding:11px 12px!important;transition:border-color .16s ease,box-shadow .16s ease}.fitcv-profile-field input:focus{border-color:var(--accent)!important;box-shadow:0 0 0 3px var(--accent-soft)}.fitcv-profile-kicker{display:flex;align-items:center;gap:8px;margin-bottom:10px;color:var(--accent);font-size:11px;font-weight:750;letter-spacing:.11em;text-transform:uppercase}.fitcv-profile-heading h1{font-size:34px!important;letter-spacing:-.045em}.fitcv-profile-heading p{max-width:540px;font-size:14px!important;line-height:1.6}.fitcv-profile-account dt{margin-top:12px;color:var(--text-muted);font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}.fitcv-profile-account dd{margin:3px 0 0;color:var(--text-primary);font-size:13px;word-break:break-word}.fitcv-profile-actions{display:flex;justify-content:flex-end;padding-top:4px}.fitcv-profile-actions button{border-radius:10px!important;padding:11px 16px!important;box-shadow:none!important}.fitcv-avatar-shell{border:1px solid #dbeafe!important;border-radius:50%!important;background:linear-gradient(145deg,#2563eb,#0f172a)!important}.fitcv-upload-zone{border-radius:12px!important;background:#fbfdff!important}.fitcv-profile-empty{border-left:2px solid var(--accent)}@keyframes fitcv-spin{to{transform:rotate(360deg)}}.fitcv-spin{animation:fitcv-spin 1s linear infinite}@media(max-width:820px){.fitcv-profile-grid{grid-template-columns:1fr}.fitcv-profile-sidebar{position:static;grid-template-columns:1fr 1fr}.fitcv-profile-heading h1{font-size:29px!important}}@media(max-width:620px){.fitcv-profile-workspace{padding:24px 16px 48px}.fitcv-form-grid,.fitcv-profile-sidebar{grid-template-columns:1fr}.fitcv-profile-section,.fitcv-profile-card{padding:18px}}`}</style>
@@ -524,6 +504,73 @@ export default function ProfileScreen({
           {success}
         </div>
       )}
+      {loading ? (
+        <div className="fitcv-profile-grid">
+          <aside className="fitcv-profile-sidebar">
+            <section className="fitcv-profile-card" style={{ textAlign: "center" }}>
+              <div
+                className="fc-skeleton"
+                style={{
+                  width: 88,
+                  height: 88,
+                  borderRadius: "50%",
+                  margin: "0 auto 14px",
+                }}
+              />
+              <div
+                className="fc-skeleton"
+                style={{ width: "60%", height: 16, borderRadius: 6, margin: "0 auto 6px" }}
+              />
+              <div
+                className="fc-skeleton"
+                style={{ width: "40%", height: 13, borderRadius: 6, margin: "0 auto" }}
+              />
+            </section>
+            <section className="fitcv-profile-card fitcv-profile-account">
+              <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 12 }}>
+                <div className="fc-skeleton" style={{ width: 17, height: 17, borderRadius: 4 }} />
+                <div className="fc-skeleton" style={{ width: "30%", height: 15, borderRadius: 4 }} />
+              </div>
+              {[1, 2, 3, 4].map((i) => (
+                <div key={i}>
+                  <div className="fc-skeleton" style={{ width: "50%", height: 10, borderRadius: 4, marginTop: 12 }} />
+                  <div className="fc-skeleton" style={{ width: "80%", height: 13, borderRadius: 4, marginTop: 3 }} />
+                </div>
+              ))}
+            </section>
+          </aside>
+          <div className="fitcv-profile-main">
+            <section className="fitcv-profile-section">
+              <div className="fc-skeleton" style={{ width: "35%", height: 18, borderRadius: 6, marginBottom: 18 }} />
+              <div className="fitcv-form-grid">
+                {[1, 2].map((i) => (
+                  <div key={i}>
+                    <div className="fc-skeleton" style={{ width: "40%", height: 12, borderRadius: 4, marginBottom: 7 }} />
+                    <div className="fc-skeleton" style={{ width: "100%", height: 40, borderRadius: 9 }} />
+                  </div>
+                ))}
+              </div>
+            </section>
+            {hasCompanyRole && (
+              <section className="fitcv-profile-section">
+                <div className="fc-skeleton" style={{ width: "40%", height: 18, borderRadius: 6, marginBottom: 18 }} />
+                <div className="fitcv-form-grid">
+                  {[1, 2, 3, 4].map((i) => (
+                    <div key={i}>
+                      <div className="fc-skeleton" style={{ width: "40%", height: 12, borderRadius: 4, marginBottom: 7 }} />
+                      <div className="fc-skeleton" style={{ width: "100%", height: 40, borderRadius: 9 }} />
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+            <section className="fitcv-profile-section">
+              <div className="fc-skeleton" style={{ width: "35%", height: 18, borderRadius: 6, marginBottom: 18 }} />
+              <div className="fc-skeleton" style={{ width: "100%", height: 80, borderRadius: 12 }} />
+            </section>
+          </div>
+        </div>
+      ) : (
       <form onSubmit={submit} className="fitcv-profile-grid">
         <aside className="fitcv-profile-sidebar">
           <section
@@ -869,6 +916,7 @@ export default function ProfileScreen({
           </div>
         </div>
       </form>
+      )}
     </div>
   )
 }
