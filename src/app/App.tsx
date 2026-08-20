@@ -60,13 +60,13 @@ import JobPostsScreen from "@/ui/screens/JobPostsScreen"
 
 import JobSearchScreen from "@/ui/screens/JobSearchScreen"
 
-import LandingScreen from "@/ui/screens/LandingScreen"
-
 import PipelineScreen from "@/ui/screens/PipelineScreen"
 
 import ProfileScreen from "@/ui/screens/ProfileScreen"
 
 import ReportsScreen from "@/ui/screens/ReportsScreen"
+
+const LandingScreen = lazy(() => import("@/ui/screens/LandingScreen"))
 
 const PublicJobScreen = lazy(() => import("@/ui/screens/PublicJobScreen"))
 

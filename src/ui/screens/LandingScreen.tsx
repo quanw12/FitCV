@@ -1,9 +1,11 @@
 import { useEffect, useRef, type PointerEvent, type ReactNode } from "react"
 import {
   ArrowRight,
+  BookOpen,
   Briefcase,
   Buildings,
   ChartBar,
+  EnvelopeSimple,
   FileText,
   MagnifyingGlass,
   ShieldCheck,
@@ -58,6 +60,11 @@ const SEEKER_FEATURES: Feature[] = [
     title: "Find matching jobs with AI",
     copy: "Select a parsed CV and FitCV scans freehire.me and LinkedIn for jobs that match your skills, experience and location — no manual searching needed.",
   },
+  {
+    icon: <BookOpen size={18} weight="duotone" />,
+    title: "See what the market asks for",
+    copy: "Every scored job description is saved to your JD library, where market insights show the skills employers request most and the ones candidates miss most.",
+  },
 ]
 
 const HR_FEATURES: Feature[] = [
@@ -85,6 +92,11 @@ const HR_FEATURES: Feature[] = [
     icon: <FileText size={18} weight="duotone" />,
     title: "Upload external CVs and rank them",
     copy: "Paste a job description, upload up to 20 CVs from your own sourcing, and FitCV parses, scores and ranks them side by side — no FitCV job post required.",
+  },
+  {
+    icon: <EnvelopeSimple size={18} weight="duotone" />,
+    title: "Draft candidate emails, approve before send",
+    copy: "Stage-aware templates draft outreach and replies for you. Nothing leaves FitCV until you review and approve it — AI never sends on its own.",
   },
 ]
 
@@ -160,11 +172,27 @@ const HR_FLOW: TimelineSpec = {
   },
 }
 
+/* One rect read per frame no matter how many pointer events fire, so the
+   card spotlight tracks the pointer without forcing layout on every move. */
+
+let glowFrame = 0
+let glowCard: HTMLElement | null = null
+let glowEvent: PointerEvent<HTMLElement> | null = null
+
 function handleCardPointerMove(event: PointerEvent<HTMLElement>) {
-  const card = event.currentTarget
-  const box = card.getBoundingClientRect()
-  card.style.setProperty("--lp-mx", `${event.clientX - box.left}px`)
-  card.style.setProperty("--lp-my", `${event.clientY - box.top}px`)
+  glowCard = event.currentTarget
+  glowEvent = event
+
+  if (glowFrame !== 0) return
+
+  glowFrame = window.requestAnimationFrame(() => {
+    glowFrame = 0
+    if (!glowCard || !glowEvent) return
+
+    const box = glowCard.getBoundingClientRect()
+    glowCard.style.setProperty("--lp-mx", `${glowEvent.clientX - box.left}px`)
+    glowCard.style.setProperty("--lp-my", `${glowEvent.clientY - box.top}px`)
+  })
 }
 
 export default function LandingScreen({
@@ -404,11 +432,19 @@ export default function LandingScreen({
 
       <footer className="lp-footer">
         <div className="lp-footer-inner">
-          <span className="lp-brand">
-            <BrandMark size={26} className="lp-brand-mark" />
-            FitCV
-          </span>
-          <p>CV analysis, rebuilding and application tracking.</p>
+          <div className="lp-footer-brand">
+            <span className="lp-brand">
+              <BrandMark size={26} className="lp-brand-mark" />
+              FitCV
+            </span>
+            <p>CV analysis, rebuilding and application tracking.</p>
+          </div>
+
+          <div className="lp-footer-links">
+            <a href="#seekers">Job seekers</a>
+            <a href="#recruiters">Recruiters</a>
+            <span className="lp-footer-copy">© 2026 FitCV</span>
+          </div>
         </div>
       </footer>
     </div>

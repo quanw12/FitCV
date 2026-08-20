@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react"
-import { useReducedMotion } from "framer-motion"
+
+import usePrefersReducedMotion from "./usePrefersReducedMotion"
 
 export interface CountUpProps {
   to: number
@@ -33,7 +34,7 @@ export default function CountUp({
 }: CountUpProps) {
   const nodeRef = useRef<HTMLSpanElement>(null)
   const elapsedRef = useRef(0)
-  const prefersReducedMotion = useReducedMotion()
+  const prefersReducedMotion = usePrefersReducedMotion()
 
   useEffect(() => {
     const node = nodeRef.current

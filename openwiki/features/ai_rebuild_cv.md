@@ -21,6 +21,8 @@ When a student uploads a CV, this feature:
 
 The entire process runs in a temporary directory and does not store files persistently or modify the database.
 
+When the student has previously reviewed and approved improvement suggestions (via the AI Improvement Suggestions feature), those approved skill-gap additions can be incorporated into the rebuilt CV.
+
 ## How It Works
 
 ### Processing Pipeline
@@ -34,6 +36,10 @@ Uploaded PDF/DOCX
         → Thumbnail Generation (First page of PDF)
         → Return: preview_json, pdf_base64, thumbnail_base64
 ```
+When approved skill-gap improvements are provided (from the AI Improvement Suggestions feature), the extractor uses them to:
+- Allow the exact approved skill names to be considered as valid (even if not found in the source CV)
+- Filter out other unfounded skill claims that are not covered by the approved skills
+The normalization step then ensures that skills are not duplicated across the flat skills list and skill groups.
 
 ### Key Characteristics
 
@@ -43,6 +49,8 @@ Uploaded PDF/DOCX
 - **Headless Chromium**: Relies on Playwright-installed Chromium for PDF rendering.
 - **Source-Grounded**: Gemini extraction is validated against the source document; unsupported evidence is removed.
 - **Structured Output**: Uses Pydantic to validate Gemini's JSON response.
+- **Approved Skill-Gap Incorporation**: When student-approved skill-gap improvements are provided, those exact skill names can be added to the CV (filtered to prevent over-generation).
+- **Skill Deduplication**: Prevents duplicate skill entries across the flat skills list and skill groups sections.
 
 ## Configuration
 
@@ -93,8 +101,9 @@ OCR_MAX_OUTPUT_TOKENS=20000
 1. Log in as a Student.
 2. Navigate to the CV upload section (likely in the CV & JD Match Analyzer or profile section).
 3. Click to upload a CV file (PDF or DOCX, max 10 MB).
-4. Wait for processing (typically a few seconds).
-5. Receive:
+4. [Optional] If you have previously generated and approved improvement suggestions (see [AI Improvement Suggestions](./ai_improvement_suggestions.md)), you can choose to apply them now.
+5. Wait for processing (typically a few seconds).
+6. Receive:
    - A JSON preview of the extracted CV data (can be reviewed for accuracy).
    - A base64-encoded PDF that can be decoded and saved or displayed.
    - A base64-encoded thumbnail of the PDF (for preview).

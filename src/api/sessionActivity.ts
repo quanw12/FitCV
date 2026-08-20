@@ -1,7 +1,7 @@
 import { expireStoredSession, getStoredSession } from "./authSession"
 import { requestJson } from "./httpClient"
 
-export const SESSION_IDLE_TIMEOUT_MS = 60 * 60 * 1000
+export const SESSION_IDLE_TIMEOUT_MS = 3 * 60 * 60 * 1000
 const ACTIVITY_REPORT_INTERVAL_MS = 60 * 1000
 const LAST_ACTIVITY_KEY = "fitcv.auth.lastActivityAt"
 
@@ -30,7 +30,10 @@ export function initializeSessionActivity(now = Date.now()): void {
 export function startSessionActivityMonitoring(): () => void {
   let timer: number | undefined
   let stopped = false
-  let lastReportedAt = Date.now()
+  // A restored page must report its first real user action immediately. Otherwise
+  // the backend can retain an older last_used_at while the browser has a new
+  // local activity timestamp.
+  let lastReportedAt: number | null = null
 
   const schedule = () => {
     if (timer !== undefined) window.clearTimeout(timer)
@@ -73,7 +76,12 @@ export function startSessionActivityMonitoring(): () => void {
 
     writeLastActivity(now)
     schedule()
-    if (now - lastReportedAt < ACTIVITY_REPORT_INTERVAL_MS) return
+    if (
+      lastReportedAt !== null &&
+      now - lastReportedAt < ACTIVITY_REPORT_INTERVAL_MS
+    ) {
+      return
+    }
 
     lastReportedAt = now
     void requestJson<void>("/api/auth/activity", {
@@ -97,9 +105,17 @@ export function startSessionActivityMonitoring(): () => void {
     if (event.key === LAST_ACTIVITY_KEY) checkIdle()
   }
 
-  window.addEventListener("pointerdown", recordHumanActivity, { passive: true })
-  window.addEventListener("keydown", recordHumanActivity)
-  window.addEventListener("touchstart", recordHumanActivity, { passive: true })
+  const passiveCapture = { passive: true, capture: true }
+
+  window.addEventListener("pointerdown", recordHumanActivity, passiveCapture)
+  window.addEventListener("keydown", recordHumanActivity, true)
+  window.addEventListener("touchstart", recordHumanActivity, passiveCapture)
+  window.addEventListener("wheel", recordHumanActivity, passiveCapture)
+  window.addEventListener("scroll", recordHumanActivity, passiveCapture)
+  window.addEventListener("click", recordHumanActivity, true)
+  window.addEventListener("input", recordHumanActivity, true)
+  window.addEventListener("change", recordHumanActivity, true)
+  document.addEventListener("scroll", recordHumanActivity, passiveCapture)
   window.addEventListener("focus", onFocus)
   window.addEventListener("storage", onStorage)
   document.addEventListener("visibilitychange", onVisibilityChange)
@@ -108,9 +124,15 @@ export function startSessionActivityMonitoring(): () => void {
   return () => {
     stopped = true
     if (timer !== undefined) window.clearTimeout(timer)
-    window.removeEventListener("pointerdown", recordHumanActivity)
-    window.removeEventListener("keydown", recordHumanActivity)
-    window.removeEventListener("touchstart", recordHumanActivity)
+    window.removeEventListener("pointerdown", recordHumanActivity, true)
+    window.removeEventListener("keydown", recordHumanActivity, true)
+    window.removeEventListener("touchstart", recordHumanActivity, true)
+    window.removeEventListener("wheel", recordHumanActivity, true)
+    window.removeEventListener("scroll", recordHumanActivity, true)
+    window.removeEventListener("click", recordHumanActivity, true)
+    window.removeEventListener("input", recordHumanActivity, true)
+    window.removeEventListener("change", recordHumanActivity, true)
+    document.removeEventListener("scroll", recordHumanActivity, true)
     window.removeEventListener("focus", onFocus)
     window.removeEventListener("storage", onStorage)
     document.removeEventListener("visibilitychange", onVisibilityChange)

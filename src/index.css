@@ -108,8 +108,8 @@
   --sidebar-w-collapsed: 72px;
   --topbar-h: 64px;
 
-  --font-display: 'Cabinet Grotesk', 'Geist', system-ui, sans-serif;
-  --font-body: 'Geist', system-ui, -apple-system, sans-serif;
+  --font-display: 'Cabinet Grotesk', 'Geist Variable', system-ui, sans-serif;
+  --font-body: 'Geist Variable', system-ui, -apple-system, sans-serif;
   --font-serif: 'Fraunces Variable', 'Fraunces', Georgia, 'Times New Roman', serif;
 }
 
