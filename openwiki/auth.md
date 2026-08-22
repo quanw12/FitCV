@@ -26,7 +26,7 @@ The authentication system supports:
 - **Password Hashing**: bcrypt or similar (inferred from security practices)
 - **OAuth**: Google Identity Services for Google sign-in
 - **Rate Limiting**: Database-backed rate limiting for auth endpoints
-- **Session Idle Timeout**: 60 minutes of inactivity
+- **Session Idle Timeout**: 180 minutes of inactivity (3 hours)
 
 ## File Organization
 
@@ -95,7 +95,7 @@ Uses Google Identity Services:
 
 ### Session Security
 
-- **Idle Timeout**: Session expires after 60 minutes of no real user interaction (`SESSION_IDLE_TIMEOUT_MINUTES=60`)
+- **Idle Timeout**: Session expires after 180 minutes of no real user interaction (`SESSION_IDLE_TIMEOUT_MINUTES=180`)
 - **Frontend Activity Tracking**: Frontend sends `/api/auth/activity` on pointer, keyboard, touch, or tab focus events
 - **Cookie Settings**:
   - Development: `REFRESH_COOKIE_SECURE=false`
