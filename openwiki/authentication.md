@@ -78,7 +78,7 @@ FitCV implements a comprehensive authentication system with multiple providers, 
 - **Implementation**: 
   - Backend: `/backend/app/services/auth_rate_limit.py` (also handles rate limiting) and `/backend/app/repositories/auth_sessions.py` track session creation and last activity.
   - Frontend: `/src/api/sessionActivity.ts` and `/src/api/authSession.ts` manage session heartbeat and timeout warnings.
-  - Configuration: Timeout duration is set in `/backend/app/core/config.py` (e.g., `SESSION_IDLE_TIMEOUT_MINUTES`).
+  - Configuration: Timeout duration is set in `/backend/app/core/config.py` (currently `SESSION_IDLE_TIMEOUT_MINUTES = 180` minutes, i.e., 3 hours).
   - Tests: `/backend/tests/test_session_idle_timeout.py` verifies timeout behavior and extension on activity.
 
 ### Password Reset
@@ -113,5 +113,5 @@ FitCV implements role-based access control to restrict system access based on us
 - **Implementation**: 
   - Backend: `/backend/app/services/auth_rate_limit.py` (also handles rate limiting) and `/backend/app/repositories/auth_sessions.py` track session creation and last activity.
   - Frontend: `/src/api/sessionActivity.ts` and `/src/api/authSession.ts` manage session heartbeat and timeout warnings.
-  - Configuration: Timeout duration is set in `/backend/app/core/config.py` (e.g., `SESSION_IDLE_TIMEOUT_MINUTES`).
+  - Configuration: Timeout duration is set in `/backend/app/core/config.py` (currently `SESSION_IDLE_TIMEOUT_MINUTES = 180` minutes, i.e., 3 hours).
   - Tests: `/backend/tests/test_session_idle_timeout.py` verifies timeout behavior and extension on activity.

@@ -58,7 +58,7 @@ backend/
   - **reports.py**: Reporting and analytics endpoints
   - **profile.py**: User profile management
 - **backend/app/core**: Configuration, security settings, and utility functions
-- **backend/app/db**: Database engine setup, session management, and connection handling
+- **backend/app/db**: Database engine setup with conditional configuration for SQLite (allowing cross-thread use) vs. server databases (with connection pooling), session management, and connection handling
 - **backend/app/models**: SQLAlchemy ORM models representing database tables
 - **backend/app/repositories**: Data access layer that abstracts database operations
 - **backend/app/schemas**: Pydantic models for request validation and response serialization
@@ -133,7 +133,7 @@ backend/
    JWT_SECRET_KEY=<local-secret>
    ACCESS_TOKEN_EXPIRE_MINUTES=15
    REFRESH_TOKEN_EXPIRE_DAYS=30
-   SESSION_IDLE_TIMEOUT_MINUTES=60
+   SESSION_IDLE_TIMEOUT_MINUTES=180
    REFRESH_COOKIE_SECURE=false
    GOOGLE_CLIENT_ID=<google-oauth-client-id>
    CORS_ORIGINS=["http://localhost:5173","http://127.0.0.1:5173","https://fit-cv.vercel.app"]
