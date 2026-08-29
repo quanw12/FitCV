@@ -20,6 +20,7 @@ FitCV's backend is built with FastAPI, SQLAlchemy, and MySQL. This document outl
 - **Background Workers**: For AI processing tasks
 - **PDF Generation**: Headless Chromium (Playwright) for AI Rebuild CV feature
 - **Language**: Python 3.11+
+- **Configuration**: Pydantic Settings with environment variables
 
 ## File Organization
 
@@ -57,7 +58,7 @@ backend/
   - **email_workflow.py**: Email workflow management
   - **reports.py**: Reporting and analytics endpoints
   - **profile.py**: User profile management
-- **backend/app/core**: Configuration, security settings, and utility functions
+- **backend/app/core**: Configuration, security settings, and utility functions (includes `config.py` with Pydantic Settings)
 - **backend/app/db**: Database engine setup, session management, and connection handling
 - **backend/app/models**: SQLAlchemy ORM models representing database tables
 - **backend/app/repositories**: Data access layer that abstracts database operations
@@ -133,7 +134,7 @@ backend/
    JWT_SECRET_KEY=<local-secret>
    ACCESS_TOKEN_EXPIRE_MINUTES=15
    REFRESH_TOKEN_EXPIRE_DAYS=30
-   SESSION_IDLE_TIMEOUT_MINUTES=60
+   SESSION_IDLE_TIMEOUT_MINUTES=180
    REFRESH_COOKIE_SECURE=false
    GOOGLE_CLIENT_ID=<google-oauth-client-id>
    CORS_ORIGINS=["http://localhost:5173","http://127.0.0.1:5173","https://fit-cv.vercel.app"]

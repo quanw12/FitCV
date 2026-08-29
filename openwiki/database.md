@@ -99,6 +99,22 @@ Migration scripts are located in the `database/migrations/` directory. These are
 
 3. Ensure the backend runtime user has `SELECT`, `INSERT`, `UPDATE`, `DELETE` permissions on the `fitcv` database.
 
+### Database Session Handling
+
+The backend uses SQLAlchemy for database session management, configured in `backend/app/db/session.py`. Key features include:
+
+- **Connection Pooling**: For non-SQLite databases (like MySQL), a connection pool is configured with:
+  - `pool_size=10`
+  - `max_overflow=20`
+  - `pool_recycle=1800` (30 minutes)
+  - `pool_timeout=30` seconds
+  - `pool_pre_ping=True` to validate connections before use
+- **SQLite Support**: For SQLite (typically used in testing), the engine is configured with `connect_args={"check_same_thread": False}` to allow cross-thread use, and minimal pooling.
+- **Session Factory**: `SessionLocal` is configured with `autocommit=False` and `autoflush=False`.
+- **Dependency Injection**: The `get_db()` function provides a FastAPI dependency that yields a database session and ensures it is closed after use.
+
+These settings help manage database connections efficiently in a concurrent web application environment.
+
 ### For an Existing Database
 
 When deploying updates, run the necessary migration files in order. For example, to update to the latest schema:
