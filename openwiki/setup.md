@@ -93,7 +93,54 @@ Install headless Chromium for the AI Rebuild CV functionality:
 
 ### Environment Variables
 
-Create a `.env` file in the `backend` directory with necessary configuration (refer to backend documentation for required variables).
+Create a `.env` file in the `backend` directory with the following variables (based on `.env.example`):
+
+```env
+ENVIRONMENT=dev
+DATABASE_URL=mysql+pymysql://<db_user>:<url_encoded_password>@<db_host>:3306/fitcv
+# Development-only sentinel. Production rejects this value; replace it with a unique secret.
+JWT_SECRET_KEY=change-me-before-production
+ACCESS_TOKEN_EXPIRE_MINUTES=15
+REFRESH_TOKEN_EXPIRE_DAYS=30
+SESSION_IDLE_TIMEOUT_MINUTES=180
+REFRESH_COOKIE_NAME=fitcv_refresh
+# Set ENVIRONMENT=prod and this value to true for cross-site deployments.
+REFRESH_COOKIE_SECURE=false
+GOOGLE_CLIENT_ID=
+RESEND_API_KEY=
+RESEND_FROM_EMAIL=
+RESEND_WEBHOOK_SECRET=
+RESEND_INBOUND_DOMAIN=
+RESEND_TIMEOUT_SECONDS=15
+RESEND_MAX_RETRIES=2
+AVATAR_STORAGE=local
+BACKEND_PUBLIC_URL=http://127.0.0.1:8000
+CLOUDINARY_CLOUD_NAME=
+CLOUDINARY_API_KEY=
+CLOUDINARY_API_SECRET=
+ANALYZER_PROVIDER=deterministic
+GEMINI_API_KEY=
+GEMINI_MODEL=gemini-3.6-flash
+GEMINI_THINKING_LEVEL=high
+GEMINI_STRUCTURED_THINKING_LEVEL=low
+GEMINI_STRUCTURED_OUTPUT_TOKENS=24000
+GEMINI_TIMEOUT_SECONDS=90
+GEMINI_MAX_RETRIES=2
+OCR_PROVIDER=gemini
+OCR_MODEL=
+OCR_TIMEOUT_SECONDS=120
+OCR_MAX_OUTPUT_TOKENS=20000
+IMPROVEMENT_TASK_STALE_MINUTES=10
+AI_WORKER_ENABLED=true
+AI_WORKER_POLL_SECONDS=1
+AI_WORKER_LEASE_SECONDS=1800
+AI_WORKER_HEARTBEAT_SECONDS=30
+AI_TASK_MAX_ATTEMPTS=3
+IMPROVEMENT_MAX_CV_CHARS=120000
+IMPROVEMENT_MAX_JD_CHARS=60000
+UPLOAD_DIR=uploads
+CORS_ORIGINS=["http://localhost:5173","http://127.0.0.1:5173","https://fit-cv.vercel.app"]
+```
 
 ### Running the Backend
 

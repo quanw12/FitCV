@@ -17,6 +17,7 @@ FitCV's frontend is built with React 19, Vite, and Tailwind CSS v4. This documen
 - **Language**: TypeScript
 - **State Management**: React Context and hooks (inferred from structure)
 - **HTTP Client**: Likely fetch or axios (inferred from API calls)
+- **Configuration**: Vite configuration in `vite.config.ts`
 
 ## File Organization
 

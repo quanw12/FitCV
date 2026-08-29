@@ -43,6 +43,7 @@ FitCV provides specialized HR functionality for recruiters and hiring managers t
 - **Auto Email Screen**: `/src/ui/screens/AutoEmailScreen.tsx` - Configure and manage automated email sequences
 - **HR Dashboard**: `/src/ui/screens/HRDashboard.tsx` - Executive overview of recruitment metrics
 - **Job Applicants Ranking Panel**: `/src/ui/screens/JobApplicantsRankingPanel.tsx` - Rank candidates for a job
+- **Hiring Flow Component**: `/src/ui/components/HiringFlow.tsx` - Component for managing hiring flows
 
 ## HR-Focused Features
 
