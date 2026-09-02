@@ -25,7 +25,7 @@ import "./landing.css"
 
 interface LandingScreenProps {
   onGetStarted: () => void
-  onSignIn?: () => void
+  onSignIn: () => void
 }
 
 interface Feature {
@@ -197,7 +197,7 @@ function handleCardPointerMove(event: PointerEvent<HTMLElement>) {
 
 export default function LandingScreen({
   onGetStarted,
-  onSignIn = onGetStarted,
+  onSignIn,
 }: LandingScreenProps) {
   const rootRef = useRef<HTMLDivElement>(null)
   const headerRef = useRef<HTMLElement>(null)

@@ -223,28 +223,6 @@ export default function HRDashboard({ onNavigate }: HRDashboardProps) {
                 : "All candidate CV reviews are currently up to date."}
             </p>
           </div>
-          <div className="hr-hero-banner__metrics">
-            <div className="hr-hero-banner__ai-pill">
-              <div
-                style={{
-                  width: 38,
-                  height: 38,
-                  borderRadius: 10,
-                  background: "var(--accent-soft)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  color: "var(--accent)",
-                }}
-              >
-                <Zap size={20} />
-              </div>
-              <div>
-                <strong>~14h Saved</strong>
-                <span>AI Automated Match</span>
-              </div>
-            </div>
-          </div>
         </div>
       </RevealStagger>
 

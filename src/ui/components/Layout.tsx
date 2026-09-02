@@ -6,6 +6,7 @@ import FloatingTopbar from "./FloatingTopbar"
 import CommandPalette from "./CommandPalette"
 import ScrollMotion from "./ScrollMotion"
 import HiringFlow from "./HiringFlow"
+import SeekerFlow from "./SeekerFlow"
 
 import { getPortalNavigation } from "@/data/navigation"
 
@@ -176,11 +177,13 @@ export default function Layout({
           )}
         </div>
 
-        {portal === "hr" && (
-          <div className="fc-hiring-flow-wrap">
+        <div className="fc-hiring-flow-wrap">
+          {portal === "hr" ? (
             <HiringFlow currentScreen={currentScreen} onNavigate={onNavigate} />
-          </div>
-        )}
+          ) : (
+            <SeekerFlow currentScreen={currentScreen} onNavigate={onNavigate} />
+          )}
+        </div>
 
         <main className="fc-app-content">
           <ScrollMotion key={`${portal}-${currentScreen}`}>{children}</ScrollMotion>

@@ -130,15 +130,17 @@ def select_role(
     session_id = getattr(request.state, "auth_session_id", None)
     if not session_id:
         raise HTTPException(status_code=401, detail="Authenticated session is missing.")
-    auth_rate_limit.consume(
+    key = auth_rate_limit.consume(
         db,
         action="select_role",
         request=request,
         identifier=str(account.account_id),
     )
-    return auth_service.select_role(
+    issued = auth_service.select_role(
         db, account=account, role=payload.role, session_id=session_id
     )
+    auth_rate_limit.clear(db, key)
+    return issued
 
 
 @router.post("/refresh", response_model=AuthSession)

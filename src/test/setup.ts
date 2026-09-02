@@ -32,6 +32,11 @@ Object.defineProperty(globalThis, "IntersectionObserver", {
   value: IntersectionObserverMock,
 })
 
+if (typeof window !== "undefined" && window.HTMLElement) {
+  window.HTMLElement.prototype.scrollIntoView =
+    window.HTMLElement.prototype.scrollIntoView || (() => {})
+}
+
 const localStorageValues = new Map<string, string>()
 Object.defineProperty(window, "localStorage", {
   configurable: true,

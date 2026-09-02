@@ -35,6 +35,7 @@ import {
 import { jobsApi } from "@/api/jobsApi"
 import { pipelineApi } from "@/api/pipelineApi"
 import {
+  clearResourceCache,
   getCachedResource,
   getOrFetchResource,
   setCachedResource,
@@ -247,11 +248,15 @@ export default function PipelineScreen() {
     ) => {
       setApplications((current) => {
         const next = updater(current)
+        const snapshot = { applications: next, jobs }
 
-        setCachedResource(pipelineCacheKey(selectedJobId), {
-          applications: next,
-          jobs,
-        })
+        setCachedResource(pipelineCacheKey(selectedJobId), snapshot)
+        setCachedResource("pipeline:list:all", snapshot)
+        setCachedResource("pipeline:list:undefined", snapshot)
+
+        clearResourceCache("hr-dashboard")
+        clearResourceCache("reports")
+        clearResourceCache("hr-auto-email")
 
         return next
       })
@@ -417,11 +422,24 @@ export default function PipelineScreen() {
     stage: PipelineStage,
   ) => {
     if (application.current_stage === stage || movingId) return
-    setMovingId(application.application_id)
     setError("")
     setDetailError("")
     setSuccess("")
 
+    const previousApplications = [...applications]
+    const updatedApplications = applications.map((item) =>
+      item.application_id === application.application_id
+        ? { ...item, current_stage: stage }
+        : item,
+    )
+
+    commitApplications(() => updatedApplications)
+    if (selected?.application_id === application.application_id) {
+      setSelected({ ...selected, current_stage: stage })
+    }
+    setSuccess(`Moved ${application.candidate_name} to ${stage}.`)
+
+    setMovingId(application.application_id)
     try {
       const updated = await pipelineApi.moveStage(
         application.application_id,
@@ -435,19 +453,17 @@ export default function PipelineScreen() {
       setSelected((current) =>
         current?.application_id === updated.application_id ? updated : current,
       )
-      setSuccess(`Moved ${updated.candidate_name} to ${updated.current_stage}.`)
 
       if (selected?.application_id === updated.application_id) {
         const nextHistory = await pipelineApi.listHistory(updated.application_id)
-
         setHistory(nextHistory)
-
         setCachedResource(pipelineDetailCacheKey(updated.application_id), {
           notes,
           history: nextHistory,
         })
       }
     } catch (cause) {
+      commitApplications(() => previousApplications)
       const message = errorMessage(cause, "Could not move this candidate.")
       if (selected?.application_id === application.application_id) {
         setDetailError(message)
@@ -461,47 +477,39 @@ export default function PipelineScreen() {
 
   const bulkMove = async () => {
     if (selectedIds.length === 0 || bulkMoving) return
-    setBulkMoving(true)
     setError("")
     setSuccess("")
 
+    const targetIds = [...selectedIds]
+    const targetStage = bulkStage
+    const previousApplications = [...applications]
+
+    const updatedApplications = applications.map((item) =>
+      targetIds.includes(item.application_id)
+        ? { ...item, current_stage: targetStage }
+        : item,
+    )
+
+    commitApplications(() => updatedApplications)
+    if (selected && targetIds.includes(selected.application_id)) {
+      setSelected({ ...selected, current_stage: targetStage })
+    }
+    setSuccess(
+      `Moved ${targetIds.length} candidate${targetIds.length === 1 ? "" : "s"} to ${targetStage}.`,
+    )
+    setSelectedIds([])
+
+    setBulkMoving(true)
     try {
-      const result = await pipelineApi.bulkMoveStage(selectedIds, bulkStage)
+      const result = await pipelineApi.bulkMoveStage(targetIds, targetStage)
       const updatedById = new Map(
-        result.updated.map((application) => [
-          application.application_id,
-          application,
-        ]),
+        result.updated.map((item) => [item.application_id, item]),
       )
       commitApplications((current) =>
-        current.map((application) =>
-          updatedById.get(application.application_id) ?? application,
-        ),
-      )
-      setSelected((current) =>
-        current ? updatedById.get(current.application_id) ?? current : current,
-      )
-      if (
-        selected &&
-        updatedById.has(selected.application_id)
-      ) {
-        const nextHistory = await pipelineApi.listHistory(selected.application_id)
-
-        setHistory(nextHistory)
-
-        setCachedResource(pipelineDetailCacheKey(selected.application_id), {
-          notes,
-          history: nextHistory,
-        })
-      }
-      setSelectedIds([])
-      const skippedMessage = result.skipped_application_ids.length
-        ? ` ${result.skipped_application_ids.length} already in ${bulkStage}.`
-        : ""
-      setSuccess(
-        `Moved ${result.updated.length} candidate${result.updated.length === 1 ? "" : "s"} to ${bulkStage}.${skippedMessage}`,
+        current.map((item) => updatedById.get(item.application_id) ?? item),
       )
     } catch (cause) {
+      commitApplications(() => previousApplications)
       setError(errorMessage(cause, "Could not move selected candidates."))
     } finally {
       setBulkMoving(false)
@@ -596,18 +604,97 @@ export default function PipelineScreen() {
     const { active, over } = event
     if (!over) return
 
-    const application = applications.find(
-      (item) => item.application_id === Number(active.id),
+    const draggedId = Number(active.id)
+    const draggedApp = applications.find(
+      (item) => item.application_id === draggedId,
     )
-    if (!application) return
+    if (!draggedApp) return
 
     const overId = String(over.id)
-    const destination = stages.includes(overId as PipelineStage)
-      ? overId as PipelineStage
+    const destination: PipelineStage | undefined = stages.includes(
+      overId as PipelineStage,
+    )
+      ? (overId as PipelineStage)
       : applications.find((item) => item.application_id === Number(overId))
           ?.current_stage
 
-    if (destination) void move(application, destination)
+    if (!destination) return
+
+    const isMultiDrag =
+      selectedIds.includes(draggedId) && selectedIds.length > 1
+    const idsToMove = isMultiDrag
+      ? selectedIds.filter((id) => {
+          const app = applications.find((item) => item.application_id === id)
+          return app && app.current_stage !== destination
+        })
+      : draggedApp.current_stage !== destination
+        ? [draggedId]
+        : []
+
+    if (idsToMove.length === 0) return
+
+    const previousApplications = [...applications]
+    const targetIdsSet = new Set(idsToMove)
+
+    const updatedApplications = applications.map((item) =>
+      targetIdsSet.has(item.application_id)
+        ? { ...item, current_stage: destination }
+        : item,
+    )
+
+    commitApplications(() => updatedApplications)
+
+    if (selected && targetIdsSet.has(selected.application_id)) {
+      setSelected({ ...selected, current_stage: destination })
+    }
+
+    if (idsToMove.length === 1) {
+      setSuccess(`Moved ${draggedApp.candidate_name} to ${destination}.`)
+    } else {
+      setSuccess(
+        `Moved ${idsToMove.length} selected candidates to ${destination}.`,
+      )
+      setSelectedIds([])
+    }
+
+    if (idsToMove.length === 1) {
+      setMovingId(draggedId)
+      pipelineApi
+        .moveStage(draggedId, destination)
+        .then((updated) => {
+          commitApplications((current) =>
+            current.map((item) =>
+              item.application_id === updated.application_id ? updated : item,
+            ),
+          )
+        })
+        .catch((cause) => {
+          commitApplications(() => previousApplications)
+          setError(errorMessage(cause, "Could not move this candidate."))
+        })
+        .finally(() => {
+          setMovingId(null)
+        })
+    } else {
+      setBulkMoving(true)
+      pipelineApi
+        .bulkMoveStage(idsToMove, destination)
+        .then((result) => {
+          const updatedById = new Map(
+            result.updated.map((item) => [item.application_id, item]),
+          )
+          commitApplications((current) =>
+            current.map((item) => updatedById.get(item.application_id) ?? item),
+          )
+        })
+        .catch((cause) => {
+          commitApplications(() => previousApplications)
+          setError(errorMessage(cause, "Could not move selected candidates."))
+        })
+        .finally(() => {
+          setBulkMoving(false)
+        })
+    }
   }
 
   const renderCard = (application: PipelineApplication, clickable: boolean) => {
@@ -615,21 +702,28 @@ export default function PipelineScreen() {
 
     return (
       <div
+        className="pipeline-card-box"
         style={{
           width: "100%",
-          padding: 0,
+          padding: "11px 13px",
+          borderRadius: 12,
+          border: "1px solid var(--border)",
+          background: "var(--surface)",
+          boxShadow: "0 1px 3px rgba(0, 0, 0, 0.04)",
           textAlign: "left",
           color: "inherit",
           cursor: clickable ? "pointer" : undefined,
           opacity: movingId === application.application_id ? 0.65 : 1,
+          transition: "all 0.15s ease",
+          boxSizing: "border-box",
         }}
       >
         <div
           style={{
             display: "flex",
             alignItems: "center",
-            gap: 8,
-            marginBottom: 8,
+            gap: 7,
+            marginBottom: 6,
           }}
         >
           <input
@@ -639,18 +733,18 @@ export default function PipelineScreen() {
             onChange={() => toggleSelection(application.application_id)}
             onClick={(event) => event.stopPropagation()}
             onPointerDown={(event) => event.stopPropagation()}
-            style={{ flexShrink: 0 }}
+            style={{ flexShrink: 0, cursor: "pointer" }}
           />
           <div
             style={{
-              width: 30,
-              height: 30,
-              borderRadius: 8,
+              width: 26,
+              height: 26,
+              borderRadius: 7,
               background: score.soft,
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              fontSize: 11,
+              fontSize: 10,
               fontWeight: 800,
               color: score.color,
               flexShrink: 0,
@@ -662,7 +756,7 @@ export default function PipelineScreen() {
             style={{
               flex: 1,
               minWidth: 0,
-              fontSize: 13,
+              fontSize: 12,
               fontWeight: 700,
               color: "var(--text-primary)",
               whiteSpace: "nowrap",
@@ -676,9 +770,11 @@ export default function PipelineScreen() {
 
         <div
           style={{
-            fontSize: 11,
+            fontSize: 10.5,
+            lineHeight: 1.35,
             color: "var(--text-muted)",
             marginBottom: 8,
+            paddingLeft: 1,
             whiteSpace: "nowrap",
             overflow: "hidden",
             textOverflow: "ellipsis",
@@ -692,11 +788,12 @@ export default function PipelineScreen() {
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
+            paddingLeft: 1,
           }}
         >
           <span
             style={{
-              fontSize: 13,
+              fontSize: 11.5,
               fontWeight: 800,
               color: score.color,
               fontFamily: "var(--font-display)",
@@ -712,11 +809,11 @@ export default function PipelineScreen() {
                 display: "flex",
                 alignItems: "center",
                 gap: 3,
-                fontSize: 11,
+                fontSize: 10,
                 color: "var(--text-muted)",
               }}
             >
-              <ChatCircle size={11} /> {application.note_count}
+              <ChatCircle size={10} /> {application.note_count}
             </span>
           )}
         </div>
@@ -988,26 +1085,52 @@ export default function PipelineScreen() {
             {stages.map((stage) => (
               <section key={stage} style={{ minWidth: 210, flex: "0 0 210px" }}>
                 <div
+                  className="pipeline-stage-pill"
                   style={{
                     display: "flex",
                     alignItems: "center",
+                    justifyContent: "space-between",
                     gap: 8,
-                    marginBottom: 12,
-                    padding: "0 2px",
+                    padding: "6px 12px",
+                    marginBottom: 10,
+                    borderRadius: 999,
+                    background: "var(--surface)",
+                    border: "1px solid var(--border)",
+                    boxShadow: "0 1px 2px rgba(0, 0, 0, 0.03)",
                   }}
                 >
+                  <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+                    <span
+                      style={{
+                        width: 7,
+                        height: 7,
+                        borderRadius: "50%",
+                        background: stageColors[stage].dot,
+                        flexShrink: 0,
+                      }}
+                    />
+                    <span
+                      style={{
+                        fontSize: 11.5,
+                        fontWeight: 700,
+                        color: "var(--text-primary)",
+                        letterSpacing: "0.02em",
+                        textTransform: "uppercase",
+                      }}
+                    >
+                      {stage}
+                    </span>
+                  </div>
                   <span
                     style={{
-                      width: 8,
-                      height: 8,
-                      borderRadius: "50%",
-                      background: stageColors[stage].dot,
+                      fontSize: 11,
+                      fontWeight: 800,
+                      padding: "1px 8px",
+                      borderRadius: 999,
+                      background: stageColors[stage].soft,
+                      color: stageColors[stage].text,
+                      lineHeight: 1.3,
                     }}
-                  />
-                  <span className="fc-eyebrow">{stage}</span>
-                  <span
-                    className="fc-badge fc-badge--gray"
-                    style={{ marginLeft: "auto" }}
                   >
                     {grouped[stage].length}
                   </span>
@@ -1037,9 +1160,7 @@ export default function PipelineScreen() {
                             }
                           }}
                         >
-                          <BezelCard className="fc-card fc-card--lift">
-                            {renderCard(application, true)}
-                          </BezelCard>
+                          {renderCard(application, true)}
                         </SortableCard>
                       ))}
                     </div>
@@ -1051,12 +1172,30 @@ export default function PipelineScreen() {
 
           <DragOverlay>
             {activeCard ? (
-              <BezelCard
-                className="fc-card fc-card--lift"
-                style={{ width: 210 }}
-              >
+              <div style={{ position: "relative", width: 210 }}>
+                {selectedIds.includes(activeCard.application_id) &&
+                  selectedIds.length > 1 && (
+                    <div
+                      style={{
+                        position: "absolute",
+                        top: -8,
+                        right: -8,
+                        zIndex: 10,
+                        background: "var(--accent)",
+                        color: "#ffffff",
+                        fontSize: 10.5,
+                        fontWeight: 800,
+                        padding: "2px 8px",
+                        borderRadius: 999,
+                        boxShadow: "0 2px 8px rgba(0, 0, 0, 0.25)",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      Moving {selectedIds.length} items
+                    </div>
+                  )}
                 {renderCard(activeCard, false)}
-              </BezelCard>
+              </div>
             ) : null}
           </DragOverlay>
         </DndContext>

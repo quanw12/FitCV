@@ -556,14 +556,10 @@ export default function AnalyzerScreen({
             className="fc-input"
             value={jdText}
             onChange={(event) => {
-              const value = event.target.value
-
-              invalidateAnalysis()
-
               setDraft((current) => ({
                 ...current,
 
-                jdText: value,
+                jdText: event.target.value,
 
                 result: null,
               }))
