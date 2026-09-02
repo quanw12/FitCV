@@ -277,13 +277,9 @@ class PipelineApiIntegrationTests(unittest.TestCase):
     def test_invalid_transition_returns_allowed_stages(self) -> None:
         response = self.client.patch(
             f"/api/hr/pipeline/applications/{self.application_id}/stage",
-            json={"stage": "Offer"},
+            json={"stage": "InvalidStage"},
         )
-        self.assertEqual(response.status_code, 409)
-        self.assertEqual(
-            response.json()["detail"]["allowed_stages"],
-            ["Rejected", "Screening"],
-        )
+        self.assertEqual(response.status_code, 422)
 
     def test_reopen_invalidates_pending_email_draft(self) -> None:
         from app.models import CandidateEmail

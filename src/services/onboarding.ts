@@ -5,6 +5,11 @@ function storageKey(portal: Portal, accountId: string): string {
   return `fitcv.onboarding_completed.${portal}.${safeId}`
 }
 
+function stepsKey(portal: Portal, accountId: string): string {
+  const safeId = accountId.trim() || "guest"
+  return `fitcv.onboarding_steps.${portal}.${safeId}`
+}
+
 export function isOnboardingCompleted(portal: Portal, accountId: string): boolean {
   if (typeof window === "undefined" || typeof window.localStorage === "undefined") {
     return false
@@ -32,5 +37,40 @@ export function setOnboardingCompleted(
     }
   } catch {
     // Ignore storage quota/security errors in strict privacy modes
+  }
+}
+
+export function getCompletedSteps(portal: Portal, accountId: string): number[] {
+  if (typeof window === "undefined" || typeof window.localStorage === "undefined") {
+    return []
+  }
+  try {
+    const raw = window.localStorage.getItem(stepsKey(portal, accountId))
+    if (!raw) return []
+    const parsed = JSON.parse(raw)
+    return Array.isArray(parsed) ? parsed.map(Number) : []
+  } catch {
+    return []
+  }
+}
+
+export function markStepsCompleted(
+  portal: Portal,
+  accountId: string,
+  stepIndexes: number[],
+): number[] {
+  if (typeof window === "undefined" || typeof window.localStorage === "undefined") {
+    return stepIndexes
+  }
+  try {
+    const existing = new Set(getCompletedSteps(portal, accountId))
+    for (const idx of stepIndexes) {
+      existing.add(idx)
+    }
+    const result = Array.from(existing)
+    window.localStorage.setItem(stepsKey(portal, accountId), JSON.stringify(result))
+    return result
+  } catch {
+    return stepIndexes
   }
 }

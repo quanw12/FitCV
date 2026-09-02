@@ -82,11 +82,13 @@ describe("PipelineScreen", () => {
       target: { value: "Interview" },
     })
 
+    fireEvent.click(screen.getByRole("button", { name: /Save changes/ }))
+
     await waitFor(() => {
       expect(pipelineMocks.moveStage).toHaveBeenCalledWith(4, "Interview")
     })
     expect(
-      await screen.findByText("Moved Nguyen Minh to Interview."),
+      await screen.findByText("Saved 1 stage change."),
     ).toBeInTheDocument()
   })
 
@@ -145,12 +147,13 @@ describe("PipelineScreen", () => {
       target: { value: "Offer" },
     })
     fireEvent.click(screen.getByRole("button", { name: "Move selected" }))
+    fireEvent.click(screen.getByRole("button", { name: /Save changes/ }))
 
     await waitFor(() => {
       expect(pipelineMocks.bulkMoveStage).toHaveBeenCalledWith([4, 5], "Offer")
     })
     expect(
-      await screen.findByText("Moved 2 candidates to Offer."),
+      await screen.findByText("Saved 2 stage changes."),
     ).toBeInTheDocument()
   })
 

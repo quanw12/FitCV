@@ -4,7 +4,12 @@ import { Check, X } from "lucide-react"
 import type { ScreenId } from "@/types/app"
 import { authApi } from "@/api/authApi"
 import { getStoredImprovementMatchResultId } from "@/services/improvementSelection"
-import { isOnboardingCompleted, setOnboardingCompleted } from "@/services/onboarding"
+import {
+  getCompletedSteps,
+  isOnboardingCompleted,
+  markStepsCompleted,
+  setOnboardingCompleted,
+} from "@/services/onboarding"
 
 interface SeekerFlowProps {
   currentScreen: ScreenId | ""
@@ -67,7 +72,7 @@ function readSeekerStatus(accountId: string): SeekerStageStatus {
   }
 
   return {
-    hasCv: true, // Seeker default screen is cv-rebuild; baseline initial CV active
+    hasCv: true,
     hasAnalysis: matchId != null,
     hasApplications,
   }
@@ -103,8 +108,11 @@ export default function SeekerFlow({
     isOnboardingCompleted("seeker", accountId),
   )
 
+  const currentIndex = STAGES.findIndex((stage) => stage.screen === currentScreen)
+
   useEffect(() => {
     setIsDismissed(isOnboardingCompleted("seeker", accountId))
+    setCompletedSteps(getCompletedSteps("seeker", accountId))
   }, [accountId])
 
   useEffect(() => {
@@ -115,22 +123,34 @@ export default function SeekerFlow({
       if (STAGES.every((stage) => stageDone(stage.screen, nextStatus))) {
         setOnboardingCompleted("seeker", accountId, true)
       }
-    }, 1200)
+    }
 
-    return () => clearTimeout(timer)
-  }, [currentScreen, accountId])
+    if (currentIndex === 4) {
+      newlyDone.push(4)
+    }
+
+    if (newlyDone.length > 0) {
+      const updated = markStepsCompleted("seeker", accountId, newlyDone)
+      setCompletedSteps(updated)
+
+      if ([0, 1, 2, 3, 4].every((idx) => updated.includes(idx))) {
+        setOnboardingCompleted("seeker", accountId, true)
+        setIsDismissed(true)
+      }
+    }
+  }, [currentScreen, currentIndex, accountId])
 
   if (isDismissed) {
     return null
   }
-
-  const currentIndex = STAGES.findIndex((stage) => stage.screen === currentScreen)
 
   const handleDismiss = (e: React.MouseEvent) => {
     e.stopPropagation()
     setOnboardingCompleted("seeker", accountId, true)
     setIsDismissed(true)
   }
+
+  const isStepDone = (index: number) => completedSteps.includes(index)
 
   return (
     <nav className="hiring-flow" aria-label="Job seeker workflow progress">
