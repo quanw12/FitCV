@@ -676,7 +676,6 @@ export default function ImprovementScreen({
                         onClick={() => toggleWin(item.id)}
                         aria-pressed={done}
                       >
-                        {done ? <CheckSquare size={19} /> : <Square size={19} />}
                         <span>
                           <strong>{item.title}</strong>
                           <small>
