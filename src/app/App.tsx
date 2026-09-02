@@ -183,39 +183,27 @@ export default function App() {
   ])
 
   useEffect(() => {
-    if (session) {
+    if (session || publicJobId) {
       setAuthReady(true)
-
       return
     }
-
-    if (publicJobId) {
-      setAuthReady(true)
-
-      return
-    }
-
-    setAuthReady(true)
 
     let active = true
 
-    authApi
-
+    void authApi
       .refresh()
-
       .then((restored) => {
         if (!active) return
-
         setSession(restored)
-
         setShowLanding(false)
-
         if (restored.user.role) {
           setScreen(defaultScreen(portalFromAccountRole(restored.user.role)))
         }
       })
-
-        .catch(() => undefined)
+      .catch(() => undefined)
+      .finally(() => {
+        if (active) setAuthReady(true)
+      })
 
     return () => {
       active = false

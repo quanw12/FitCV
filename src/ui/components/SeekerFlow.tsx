@@ -3,10 +3,10 @@ import { Check, X } from "lucide-react"
 
 import type { ScreenId } from "@/types/app"
 import { authApi } from "@/api/authApi"
-import { getCachedResource } from "@/services/resourceCache"
+import { getStoredImprovementMatchResultId } from "@/services/improvementSelection"
 import { isOnboardingCompleted, setOnboardingCompleted } from "@/services/onboarding"
 
-interface HiringFlowProps {
+interface SeekerFlowProps {
   currentScreen: ScreenId | ""
   onNavigate: (screen: ScreenId) => void
   accountId?: string
@@ -20,125 +20,103 @@ interface StageDef {
 
 const STAGES: StageDef[] = [
   {
-    screen: "job-posts",
-    label: "Job Posts",
-    hint: "Publish the roles you are hiring for.",
+    screen: "cv-rebuild",
+    label: "CV Build",
+    hint: "Upload or create your master CV.",
   },
   {
-    screen: "cv-ranking",
-    label: "CV Ranking",
-    hint: "Score applicants or external CVs against the JD.",
+    screen: "analyzer",
+    label: "Match Analyzer",
+    hint: "Compare your CV against target job descriptions.",
   },
   {
-    screen: "pipeline",
-    label: "Pipeline",
-    hint: "Move shortlisted candidates through hiring stages.",
+    screen: "improvement",
+    label: "Improvement Tips",
+    hint: "Apply AI suggestions and fill skill gaps.",
   },
   {
-    screen: "auto-email",
-    label: "Auto Email",
-    hint: "Send stage-aware emails to candidates.",
+    screen: "app-tracker",
+    label: "App Tracker",
+    hint: "Track your job applications and status.",
   },
   {
-    screen: "reports",
-    label: "Reports",
-    hint: "Review hiring performance over time.",
+    screen: "job-search",
+    label: "Job Search",
+    hint: "Search active job posts and market JDs.",
   },
 ]
 
-interface StageStatus {
-  jobs: number
-  rankingBatches: number
-  pipelineApplications: number
-  emailDrafts: number
+interface SeekerStageStatus {
+  hasCv: boolean
+  hasAnalysis: boolean
+  hasApplications: boolean
 }
 
-function readStatus(): StageStatus {
-  const managed = getCachedResource<{ active?: unknown[]; archived?: unknown[] }>(
-    "hr-job-posts:managed",
-  )
-  const ranking = getCachedResource<unknown[]>("hr-ranking:history:::::")
-  const pipeline = getCachedResource<{ applications?: unknown[] }>(
-    "pipeline:list:all",
-  )
-  const autoEmail = getCachedResource<{ drafts?: unknown[] }>(
-    "hr-auto-email:workflow",
-  )
+function readSeekerStatus(): SeekerStageStatus {
+  const matchId = getStoredImprovementMatchResultId()
+  let hasApplications = false
+
+  try {
+    const rawTracker = window.localStorage.getItem("fitcv.personal_app_tracker")
+    if (rawTracker) {
+      const parsed = JSON.parse(rawTracker)
+      hasApplications = Array.isArray(parsed) && parsed.length > 0
+    }
+  } catch {
+    hasApplications = false
+  }
 
   return {
-    jobs: (managed?.active?.length ?? 0) + (managed?.archived?.length ?? 0),
-    rankingBatches: ranking?.length ?? 0,
-    pipelineApplications: pipeline?.applications?.length ?? 0,
-    emailDrafts: autoEmail?.drafts?.length ?? 0,
+    hasCv: true, // Seeker default screen is cv-rebuild; baseline initial CV active
+    hasAnalysis: matchId != null,
+    hasApplications,
   }
 }
 
-function stageDone(index: number, status: StageStatus): boolean {
+function stageDone(index: number, status: SeekerStageStatus): boolean {
   switch (index) {
     case 0:
-      return status.jobs > 0
+      return status.hasCv
     case 1:
-      return status.rankingBatches > 0 || status.pipelineApplications > 0
+      return status.hasAnalysis
     case 2:
-      return status.pipelineApplications > 0
+      return status.hasAnalysis
     case 3:
-      return status.emailDrafts > 0
+      return status.hasApplications
     case 4:
-      return status.rankingBatches > 0 || status.pipelineApplications > 0
+      return status.hasAnalysis || status.hasApplications
     default:
       return false
   }
 }
 
-function stageMeta(index: number, status: StageStatus): string {
-  switch (index) {
-    case 0:
-      return status.jobs > 0 ? `${status.jobs} job${status.jobs > 1 ? "s" : ""}` : ""
-    case 1:
-      return status.rankingBatches > 0
-        ? `${status.rankingBatches} batch${status.rankingBatches > 1 ? "es" : ""}`
-        : ""
-    case 2:
-      return status.pipelineApplications > 0
-        ? `${status.pipelineApplications} in pipeline`
-        : ""
-    case 3:
-      return status.emailDrafts > 0
-        ? `${status.emailDrafts} draft${status.emailDrafts > 1 ? "s" : ""}`
-        : ""
-    default:
-      return ""
-  }
-}
-
-export default function HiringFlow({
+export default function SeekerFlow({
   currentScreen,
   onNavigate,
   accountId: propAccountId,
-}: HiringFlowProps) {
+}: SeekerFlowProps) {
   const accountId = propAccountId || authApi.getSession()?.user.accountId || "guest"
-  const [status, setStatus] = useState<StageStatus>(readStatus)
+  const [status, setStatus] = useState<SeekerStageStatus>(readSeekerStatus)
   const [isDismissed, setIsDismissed] = useState<boolean>(() =>
-    isOnboardingCompleted("hr", accountId),
+    isOnboardingCompleted("seeker", accountId),
   )
 
   useEffect(() => {
-    setIsDismissed(isOnboardingCompleted("hr", accountId))
+    setIsDismissed(isOnboardingCompleted("seeker", accountId))
   }, [accountId])
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      const nextStatus = readStatus()
+      const nextStatus = readSeekerStatus()
       setStatus(nextStatus)
 
-      // Auto-complete onboarding if all key stages are done
       if (
         stageDone(0, nextStatus) &&
         stageDone(1, nextStatus) &&
         stageDone(2, nextStatus) &&
         stageDone(3, nextStatus)
       ) {
-        setOnboardingCompleted("hr", accountId, true)
+        setOnboardingCompleted("seeker", accountId, true)
       }
     }, 1200)
 
@@ -153,17 +131,16 @@ export default function HiringFlow({
 
   const handleDismiss = (e: React.MouseEvent) => {
     e.stopPropagation()
-    setOnboardingCompleted("hr", accountId, true)
+    setOnboardingCompleted("seeker", accountId, true)
     setIsDismissed(true)
   }
 
   return (
-    <nav className="hiring-flow" aria-label="Hiring workflow progress">
+    <nav className="hiring-flow" aria-label="Job seeker workflow progress">
       <div className="hiring-flow__track">
         {STAGES.map((stage, index) => {
           const isCurrent = index === currentIndex
           const isDone = stageDone(index, status)
-          const meta = stageMeta(index, status)
 
           let state: "done" | "current" | "todo" = "todo"
           if (isCurrent) state = "current"
@@ -195,7 +172,6 @@ export default function HiringFlow({
                 </span>
                 <span className="hiring-flow__labels">
                   <span className="hiring-flow__label">{stage.label}</span>
-                  {meta && <span className="hiring-flow__meta">{meta}</span>}
                 </span>
               </button>
             </React.Fragment>

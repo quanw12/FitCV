@@ -41,6 +41,7 @@ from app.services.match_engine import (
     score_match,
     selected_analyzer_config,
 )
+from app.services import ai_task_service
 
 logger = logging.getLogger(__name__)
 
@@ -510,6 +511,16 @@ def request_analysis(
     elif match.status == "Failed":
         analyzer.restart_match(db, match)
         should_start = True
+    elif match.status in {"Pending", "Processing"}:
+        # The previous run may have stalled if the worker died before stale
+        # recovery could recycle the lease. If no task is currently claimable,
+        # restart the match so the user does not wait on a dead task.
+        active_task = ai_task_service.get_active_for_resource(
+            db, task_type="MatchAnalysis", resource_id=match.match_result_id
+        )
+        if active_task is None:
+            analyzer.restart_match(db, match)
+            should_start = True
     return _match_response(db, match), should_start
 
 

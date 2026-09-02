@@ -158,7 +158,7 @@ describe("JobPostsScreen", () => {
 
     expect(
       screen.getByText(
-        "Each scoring weight must be between 0 and 100, with a total of 100%.",
+        "Tổng 4 trọng số chấm điểm phải bằng đúng 100%",
       ),
     ).toBeInTheDocument()
     expect(jobsMocks.create).not.toHaveBeenCalled()
@@ -181,7 +181,7 @@ describe("JobPostsScreen", () => {
       )
     })
     expect(
-      await screen.findByText("Created draft “Platform Engineer”."),
+      await screen.findByText("Đã tạo bài tuyển dụng “Platform Engineer”."),
     ).toBeInTheDocument()
   })
 
@@ -205,7 +205,7 @@ describe("JobPostsScreen", () => {
     ).toBeInTheDocument()
     expect(
       screen.getByText(
-        "AI extracted a draft. Review every field before saving or publishing.",
+        "AI đã trích xuất thông tin. Các ô bạn đã nhập nội dung trước đó được giữ nguyên, chỉ các ô trống mới được điền tự động.",
       ),
     ).toBeInTheDocument()
     expect(screen.getByText("Salary was not specified.")).toBeInTheDocument()
@@ -308,7 +308,7 @@ describe("JobPostsScreen", () => {
       )
     })
     expect(
-      await screen.findByText("Saved changes to “API Platform Engineer”."),
+      await screen.findByText("Đã lưu thay đổi cho “API Platform Engineer”."),
     ).toBeInTheDocument()
   })
 

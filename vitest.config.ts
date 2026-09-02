@@ -9,7 +9,7 @@ export default defineConfig({
 
   resolve: {
     alias: {
-      "@": path.resolve(__dirname, "./src"),
+      "@": path.resolve(import.meta.dirname, "./src"),
     },
   },
 
@@ -23,5 +23,7 @@ export default defineConfig({
     clearMocks: true,
 
     restoreMocks: true,
+
+    pool: "threads",
   },
 })
