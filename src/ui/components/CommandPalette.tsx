@@ -72,16 +72,6 @@ function screenItems(
       },
 
       {
-        id: "app-tracker",
-
-        label: "Application Tracker",
-
-        icon: null,
-
-        action: () => onNavigate("app-tracker"),
-      },
-
-      {
         id: "jd-library",
 
         label: "JD Library",
@@ -89,6 +79,26 @@ function screenItems(
         icon: null,
 
         action: () => onNavigate("jd-library"),
+      },
+
+      {
+        id: "job-search",
+
+        label: "Job Search",
+
+        icon: null,
+
+        action: () => onNavigate("job-search"),
+      },
+
+      {
+        id: "app-tracker",
+
+        label: "Application Tracker",
+
+        icon: null,
+
+        action: () => onNavigate("app-tracker"),
       },
 
       {

@@ -124,7 +124,7 @@ export default function App() {
   const [trackerFocusApplicationId, setTrackerFocusApplicationId] =
     useState<number | null>(null)
 
-  const [showLanding, setShowLanding] = useState(true)
+  const [showLanding, setShowLanding] = useState(() => !authApi.getSession())
   const [authEntryMode, setAuthEntryMode] = useState<AuthEntryMode>("login")
 
   const [companyProfileGate, setCompanyProfileGate] =
@@ -380,7 +380,7 @@ export default function App() {
 
   if (!authReady) return <FullPageSkeleton />
 
-  if (showLanding) {
+  if (showLanding && !session) {
     return (
       <Suspense fallback={<FullPageSkeleton />}>
         <LandingScreen
