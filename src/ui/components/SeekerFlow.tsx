@@ -104,6 +104,9 @@ export default function SeekerFlow({
   const [status, setStatus] = useState<SeekerStageStatus>(() =>
     readSeekerStatus(accountId),
   )
+  const [completedSteps, setCompletedSteps] = useState<number[]>(() =>
+    getCompletedSteps("seeker", accountId),
+  )
   const [isDismissed, setIsDismissed] = useState<boolean>(() =>
     isOnboardingCompleted("seeker", accountId),
   )
@@ -113,6 +116,7 @@ export default function SeekerFlow({
   useEffect(() => {
     setIsDismissed(isOnboardingCompleted("seeker", accountId))
     setCompletedSteps(getCompletedSteps("seeker", accountId))
+    setStatus(readSeekerStatus(accountId))
   }, [accountId])
 
   useEffect(() => {
@@ -120,24 +124,32 @@ export default function SeekerFlow({
       const nextStatus = readSeekerStatus(accountId)
       setStatus(nextStatus)
 
-      if (STAGES.every((stage) => stageDone(stage.screen, nextStatus))) {
-        setOnboardingCompleted("seeker", accountId, true)
+      const newlyDone = STAGES.flatMap((stage, index) =>
+        stageDone(stage.screen, nextStatus) ? [index] : [],
+      )
+
+      if (currentIndex > 0) {
+        for (let index = 0; index < currentIndex; index += 1) {
+          newlyDone.push(index)
+        }
       }
-    }
 
-    if (currentIndex === 4) {
-      newlyDone.push(4)
-    }
-
-    if (newlyDone.length > 0) {
-      const updated = markStepsCompleted("seeker", accountId, newlyDone)
-      setCompletedSteps(updated)
-
-      if ([0, 1, 2, 3, 4].every((idx) => updated.includes(idx))) {
-        setOnboardingCompleted("seeker", accountId, true)
-        setIsDismissed(true)
+      if (currentIndex === STAGES.length - 1) {
+        newlyDone.push(currentIndex)
       }
-    }
+
+      if (newlyDone.length > 0) {
+        const updated = markStepsCompleted("seeker", accountId, newlyDone)
+        setCompletedSteps(updated)
+
+        if (STAGES.every((_, index) => updated.includes(index))) {
+          setOnboardingCompleted("seeker", accountId, true)
+          setIsDismissed(true)
+        }
+      }
+    }, 1200)
+
+    return () => clearTimeout(timer)
   }, [currentScreen, currentIndex, accountId])
 
   if (isDismissed) {
@@ -157,7 +169,7 @@ export default function SeekerFlow({
       <div className="hiring-flow__track">
         {STAGES.map((stage, index) => {
           const isCurrent = index === currentIndex
-          const isDone = stageDone(stage.screen, status)
+          const isDone = isStepDone(index) || stageDone(stage.screen, status)
 
           let state: "done" | "current" | "todo" = "todo"
           if (isCurrent) state = "current"
@@ -168,6 +180,7 @@ export default function SeekerFlow({
               {index > 0 && (
                 <span
                   className={`hiring-flow__connector ${
+                    isStepDone(index - 1) ||
                     stageDone(STAGES[index - 1].screen, status)
                       ? "is-filled"
                       : ""

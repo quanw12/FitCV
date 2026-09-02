@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from "@testing-library/react"
+import { act, fireEvent, render, screen, within } from "@testing-library/react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import HiringFlow from "./HiringFlow"
@@ -87,5 +87,25 @@ describe("SeekerFlow component", () => {
 
     expect(container.firstChild).toBeNull()
     expect(isOnboardingCompleted("seeker", "test-seeker")).toBe(true)
+  })
+
+  it("completes onboarding after the seeker reaches the final workflow step", () => {
+    vi.useFakeTimers()
+    const onNavigate = vi.fn()
+    const { container } = render(
+      <SeekerFlow
+        currentScreen="app-tracker"
+        onNavigate={onNavigate}
+        accountId="test-seeker"
+      />,
+    )
+
+    act(() => {
+      vi.advanceTimersByTime(1200)
+    })
+
+    expect(container.firstChild).toBeNull()
+    expect(isOnboardingCompleted("seeker", "test-seeker")).toBe(true)
+    vi.useRealTimers()
   })
 })
