@@ -47,14 +47,13 @@ export const seekerNavItems: NavItem[] = [
 
   { icon: icon(clock), label: "CV History", screen: "cv-history" },
 
+  { icon: icon(bookOpen), label: "JD Library", screen: "jd-library" },
+  { icon: icon(briefcase), label: "Job Search", screen: "job-search" },
   {
     icon: icon(clipboardCheck),
     label: "Application Tracker",
     screen: "app-tracker",
   },
-
-  { icon: icon(bookOpen), label: "JD Library", screen: "jd-library" },
-  { icon: icon(briefcase), label: "Job Search", screen: "job-search" },
 
   { icon: icon(userCircle), label: "Profile", screen: "profile" },
 ]
