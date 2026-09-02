@@ -40,14 +40,14 @@ const STAGES: StageDef[] = [
     hint: "Apply AI suggestions and fill skill gaps.",
   },
   {
-    screen: "app-tracker",
-    label: "App Tracker",
-    hint: "Track your job applications and status.",
-  },
-  {
     screen: "job-search",
     label: "Job Search",
     hint: "Search active job posts and market JDs.",
+  },
+  {
+    screen: "app-tracker",
+    label: "App Tracker",
+    hint: "Track your job applications and status.",
   },
 ]
 
@@ -57,8 +57,8 @@ interface SeekerStageStatus {
   hasApplications: boolean
 }
 
-function readSeekerStatus(): SeekerStageStatus {
-  const matchId = getStoredImprovementMatchResultId()
+function readSeekerStatus(accountId: string): SeekerStageStatus {
+  const matchId = getStoredImprovementMatchResultId(accountId)
   let hasApplications = false
 
   try {
@@ -78,15 +78,31 @@ function readSeekerStatus(): SeekerStageStatus {
   }
 }
 
+function stageDone(screen: ScreenId, status: SeekerStageStatus): boolean {
+  switch (screen) {
+    case "cv-rebuild":
+      return status.hasCv
+    case "analyzer":
+      return status.hasAnalysis
+    case "improvement":
+      return status.hasAnalysis
+    case "job-search":
+      return status.hasAnalysis || status.hasApplications
+    case "app-tracker":
+      return status.hasApplications
+    default:
+      return false
+  }
+}
+
 export default function SeekerFlow({
   currentScreen,
   onNavigate,
   accountId: propAccountId,
 }: SeekerFlowProps) {
   const accountId = propAccountId || authApi.getSession()?.user.accountId || "guest"
-  const [status, setStatus] = useState<SeekerStageStatus>(readSeekerStatus)
-  const [completedSteps, setCompletedSteps] = useState<number[]>(() =>
-    getCompletedSteps("seeker", accountId),
+  const [status, setStatus] = useState<SeekerStageStatus>(() =>
+    readSeekerStatus(accountId),
   )
   const [isDismissed, setIsDismissed] = useState<boolean>(() =>
     isOnboardingCompleted("seeker", accountId),
@@ -100,20 +116,12 @@ export default function SeekerFlow({
   }, [accountId])
 
   useEffect(() => {
-    const nextStatus = readSeekerStatus()
-    setStatus(nextStatus)
+    const timer = setTimeout(() => {
+      const nextStatus = readSeekerStatus(accountId)
+      setStatus(nextStatus)
 
-    const newlyDone: number[] = []
-    if (nextStatus.hasCv) newlyDone.push(0)
-    if (nextStatus.hasAnalysis) {
-      newlyDone.push(1)
-      newlyDone.push(2)
-    }
-    if (nextStatus.hasApplications) newlyDone.push(3)
-
-    if (currentIndex > 0) {
-      for (let i = 0; i < currentIndex; i++) {
-        newlyDone.push(i)
+      if (STAGES.every((stage) => stageDone(stage.screen, nextStatus))) {
+        setOnboardingCompleted("seeker", accountId, true)
       }
     }
 
@@ -149,7 +157,7 @@ export default function SeekerFlow({
       <div className="hiring-flow__track">
         {STAGES.map((stage, index) => {
           const isCurrent = index === currentIndex
-          const isDone = isStepDone(index)
+          const isDone = stageDone(stage.screen, status)
 
           let state: "done" | "current" | "todo" = "todo"
           if (isCurrent) state = "current"
@@ -160,7 +168,9 @@ export default function SeekerFlow({
               {index > 0 && (
                 <span
                   className={`hiring-flow__connector ${
-                    isStepDone(index - 1) ? "is-filled" : ""
+                    stageDone(STAGES[index - 1].screen, status)
+                      ? "is-filled"
+                      : ""
                   }`}
                   aria-hidden="true"
                 />

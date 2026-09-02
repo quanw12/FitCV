@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react"
+import { fireEvent, render, screen, within } from "@testing-library/react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import HiringFlow from "./HiringFlow"
@@ -67,6 +67,13 @@ describe("SeekerFlow component", () => {
     expect(screen.getByText("Improvement Tips")).toBeInTheDocument()
     expect(screen.getByText("App Tracker")).toBeInTheDocument()
     expect(screen.getByText("Job Search")).toBeInTheDocument()
+
+    const stages = within(
+      screen.getByRole("navigation", { name: "Job seeker workflow progress" }),
+    ).getAllByRole("button")
+
+    expect(stages[3]).toHaveTextContent("Job Search")
+    expect(stages[4]).toHaveTextContent("App Tracker")
   })
 
   it("hides when dismissed and persists completion state for seeker", () => {
