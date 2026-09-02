@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 
 import {
   DndContext,
@@ -25,6 +25,7 @@ import {
   CheckCircle,
   Clock,
   Envelope,
+  FloppyDisk,
   PaperPlaneRight,
   Phone,
   UserCircle,
@@ -234,6 +235,11 @@ export default function PipelineScreen() {
   const [error, setError] = useState("")
   const [detailError, setDetailError] = useState("")
   const [success, setSuccess] = useState("")
+  const [pendingMoves, setPendingMoves] = useState<Map<number, { from: PipelineStage; to: PipelineStage }>>(
+    () => new Map(),
+  )
+  const [saving, setSaving] = useState(false)
+  const savedApplicationsRef = useRef<PipelineApplication[]>([])
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -271,6 +277,8 @@ export default function PipelineScreen() {
 
     if (cached && !force) {
       setApplications(cached.applications)
+      savedApplicationsRef.current = cached.applications
+      setPendingMoves(new Map())
 
       setJobs(cached.jobs)
 
@@ -295,6 +303,8 @@ export default function PipelineScreen() {
         { force },
       )
       setApplications(snapshot.applications)
+      savedApplicationsRef.current = snapshot.applications
+      setPendingMoves(new Map())
       setJobs(snapshot.jobs)
     } catch (cause) {
       setError(errorMessage(cause, "Could not load the hiring pipeline."))
@@ -417,102 +427,136 @@ export default function PipelineScreen() {
     }
   }
 
-  const move = async (
+  const queueMove = (applicationId: number, fromStage: PipelineStage, toStage: PipelineStage) => {
+    setPendingMoves((current) => {
+      const next = new Map(current)
+      const existing = next.get(applicationId)
+      const originalStage = existing ? existing.from : fromStage
+      if (originalStage === toStage) {
+        next.delete(applicationId)
+      } else {
+        next.set(applicationId, { from: originalStage, to: toStage })
+      }
+      return next
+    })
+  }
+
+  const move = (
     application: PipelineApplication,
     stage: PipelineStage,
   ) => {
-    if (application.current_stage === stage || movingId) return
+    if (application.current_stage === stage) return
     setError("")
     setDetailError("")
-    setSuccess("")
 
-    const previousApplications = [...applications]
-    const updatedApplications = applications.map((item) =>
-      item.application_id === application.application_id
-        ? { ...item, current_stage: stage }
-        : item,
+    queueMove(application.application_id, application.current_stage, stage)
+
+    commitApplications((current) =>
+      current.map((item) =>
+        item.application_id === application.application_id
+          ? { ...item, current_stage: stage }
+          : item,
+      ),
     )
-
-    commitApplications(() => updatedApplications)
     if (selected?.application_id === application.application_id) {
       setSelected({ ...selected, current_stage: stage })
     }
-    setSuccess(`Moved ${application.candidate_name} to ${stage}.`)
+    setSuccess(`Moved ${application.candidate_name} to ${stage}. Press Save to confirm.`)
+  }
 
-    setMovingId(application.application_id)
+  const bulkMove = () => {
+    if (selectedIds.length === 0) return
+    setError("")
+
+    const targetIds = [...selectedIds]
+    const targetStage = bulkStage
+
+    for (const id of targetIds) {
+      const app = applications.find((item) => item.application_id === id)
+      if (app && app.current_stage !== targetStage) {
+        queueMove(id, app.current_stage, targetStage)
+      }
+    }
+
+    commitApplications((current) =>
+      current.map((item) =>
+        targetIds.includes(item.application_id)
+          ? { ...item, current_stage: targetStage }
+          : item,
+      ),
+    )
+    if (selected && targetIds.includes(selected.application_id)) {
+      setSelected({ ...selected, current_stage: targetStage })
+    }
+    setSuccess(
+      `Moved ${targetIds.length} candidate${targetIds.length === 1 ? "" : "s"} to ${targetStage}. Press Save to confirm.`,
+    )
+    setSelectedIds([])
+  }
+
+  const discardPendingMoves = () => {
+    commitApplications(() => savedApplicationsRef.current)
+    setPendingMoves(new Map())
+    setSuccess("")
+    if (selected) {
+      const restored = savedApplicationsRef.current.find(
+        (item) => item.application_id === selected.application_id,
+      )
+      if (restored) setSelected(restored)
+    }
+  }
+
+  const savePendingMoves = async () => {
+    if (pendingMoves.size === 0 || saving) return
+    setSaving(true)
+    setError("")
+    setSuccess("")
+
+    const movesByStage = new Map<PipelineStage, number[]>()
+    for (const [appId, { to }] of pendingMoves) {
+      const ids = movesByStage.get(to) ?? []
+      ids.push(appId)
+      movesByStage.set(to, ids)
+    }
+
     try {
-      const updated = await pipelineApi.moveStage(
-        application.application_id,
-        stage,
-      )
-      commitApplications((current) =>
-        current.map((item) =>
-          item.application_id === updated.application_id ? updated : item,
-        ),
-      )
-      setSelected((current) =>
-        current?.application_id === updated.application_id ? updated : current,
+      const allUpdated = new Map<number, PipelineApplication>()
+      await Promise.all(
+        Array.from(movesByStage.entries()).map(async ([stage, ids]) => {
+          if (ids.length === 1) {
+            const updated = await pipelineApi.moveStage(ids[0], stage)
+            allUpdated.set(updated.application_id, updated)
+          } else {
+            const result = await pipelineApi.bulkMoveStage(ids, stage)
+            for (const item of result.updated) {
+              allUpdated.set(item.application_id, item)
+            }
+          }
+        }),
       )
 
-      if (selected?.application_id === updated.application_id) {
-        const nextHistory = await pipelineApi.listHistory(updated.application_id)
+      const nextApplications = applications.map((item) =>
+        allUpdated.get(item.application_id) ?? item,
+      )
+      savedApplicationsRef.current = nextApplications
+      commitApplications(() => nextApplications)
+      setPendingMoves(new Map())
+      setSuccess(`Saved ${allUpdated.size} stage change${allUpdated.size === 1 ? "" : "s"}.`)
+
+      if (selected && allUpdated.has(selected.application_id)) {
+        const updatedSelected = allUpdated.get(selected.application_id)!
+        setSelected(updatedSelected)
+        const nextHistory = await pipelineApi.listHistory(updatedSelected.application_id)
         setHistory(nextHistory)
-        setCachedResource(pipelineDetailCacheKey(updated.application_id), {
+        setCachedResource(pipelineDetailCacheKey(updatedSelected.application_id), {
           notes,
           history: nextHistory,
         })
       }
     } catch (cause) {
-      commitApplications(() => previousApplications)
-      const message = errorMessage(cause, "Could not move this candidate.")
-      if (selected?.application_id === application.application_id) {
-        setDetailError(message)
-      } else {
-        setError(message)
-      }
+      setError(errorMessage(cause, "Could not save pipeline changes. Your changes are preserved — try again."))
     } finally {
-      setMovingId(null)
-    }
-  }
-
-  const bulkMove = async () => {
-    if (selectedIds.length === 0 || bulkMoving) return
-    setError("")
-    setSuccess("")
-
-    const targetIds = [...selectedIds]
-    const targetStage = bulkStage
-    const previousApplications = [...applications]
-
-    const updatedApplications = applications.map((item) =>
-      targetIds.includes(item.application_id)
-        ? { ...item, current_stage: targetStage }
-        : item,
-    )
-
-    commitApplications(() => updatedApplications)
-    if (selected && targetIds.includes(selected.application_id)) {
-      setSelected({ ...selected, current_stage: targetStage })
-    }
-    setSuccess(
-      `Moved ${targetIds.length} candidate${targetIds.length === 1 ? "" : "s"} to ${targetStage}.`,
-    )
-    setSelectedIds([])
-
-    setBulkMoving(true)
-    try {
-      const result = await pipelineApi.bulkMoveStage(targetIds, targetStage)
-      const updatedById = new Map(
-        result.updated.map((item) => [item.application_id, item]),
-      )
-      commitApplications((current) =>
-        current.map((item) => updatedById.get(item.application_id) ?? item),
-      )
-    } catch (cause) {
-      commitApplications(() => previousApplications)
-      setError(errorMessage(cause, "Could not move selected candidates."))
-    } finally {
-      setBulkMoving(false)
+      setSaving(false)
     }
   }
 
@@ -533,6 +577,9 @@ export default function PipelineScreen() {
         current.map((item) =>
           item.application_id === updated.application_id ? updated : item,
         ),
+      )
+      savedApplicationsRef.current = savedApplicationsRef.current.map((item) =>
+        item.application_id === updated.application_id ? updated : item,
       )
       setSelected(updated)
       const nextHistory = await pipelineApi.listHistory(updated.application_id)
@@ -633,67 +680,31 @@ export default function PipelineScreen() {
 
     if (idsToMove.length === 0) return
 
-    const previousApplications = [...applications]
+    for (const id of idsToMove) {
+      const app = applications.find((item) => item.application_id === id)
+      if (app) queueMove(id, app.current_stage, destination)
+    }
+
     const targetIdsSet = new Set(idsToMove)
-
-    const updatedApplications = applications.map((item) =>
-      targetIdsSet.has(item.application_id)
-        ? { ...item, current_stage: destination }
-        : item,
+    commitApplications((current) =>
+      current.map((item) =>
+        targetIdsSet.has(item.application_id)
+          ? { ...item, current_stage: destination }
+          : item,
+      ),
     )
-
-    commitApplications(() => updatedApplications)
 
     if (selected && targetIdsSet.has(selected.application_id)) {
       setSelected({ ...selected, current_stage: destination })
     }
 
     if (idsToMove.length === 1) {
-      setSuccess(`Moved ${draggedApp.candidate_name} to ${destination}.`)
+      setSuccess(`Moved ${draggedApp.candidate_name} to ${destination}. Press Save to confirm.`)
     } else {
       setSuccess(
-        `Moved ${idsToMove.length} selected candidates to ${destination}.`,
+        `Moved ${idsToMove.length} selected candidates to ${destination}. Press Save to confirm.`,
       )
       setSelectedIds([])
-    }
-
-    if (idsToMove.length === 1) {
-      setMovingId(draggedId)
-      pipelineApi
-        .moveStage(draggedId, destination)
-        .then((updated) => {
-          commitApplications((current) =>
-            current.map((item) =>
-              item.application_id === updated.application_id ? updated : item,
-            ),
-          )
-        })
-        .catch((cause) => {
-          commitApplications(() => previousApplications)
-          setError(errorMessage(cause, "Could not move this candidate."))
-        })
-        .finally(() => {
-          setMovingId(null)
-        })
-    } else {
-      setBulkMoving(true)
-      pipelineApi
-        .bulkMoveStage(idsToMove, destination)
-        .then((result) => {
-          const updatedById = new Map(
-            result.updated.map((item) => [item.application_id, item]),
-          )
-          commitApplications((current) =>
-            current.map((item) => updatedById.get(item.application_id) ?? item),
-          )
-        })
-        .catch((cause) => {
-          commitApplications(() => previousApplications)
-          setError(errorMessage(cause, "Could not move selected candidates."))
-        })
-        .finally(() => {
-          setBulkMoving(false)
-        })
     }
   }
 
@@ -888,6 +899,35 @@ export default function PipelineScreen() {
               <option value="pending">Score pending</option>
             </select>
           </label>
+          {pendingMoves.size > 0 && (
+            <button
+              type="button"
+              className="fc-btn fc-btn--secondary"
+              disabled={saving}
+              onClick={discardPendingMoves}
+              title="Discard unsaved stage changes"
+            >
+              Discard
+            </button>
+          )}
+          <button
+            type="button"
+            className={`fc-btn ${pendingMoves.size > 0 ? "fc-btn--primary" : "fc-btn--secondary"}`}
+            disabled={pendingMoves.size === 0 || saving}
+            onClick={() => void savePendingMoves()}
+            title={
+              pendingMoves.size > 0
+                ? `Save ${pendingMoves.size} unsaved stage change(s)`
+                : "No unsaved changes"
+            }
+          >
+            <FloppyDisk size={15} weight={pendingMoves.size > 0 ? "bold" : "regular"} />
+            {saving
+              ? "Saving..."
+              : pendingMoves.size > 0
+                ? `Save changes (${pendingMoves.size})`
+                : "Save changes"}
+          </button>
           <button
             type="button"
             className="fc-btn fc-btn--secondary pipeline-filter-refresh"
@@ -899,7 +939,6 @@ export default function PipelineScreen() {
           </button>
         </div>
       </div>
-
       {!loading && applications.length > 0 && (
         <div
           className="fc-card fc-card--pad"
@@ -936,10 +975,10 @@ export default function PipelineScreen() {
             <button
               type="button"
               className="fc-btn fc-btn--primary"
-              onClick={() => void bulkMove()}
-              disabled={selectedIds.length === 0 || bulkMoving}
+              onClick={bulkMove}
+              disabled={selectedIds.length === 0}
             >
-              {bulkMoving ? "Moving..." : "Move selected"}
+              Move selected
             </button>
             <button
               type="button"
@@ -1305,7 +1344,7 @@ export default function PipelineScreen() {
                   value={selected.current_stage}
                   disabled={movingId === selected.application_id}
                   onChange={(event) =>
-                    void move(selected, event.target.value as PipelineStage)
+                    move(selected, event.target.value as PipelineStage)
                   }
                 >
                   {stages.map((stage) => (

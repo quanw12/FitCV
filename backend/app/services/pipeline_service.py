@@ -12,13 +12,9 @@ from app.schemas.pipeline import (
 )
 
 TERMINAL_STATUS = {"Hired": "Hired", "Rejected": "Rejected"}
+VALID_STAGES = {"Applied", "Screening", "Interview", "Offer", "Hired", "Rejected"}
 ALLOWED_TRANSITIONS: dict[str, set[str]] = {
-    "Applied": {"Screening", "Rejected"},
-    "Screening": {"Interview", "Rejected"},
-    "Interview": {"Offer", "Rejected"},
-    "Offer": {"Hired", "Rejected"},
-    "Hired": set(),
-    "Rejected": set(),
+    stage: VALID_STAGES - {stage} for stage in VALID_STAGES
 }
 
 
@@ -44,19 +40,10 @@ def _managed_application(db: Session, account: Account, application_id: int):
 
 
 def _validate_transition(application, stage: str) -> None:
-    allowed = sorted(ALLOWED_TRANSITIONS.get(application.current_stage, set()))
-    if stage not in ALLOWED_TRANSITIONS.get(application.current_stage, set()):
+    if stage not in VALID_STAGES:
         raise HTTPException(
-            status_code=409,
-            detail={
-                "message": (
-                    f"Cannot move application from {application.current_stage} "
-                    f"to {stage}."
-                ),
-                "current_stage": application.current_stage,
-                "requested_stage": stage,
-                "allowed_stages": allowed,
-            },
+            status_code=422,
+            detail=f"Invalid pipeline stage: {stage}",
         )
 
 
@@ -97,19 +84,15 @@ def move_stage(
             status_code=409,
             detail="A withdrawn application cannot move through the pipeline.",
         )
-    if application.current_stage == stage:
-        raise HTTPException(
-            status_code=409,
-            detail=f"Application is already in {stage}.",
-        )
     _validate_transition(application, stage)
-    pipeline.update_stage(
-        db,
-        application,
-        stage=stage,
-        status=TERMINAL_STATUS.get(stage, "Active"),
-        account_id=account.account_id,
-    )
+    if application.current_stage != stage:
+        pipeline.update_stage(
+            db,
+            application,
+            stage=stage,
+            status=TERMINAL_STATUS.get(stage, "Active"),
+            account_id=account.account_id,
+        )
     return next(
         item
         for item in list_applications(db, account, job_id=application.job_id)

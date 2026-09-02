@@ -4,7 +4,12 @@ import { Check, X } from "lucide-react"
 import type { ScreenId } from "@/types/app"
 import { authApi } from "@/api/authApi"
 import { getStoredImprovementMatchResultId } from "@/services/improvementSelection"
-import { isOnboardingCompleted, setOnboardingCompleted } from "@/services/onboarding"
+import {
+  getCompletedSteps,
+  isOnboardingCompleted,
+  markStepsCompleted,
+  setOnboardingCompleted,
+} from "@/services/onboarding"
 
 interface SeekerFlowProps {
   currentScreen: ScreenId | ""
@@ -67,26 +72,9 @@ function readSeekerStatus(): SeekerStageStatus {
   }
 
   return {
-    hasCv: true, // Seeker default screen is cv-rebuild; baseline initial CV active
+    hasCv: true,
     hasAnalysis: matchId != null,
     hasApplications,
-  }
-}
-
-function stageDone(index: number, status: SeekerStageStatus): boolean {
-  switch (index) {
-    case 0:
-      return status.hasCv
-    case 1:
-      return status.hasAnalysis
-    case 2:
-      return status.hasAnalysis
-    case 3:
-      return status.hasApplications
-    case 4:
-      return status.hasAnalysis || status.hasApplications
-    default:
-      return false
   }
 }
 
@@ -97,37 +85,56 @@ export default function SeekerFlow({
 }: SeekerFlowProps) {
   const accountId = propAccountId || authApi.getSession()?.user.accountId || "guest"
   const [status, setStatus] = useState<SeekerStageStatus>(readSeekerStatus)
+  const [completedSteps, setCompletedSteps] = useState<number[]>(() =>
+    getCompletedSteps("seeker", accountId),
+  )
   const [isDismissed, setIsDismissed] = useState<boolean>(() =>
     isOnboardingCompleted("seeker", accountId),
   )
 
+  const currentIndex = STAGES.findIndex((stage) => stage.screen === currentScreen)
+
   useEffect(() => {
     setIsDismissed(isOnboardingCompleted("seeker", accountId))
+    setCompletedSteps(getCompletedSteps("seeker", accountId))
   }, [accountId])
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      const nextStatus = readSeekerStatus()
-      setStatus(nextStatus)
+    const nextStatus = readSeekerStatus()
+    setStatus(nextStatus)
 
-      if (
-        stageDone(0, nextStatus) &&
-        stageDone(1, nextStatus) &&
-        stageDone(2, nextStatus) &&
-        stageDone(3, nextStatus)
-      ) {
-        setOnboardingCompleted("seeker", accountId, true)
+    const newlyDone: number[] = []
+    if (nextStatus.hasCv) newlyDone.push(0)
+    if (nextStatus.hasAnalysis) {
+      newlyDone.push(1)
+      newlyDone.push(2)
+    }
+    if (nextStatus.hasApplications) newlyDone.push(3)
+
+    if (currentIndex > 0) {
+      for (let i = 0; i < currentIndex; i++) {
+        newlyDone.push(i)
       }
-    }, 1200)
+    }
 
-    return () => clearTimeout(timer)
-  }, [currentScreen, accountId])
+    if (currentIndex === 4) {
+      newlyDone.push(4)
+    }
+
+    if (newlyDone.length > 0) {
+      const updated = markStepsCompleted("seeker", accountId, newlyDone)
+      setCompletedSteps(updated)
+
+      if ([0, 1, 2, 3, 4].every((idx) => updated.includes(idx))) {
+        setOnboardingCompleted("seeker", accountId, true)
+        setIsDismissed(true)
+      }
+    }
+  }, [currentScreen, currentIndex, accountId])
 
   if (isDismissed) {
     return null
   }
-
-  const currentIndex = STAGES.findIndex((stage) => stage.screen === currentScreen)
 
   const handleDismiss = (e: React.MouseEvent) => {
     e.stopPropagation()
@@ -135,12 +142,14 @@ export default function SeekerFlow({
     setIsDismissed(true)
   }
 
+  const isStepDone = (index: number) => completedSteps.includes(index)
+
   return (
     <nav className="hiring-flow" aria-label="Job seeker workflow progress">
       <div className="hiring-flow__track">
         {STAGES.map((stage, index) => {
           const isCurrent = index === currentIndex
-          const isDone = stageDone(index, status)
+          const isDone = isStepDone(index)
 
           let state: "done" | "current" | "todo" = "todo"
           if (isCurrent) state = "current"
@@ -151,7 +160,7 @@ export default function SeekerFlow({
               {index > 0 && (
                 <span
                   className={`hiring-flow__connector ${
-                    stageDone(index - 1, status) ? "is-filled" : ""
+                    isStepDone(index - 1) ? "is-filled" : ""
                   }`}
                   aria-hidden="true"
                 />
