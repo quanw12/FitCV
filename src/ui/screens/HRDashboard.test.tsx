@@ -139,9 +139,15 @@ describe("HRDashboard", () => {
 
     // Hero title and description must be visible immediately, not hidden
     // behind a full-page skeleton.
-    expect(screen.getByText("HR Dashboard")).toBeInTheDocument()
+    expect(
+      screen.getByRole("heading", {
+        name: /Ready to discover top talent\?/,
+      }),
+    ).toBeInTheDocument()
 
-    expect(screen.getByText(/Last 30 days/)).toBeInTheDocument()
+    expect(
+      screen.getByText(/AI-assisted screening is active/),
+    ).toBeInTheDocument()
   })
 
   it("renders real KPI values and job rows", async () => {
@@ -218,7 +224,11 @@ describe("HRDashboard", () => {
     ).toBeInTheDocument()
 
     // Hero must remain visible even when the data section shows an error.
-    expect(screen.getByText("HR Dashboard")).toBeInTheDocument()
+    expect(
+      screen.getByRole("heading", {
+        name: /Ready to discover top talent\?/,
+      }),
+    ).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole("button", { name: "Retry" }))
 
@@ -241,6 +251,10 @@ describe("HRDashboard", () => {
 
     // Cached KPI data must be visible synchronously — no loading skeleton.
     expect(screen.getByText("119")).toBeInTheDocument()
-    expect(screen.getByText("HR Dashboard")).toBeInTheDocument()
+    expect(
+      screen.getByRole("heading", {
+        name: /Ready to discover top talent\?/,
+      }),
+    ).toBeInTheDocument()
   })
 })

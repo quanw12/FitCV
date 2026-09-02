@@ -229,13 +229,17 @@ describe("CVRankingScreen", () => {
     render(<CVRankingScreen />)
 
     expect(
-      screen.getByRole("heading", { name: "Bulk CV Ranking" }),
+      screen.getByRole("heading", { name: "Candidate CV Ranking" }),
     ).toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole("tab", { name: "Job Applicants" }))
+    const jobApplicantsTab = screen.getByRole("tab", {
+      name: "Job Applicants",
+    })
+    fireEvent.click(jobApplicantsTab)
 
+    expect(jobApplicantsTab).toHaveAttribute("aria-selected", "true")
     expect(
-      await screen.findByRole("heading", { name: "Job Applicants" }),
+      screen.getByText(/Rank candidates who applied directly/),
     ).toBeInTheDocument()
 
     await waitFor(() =>

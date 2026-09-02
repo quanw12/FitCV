@@ -42,3 +42,4 @@ testsprite_tests/tmp/config.json
 skills-lock.json
 .kilo 
 
+backend/app/uploads
